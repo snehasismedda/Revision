@@ -1,0 +1,81 @@
+import db from '../db/knex.js';
+
+export const getSubjectOverview = async (data) => {
+    const result = await db('revision.session_entries as se')
+        .join('revision.sessions as s', 'se.session_id', 's.id')
+        .join('revision.topics as t', 'se.topic_id', 't.id')
+        .where('s.subject_id', data.subjectId)
+        .where('s.is_deleted', false)
+        .where('se.is_deleted', false)
+        .where('t.is_deleted', false)
+        .select(
+            db.raw('COUNT(*) as total_questions'),
+            db.raw('SUM(CASE WHEN se.is_correct THEN 1 ELSE 0 END) as total_correct'),
+            db.raw('COUNT(DISTINCT se.session_id) as total_sessions'),
+            db.raw('COUNT(DISTINCT se.topic_id) as topics_covered'),
+        )
+        .first();
+    return result;
+};
+
+export const getTopicPerformance = async (data) => {
+    return db('revision.session_entries as se')
+        .join('revision.sessions as s', 'se.session_id', 's.id')
+        .join('revision.topics as t', 'se.topic_id', 't.id')
+        .where('s.subject_id', data.subjectId)
+        .where('s.is_deleted', false)
+        .where('se.is_deleted', false)
+        .where('t.is_deleted', false)
+        .groupBy('t.id', 't.name', 't.parent_id')
+        .select(
+            't.id as topic_id',
+            't.name as topic_name',
+            't.parent_id',
+            db.raw('COUNT(*) as total'),
+            db.raw('SUM(CASE WHEN se.is_correct THEN 1 ELSE 0 END) as correct'),
+            db.raw('ROUND(100.0 * SUM(CASE WHEN se.is_correct THEN 1 ELSE 0 END) / COUNT(*), 1) as accuracy'),
+        )
+        .orderBy('accuracy', 'asc');
+};
+
+export const getSessionTrends = async (data) => {
+    return db('revision.session_entries as se')
+        .join('revision.sessions as s', 'se.session_id', 's.id')
+        .where('s.subject_id', data.subjectId)
+        .where('s.is_deleted', false)
+        .where('se.is_deleted', false)
+        .groupBy('s.id', 's.title', 's.session_date')
+        .select(
+            's.id as session_id',
+            's.title',
+            's.session_date',
+            db.raw('COUNT(*) as total'),
+            db.raw('SUM(CASE WHEN se.is_correct THEN 1 ELSE 0 END) as correct'),
+            db.raw('ROUND(100.0 * SUM(CASE WHEN se.is_correct THEN 1 ELSE 0 END) / COUNT(*), 1) as accuracy'),
+        )
+        .orderBy('s.session_date', 'asc');
+};
+
+export const getWeakAreas = async (data) => {
+    return db('revision.session_entries as se')
+        .join('revision.sessions as s', 'se.session_id', 's.id')
+        .join('revision.topics as t', 'se.topic_id', 't.id')
+        .where('s.subject_id', data.subjectId)
+        .where('s.is_deleted', false)
+        .where('se.is_deleted', false)
+        .where('t.is_deleted', false)
+        .groupBy('t.id', 't.name', 't.parent_id')
+        .havingRaw('COUNT(*) >= ?', [data.minEncounters || 1])
+        .havingRaw('ROUND(100.0 * SUM(CASE WHEN se.is_correct THEN 1 ELSE 0 END) / COUNT(*), 1) < 75')
+        .select(
+            't.id as topic_id',
+            't.name as topic_name',
+            't.parent_id',
+            db.raw('COUNT(*) as total'),
+            db.raw('SUM(CASE WHEN se.is_correct THEN 1 ELSE 0 END) as correct'),
+            db.raw('ROUND(100.0 * SUM(CASE WHEN se.is_correct THEN 1 ELSE 0 END) / COUNT(*), 1) as accuracy'),
+            db.raw('COUNT(*) - SUM(CASE WHEN se.is_correct THEN 1 ELSE 0 END) as incorrect'),
+        )
+        .orderByRaw('accuracy ASC, total DESC')
+        .limit(10);
+};
