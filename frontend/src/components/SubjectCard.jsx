@@ -1,8 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import PerformanceBadge from './PerformanceBadge.jsx';
-import { BookMarked, BrainCircuit, ActivitySquare, ArrowRight, Clock } from 'lucide-react';
+import { BookMarked, BrainCircuit, ActivitySquare, ArrowRight, Trash2, Edit2 } from 'lucide-react';
 
-const SubjectCard = ({ subject, stats, variant }) => {
+const SubjectCard = ({ subject, stats, variant, onEdit, onDelete }) => {
     const navigate = useNavigate();
 
     const accuracy = stats?.accuracy ?? null;
@@ -45,7 +45,7 @@ const SubjectCard = ({ subject, stats, variant }) => {
             {totalQ > 0 && (
                 <div className="mb-3">
                     <div className="flex items-center justify-between text-[10px] font-medium text-slate-500 mb-1.5">
-                        <span>Progress</span>
+                        <span>Accuracy</span>
                         <span className="text-slate-400 font-semibold">{pct}%</span>
                     </div>
                     <div className="w-full h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
@@ -57,7 +57,7 @@ const SubjectCard = ({ subject, stats, variant }) => {
                 </div>
             )}
 
-            {/* Footer: stats + CTA */}
+            {/* Footer: stats + Actions */}
             <div className="mt-auto pt-3 border-t border-white/[0.06] flex items-center justify-between">
                 <div className="flex items-center gap-3 text-[10px] font-medium text-slate-500">
                     <div className="flex items-center gap-1.5">
@@ -70,10 +70,35 @@ const SubjectCard = ({ subject, stats, variant }) => {
                         <span>{totalQ} Qs</span>
                     </div>
                 </div>
-                <div className="flex items-center gap-1 text-[11px] font-semibold text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span>Continue</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                </div>
+
+                {(onEdit || onDelete) && (
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                        {onEdit && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onEdit(subject);
+                                }}
+                                className="p-1 text-slate-500 hover:text-blue-400 transition-colors cursor-pointer"
+                                title="Edit Subject"
+                            >
+                                <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                        {onDelete && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDelete(subject);
+                                }}
+                                className="p-1 text-slate-500 hover:text-red-400 transition-colors cursor-pointer"
+                                title="Delete Subject"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );

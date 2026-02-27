@@ -22,7 +22,7 @@ const Layout = () => {
                 id="main-scroll"
                 className="flex-1 relative z-10 h-[100dvh] overflow-y-auto overflow-x-hidden"
             >
-                <div className="w-full max-w-[1400px] mx-auto px-10 py-12 lg:px-20 lg:py-16">
+                <div className="w-full max-w-[1400px] mx-auto px-6 py-6 lg:px-10 lg:py-10">
                     <Outlet />
                 </div>
             </main>

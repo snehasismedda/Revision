@@ -89,7 +89,7 @@ const Subjects = () => {
             />
 
             {/* Header */}
-            <div className="flex items-end justify-between mb-10">
+            <div className="flex items-end justify-between mb-8">
                 <div>
                     <div className="flex items-center gap-2 mb-2">
                         <LibraryBig className="w-5 h-5 text-primary" />
@@ -149,25 +149,13 @@ const Subjects = () => {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {subjects.map((s) => (
-                        <div key={s.id} className="relative group/card">
-                            <SubjectCard subject={s} stats={statsMap[s.id]} />
-                            <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover/card:opacity-100 transition-all">
-                                <button
-                                    onClick={() => handleEditClick(s)}
-                                    className="p-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-lg transition-all border border-transparent hover:border-blue-500/20 cursor-pointer"
-                                    title="Edit subject"
-                                >
-                                    <Edit2 className="w-4 h-4" />
-                                </button>
-                                <button
-                                    onClick={() => setConfirmDelete({ open: true, id: s.id, name: s.name })}
-                                    className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-all border border-transparent hover:border-red-500/20 cursor-pointer"
-                                    title="Delete subject"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            </div>
-                        </div>
+                        <SubjectCard
+                            key={s.id}
+                            subject={s}
+                            stats={statsMap[s.id]}
+                            onEdit={handleEditClick}
+                            onDelete={(subj) => setConfirmDelete({ open: true, id: subj.id, name: subj.name })}
+                        />
                     ))}
                 </div>
             )}

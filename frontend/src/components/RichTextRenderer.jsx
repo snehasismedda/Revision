@@ -23,11 +23,13 @@ const TextWithMath = ({ text }) => {
 
         if (match[1]) {
             // Block math (match[2] is $$...$$, match[3] is \[...\])
-            const mathContent = match[2] !== undefined ? match[2] : match[3];
+            let mathContent = match[2] !== undefined ? match[2] : match[3];
+            mathContent = mathContent.replace(/\\bottom([a-zA-Z])/g, '\\bot $1').replace(/\\bottom/g, '\\bot');
             parts.push({ type: 'blockMath', content: mathContent });
         } else if (match[4]) {
             // Inline math (match[5] is $...$, match[6] is \(...\))
-            const mathContent = match[5] !== undefined ? match[5] : match[6];
+            let mathContent = match[5] !== undefined ? match[5] : match[6];
+            mathContent = mathContent.replace(/\\bottom([a-zA-Z])/g, '\\bot $1').replace(/\\bottom/g, '\\bot');
             parts.push({ type: 'inlineMath', content: mathContent });
         }
 
@@ -70,16 +72,34 @@ const RichTextRenderer = ({ content }) => {
                         {node.children?.map((child, i) => renderNode(child, i))}
                     </p>
                 );
-            case 'text':
-                // Instead of just a span, split text by math delimiters and render Katex
-                return <TextWithMath key={index} text={node.text} />;
-            case 'list':
+            case 'heading': {
+                const Tag = node.tag || 'h2'; // default to h2 if missing
+                const sizeClass = Tag === 'h1' ? 'text-2xl' : Tag === 'h2' ? 'text-xl' : 'text-lg';
+                return (
+                    <Tag key={index} className={`font-heading font-bold text-white mb-3 mt-4 ${sizeClass}`}>
+                        {node.children?.map((child, i) => renderNode(child, i))}
+                    </Tag>
+                );
+            }
+            case 'text': {
+                let element = <TextWithMath text={node.text} />;
+                // Lexical text format bitwise flags
+                if (node.format & 1) element = <strong className="font-bold text-white">{element}</strong>; // Bold
+                if (node.format & 2) element = <em className="italic">{element}</em>; // Italic
+                if (node.format & 4) element = <del className="line-through opacity-70">{element}</del>; // Strikethrough
+                if (node.format & 8) element = <u className="underline decoration-indigo-500/50">{element}</u>; // Underline
+                if (node.format & 16) element = <code className="text-emerald-300 bg-emerald-500/10 px-1.5 py-0.5 rounded-md text-[0.9em]">{element}</code>; // Code
+
+                return <span key={index}>{element}</span>;
+            }
+            case 'list': {
                 const ListTag = node.listType === 'number' ? 'ol' : 'ul';
                 return (
                     <ListTag key={index} className={`mb-3 ml-5 ${node.listType === 'number' ? 'list-decimal' : 'list-disc'}`} style={{ listStylePosition: 'outside' }}>
                         {node.children?.map((child, i) => renderNode(child, i))}
                     </ListTag>
                 );
+            }
             case 'listItem':
                 return (
                     <li key={index} className="mb-1.5 pl-1 text-slate-300">

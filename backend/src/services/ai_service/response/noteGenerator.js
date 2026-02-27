@@ -29,7 +29,7 @@ export const generateNoteFromQuestion = async (questionContent) => {
         6. Use LaTeX for ALL mathematical expressions:
         - Inline: $a^2$
         - Block: $$equation$$
-        7. Add proper spacing between lines and sections.
+        7. Add proper spacing, next-line, break between lines and sections.
         8. Avoid long paragraphs. Prefer structured bullets.
         9. Notes must help solve SIMILAR problems, not just the given one.
 

@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { subjectsApi, analyticsApi } from '../api/index.js';
 import SubjectCard from '../components/SubjectCard.jsx';
+import SubjectModal from '../components/modals/SubjectModal.jsx';
+import ConfirmDialog from '../components/ConfirmDialog.jsx';
+import toast from 'react-hot-toast';
 import { BookOpen, Target, Activity, CheckCircle2, AlertTriangle, PlusCircle, LayoutDashboard, TrendingUp, ArrowUpRight } from 'lucide-react';
 
 /* ── Mini sparkline-style progress bar ─────────────────────── */
@@ -50,6 +53,9 @@ const Dashboard = () => {
     const [subjects, setSubjects] = useState([]);
     const [statsMap, setStatsMap] = useState({});
     const [loading, setLoading] = useState(true);
+    const [showModal, setShowModal] = useState(false);
+    const [editingSubject, setEditingSubject] = useState(null);
+    const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null, name: '' });
 
     useEffect(() => {
         const load = async () => {
@@ -81,6 +87,28 @@ const Dashboard = () => {
         load();
     }, []);
 
+    const handleSubjectSaved = (subject, isEditing) => {
+        if (isEditing) {
+            setSubjects((prev) => prev.map((s) => (s.id === subject.id ? subject : s)));
+        } else {
+            setSubjects((prev) => [subject, ...prev]);
+        }
+    };
+
+    const handleDelete = async () => {
+        const { id, name } = confirmDelete;
+        const loadingToast = toast.loading(`Deleting ${name}...`);
+        try {
+            await subjectsApi.delete(id);
+            setSubjects((prev) => prev.filter((s) => s.id !== id));
+            toast.success(`${name} deleted`, { id: loadingToast });
+        } catch {
+            toast.error('Failed to delete subject', { id: loadingToast });
+        } finally {
+            setConfirmDelete({ open: false, id: null, name: '' });
+        }
+    };
+
     const totalSessions = Object.values(statsMap).reduce((a, s) => a + (s?.totalSessions || 0), 0);
     const totalQuestions = Object.values(statsMap).reduce((a, s) => a + (s?.totalQuestions || 0), 0);
     const totalCorrect = Object.values(statsMap).reduce((a, s) => a + (s?.totalCorrect || 0), 0);
@@ -93,8 +121,24 @@ const Dashboard = () => {
 
     return (
         <div className="fade-in max-w-6xl mx-auto">
+            <ConfirmDialog
+                isOpen={confirmDelete.open}
+                title="Delete Subject"
+                message={`Are you sure you want to delete "${confirmDelete.name}"? This will permanently remove all topics, sessions, and performance data associated with it.`}
+                confirmText="Delete Subject"
+                onConfirm={handleDelete}
+                onCancel={() => setConfirmDelete({ open: false, id: null, name: '' })}
+            />
+
+            <SubjectModal
+                isOpen={showModal}
+                onClose={() => setShowModal(false)}
+                editingSubject={editingSubject}
+                onSubjectSaved={handleSubjectSaved}
+            />
+
             {/* Header */}
-            <div className="flex items-end justify-between mb-12">
+            <div className="flex items-end justify-between mb-8">
                 <div>
                     <div className="flex items-center gap-2 mb-2">
                         <LayoutDashboard className="w-5 h-5 text-primary" />
@@ -106,7 +150,7 @@ const Dashboard = () => {
             </div>
 
             {/* Global Stats Grid — 4 even columns */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-16">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
                 <StatCard
                     delayClass="stagger-1"
                     label="Total Subjects"
@@ -155,7 +199,7 @@ const Dashboard = () => {
 
             {/* Weak areas spotlight with amber glow */}
             {weakSubjects.length > 0 && (
-                <div className="mb-16 fade-in stagger-3">
+                <div className="mb-10 fade-in stagger-3">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
                             <AlertTriangle className="w-5 h-5 text-amber-400" />
@@ -164,7 +208,17 @@ const Dashboard = () => {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-5 p-5 rounded-2xl border border-amber-500/10 bg-amber-500/[0.02]">
                         {weakSubjects.map((s) => (
-                            <SubjectCard key={s.id} subject={s} stats={statsMap[s.id]} variant="attention" />
+                            <SubjectCard
+                                key={s.id}
+                                subject={s}
+                                stats={statsMap[s.id]}
+                                variant="attention"
+                                onEdit={(subj) => {
+                                    setEditingSubject(subj);
+                                    setShowModal(true);
+                                }}
+                                onDelete={(subj) => setConfirmDelete({ open: true, id: subj.id, name: subj.name })}
+                            />
                         ))}
                     </div>
                 </div>
@@ -205,7 +259,16 @@ const Dashboard = () => {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                         {subjects.map((s) => (
-                            <SubjectCard key={s.id} subject={s} stats={statsMap[s.id]} />
+                            <SubjectCard
+                                key={s.id}
+                                subject={s}
+                                stats={statsMap[s.id]}
+                                onEdit={(subj) => {
+                                    setEditingSubject(subj);
+                                    setShowModal(true);
+                                }}
+                                onDelete={(subj) => setConfirmDelete({ open: true, id: subj.id, name: subj.name })}
+                            />
                         ))}
                     </div>
                 )}
