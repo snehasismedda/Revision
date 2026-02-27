@@ -1,5 +1,6 @@
 import { generateResponse } from '../services/ai_service/response/index.js';
 import * as topicModel from '../models/topicModel.js';
+import * as sessionModel from '../models/sessionModel.js';
 import * as subjectModel from '../models/subjectModel.js';
 import * as analyticsModel from '../models/analyticsModel.js';
 
@@ -23,20 +24,55 @@ export const parseSyllabus = async (req, res) => {
             model,
             messages: [
                 {
-                    role: 'system',
-                    content: 'You are an educational content organizer. You MUST respond with ONLY a valid JSON array. No markdown code fences, no explanation, no extra text. Just the raw JSON array.',
+                    role: "system",
+                    content: `
+            You are a precise educational syllabus parser and hierarchy builder.
+
+            Your task is to convert raw syllabus text into a clean, logically structured JSON topic tree.
+
+            STRICT OUTPUT RULES (MANDATORY):
+            - Output ONLY a valid JSON array.
+            - DO NOT include markdown, explanations, comments, or extra text.
+            - DO NOT wrap output in code fences.
+            - The response must be directly JSON.parse() compatible.
+            - Never include trailing commas.
+            - Never invent topics not implied by the syllabus.
+            - Preserve conceptual hierarchy from the syllabus.
+
+            STRUCTURE RULES:
+            - Each object MUST contain:
+            - "name": concise topic title (2–6 words, normalized wording).
+            - "children": array of subtopics using the SAME structure.
+            - If a topic has no subtopics, use an empty array [].
+            - Maintain consistent granularity across sibling topics.
+            - Merge duplicates or synonymous topics.
+            - Avoid overly long names, numbering, or descriptions.
+
+            NORMALIZATION RULES:
+            - Remove numbering, bullets, and formatting artifacts.
+            - Convert long phrases into short academic topic names.
+            - Prefer standard computer science terminology.
+            - Keep hierarchy shallow but meaningful (avoid unnecessary nesting).
+
+            VALIDATION BEFORE OUTPUT:
+            - Ensure valid JSON syntax.
+            - Ensure every node has both "name" and "children".
+            - Ensure root output is a JSON array.
+
+            Return ONLY the JSON array.
+            `
                 },
                 {
-                    role: 'user',
+                    role: "user",
                     content: `Parse the following syllabus into a structured JSON array of topics.
-Each topic object must have: "name" (string, concise 2-6 words) and "children" (array of subtopic objects with the same structure, can be empty array []).
+            Each topic object must have: "name" (string, concise 2-6 words) and "children" (array of subtopic objects with the same structure, can be empty array []).
 
-Example format:
-[{"name": "Data Structures", "children": [{"name": "Arrays", "children": []}, {"name": "Linked Lists", "children": []}]}]
+            Example format:
+            [{"name": "Data Structures", "children": [{"name": "Arrays", "children": []}, {"name": "Linked Lists", "children": []}]}]
 
-Syllabus:
-${syllabusText}`,
-                },
+            Syllabus:
+            ${syllabusText}`
+                }
             ],
             stream: false,
             format: 'json',
@@ -118,5 +154,65 @@ ${analyticsContext}`,
     } catch (error) {
         console.error('getInsights error:', error);
         res.status(500).json({ error: 'Failed to generate insights' });
+    }
+};
+
+export const getSessionInsights = async (req, res) => {
+    try {
+        const { subjectId, sessionId } = req.params;
+        const session = await sessionModel.findSessionById({ id: sessionId, subjectId });
+
+        if (!session) return res.status(404).json({ error: 'Session not found' });
+
+        const sessionEntries = await sessionModel.findEntriesBySessionId({ sessionId });
+
+        // Calculate basic session stats for context
+        const total = sessionEntries.length;
+        const correct = sessionEntries.filter(e => e.is_correct).length;
+        const accuracy = total > 0 ? ((correct / total) * 100).toFixed(1) : 0;
+
+        // Find best and worst topics in this session
+        const topicPerf = {};
+        sessionEntries.forEach(e => {
+            if (!topicPerf[e.topic_name]) topicPerf[e.topic_name] = { correct: 0, total: 0 };
+            topicPerf[e.topic_name].total++;
+            if (e.is_correct) topicPerf[e.topic_name].correct++;
+        });
+
+        const topics = Object.entries(topicPerf).map(([name, stats]) => ({
+            name,
+            accuracy: ((stats.correct / stats.total) * 100).toFixed(1),
+            total: stats.total
+        })).sort((a, b) => b.accuracy - a.accuracy);
+
+        const bestTopics = topics.filter(t => t.accuracy >= 75).slice(0, 3);
+        const weakTopics = topics.filter(t => t.accuracy < 50).slice(0, 3);
+
+        const analyticsContext = JSON.stringify({
+            sessionTitle: session.title,
+            sessionAccuracy: accuracy,
+            totalQuestions: total,
+            bestTopics,
+            weakTopics,
+            notes: session.notes
+        });
+
+        const result = await generateResponse({
+            model: 'qwen',
+            query: `Based on this single study session's data, provide a brief, actionable performance summary in 3-4 sentences. Mention what went well, highlight the main topic that needs revision, and give one specific piece of advice for the next session.
+            
+Analytics Data:
+${analyticsContext}`,
+            history: [],
+            systemPrompt: `You are a personalized learning coach analyzing a single study session. Provide direct, encouraging, and specific advice and actionable Next Steps
+            - Specific recommendations for the next session
+            - What to continue, adjust, or stop doing`,
+            subjectId,
+        });
+
+        res.status(200).json({ insight: result });
+    } catch (error) {
+        console.error('getSessionInsights error:', error);
+        res.status(500).json({ error: 'Failed to generate session insights' });
     }
 };

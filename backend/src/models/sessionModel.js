@@ -82,3 +82,14 @@ export const softDeleteSessionsBySubject = async (data) => {
         .where('subject_id', data.subjectId)
         .update({ is_deleted: true, deleted_at: new Date() });
 };
+
+export const findEntriesBySessionId = async (data) => {
+    return db('revision.session_entries as se')
+        .join('revision.topics as t', 'se.topic_id', 't.id')
+        .where('se.session_id', data.sessionId)
+        .where('se.is_deleted', false)
+        .select([
+            'se.id', 'se.topic_id', 'se.is_correct',
+            't.name as topic_name', 't.parent_id',
+        ]);
+};

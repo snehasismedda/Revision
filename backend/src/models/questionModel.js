@@ -36,7 +36,7 @@ export const getQuestionImage = async (id, subjectId) => {
 
 export const getQuestionById = async (id, subjectId) => {
     return await db('questions')
-        .select('id', 'source_image_id', 'type')
+        .select('id', 'source_image_id', 'type', 'content', 'formatted_content')
         .where({ id, subject_id: subjectId })
         .first();
 };

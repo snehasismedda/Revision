@@ -218,6 +218,41 @@ h6 {
   animation: pulse-soft 2s infinite ease-in-out;
 }
 
+@keyframes highlight-pop {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.01);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes highlight-breathe {
+
+  0%,
+  100% {
+    box-shadow: 0 0 25px rgba(139, 92, 246, 0.35);
+    border-color: rgba(139, 92, 246, 0.8);
+    background-color: rgba(79, 70, 229, 0.1);
+  }
+
+  50% {
+    box-shadow: 0 0 50px rgba(139, 92, 246, 0.6);
+    border-color: rgba(139, 92, 246, 1);
+    background-color: rgba(79, 70, 229, 0.2);
+  }
+}
+
+.animate-highlight-spotlight {
+  animation: highlight-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
+    highlight-breathe 2.5s ease-in-out infinite;
+}
+
 /* --- Question Card --- */
 .question-card {
   background: rgba(26, 26, 34, 0.65);
@@ -244,4 +279,15 @@ h6 {
 
 .rich-text-content li {
   padding-left: 0.25rem;
+}
+
+/* Fix for subscript and superscript rendering */
+sub {
+  vertical-align: sub;
+  font-size: smaller;
+}
+
+sup {
+  vertical-align: super;
+  font-size: smaller;
 }

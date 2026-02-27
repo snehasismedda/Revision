@@ -72,6 +72,7 @@ export const analyticsApi = {
 export const aiApi = {
     parseSyllabus: (body) => request('/ai/parse-syllabus', { method: 'POST', body }),
     insights: (subjectId) => request(`/ai/insights/${subjectId}`),
+    sessionInsights: (subjectId, sessionId) => request(`/ai/insights/${subjectId}/sessions/${sessionId}`)
 };
 
 // Questions
@@ -80,4 +81,11 @@ export const questionsApi = {
     create: (subjectId, body) => request(`/subjects/${subjectId}/questions`, { method: 'POST', body }),
     delete: (subjectId, questionId) => request(`/subjects/${subjectId}/questions/${questionId}`, { method: 'DELETE' }),
     getImage: (subjectId, questionId) => request(`/subjects/${subjectId}/questions/${questionId}/image`),
+};
+
+// Notes
+export const notesApi = {
+    list: (subjectId) => request(`/subjects/${subjectId}/notes`),
+    create: (subjectId, body) => request(`/subjects/${subjectId}/notes`, { method: 'POST', body }),
+    delete: (subjectId, noteId) => request(`/subjects/${subjectId}/notes/${noteId}`, { method: 'DELETE' }),
 };

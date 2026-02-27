@@ -12,6 +12,7 @@ import entryRoute from './routes/entryRoute.js';
 import analyticsRoute from './routes/analyticsRoute.js';
 import aiRoute from './routes/aiRoute.js';
 import questionRoute from './routes/questionRoute.js';
+import noteRoute from './routes/noteRoute.js';
 
 const app = express();
 
@@ -30,6 +31,7 @@ app.use('/api/subjects', subjectRoute);
 app.use('/api/subjects/:subjectId/topics', topicRoute);
 app.use('/api/subjects/:subjectId/sessions', sessionRoute);
 app.use('/api/subjects/:subjectId/questions', questionRoute);
+app.use('/api/subjects/:subjectId/notes', noteRoute);
 app.use('/api/sessions/:sessionId/entries', entryRoute);
 app.use('/api/analytics', analyticsRoute);
 app.use('/api/ai', aiRoute);
