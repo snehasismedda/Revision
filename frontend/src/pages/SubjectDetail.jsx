@@ -41,7 +41,9 @@ const preprocessMarkdown = (text) => {
         .replace(/\$\$([^\n])/g, '$$\n$1')
         // Fix common quirk
         .replace(/\\bottom([a-zA-Z])/g, '\\bot $1')
-        .replace(/\\bottom/g, '\\bot');
+        .replace(/\\bottom/g, '\\bot')
+        // Ensure single newlines become double newlines to prevent text collapsing horizontally
+        .replace(/([^\n])\n([^\n])/g, '$1\n\n$2');
 };
 
 const SubjectDetail = () => {
@@ -281,7 +283,7 @@ const SubjectDetail = () => {
         const groups = {};
         // First pass: identify all potential roots and initialize groups
         filtered.forEach(q => {
-            const rootId = q.source_image_id || q.id;
+            const rootId = q.parent_id || q.source_image_id || q.id;
             if (!groups[rootId]) {
                 groups[rootId] = [];
             }
@@ -289,7 +291,7 @@ const SubjectDetail = () => {
 
         // Second pass: assign questions to groups
         filtered.forEach(q => {
-            const rootId = q.source_image_id || q.id;
+            const rootId = q.parent_id || q.source_image_id || q.id;
             groups[rootId].push(q);
         });
 
@@ -299,12 +301,23 @@ const SubjectDetail = () => {
         });
 
         // Convert to array of groups and sort by newest question in each group
-        return Object.entries(groups).map(([rootId, qs]) => ({
-            rootId,
-            questions: qs,
-            isGroup: qs.length > 1,
-            newestAt: new Date(Math.max(...qs.map(q => new Date(q.created_at))))
-        })).sort((a, b) => b.newestAt - a.newestAt);
+        return Object.entries(groups).map(([rootId, qs]) => {
+            const parent = qs.find(q => q.content === null);
+            const actionableQs = qs.filter(q => q.content !== null);
+
+            // A group exists if:
+            // 1. More than 1 actionable question share a source ID
+            // 2. OR a logical parent exists that extracted multiple questions
+            const isGroup = actionableQs.length > 1 || (parent && parent.formatted_content?.questions?.length > 1);
+
+            return {
+                rootId,
+                parent,
+                questions: actionableQs,
+                isGroup,
+                newestAt: new Date(Math.max(...qs.map(q => new Date(q.created_at))))
+            };
+        }).sort((a, b) => b.newestAt - a.newestAt);
     }, [questions, searchQuery]);
 
     if (loading) {
@@ -737,7 +750,8 @@ const SubjectDetail = () => {
                                 <div className="grid grid-cols-1 gap-7">
                                     {groupedQuestions.map((group) => {
                                         const isExpanded = expandedGroups[group.rootId];
-                                        const rootQ = group.questions[0];
+                                        const rootQ = group.questions[0] || group.parent;
+                                        if (!rootQ) return null;
 
                                         if (!group.isGroup) {
                                             const q = rootQ;
@@ -804,10 +818,15 @@ const SubjectDetail = () => {
 
                                                     {/* Card Body — question content */}
                                                     <div className="prose prose-invert prose-lg max-w-none text-slate-200 text-[15px] leading-[1.7]">
-                                                        {q.formatted_content ? (
+                                                        {q.formatted_content && q.formatted_content.root ? (
                                                             <RichTextRenderer content={q.formatted_content} />
                                                         ) : (
-                                                            <p className="whitespace-pre-wrap">{q.content}</p>
+                                                            <ReactMarkdown
+                                                                remarkPlugins={[remarkGfm, remarkMath]}
+                                                                rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                                            >
+                                                                {preprocessMarkdown(q.content)}
+                                                            </ReactMarkdown>
                                                         )}
                                                     </div>
 
@@ -966,10 +985,15 @@ const SubjectDetail = () => {
 
                                                                     {/* Card Body — question content */}
                                                                     <div className="prose prose-invert prose-lg max-w-none text-slate-200 text-[15px] leading-[1.7]">
-                                                                        {q.formatted_content ? (
+                                                                        {q.formatted_content && q.formatted_content.root ? (
                                                                             <RichTextRenderer content={q.formatted_content} />
                                                                         ) : (
-                                                                            <p className="whitespace-pre-wrap">{q.content}</p>
+                                                                            <ReactMarkdown
+                                                                                remarkPlugins={[remarkGfm, remarkMath]}
+                                                                                rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                                                            >
+                                                                                {preprocessMarkdown(q.content)}
+                                                                            </ReactMarkdown>
                                                                         )}
                                                                     </div>
 

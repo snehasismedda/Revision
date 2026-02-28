@@ -20,31 +20,28 @@ export const createNote = async (req, res, next) => {
         let finalContent = content;
         let finalTitle = title;
 
-        // If a note generation request from a question
         if (questionId && !content) {
             const question = await questionModel.getQuestionById(questionId, subjectId);
             if (!question) {
                 return res.status(404).json({ error: 'Question not found' });
             }
 
-            // Extract clean text for the AI. 
-            // If it's an image, content is base64 (useless for text prompt), so we must use formatted_content.
-            let promptText = '';
+            let promptText = question.content || '';
 
-            if (question.formatted_content) {
-                // If formatted_content is an object (common), extract the 'content' field which contains the parsed question text.
-                if (typeof question.formatted_content === 'object' && question.formatted_content.content) {
-                    promptText = question.formatted_content.content;
-                } else if (typeof question.formatted_content === 'string') {
-                    promptText = question.formatted_content;
+            if (!promptText && question.formatted_content) {
+                if (typeof question.formatted_content === 'object') {
+                    // Try to join all questions if it's our new raw AI JSON structure
+                    if (Array.isArray(question.formatted_content.questions)) {
+                        promptText = question.formatted_content.questions.map(q => q.question).join('\n\n');
+                    } else {
+                        promptText = JSON.stringify(question.formatted_content);
+                    }
                 } else {
-                    promptText = JSON.stringify(question.formatted_content);
+                    promptText = question.formatted_content;
                 }
-            } else if (question.type === 'text') {
-                promptText = question.content;
             }
 
-            if (!promptText || promptText.startsWith('[shared image')) {
+            if (!promptText) {
                 return res.status(400).json({ error: 'Cannot generate note: No text found in this question. Please ensure the question has been processed first.' });
             }
 

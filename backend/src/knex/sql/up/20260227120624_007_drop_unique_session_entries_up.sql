@@ -1,1 +1,1 @@
-ALTER TABLE revision.session_entries DROP CONSTRAINT IF EXISTS session_entries_session_id_topic_id_unique;
+ALTER TABLE revision.session_entries DROP CONSTRAINT IF EXISTS revision.session_entries_session_id_topic_id_unique;

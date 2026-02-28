@@ -12,6 +12,29 @@ import {
     AlertTriangle, BookOpen, CheckCircle2, XCircle, Activity
 } from 'lucide-react';
 
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeRaw from 'rehype-raw';
+import rehypeKatex from 'rehype-katex';
+
+const preprocessMarkdown = (text) => {
+    if (!text) return '';
+    return text
+        .replace(/\\\\\[/g, '\n$$\n')
+        .replace(/\\\\\]/g, '\n$$\n')
+        .replace(/\\\[/g, '\n$$\n')
+        .replace(/\\\]/g, '\n$$\n')
+        .replace(/\\\(/g, '$')
+        .replace(/\\\)/g, '$')
+        .replace(/\$\$\$\$/g, '$$\n$$')
+        .replace(/\$ \$/g, '$$')
+        .replace(/([^\n])\$\$/g, '$1\n$$')
+        .replace(/\$\$([^\n])/g, '$$\n$1')
+        .replace(/\\bottom([a-zA-Z])/g, '\\bot $1')
+        .replace(/\\bottom/g, '\\bot');
+};
+
 const PURPLE = '#8b5cf6';
 const EMERALD = '#10b981';
 const AMBER = '#f59e0b';
@@ -374,8 +397,15 @@ const Reports = () => {
 
                             <div className="relative z-10">
                                 {insight ? (
-                                    <div className="p-4 rounded-lg bg-surface-2/80 border border-indigo-500/10 shadow-inner max-h-[320px] overflow-y-auto">
-                                        <p className="text-indigo-100/90 text-sm leading-relaxed font-medium whitespace-pre-wrap">{insight}</p>
+                                    <div className="p-4 rounded-lg bg-surface-2/80 border border-indigo-500/10 shadow-inner max-h-[400px] overflow-y-auto">
+                                        <div className="prose prose-sm prose-invert prose-indigo max-w-none prose-p:leading-relaxed">
+                                            <ReactMarkdown
+                                                remarkPlugins={[remarkGfm, remarkMath]}
+                                                rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                            >
+                                                {preprocessMarkdown(insight)}
+                                            </ReactMarkdown>
+                                        </div>
                                     </div>
                                 ) : (
                                     <div className="p-8 rounded-lg border border-dashed border-indigo-500/15 text-center bg-indigo-500/[0.02] flex flex-col items-center">

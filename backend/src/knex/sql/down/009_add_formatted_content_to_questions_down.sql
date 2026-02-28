@@ -1,1 +1,1 @@
-ALTER TABLE questions DROP COLUMN IF EXISTS formatted_content;
+ALTER TABLE revision.questions DROP COLUMN IF EXISTS formatted_content;

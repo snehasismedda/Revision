@@ -43,12 +43,15 @@ const EditQuestionModal = ({ isOpen, onClose, subjectId, question, topics, onQue
 
     const handleUpdate = async (e) => {
         e.preventDefault();
-        if (question.type === 'text' && !content.trim()) return toast.error('Content cannot be empty');
+        if (!content.trim()) return toast.error('Content cannot be empty');
 
         setSaving(true);
         try {
-            const payload = { tags, type: question.type };
-            if (question.type === 'text') payload.content = content.trim();
+            const payload = {
+                tags,
+                type: question.type,
+                content: content.trim()
+            };
 
             const { question: updated } = await questionsApi.update(subjectId, question.id, payload);
             onQuestionUpdated(updated);
@@ -93,21 +96,15 @@ const EditQuestionModal = ({ isOpen, onClose, subjectId, question, topics, onQue
                         <form id="edit-question-form" onSubmit={handleUpdate} className="space-y-6">
                             <div>
                                 <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-2.5 text-slate-400">
-                                    {question.type === 'image' ? 'Question Content (Source Image)' : 'Question Text'}
+                                    Question Text
                                 </label>
-                                {question.type === 'image' ? (
-                                    <div className="w-full bg-surface-2/30 border border-white/[0.04] text-slate-500 rounded-xl px-4 py-4 text-[13px] italic">
-                                        Source image content cannot be edited as text. You can still update the tags below.
-                                    </div>
-                                ) : (
-                                    <textarea
-                                        value={content}
-                                        onChange={(e) => setContent(e.target.value)}
-                                        placeholder="Edit question content..."
-                                        rows={6}
-                                        className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-indigo-400/40 focus:ring-2 focus:ring-indigo-400/15 focus:bg-surface-2/70 transition-all placeholder:text-slate-600/80 resize-none"
-                                    />
-                                )}
+                                <textarea
+                                    value={content}
+                                    onChange={(e) => setContent(e.target.value)}
+                                    placeholder="Edit question content..."
+                                    rows={6}
+                                    className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-indigo-400/40 focus:ring-2 focus:ring-indigo-400/15 focus:bg-surface-2/70 transition-all placeholder:text-slate-600/80 resize-none"
+                                />
                             </div>
 
                             <div>

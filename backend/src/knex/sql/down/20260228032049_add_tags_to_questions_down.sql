@@ -1,1 +1,1 @@
-ALTER TABLE questions DROP COLUMN IF EXISTS tags;
+ALTER TABLE revision.questions DROP COLUMN IF EXISTS tags;

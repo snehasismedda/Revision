@@ -1,4 +1,4 @@
-CREATE TABLE questions (
+CREATE TABLE revision.questions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     subject_id UUID NOT NULL REFERENCES revision.subjects(id) ON DELETE CASCADE,
     topic_id UUID REFERENCES revision.topics(id) ON DELETE SET NULL,
