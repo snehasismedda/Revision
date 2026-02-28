@@ -248,7 +248,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
                     <div className="px-7 py-5 border-t border-white/[0.06] shrink-0 flex items-center justify-between">
                         <div className="flex items-center gap-2 text-[11px] text-slate-500 bg-indigo-500/[0.06] px-3 py-1.5 rounded-lg border border-indigo-500/10">
                             <Wand2 className="w-3.5 h-3.5 text-indigo-400" />
-                            <span>AI will auto-process this question</span>
+                            <span>AI will auto-parse and tag topics from your syllabus</span>
                         </div>
                         <div className="flex gap-3">
                             <button

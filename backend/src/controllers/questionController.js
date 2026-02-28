@@ -1,4 +1,5 @@
 import * as questionModel from '../models/questionModel.js';
+import * as topicModel from '../models/topicModel.js';
 import { parseQuestionToRichText } from '../services/ai_service/response/questionParser.js';
 
 export const getQuestions = async (req, res, next) => {
@@ -45,10 +46,22 @@ export const createQuestion = async (req, res, next) => {
             return res.status(400).json({ error: 'Content is required' });
         }
 
+        // Fetch available topics for AI context
+        const subjectTopics = await topicModel.findTopicsBySubject({ subjectId });
+
+        // Find leaf topics (those that are not parent_ids for any other topic)
+        const allParentIds = new Set(subjectTopics.map(t => t.parent_id).filter(id => id !== null));
+        const leafTopics = subjectTopics.filter(t => !allParentIds.has(t.id));
+        const topicNames = leafTopics.map(t => t.name);
+
         const typeValue = type === 'image' ? 'image' : 'text';
 
         // AI parser now returns an ARRAY of formatted question objects
-        const parsedQuestions = await parseQuestionToRichText({ content, type: typeValue });
+        const parsedQuestions = await parseQuestionToRichText({
+            content,
+            type: typeValue,
+            topics: topicNames
+        });
 
         if (parsedQuestions.length === 1) {
             // Single question — simple path
