@@ -1,4 +1,4 @@
-import db from '../db/knex.js';
+import db from '../knex/db.js';
 
 export const createSubject = async (data) => {
     const [subject] = await db('revision.subjects')

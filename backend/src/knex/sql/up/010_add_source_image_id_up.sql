@@ -1,0 +1,1 @@
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS source_image_id UUID REFERENCES questions(id) ON DELETE SET NULL;

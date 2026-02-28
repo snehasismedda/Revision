@@ -1,4 +1,4 @@
-import db from '../db/knex.js';
+import db from '../knex/db.js';
 
 export const createQuestion = async (subjectId, topicId, content, type, formattedContent = null, sourceImageId = null) => {
     let tags = [];
@@ -77,5 +77,17 @@ export const updateQuestion = async (id, subjectId, updateData) => {
 export const deleteQuestion = async (id, subjectId) => {
     await db('questions')
         .where({ id, subject_id: subjectId })
+        .update({ is_deleted: true, deleted_at: db.fn.now() });
+};
+
+export const softDeleteQuestionsByTopic = async (data) => {
+    return await db('questions')
+        .where('topic_id', data.topicId)
+        .update({ is_deleted: true, deleted_at: db.fn.now() });
+};
+
+export const softDeleteQuestionsBySubject = async (data) => {
+    return await db('questions')
+        .where('subject_id', data.subjectId)
         .update({ is_deleted: true, deleted_at: db.fn.now() });
 };

@@ -1,0 +1,4 @@
+ALTER TABLE questions DROP COLUMN IF EXISTS is_deleted;
+ALTER TABLE questions DROP COLUMN IF EXISTS deleted_at;
+ALTER TABLE notes DROP COLUMN IF EXISTS is_deleted;
+ALTER TABLE notes DROP COLUMN IF EXISTS deleted_at;

@@ -1,6 +1,6 @@
 import * as sessionModel from '../models/sessionModel.js';
 import * as subjectModel from '../models/subjectModel.js';
-import { addDeletionJob } from '../queues/deletionQueue.js';
+import * as deletionService from '../services/deletionService.js';
 
 export const getSessions = async (req, res) => {
     try {
@@ -80,7 +80,7 @@ export const deleteSession = async (req, res) => {
         if (!session) return res.status(404).json({ error: 'Session not found' });
 
         await sessionModel.softDeleteSession({ id: req.params.id });
-        await addDeletionJob({ type: 'session', sessionId: req.params.id });
+        await deletionService.deleteSessionCascade(req.params.id);
 
         res.status(200).json({ message: 'Session deleted successfully' });
     } catch (error) {

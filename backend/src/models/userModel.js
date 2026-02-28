@@ -1,4 +1,4 @@
-import db from '../db/knex.js';
+import db from '../knex/db.js';
 
 export const createUser = async (data) => {
     const [user] = await db('revision.users')

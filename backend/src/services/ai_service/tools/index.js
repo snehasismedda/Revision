@@ -1,7 +1,6 @@
 import { syllabusParserTool } from './syllabusParser.js';
-import { vectorSearchTool } from './vectorSearch.js';
 
-const tools = [syllabusParserTool, vectorSearchTool];
+const tools = [syllabusParserTool];
 
 export const toolDefinitions = tools.map((tool) => tool.definition);
 

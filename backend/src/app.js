@@ -40,7 +40,6 @@ app.use('/api/ai', aiRoute);
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 // --- Global Error Handler ---
-// eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
     console.error('[GlobalError]', err);
     res.status(err.status || 500).json({

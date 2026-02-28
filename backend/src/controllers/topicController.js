@@ -1,5 +1,6 @@
 import * as topicModel from '../models/topicModel.js';
 import * as subjectModel from '../models/subjectModel.js';
+import * as deletionService from '../services/deletionService.js';
 
 const buildTopicTree = (topics) => {
     const map = {};
@@ -93,6 +94,7 @@ export const updateTopic = async (req, res) => {
 export const deleteTopic = async (req, res) => {
     try {
         await topicModel.softDeleteTopic({ id: req.params.id });
+        await deletionService.deleteTopicCascade(req.params.id);
         res.status(200).json({ message: 'Topic deleted successfully' });
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete topic' });

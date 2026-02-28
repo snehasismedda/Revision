@@ -1,4 +1,4 @@
-import db from '../db/knex.js';
+import db from '../knex/db.js';
 
 export const getSubjectOverview = async (data) => {
     const result = await db('revision.session_entries as se')

@@ -1,4 +1,4 @@
-import db from '../db/knex.js';
+import db from '../knex/db.js';
 
 export const createTopic = async (data) => {
     const [topic] = await db('revision.topics')
@@ -59,5 +59,17 @@ export const softDeleteTopic = async (data) => {
 export const softDeleteTopicsBySubject = async (data) => {
     return db('revision.topics')
         .where('subject_id', data.subjectId)
+        .update({ is_deleted: true, deleted_at: new Date() });
+};
+
+export const findSubTopics = async (parentId) => {
+    return db('revision.topics')
+        .where('parent_id', parentId)
+        .where('is_deleted', false);
+};
+
+export const softDeleteSubTopics = async (parentId) => {
+    return db('revision.topics')
+        .where('parent_id', parentId)
         .update({ is_deleted: true, deleted_at: new Date() });
 };

@@ -1,4 +1,4 @@
-import db from '../db/knex.js';
+import db from '../knex/db.js';
 
 export const bulkCreateEntries = async (data) => {
     const rows = data.entries.map((e) => ({
@@ -36,5 +36,11 @@ export const findEntriesBySession = async (data) => {
 export const softDeleteEntriesBySession = async (data) => {
     return db('revision.session_entries')
         .where('session_id', data.sessionId)
+        .update({ is_deleted: true, deleted_at: new Date() });
+};
+
+export const softDeleteEntriesByTopic = async (data) => {
+    return db('revision.session_entries')
+        .where('topic_id', data.topicId)
         .update({ is_deleted: true, deleted_at: new Date() });
 };

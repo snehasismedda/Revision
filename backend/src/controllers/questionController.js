@@ -1,5 +1,6 @@
 import * as questionModel from '../models/questionModel.js';
 import * as topicModel from '../models/topicModel.js';
+import * as deletionService from '../services/deletionService.js';
 import { parseQuestionToRichText } from '../services/ai_service/response/questionParser.js';
 
 export const getQuestions = async (req, res, next) => {
@@ -99,6 +100,7 @@ export const deleteQuestion = async (req, res, next) => {
     try {
         const { subjectId, questionId } = req.params;
         await questionModel.deleteQuestion(questionId, subjectId);
+        await deletionService.deleteQuestionCascade(questionId);
         res.json({ message: 'Question deleted successfully' });
     } catch (error) {
         next(error);

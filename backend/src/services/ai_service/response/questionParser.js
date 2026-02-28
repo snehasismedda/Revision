@@ -12,7 +12,7 @@ import ollama from '../../../config/ollama.js';
  */
 export const parseQuestionToRichText = async ({ content, type, topics = [] }) => {
   try {
-    const model = type === 'image' ? (process.env.QWEN_VL_MODEL || 'qwen2.5vl:latest') : (process.env.OLLAMA_MODEL || 'qwen2.5:7b');
+    const model = type === 'image' ? (process.env.OLLAMA_VL_MODEL) : (process.env.OLLAMA_TEXT_MODEL);
 
     const topicsString = topics.length > 0 ? `
                 ====================

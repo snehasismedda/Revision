@@ -1,4 +1,4 @@
-import db from '../db/knex.js';
+import db from '../knex/db.js';
 
 export const createSession = async (data) => {
     const [session] = await db('revision.sessions')

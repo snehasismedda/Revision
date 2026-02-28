@@ -643,7 +643,7 @@ const SubjectDetail = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                             {(() => {
                                 const filtered = sessions.filter(s =>
-                                    s.name?.toLowerCase().includes(sessionSearchQuery.toLowerCase()) ||
+                                    (s.title || s.name || '')?.toLowerCase().includes(sessionSearchQuery.toLowerCase()) ||
                                     s.notes?.toLowerCase().includes(sessionSearchQuery.toLowerCase())
                                 );
 

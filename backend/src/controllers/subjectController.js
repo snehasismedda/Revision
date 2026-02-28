@@ -1,5 +1,5 @@
 import * as subjectModel from '../models/subjectModel.js';
-import { addDeletionJob } from '../queues/deletionQueue.js';
+import * as deletionService from '../services/deletionService.js';
 
 export const getSubjects = async (req, res) => {
     try {
@@ -64,8 +64,8 @@ export const deleteSubject = async (req, res) => {
         if (!subject) return res.status(404).json({ error: 'Subject not found' });
 
         await subjectModel.softDeleteSubject({ id: req.params.id, userId: req.user.id });
-        // Cascade soft-delete topics, sessions, entries in background
-        await addDeletionJob({ type: 'subject', subjectId: req.params.id });
+        // Cascade soft-delete topics, sessions, entries
+        await deletionService.deleteSubjectCascade(req.params.id);
 
         res.status(200).json({ message: 'Subject deleted successfully' });
     } catch (error) {
