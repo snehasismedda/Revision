@@ -73,7 +73,10 @@ export const aiApi = {
     parseSyllabus: (body) => request('/ai/parse-syllabus', { method: 'POST', body }),
     insights: (subjectId) => request(`/ai/insights/${subjectId}`),
     sessionInsights: (subjectId, sessionId) => request(`/ai/insights/${subjectId}/sessions/${sessionId}`),
-    globalInsights: () => request('/ai/global-insights')
+    globalInsights: () => request('/ai/global-insights'),
+    parseNote: (body) => request('/ai/parse-note', { method: 'POST', body }),
+    describeImage: (body) => request('/ai/describe-image', { method: 'POST', body }),
+    enhanceNote: (body) => request('/ai/enhance-note', { method: 'POST', body }),
 };
 
 // Questions
@@ -90,4 +93,5 @@ export const notesApi = {
     list: (subjectId) => request(`/subjects/${subjectId}/notes`),
     create: (subjectId, body) => request(`/subjects/${subjectId}/notes`, { method: 'POST', body }),
     delete: (subjectId, noteId) => request(`/subjects/${subjectId}/notes/${noteId}`, { method: 'DELETE' }),
+    getImage: (subjectId, noteId) => request(`/subjects/${subjectId}/notes/${noteId}/image`),
 };

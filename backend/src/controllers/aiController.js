@@ -2,7 +2,100 @@ import * as sessionModel from '../models/sessionModel.js';
 import * as subjectModel from '../models/subjectModel.js';
 import * as analyticsModel from '../models/analyticsModel.js';
 import { ollama, models } from '../config/ollama.js';
-import { syllabusPrompt, insightPrompt, globalInsightPrompt } from '../system_prompts/index.js';
+import { syllabusPrompt, insightPrompt, globalInsightPrompt, noteAnalysisPrompt, enhanceNotePrompt, noteDescriptionPrompt } from '../system_prompts/index.js';
+
+export const enhanceNote = async (req, res) => {
+    try {
+        const { title, content } = req.body;
+        if (!content) return res.status(400).json({ error: 'Content is required' });
+
+        const messages = [
+            { role: "system", content: enhanceNotePrompt },
+            { role: "user", content: `Title: ${title}\nContent: ${content}` }
+        ];
+
+        const response = await ollama.chat({
+            model: models.TEXT,
+            messages,
+            stream: false,
+            format: 'json'
+        });
+        const result = JSON.parse(response.message?.content || '{}');
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('enhanceNote error:', error);
+        res.status(500).json({ error: 'Failed to enhance note' });
+    }
+};
+
+export const describeImage = async (req, res) => {
+    try {
+        const { content } = req.body;
+        if (!content) return res.status(400).json({ error: 'Image content is required' });
+
+        const base64Data = content.replace(/^data:image\/\w+;base64,/, '');
+        const messages = [
+            { role: "system", content: noteDescriptionPrompt },
+            {
+                role: 'user',
+                content: 'Provide a detailed educational description for this image. Return strictly as JSON.',
+                images: [base64Data]
+            }
+        ];
+
+        const response = await ollama.chat({
+            model: models.IMAGE,
+            messages,
+            stream: false,
+            format: 'json',
+        });
+
+        const result = JSON.parse(response.message?.content || '{}');
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('describeImage error:', error);
+        res.status(500).json({ error: 'Failed to describe image' });
+    }
+};
+
+export const parseNote = async (req, res) => {
+    try {
+        const { content, type } = req.body;
+        if (!content) return res.status(400).json({ error: 'Content is required' });
+
+        const model = type === 'image' ? models.IMAGE : models.TEXT;
+        const messages = [
+            { role: "system", content: noteAnalysisPrompt }
+        ];
+
+        if (type === 'image') {
+            const base64Data = content.replace(/^data:image\/\w+;base64,/, '');
+            messages.push({
+                role: 'user',
+                content: 'Extract the title and structured study notes from this image. Return strictly as JSON.',
+                images: [base64Data]
+            });
+        } else {
+            messages.push({
+                role: 'user',
+                content: `Extract the title and structured study notes from the following text:\n\n${content}`
+            });
+        }
+
+        const response = await ollama.chat({
+            model,
+            messages,
+            stream: false,
+            format: 'json',
+        });
+
+        const result = JSON.parse(response.message?.content || '{}');
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('parseNote error:', error);
+        res.status(500).json({ error: 'Failed to analyze note' });
+    }
+};
 
 export const parseSyllabus = async (req, res) => {
     try {

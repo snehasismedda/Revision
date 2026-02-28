@@ -32,17 +32,50 @@ const preprocessMarkdown = (text) => {
         .replace(/\\bottom/g, '\\bot');
 };
 
-const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion }) => {
+const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImage, isFetchingImage }) => {
     if (!isOpen || !note) return null;
 
     const isAINote = note.title?.startsWith('AI Note');
-    const processedContent = preprocessMarkdown(note.content);
+    const processedContent = preprocessMarkdown(note.content || '');
+
+    const handleOpenOriginal = () => {
+        if (!sourceImage) return;
+
+        try {
+            // Split the data URI to get the mime type and the base64 data
+            const [metadata, base64Data] = sourceImage.split(',');
+            const mimeMatch = metadata.match(/:(.*?);/);
+            if (!mimeMatch) throw new Error('Invalid Data URI');
+
+            const mimeType = mimeMatch[1];
+            const byteCharacters = atob(base64Data);
+            const byteNumbers = new Array(byteCharacters.length);
+
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: mimeType });
+            const blobUrl = URL.createObjectURL(blob);
+
+            window.open(blobUrl, '_blank');
+
+            // Cleanup the URL after a delay
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+        } catch (error) {
+            console.error('Error opening original image:', error);
+            // Fallback for extremely simple cases or if atob fails
+            const newWindow = window.open();
+            newWindow.document.write(`<img src="${sourceImage}" style="max-width: 100%; height: auto;" />`);
+        }
+    };
 
     return (
         <ModalPortal>
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 bg-black/60 backdrop-blur-sm fade-in" onClick={onClose}>
                 <div
-                    className="w-full max-w-4xl h-[90vh] md:h-auto md:max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-white/[0.08]"
+                    className="w-full max-w-4xl h-[90vh] md:h-auto md:max-h-[85vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-white/[0.08]"
                     style={{ background: '#12121a' }}
                     onClick={e => e.stopPropagation()}
                 >
@@ -92,6 +125,36 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion }) => {
 
                     {/* Content Body - Markdown Rendered */}
                     <div className="px-6 py-6 md:px-8 md:py-8 overflow-y-auto custom-scrollbar flex-1" style={{ background: '#12121a' }}>
+
+                        {/* Source Image Display */}
+                        {(isFetchingImage || sourceImage) && (
+                            <div className="mb-10 rounded-2xl overflow-hidden border border-white/[0.08] bg-black/40 shadow-2xl relative group">
+                                {isFetchingImage ? (
+                                    <div className="aspect-video flex flex-col items-center justify-center gap-4 bg-surface-2/30">
+                                        <div className="w-10 h-10 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
+                                        <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-widest animate-pulse">Loading Source Image...</span>
+                                    </div>
+                                ) : (
+                                    <div className="relative">
+                                        <img
+                                            src={sourceImage}
+                                            alt="Source reference"
+                                            className="w-full max-h-[500px] object-contain mx-auto"
+                                        />
+                                        <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/80 to-transparent flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <span className="text-[10px] font-bold text-white uppercase tracking-widest">Original Source Image</span>
+                                            <button
+                                                onClick={handleOpenOriginal}
+                                                className="text-[10px] font-bold text-emerald-400 hover:underline cursor-pointer bg-transparent border-none p-0"
+                                            >
+                                                Open Original
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         <div className="prose prose-invert prose-lg max-w-none prose-headings:font-heading prose-headings:font-bold prose-h1:text-[22px] prose-h2:text-[19px] prose-h3:text-[17px] prose-headings:mt-6 prose-headings:mb-3 prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mb-3 prose-a:text-indigo-400 hover:prose-a:text-indigo-300 prose-strong:text-white prose-code:text-emerald-300 prose-code:bg-emerald-500/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none prose-pre:bg-surface-2 prose-pre:border prose-pre:border-white/[0.08] prose-ul:my-3 prose-ol:my-3 prose-li:my-1">
                             <ReactMarkdown
                                 remarkPlugins={[remarkGfm, remarkMath]}

@@ -181,6 +181,21 @@ const SubjectDetail = () => {
         }
     };
 
+    const handleFetchNoteImage = async (noteId) => {
+        if (fetchedImages[`note-${noteId}`]) return;
+        try {
+            setFetchingImageId(`note-${noteId}`);
+            const res = await notesApi.getImage(id, noteId);
+            if (res.content) {
+                setFetchedImages((prev) => ({ ...prev, [`note-${noteId}`]: res.content }));
+            }
+        } catch {
+            toast.error('Failed to load note image');
+        } finally {
+            setFetchingImageId(null);
+        }
+    };
+
     const handleDeleteQuestion = async () => {
         const questionId = confirmDeleteQuestion.questionId;
         if (!questionId) return;
@@ -447,6 +462,8 @@ const SubjectDetail = () => {
                 onClose={() => setViewingNote(null)}
                 note={viewingNote}
                 onNavigateToQuestion={navigateToQuestion}
+                sourceImage={viewingNote ? fetchedImages[`note-${viewingNote.id}`] : null}
+                isFetchingImage={fetchingImageId === (viewingNote ? `note-${viewingNote.id}` : null)}
             />
 
             <EditQuestionModal
@@ -1161,16 +1178,37 @@ const SubjectDetail = () => {
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
                                             </div>
-                                            <div className="text-sm text-slate-300 line-clamp-5 leading-relaxed mb-5 flex-1 relative z-10 overflow-hidden">
+                                            <div className="text-sm text-slate-300 line-clamp-5 leading-relaxed mb-4 relative z-10 overflow-hidden">
                                                 <div className="prose prose-sm prose-invert max-w-none prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mt-0 prose-p:mb-2 prose-headings:font-bold prose-headings:text-white prose-headings:m-0 prose-headings:mb-1.5 prose-h1:text-[15px] prose-h2:text-[14px] prose-h3:text-[13px] prose-a:text-indigo-400 prose-code:text-emerald-300 prose-code:bg-emerald-500/10 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
                                                     <ReactMarkdown
                                                         remarkPlugins={[remarkGfm, remarkMath]}
                                                         rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
                                                     >
-                                                        {preprocessMarkdown(note.content)}
+                                                        {preprocessMarkdown(note.content || '')}
                                                     </ReactMarkdown>
                                                 </div>
                                             </div>
+
+                                            {note.source_image_id && (
+                                                <div className="mb-6 relative z-10">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleFetchNoteImage(note.id);
+                                                            setViewingNote(note);
+                                                        }}
+                                                        disabled={fetchingImageId === `note-${note.id}`}
+                                                        className="flex items-center gap-2.5 px-4 py-2 rounded-xl text-[12px] font-bold bg-white/[0.04] text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/30 transition-all border border-white/[0.08] disabled:opacity-50 cursor-pointer shadow-sm shadow-black/20"
+                                                    >
+                                                        {fetchingImageId === `note-${note.id}` ? (
+                                                            <div className="w-3.5 h-3.5 border border-white/30 border-t-white rounded-full animate-spin" />
+                                                        ) : (
+                                                            <ImageIcon className="w-4 h-4" />
+                                                        )}
+                                                        <span>{fetchingImageId === `note-${note.id}` ? 'Loading...' : 'Show Source Image'}</span>
+                                                    </button>
+                                                </div>
+                                            )}
 
                                             <div className="text-[11px] font-medium text-slate-500 flex items-center justify-between pt-3 border-t border-white/[0.06] mt-auto relative z-10">
                                                 <span>

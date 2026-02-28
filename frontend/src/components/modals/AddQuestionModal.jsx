@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { questionsApi } from '../../api/index.js';
 import toast from 'react-hot-toast';
-import { X, PlusCircle, Wand2, FileText, Image as ImageIcon, Trash2, Save, Scissors, Check, RotateCw, ZoomIn, ZoomOut } from 'lucide-react';
+import { X, PlusCircle, Wand2, FileText, Image as ImageIcon, Trash2, Save, Scissors, Check, RotateCw, ZoomIn, ZoomOut, Camera, RefreshCcw, FlipHorizontal, ChevronDown } from 'lucide-react';
 import ModalPortal from '../ModalPortal.jsx';
 import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -36,6 +36,92 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
     const [completedCrop, setCompletedCrop] = useState(null);
     const [isCropping, setIsCropping] = useState(false);
     const imgRef = useRef(null);
+
+    // Camera State
+    const [cameras, setCameras] = useState([]);
+    const [selectedCameraId, setSelectedCameraId] = useState('');
+    const [cameraStream, setCameraStream] = useState(null);
+    const [isCameraLoading, setIsCameraLoading] = useState(false);
+    const videoRef = useRef(null);
+
+    // Sync camera stream to video element when it mounts
+    useEffect(() => {
+        if (cameraStream && videoRef.current) {
+            videoRef.current.srcObject = cameraStream;
+        }
+    }, [cameraStream]);
+
+    // Enumerating cameras
+    const getCameras = async () => {
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            setCameras(videoDevices);
+            if (videoDevices.length > 0 && !selectedCameraId) {
+                setSelectedCameraId(videoDevices[0].deviceId);
+            }
+        } catch (err) {
+            console.error("Error enumerating cameras:", err);
+            toast.error("Could not access camera list");
+        }
+    };
+
+    const stopCamera = () => {
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            setCameraStream(null);
+        }
+    };
+
+    const startCamera = async (deviceId) => {
+        stopCamera();
+        setIsCameraLoading(true);
+        try {
+            const constraints = {
+                video: deviceId ? { deviceId: { exact: deviceId } } : true
+            };
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            setCameraStream(stream);
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+            }
+        } catch (err) {
+            console.error("Error starting camera:", err);
+            toast.error("Failed to start camera. Please check permissions.");
+        } finally {
+            setIsCameraLoading(false);
+        }
+    };
+
+    const handleTabChange = (type) => {
+        if (type !== 'camera') {
+            stopCamera();
+        } else {
+            getCameras();
+            startCamera(selectedCameraId);
+        }
+        setNewQuestionType(type);
+    };
+
+    const takePhoto = () => {
+        if (!videoRef.current || videoRef.current.videoWidth === 0) {
+            return toast.error("Camera is not ready. Please wait a moment.");
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = videoRef.current.videoWidth;
+        canvas.height = videoRef.current.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+
+        stopCamera();
+        setImageToCrop(dataUrl);
+        setIsCropping(true);
+    };
+
+    React.useEffect(() => {
+        return () => stopCamera();
+    }, []);
 
     function onImageLoad(e) {
         const { width, height } = e.currentTarget;
@@ -72,6 +158,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
 
             const croppedImage = await getCroppedImg(imageToCrop, pixelCrop, rotation);
             setNewQuestionImage(croppedImage);
+            setNewQuestionType('image'); // Switch to image tab to preview the result
             setIsCropping(false);
             setImageToCrop(null);
             setRotation(0);
@@ -108,6 +195,11 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
         }
     };
 
+    const handleModalClose = () => {
+        stopCamera();
+        onClose();
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -127,7 +219,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
                             Add New Question
                         </h3>
                         <button
-                            onClick={onClose}
+                            onClick={handleModalClose}
                             className="p-2 text-slate-500 hover:text-white hover:bg-white/[0.06] rounded-lg transition-all cursor-pointer"
                         >
                             <X className="w-5 h-5" />
@@ -139,16 +231,25 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
                         {/* Type toggle */}
                         <div className="flex p-1 bg-surface-2/80 rounded-xl mb-6 border border-white/[0.06]">
                             <button
-                                onClick={() => setNewQuestionType('text')}
+                                type="button"
+                                onClick={() => handleTabChange('text')}
                                 className={`flex-1 py-2.5 text-[13px] font-semibold rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer ${newQuestionType === 'text' ? 'bg-primary/[0.12] text-white border border-primary/20 shadow-sm' : 'text-slate-500 hover:text-slate-200 border border-transparent'}`}
                             >
-                                <FileText className="w-4 h-4" /> Text Question
+                                <FileText className="w-4 h-4" /> Text
                             </button>
                             <button
-                                onClick={() => setNewQuestionType('image')}
+                                type="button"
+                                onClick={() => handleTabChange('image')}
                                 className={`flex-1 py-2.5 text-[13px] font-semibold rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer ${newQuestionType === 'image' ? 'bg-primary/[0.12] text-white border border-primary/20 shadow-sm' : 'text-slate-500 hover:text-slate-200 border border-transparent'}`}
                             >
-                                <ImageIcon className="w-4 h-4" /> Image Upload
+                                <ImageIcon className="w-4 h-4" /> Upload
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleTabChange('camera')}
+                                className={`flex-1 py-2.5 text-[13px] font-semibold rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer ${newQuestionType === 'camera' ? 'bg-primary/[0.12] text-white border border-primary/20 shadow-sm' : 'text-slate-500 hover:text-slate-200 border border-transparent'}`}
+                            >
+                                <Camera className="w-4 h-4" /> Camera
                             </button>
                         </div>
 
@@ -164,7 +265,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
                                         className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 focus:bg-surface-2/70 transition-all placeholder:text-slate-600/80 resize-none"
                                     />
                                 </div>
-                            ) : (
+                            ) : newQuestionType === 'image' ? (
                                 <div>
                                     <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-2.5">Upload Image</label>
                                     <div
@@ -177,7 +278,10 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
                                                 const file = e.dataTransfer.files[0];
                                                 if (file.type.startsWith('image/')) {
                                                     const reader = new FileReader();
-                                                    reader.onloadend = () => setNewQuestionImage(reader.result);
+                                                    reader.onloadend = () => {
+                                                        setImageToCrop(reader.result);
+                                                        setIsCropping(true);
+                                                    };
                                                     reader.readAsDataURL(file);
                                                 }
                                             }
@@ -228,7 +332,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
                                                 }}
                                                 className="text-[13px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1.5 px-3 py-1.5 cursor-pointer rounded-lg hover:bg-indigo-500/10 transition-all active:scale-95"
                                             >
-                                                <Scissors className="w-4 h-4" /> Recrop image
+                                                <Scissors className="w-4 h-4" /> Recrop info
                                             </button>
                                             <button
                                                 type="button"
@@ -236,6 +340,160 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
                                                 className="text-[13px] text-red-400 hover:text-red-300 flex items-center gap-1.5 px-3 py-1.5 cursor-pointer rounded-lg hover:bg-red-500/10 transition-all active:scale-95"
                                             >
                                                 <Trash2 className="w-4 h-4" /> Remove image
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em]">Native Camera</label>
+                                        <div className="flex items-center gap-3">
+                                            <div className="relative group/sel min-w-[140px]">
+                                                <select
+                                                    value={selectedCameraId}
+                                                    onChange={(e) => {
+                                                        const newId = e.target.value;
+                                                        setSelectedCameraId(newId);
+                                                        startCamera(newId);
+                                                    }}
+                                                    className="w-full bg-surface-3/50 border border-white/10 rounded-lg py-1.5 pl-3 pr-8 text-[11px] text-slate-300 outline-none focus:border-primary/40 appearance-none cursor-pointer hover:bg-surface-3 transition-all shadow-sm"
+                                                >
+                                                    {cameras.length > 0 ? (
+                                                        cameras.map(camera => (
+                                                            <option key={camera.deviceId} value={camera.deviceId}>
+                                                                {camera.label || `Camera ${cameras.indexOf(camera) + 1}`}
+                                                            </option>
+                                                        ))
+                                                    ) : (
+                                                        <option value="">No Camera Found</option>
+                                                    )}
+                                                </select>
+                                                <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-slate-500 group-hover/sel:text-slate-300 transition-colors">
+                                                    <ChevronDown className="w-3.5 h-3.5" />
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={getCameras}
+                                                className="p-1.5 rounded-lg bg-surface-3/50 border border-white/10 text-slate-500 hover:text-white hover:border-white/20 transition-all active:scale-90"
+                                                title="Rescan Devices"
+                                            >
+                                                <RefreshCcw className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="relative aspect-video bg-black rounded-xl overflow-hidden border border-white/[0.08] shadow-2xl flex items-center justify-center group bg-[radial-gradient(circle_at_center,_#1a1a2e_0%,_#0a0a0f_100%)]">
+                                        {isCameraLoading ? (
+                                            <div className="flex flex-col items-center gap-4">
+                                                <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+                                                <span className="text-[12px] text-primary/80 font-bold uppercase tracking-widest animate-pulse">Initializing...</span>
+                                            </div>
+                                        ) : cameraStream ? (
+                                            <>
+                                                <video
+                                                    ref={videoRef}
+                                                    autoPlay
+                                                    playsInline
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                {/* Lens overlay effect */}
+                                                <div className="absolute inset-0 pointer-events-none border-[20px] border-black/20" />
+                                                <div className="absolute inset-0 pointer-events-none ring-1 ring-inset ring-white/10" />
+
+                                                {/* Controls Overlay */}
+                                                <div className="absolute inset-x-0 bottom-0 p-6 flex items-center justify-center">
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
+
+                                                    <div className="flex items-center gap-8 z-10">
+                                                        {cameras.length > 1 && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const currentIndex = cameras.findIndex(c => c.deviceId === selectedCameraId);
+                                                                    const nextIndex = (currentIndex + 1) % cameras.length;
+                                                                    const nextId = cameras[nextIndex].deviceId;
+                                                                    setSelectedCameraId(nextId);
+                                                                    startCamera(nextId);
+                                                                }}
+                                                                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center backdrop-blur-md border border-white/10 transition-all active:scale-90"
+                                                                title="Switch Camera"
+                                                            >
+                                                                <FlipHorizontal className="w-5 h-5" />
+                                                            </button>
+                                                        )}
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={takePhoto}
+                                                            className="relative group cursor-pointer"
+                                                        >
+                                                            <div className="absolute -inset-4 bg-primary/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity animate-pulse" />
+                                                            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all group-hover:scale-110 group-active:scale-95 group-active:shadow-inner border-4 border-slate-200">
+                                                                <div className="w-12 h-12 border-2 border-primary/40 rounded-full flex items-center justify-center">
+                                                                    <div className="w-3 h-3 bg-primary rounded-full animate-ping" />
+                                                                </div>
+                                                            </div>
+                                                        </button>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => startCamera(selectedCameraId)}
+                                                            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center backdrop-blur-md border border-white/10 transition-all active:scale-90"
+                                                            title="Refresh Stream"
+                                                        >
+                                                            <RefreshCcw className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Corner Decoration */}
+                                                <div className="absolute top-4 left-4 flex items-center gap-2 px-2 py-1 bg-black/40 rounded-md backdrop-blur-sm border border-white/10">
+                                                    <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                                                    <span className="text-[10px] font-bold text-white uppercase tracking-wider">Live</span>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="flex flex-col items-center text-center px-10">
+                                                <div className="w-16 h-16 rounded-2xl bg-red-500/10 text-red-400 flex items-center justify-center mb-4">
+                                                    <Camera className="w-8 h-8" />
+                                                </div>
+                                                <h4 className="text-white font-semibold mb-2">Camera Access Required</h4>
+                                                <p className="text-[13px] text-slate-500 mb-6">Please allow camera permissions in your browser to capture questions directly.</p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => startCamera(selectedCameraId)}
+                                                    className="px-6 py-2 bg-primary/20 text-primary border border-primary/30 rounded-lg text-sm font-semibold hover:bg-primary/30 transition-all"
+                                                >
+                                                    Retry Camera
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {newQuestionImage && !cameraStream && (
+                                        <div className="flex items-center gap-3 p-3 bg-indigo-500/5 border border-indigo-500/10 rounded-xl">
+                                            <div className="w-12 h-12 rounded-lg overflow-hidden border border-white/10 shrink-0">
+                                                <img src={newQuestionImage} className="w-full h-full object-cover" alt="Captured" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="text-[12px] text-slate-300 font-medium line-clamp-1">Last captured image</p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setImageToCrop(newQuestionImage); setIsCropping(true); }}
+                                                    className="text-[11px] text-indigo-400 hover:text-indigo-300 font-bold uppercase tracking-wider"
+                                                >
+                                                    Edit / Recrop
+                                                </button>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setNewQuestionImage('')}
+                                                className="p-2 text-slate-500 hover:text-red-400 transition-colors"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
                                             </button>
                                         </div>
                                     )}
@@ -253,7 +511,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
                         <div className="flex gap-3">
                             <button
                                 type="button"
-                                onClick={onClose}
+                                onClick={handleModalClose}
                                 className="px-5 py-3 rounded-xl text-[13px] font-semibold text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer border border-transparent hover:border-white/[0.08]"
                             >
                                 Cancel
@@ -330,7 +588,6 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
                                         src={imageToCrop}
                                         onLoad={onImageLoad}
                                         style={{ maxHeight: '65vh', maxWidth: '100%', display: 'block' }}
-                                        crossOrigin="anonymous"
                                     />
                                 </ReactCrop>
                             </div>

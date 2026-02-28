@@ -12,10 +12,11 @@ export const getNotesByQuestion = async (questionId) => {
         .orderBy('created_at', 'desc');
 };
 
-export const createNote = async (subjectId, questionId, title, content) => {
+export const createNote = async (subjectId, questionId, title, content, sourceImageId) => {
     const [note] = await db('revision.notes').insert({
         subject_id: subjectId,
         question_id: questionId || null,
+        source_image_id: sourceImageId || null,
         title,
         content
     }).returning('*');
