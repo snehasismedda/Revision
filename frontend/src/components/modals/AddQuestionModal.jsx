@@ -1,14 +1,88 @@
-import { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { questionsApi } from '../../api/index.js';
 import toast from 'react-hot-toast';
-import { X, PlusCircle, Wand2, FileText, Image as ImageIcon, Trash2, Save } from 'lucide-react';
+import { X, PlusCircle, Wand2, FileText, Image as ImageIcon, Trash2, Save, Scissors, Check, RotateCw, ZoomIn, ZoomOut } from 'lucide-react';
 import ModalPortal from '../ModalPortal.jsx';
+import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
+import 'react-image-crop/dist/ReactCrop.css';
+import getCroppedImg from '../../utils/cropImage.js';
+
+// Custom styles for react-image-crop handles
+const cropStyles = `
+.ReactCrop__drag-handle {
+    width: 12px !important;
+    height: 12px !important;
+    background-color: #8b5cf6 !important;
+    border: 2px solid white !important;
+    border-radius: 50% !important;
+}
+.ReactCrop__crop-selection {
+    border: 2px solid #8b5cf6 !important;
+    box-shadow: 0 0 0 9999em rgba(0, 0, 0, 0.7) !important;
+}
+`;
 
 const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
     const [newQuestionType, setNewQuestionType] = useState('text');
     const [newQuestionText, setNewQuestionText] = useState('');
     const [newQuestionImage, setNewQuestionImage] = useState('');
     const [addingQuestion, setAddingQuestion] = useState(false);
+
+    // Cropping State
+    const [imageToCrop, setImageToCrop] = useState(null);
+    const [crop, setCrop] = useState();
+    const [zoom, setZoom] = useState(1);
+    const [rotation, setRotation] = useState(0);
+    const [completedCrop, setCompletedCrop] = useState(null);
+    const [isCropping, setIsCropping] = useState(false);
+    const imgRef = useRef(null);
+
+    function onImageLoad(e) {
+        const { width, height } = e.currentTarget;
+        const initialCrop = centerCrop(
+            makeAspectCrop(
+                {
+                    unit: '%',
+                    width: 70,
+                },
+                undefined, // Unrestricted aspect ratio
+                width,
+                height
+            ),
+            width,
+            height
+        );
+        setCrop(initialCrop);
+    }
+
+    const handleApplyCrop = async () => {
+        try {
+            if (!completedCrop || !imgRef.current) return;
+
+            // Calculate exact pixel crop coordinates based on displayed image size and actual native resolution
+            const scaleX = imgRef.current.naturalWidth / imgRef.current.width;
+            const scaleY = imgRef.current.naturalHeight / imgRef.current.height;
+
+            const pixelCrop = {
+                x: completedCrop.x * scaleX,
+                y: completedCrop.y * scaleY,
+                width: completedCrop.width * scaleX,
+                height: completedCrop.height * scaleY,
+            };
+
+            const croppedImage = await getCroppedImg(imageToCrop, pixelCrop, rotation);
+            setNewQuestionImage(croppedImage);
+            setIsCropping(false);
+            setImageToCrop(null);
+            setRotation(0);
+            setZoom(1);
+            setCompletedCrop(null);
+            toast.success('Image cropped successfully');
+        } catch (e) {
+            console.error(e);
+            toast.error('Failed to crop image');
+        }
+    };
 
     const handleAddQuestion = async (e) => {
         e.preventDefault();
@@ -115,9 +189,15 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
                                             className="absolute inset-0 opacity-0 cursor-pointer z-10"
                                             onChange={(e) => {
                                                 if (e.target.files && e.target.files[0]) {
-                                                    const reader = new FileReader();
-                                                    reader.onloadend = () => setNewQuestionImage(reader.result);
-                                                    reader.readAsDataURL(e.target.files[0]);
+                                                    const file = e.target.files[0];
+                                                    if (file.type.startsWith('image/')) {
+                                                        const reader = new FileReader();
+                                                        reader.onloadend = () => {
+                                                            setImageToCrop(reader.result);
+                                                            setIsCropping(true);
+                                                        };
+                                                        reader.readAsDataURL(file);
+                                                    }
                                                 }
                                             }}
                                         />
@@ -139,11 +219,21 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
                                         )}
                                     </div>
                                     {newQuestionImage && (
-                                        <div className="flex justify-end mt-2">
+                                        <div className="flex justify-between items-center mt-3">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setImageToCrop(newQuestionImage);
+                                                    setIsCropping(true);
+                                                }}
+                                                className="text-[13px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1.5 px-3 py-1.5 cursor-pointer rounded-lg hover:bg-indigo-500/10 transition-all active:scale-95"
+                                            >
+                                                <Scissors className="w-4 h-4" /> Recrop image
+                                            </button>
                                             <button
                                                 type="button"
                                                 onClick={() => setNewQuestionImage('')}
-                                                className="text-[13px] text-red-400 hover:text-red-300 flex items-center gap-1.5 px-3 py-1.5 cursor-pointer rounded-lg hover:bg-red-500/10 transition-all"
+                                                className="text-[13px] text-red-400 hover:text-red-300 flex items-center gap-1.5 px-3 py-1.5 cursor-pointer rounded-lg hover:bg-red-500/10 transition-all active:scale-95"
                                             >
                                                 <Trash2 className="w-4 h-4" /> Remove image
                                             </button>
@@ -190,6 +280,126 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
                     </div>
                 </div>
             </div>
+
+            {/* Cropper UI Overlay */}
+            {isCropping && (
+                <div className="fixed inset-0 z-[60] flex flex-col bg-[#0f0f1a]">
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-surface-1 shrink-0">
+                        <style>{cropStyles}</style>
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
+                                <Scissors className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h3 className="text-white font-semibold">Free-form Crop</h3>
+                                <p className="text-slate-400 text-xs">Select and rotate the question area</p>
+                            </div>
+                        </div>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => {
+                                    setIsCropping(false);
+                                    if (!newQuestionImage) setImageToCrop(null);
+                                }}
+                                className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white transition-all border border-white/5 bg-white/5 active:scale-95"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleApplyCrop}
+                                className="px-6 py-2 rounded-lg text-sm font-semibold bg-primary text-white shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all flex items-center gap-2 active:scale-95"
+                            >
+                                <Check className="w-4 h-4" /> Apply Crop
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="relative flex-1 bg-[#05050a] overflow-auto flex items-center justify-center p-4 md:p-8">
+                        <div className="transition-transform duration-200 ease-out flex items-center justify-center min-w-max min-h-max" style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}>
+                            <div className="relative inline-block" style={{ transform: `rotate(${rotation}deg)`, transition: 'transform 0.2s ease-out' }}>
+                                <ReactCrop
+                                    crop={crop}
+                                    onChange={(c) => setCrop(c)}
+                                    onComplete={(c) => setCompletedCrop(c)}
+                                    minHeight={20}
+                                    minWidth={20}
+                                >
+                                    <img
+                                        ref={imgRef}
+                                        alt="Crop me"
+                                        src={imageToCrop}
+                                        onLoad={onImageLoad}
+                                        style={{ maxHeight: '65vh', maxWidth: '100%', display: 'block' }}
+                                        crossOrigin="anonymous"
+                                    />
+                                </ReactCrop>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="px-6 py-6 border-t border-white/10 bg-surface-1 shrink-0">
+                        <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                            {/* Zoom Control */}
+                            <div className="flex flex-col">
+                                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-3 text-center md:text-left">Zoom Control</label>
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        onClick={() => setZoom(z => Math.max(1, z - 0.2))}
+                                        className="p-2.5 rounded-lg bg-surface-2 text-slate-400 hover:text-white border border-white/5 transition-all"
+                                    >
+                                        <ZoomOut className="w-5 h-5" />
+                                    </button>
+                                    <input
+                                        type="range"
+                                        value={zoom}
+                                        min={1}
+                                        max={3}
+                                        step={0.1}
+                                        onChange={(e) => setZoom(parseFloat(e.target.value))}
+                                        className="flex-1 h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer accent-primary"
+                                    />
+                                    <button
+                                        onClick={() => setZoom(z => Math.min(3, z + 0.2))}
+                                        className="p-2.5 rounded-lg bg-surface-2 text-slate-400 hover:text-white border border-white/5 transition-all"
+                                    >
+                                        <ZoomIn className="w-5 h-5" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Rotate Control */}
+                            <div className="flex flex-col">
+                                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-3 text-center md:text-left">Rotate ({rotation}°)</label>
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        onClick={() => setRotation(r => (r - 90) % 360)}
+                                        className="p-2.5 rounded-lg bg-surface-2 text-slate-400 hover:text-white border border-white/5 transition-all"
+                                        title="Rotate Left"
+                                    >
+                                        <RotateCw className="w-5 h-5 -scale-x-100" />
+                                    </button>
+                                    <input
+                                        type="range"
+                                        value={rotation}
+                                        min={0}
+                                        max={360}
+                                        step={1}
+                                        onChange={(e) => setRotation(parseInt(e.target.value))}
+                                        className="flex-1 h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer accent-indigo-400"
+                                    />
+                                    <button
+                                        onClick={() => setRotation(r => (r + 90) % 360)}
+                                        className="p-2.5 rounded-lg bg-surface-2 text-slate-400 hover:text-white border border-white/5 transition-all"
+                                        title="Rotate Right"
+                                    >
+                                        <RotateCw className="w-5 h-5" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </ModalPortal>
     );
 };
