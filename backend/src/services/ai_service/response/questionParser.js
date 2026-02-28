@@ -50,7 +50,27 @@ export const parseQuestionToRichText = async ({ content, type, topics = [] }) =>
     });
 
     const result = response.message?.content || '';
-    return JSON.parse(result);
+    const parsed = JSON.parse(result);
+
+    // Helper to restore backslashes for common LaTeX commands that JSON.parse misinterprets as control characters
+    const restoreMathEscapes = (text) => {
+      if (typeof text !== 'string') return text;
+      return text
+        .replace(/\u000c/g, '\\f')   // \frac
+        .replace(/\u0009/g, '\\t')   // \tau, \text, \theta
+        .replace(/\u0008/g, '\\b')   // \beta, \begin, \binom
+        .replace(/\u000d/g, '\\r')   // \rho, \rightarrow
+        .replace(/\u000b/g, '\\v');  // \vec, \vfill
+    };
+
+    if (parsed.questions && Array.isArray(parsed.questions)) {
+      parsed.questions = parsed.questions.map(q => ({
+        ...q,
+        question: restoreMathEscapes(q.question)
+      }));
+    }
+
+    return parsed;
 
   } catch (error) {
     console.error('parseQuestionToRichText error:', error);

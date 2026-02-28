@@ -50,13 +50,19 @@ QUESTION FIELD RULES
 ================================================
 - Remove global numbering (e.g., "1)", "Q1.", etc.).
 - Preserve original wording and meaning.
-- If options exist, append them AFTER the question using escaped newlines:
+- CLEAN OPTIONS: If options exist, append them AFTER the question using escaped newlines (\\n).
+- ONE LINE PER OPTION: Each option must be on its own line starting with standard labels: A), B), C), D).
+- REMOVE REDUNDANCY & OCR NOISE: If the source contains messy OCR repetitions (e.g. "5 / 8 5/8)"), consolidate them into a single clean value. Remove stray artifacts like unnecessary closing parentheses or broken layout symbols.
 
-Question text
-\\nA) option
-\\nB) option
-\\nC) option
-\\nD) option
+    Example of Messy OCR Input:
+    A. 
+    5
+    /
+    8
+    5/8)
+
+    Correct Cleaned Output:
+    A) \\(\\frac{5}{8}\\)
 
 - Do NOT create separate fields for options.
 - Do NOT summarize or rewrite questions.
@@ -82,21 +88,12 @@ Each question MUST contain 1–3 tags representing academic concepts tested.
 Tag generation rules:
 - Tags must describe CONCEPTS, not difficulty or format.
 - Prefer concise canonical academic terms (2–4 words).
-- Tags must match AVAILABLE TOPICS when provided.
-- If AVAILABLE TOPICS are given:
-  • Select the closest matching topics ONLY.
-  • Do NOT invent new topics unless absolutely necessary.
-- If no exact match exists, choose the nearest conceptual category.
-
-Examples:
-- "Breadth First Search" → "Graph Traversal"
-- Recurrence equation → "Recurrence Relations"
-- Lattice properties → "Lattice Theory"
+- If AVAILABLE TOPICS are provided above, PRIORITIZE selecting tags from that list.
 
 ================================================
 NORMALIZATION RULES
 ================================================
-- Remove formatting artifacts.
+- Remove formatting artifacts and OCR noise.
 - Fix broken line spacing.
 - Preserve semantic meaning.
 - Maintain clean readable text.
@@ -110,17 +107,6 @@ FAILURE CONDITIONS (NEVER DO)
 ❌ Create extra fields
 ❌ Output markdown/code fences
 ❌ Produce invalid JSON
-❌ Invent unrelated tags
-
-================================================
-VALIDATION BEFORE OUTPUT
-================================================
-Before responding internally verify:
-- JSON is valid.
-- Root object contains "questions".
-- Each item has BOTH "question" and "tags".
-- Tags length is between 1 and 3.
-- No empty strings exist.
 
 ================================================
 EXAMPLE

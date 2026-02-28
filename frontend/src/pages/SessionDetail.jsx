@@ -279,6 +279,74 @@ const SessionDetail = () => {
             </div>
 
             {/* ═══════════════════════════════════════ */}
+            {/* SECTION 1.5: Topic Distribution         */}
+            {/* ═══════════════════════════════════════ */}
+            {topicPerformance.length > 0 && (
+                <div className="glass p-6 rounded-2xl mb-10 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-primary/[0.04] rounded-full blur-3xl pointer-events-none" />
+                    <div className="flex items-center justify-between mb-8 relative z-10">
+                        <div className="flex items-center gap-2">
+                            <BarChart3 className="w-5 h-5 text-primary" />
+                            <h2 className="text-lg font-heading font-bold text-white tracking-tight">Question Distribution</h2>
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">{topicPerformance.length} topics covered</span>
+                    </div>
+
+                    <div className="h-[280px] w-full relative z-10">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                                data={[...topicPerformance].sort((a, b) => b.total - a.total).slice(0, 8)}
+                                layout="vertical"
+                                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                            >
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" horizontal={false} />
+                                <XAxis
+                                    type="number"
+                                    tick={{ fill: '#475569', fontSize: 11 }}
+                                    tickLine={false}
+                                    axisLine={false}
+                                />
+                                <YAxis
+                                    type="category"
+                                    dataKey="topicName"
+                                    tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    width={140}
+                                />
+                                <Tooltip
+                                    cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+                                    content={({ active, payload, label }) => {
+                                        if (active && payload && payload.length) {
+                                            return (
+                                                <div className="glass p-3 border border-indigo-500/20 rounded-xl shadow-2xl backdrop-blur-2xl text-sm ring-1 ring-white/10">
+                                                    <p className="text-white font-heading font-bold mb-1.5">{label}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-2 h-2 rounded-full bg-indigo-400" />
+                                                        <span className="text-slate-300">Questions: <span className="text-white font-bold">{payload[0].value}</span></span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    }}
+                                />
+                                <Bar dataKey="total" name="Questions" radius={[0, 6, 6, 0]}>
+                                    {([...topicPerformance].sort((a, b) => b.total - a.total).slice(0, 8)).map((entry, index) => (
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            fill="#8b5cf6"
+                                            fillOpacity={0.9 - (index * 0.1)}
+                                        />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            )}
+
+            {/* ═══════════════════════════════════════ */}
             {/* SECTION 2: Best & Weak Areas Spotlight  */}
             {/* ═══════════════════════════════════════ */}
             {topicPerformance.length > 0 && (

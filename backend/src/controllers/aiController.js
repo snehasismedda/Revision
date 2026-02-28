@@ -82,13 +82,19 @@ export const getInsights = async (req, res) => {
         });
         if (!subject) return res.status(404).json({ error: 'Subject not found' });
 
-        const [overview, weakAreas, trends] = await Promise.all([
+        const [overview, weakAreas, trends, topicDist] = await Promise.all([
             analyticsModel.getSubjectOverview({ subjectId }),
             analyticsModel.getWeakAreas({ subjectId, minEncounters: 1 }),
             analyticsModel.getSessionTrends({ subjectId }),
+            analyticsModel.getTopicPerformance({ subjectId }),
         ]);
 
-        const analyticsContext = JSON.stringify({ overview, weakAreas: weakAreas.slice(0, 5), recentTrends: trends.slice(-5) });
+        const analyticsContext = JSON.stringify({
+            overview,
+            weakAreas: weakAreas.slice(0, 5),
+            recentTrends: trends.slice(-8), // Send more context for trend analysis
+            effortDistribution: topicDist.sort((a, b) => b.total - a.total).slice(0, 8)
+        });
 
         const response = await ollama.chat({
             model: models.TEXT,
@@ -96,8 +102,11 @@ export const getInsights = async (req, res) => {
                 { role: "system", content: insightPrompt },
                 {
                     role: "user",
-                    content: `Based on this learning analytics data for the subject "${subject.name}", provide a brief, actionable performance summary in 3-4 sentences. Highlight the biggest weak area, mention whether performance is improving or declining, and give one specific study recommendation.
-            Analytics Data: ${analyticsContext}`
+                    content: `Based on this learning analytics data for the subject "${subject.name}", provide a brief, actionable performance summary in 3-4 sentences. 
+                    Highlight the biggest weak area, and compare the user's focus (seen in "effortDistribution") with their actual results.
+                    Mention whether overall performance is improving or declining based on the session trends, and provide one specific study recommendation.
+                    
+                    Analytics Data: ${analyticsContext}`
                 }
             ],
             stream: false
@@ -139,15 +148,15 @@ export const getSessionInsights = async (req, res) => {
             total: stats.total
         })).sort((a, b) => b.accuracy - a.accuracy);
 
-        const bestTopics = topics.filter(t => t.accuracy >= 75).slice(0, 3);
-        const weakTopics = topics.filter(t => t.accuracy < 50).slice(0, 3);
+        // Fetch session distribution for deeper context
+        const sessionDist = await analyticsModel.getSessionTopicDistribution({ sessionId });
 
         const analyticsContext = JSON.stringify({
             sessionTitle: session.title,
             sessionAccuracy: accuracy,
             totalQuestions: total,
-            bestTopics,
-            weakTopics,
+            topicsCovered: topics,
+            distribution: sessionDist,
             notes: session.notes
         });
 
@@ -162,7 +171,10 @@ export const getSessionInsights = async (req, res) => {
                 },
                 {
                     role: "user",
-                    content: `Based on this single study session's data, provide a brief, actionable performance summary in 3-4 sentences. Mention what went well, highlight the main topic that needs revision, and give one specific piece of advice for the next session.
+                    content: `Based on this single study session's data, provide a brief, actionable performance summary in 3-4 sentences. 
+                    Identify which topics dominated the session (from "distribution") and if that effort was reflected in accuracy.
+                    Highlight the main topic that needs revision, and give one specific piece of advice for the next session.
+                    
                     Analytics Data:
                     ${analyticsContext}`
                 }

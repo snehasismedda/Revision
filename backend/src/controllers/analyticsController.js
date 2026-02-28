@@ -91,3 +91,20 @@ export const getWeakAreas = async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch weak areas' });
     }
 };
+export const getSessionTopicDistribution = async (req, res) => {
+    try {
+        const stats = await analyticsModel.getSessionTopicDistribution({
+            sessionId: req.params.sessionId,
+        });
+
+        const formatted = stats.map((t) => ({
+            topicId: t.topic_id,
+            topicName: t.topic_name,
+            total: parseInt(t.total),
+        }));
+
+        res.status(200).json({ topics: formatted });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch session topic distribution' });
+    }
+};

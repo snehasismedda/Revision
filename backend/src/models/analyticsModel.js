@@ -121,3 +121,15 @@ export const getGlobalWeakAreas = async (userId) => {
         .orderByRaw('accuracy ASC, total DESC')
         .limit(5);
 };
+export const getSessionTopicDistribution = async (data) => {
+    return db('revision.session_entries as se')
+        .join('revision.topics as t', 'se.topic_id', 't.id')
+        .where('se.session_id', data.sessionId)
+        .where('se.is_deleted', false)
+        .groupBy('t.id', 't.name')
+        .select(
+            't.id as topic_id',
+            't.name as topic_name',
+            db.raw('COUNT(*) as total')
+        );
+};

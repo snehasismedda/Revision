@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import {
     AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
     Tooltip, ResponsiveContainer, Cell, ReferenceLine,
+    ComposedChart, Line
 } from 'recharts';
 import { analyticsApi, subjectsApi, aiApi } from '../api/index.js';
 import PerformanceBadge from '../components/PerformanceBadge.jsx';
@@ -44,13 +45,20 @@ const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
     return (
         <div className="glass p-3 border border-white/10 rounded-lg shadow-xl backdrop-blur-xl text-sm">
-            <p className="text-slate-300 font-heading font-semibold mb-1.5">{label}</p>
-            {payload.map((p) => (
-                <div key={p.name} className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
-                    <span className="font-medium text-white">{p.name}: {typeof p.value === 'number' ? `${p.value}%` : p.value}</span>
-                </div>
-            ))}
+            <p className="text-slate-200 font-heading font-bold mb-2 pb-2 border-b border-white/5">{label}</p>
+            <div className="space-y-2">
+                {payload.map((p) => (
+                    <div key={p.name} className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
+                            <span className="text-slate-400 text-xs font-medium">{p.name}</span>
+                        </div>
+                        <span className="font-bold text-white text-xs">
+                            {p.name.includes('Count') ? p.value : `${p.value}%`}
+                        </span>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 };
@@ -78,7 +86,18 @@ const Reports = () => {
                 ]);
                 setSubject(subRes.subject);
                 setOverview(ovRes.overview);
-                setTrends(trendsRes.trends);
+
+                // Process trends to add rolling average
+                const rawTrends = trendsRes.trends || [];
+                const processed = rawTrends.map((t, idx) => {
+                    const windowSize = 3;
+                    const start = Math.max(0, idx - windowSize + 1);
+                    const slice = rawTrends.slice(start, idx + 1);
+                    const avg = Math.round(slice.reduce((acc, curr) => acc + curr.accuracy, 0) / slice.length);
+                    return { ...t, trend: avg };
+                });
+
+                setTrends(processed);
                 setTopicPerf(topRes.topics.slice(0, 15));
                 setWeakAreas(weakRes.weakAreas);
             } finally {
@@ -225,53 +244,216 @@ const Reports = () => {
             {/* ═══════════════════════════════════════════════ */}
             {trends.length > 0 && (
                 <div className="glass p-6 rounded-xl mb-6 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-48 h-48 bg-primary/[0.04] rounded-full blur-3xl pointer-events-none" />
-                    <div className="flex items-center justify-between mb-6">
-                        <div className="flex items-center gap-2">
-                            <TrendingUp className="w-5 h-5 text-primary" />
-                            <h2 className="text-lg font-heading font-bold text-white tracking-tight">Session Accuracy Trend</h2>
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-primary/[0.03] rounded-full blur-3xl pointer-events-none" />
+                    <div className="flex items-center justify-between mb-8">
+                        <div>
+                            <div className="flex items-center gap-2 mb-1">
+                                <TrendingUp className="w-5 h-5 text-primary" />
+                                <h2 className="text-lg font-heading font-bold text-white tracking-tight">Performance Trend</h2>
+                            </div>
+                            <p className="text-[10px] text-slate-500 font-medium uppercase tracking-widest">Accuracy vs Intensity (Session Volume)</p>
                         </div>
-                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">{trends.length} sessions</span>
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-1.5">
+                                <div className="w-2 h-2 rounded-full bg-primary" />
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Accuracy</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <div className="w-2 h-0.5 bg-amber-400" />
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Moving Avg</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <div className="w-2 h-2 rounded-sm bg-white/10" />
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Volume</span>
+                            </div>
+                        </div>
                     </div>
-                    <div className="h-[260px] w-full">
+
+                    <div className="h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={trends} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
+                            <ComposedChart data={trends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                 <defs>
-                                    <linearGradient id="purpleGrad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor={PURPLE} stopOpacity={0.3} />
+                                    <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor={PURPLE} stopOpacity={0.2} />
                                         <stop offset="100%" stopColor={PURPLE} stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
                                 <XAxis
                                     dataKey="title"
-                                    tick={{ fill: '#475569', fontSize: 11, fontFamily: 'Inter' }}
+                                    tick={{ fill: '#475569', fontSize: 10, fontWeight: 500 }}
                                     tickLine={false}
                                     axisLine={false}
                                     dy={10}
                                 />
                                 <YAxis
+                                    yAxisId="left"
                                     domain={[0, 100]}
-                                    tick={{ fill: '#475569', fontSize: 11, fontFamily: 'Inter' }}
+                                    tick={{ fill: '#64748b', fontSize: 10 }}
                                     tickLine={false}
                                     axisLine={false}
                                     tickFormatter={(v) => `${v}%`}
-                                    dx={-10}
                                 />
-                                <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(139,92,246,0.15)', strokeWidth: 1 }} />
-                                <ReferenceLine y={75} stroke={EMERALD} strokeDasharray="4 4" opacity={0.2} label={{ value: '75%', fill: EMERALD, fontSize: 10, position: 'right' }} />
-                                <ReferenceLine y={50} stroke={AMBER} strokeDasharray="4 4" opacity={0.2} />
+                                <YAxis
+                                    yAxisId="right"
+                                    orientation="right"
+                                    domain={[0, 'auto']}
+                                    tick={{ fill: '#475569', fontSize: 10 }}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    hide={window.innerWidth < 768}
+                                />
+                                <Tooltip
+                                    content={<CustomTooltip />}
+                                    cursor={{ stroke: 'rgba(255,255,255,0.05)', strokeWidth: 1 }}
+                                />
+
+                                {/* Volume Bars */}
+                                <Bar
+                                    yAxisId="right"
+                                    dataKey="total"
+                                    name="Question Count"
+                                    fill="rgba(255,255,255,0.05)"
+                                    radius={[4, 4, 0, 0]}
+                                    barSize={20}
+                                />
+
+                                {/* Accuracy Area */}
                                 <Area
+                                    yAxisId="left"
                                     type="monotone"
                                     dataKey="accuracy"
                                     name="Accuracy"
                                     stroke={PURPLE}
-                                    strokeWidth={2.5}
-                                    fill="url(#purpleGrad)"
-                                    dot={{ fill: '#0a0a0f', stroke: PURPLE, strokeWidth: 2, r: 3.5 }}
+                                    strokeWidth={3}
+                                    fill="url(#trendGrad)"
+                                    dot={{ fill: '#0a0a0f', stroke: PURPLE, strokeWidth: 2, r: 4 }}
                                     activeDot={{ r: 6, fill: PURPLE, stroke: '#fff', strokeWidth: 2 }}
+                                    animationDuration={1500}
                                 />
-                            </AreaChart>
+
+                                {/* Moving Average Line */}
+                                <Line
+                                    yAxisId="left"
+                                    type="monotone"
+                                    dataKey="trend"
+                                    name="Trend (3-Session Avg)"
+                                    stroke="#f59e0b"
+                                    strokeWidth={2}
+                                    strokeDasharray="5 5"
+                                    dot={false}
+                                    activeDot={false}
+                                />
+
+                                <ReferenceLine yAxisId="left" y={75} stroke="#10b981" strokeDasharray="3 3" opacity={0.3} />
+                                <ReferenceLine yAxisId="left" y={50} stroke="#f59e0b" strokeDasharray="3 3" opacity={0.3} />
+
+                                {/* Lifetime Average Reference Line */}
+                                {overview && (
+                                    <ReferenceLine
+                                        yAxisId="left"
+                                        y={overview.accuracy}
+                                        stroke="rgba(255,255,255,0.2)"
+                                        strokeWidth={1}
+                                        label={{
+                                            value: `Avg: ${overview.accuracy}%`,
+                                            position: 'insideBottomRight',
+                                            fill: '#94a3b8',
+                                            fontSize: 9,
+                                            fontWeight: 700
+                                        }}
+                                    />
+                                )}
+                            </ComposedChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    {/* Trend Insights Footer */}
+                    <div className="mt-6 flex flex-wrap items-center gap-4 py-3 px-4 rounded-xl bg-white/[0.02] border border-white/5 relative z-10">
+                        <div className="flex items-center gap-2">
+                            <Activity className="w-4 h-4 text-primary" />
+                            <span className="text-[11px] font-semibold text-slate-300">Trend Insight:</span>
+                        </div>
+                        {(() => {
+                            const first = trends[0].trend;
+                            const last = trends[trends.length - 1].trend;
+                            const diff = last - first;
+                            return (
+                                <p className="text-[11px] text-slate-400">
+                                    {diff > 0 ? (
+                                        <>Your performance is <span className="text-emerald-400 font-bold">improving (+{diff}%)</span> based on the 3-session moving average.</>
+                                    ) : diff < 0 ? (
+                                        <>Performance has <span className="text-amber-400 font-bold">dipped ({diff}%)</span> recently. Consider reviewing older topics.</>
+                                    ) : (
+                                        <>Performance is holding <span className="text-indigo-400 font-bold">steady</span> over recent sessions.</>
+                                    )}
+                                </p>
+                            );
+                        })()}
+                        <div className="ml-auto flex items-center gap-3">
+                            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                Best Session: <span className="text-emerald-400">{Math.max(...trends.map(t => t.accuracy))}%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ═══════════════════════════════════════════════ */}
+            {/* SECTION 2.5: Topic Distribution — Questions per Topic */}
+            {/* ═══════════════════════════════════════════════ */}
+            {topicPerf.length > 0 && (
+                <div className="glass p-6 rounded-xl mb-6 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-400/[0.04] rounded-full blur-3xl pointer-events-none" />
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-2">
+                            <BookOpen className="w-5 h-5 text-emerald-400" />
+                            <h2 className="text-lg font-heading font-bold text-white tracking-tight">Most Questions Asked</h2>
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">{topicPerf.length} topics total</span>
+                    </div>
+                    <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                                data={[...topicPerf].sort((a, b) => b.total - a.total).slice(0, 10)}
+                                layout="vertical"
+                                margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
+                            >
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" horizontal={false} />
+                                <XAxis
+                                    type="number"
+                                    tick={{ fill: '#475569', fontSize: 11 }}
+                                    tickLine={false}
+                                    axisLine={false}
+                                />
+                                <YAxis
+                                    type="category"
+                                    dataKey="topicName"
+                                    tick={{ fill: '#94a3b8', fontSize: 11 }}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    width={120}
+                                />
+                                <Tooltip
+                                    cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+                                    content={({ active, payload, label }) => {
+                                        if (active && payload && payload.length) {
+                                            return (
+                                                <div className="glass p-3 border border-white/10 rounded-lg shadow-xl backdrop-blur-xl text-sm">
+                                                    <p className="text-white font-bold mb-1">{label}</p>
+                                                    <p className="text-emerald-400">Questions: {payload[0].value}</p>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    }}
+                                />
+                                <Bar dataKey="total" name="Questions" radius={[0, 4, 4, 0]}>
+                                    {([...topicPerf].sort((a, b) => b.total - a.total).slice(0, 10)).map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={PURPLE} fillOpacity={0.8 - (index * 0.05)} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
