@@ -13,6 +13,26 @@ import {
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeRaw from 'rehype-raw';
+import rehypeKatex from 'rehype-katex';
+
+const preprocessMarkdown = (text) => {
+    if (!text) return '';
+    return text
+        .replace(/\\\\\[/g, '\n$$\n')
+        .replace(/\\\\\]/g, '\n$$\n')
+        .replace(/\\\[/g, '\n$$\n')
+        .replace(/\\\]/g, '\n$$\n')
+        .replace(/\\\(/g, '$')
+        .replace(/\\\)/g, '$')
+        .replace(/\$\$\$\$/g, '$$\n$$')
+        .replace(/\$ \$/g, '$$')
+        .replace(/([^\n])\$\$/g, '$1\n$$')
+        .replace(/\$\$([^\n])/g, '$$\n$1')
+        .replace(/\\bottom([a-zA-Z])/g, '\\bot $1')
+        .replace(/\\bottom/g, '\\bot');
+};
 
 /* ── Mini sparkline-style progress bar ─────────────────────── */
 const MiniProgressBar = ({ value, max, colorClass = 'bg-primary' }) => {
@@ -327,8 +347,11 @@ const Dashboard = () => {
                                         />
                                     ) : (
                                         <div className="prose prose-invert prose-indigo max-w-none prose-p:leading-relaxed prose-headings:mb-4 prose-headings:mt-6 first:prose-headings:mt-0">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                                {globalInsight}
+                                            <ReactMarkdown
+                                                remarkPlugins={[remarkGfm, remarkMath]}
+                                                rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                            >
+                                                {preprocessMarkdown(globalInsight)}
                                             </ReactMarkdown>
                                         </div>
                                     )}

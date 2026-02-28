@@ -13,6 +13,28 @@ import {
     CheckCircle2, XCircle, Tags, Sparkles, TrendingUp,
     Activity, ChevronRight, BarChart3, AlertTriangle
 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeRaw from 'rehype-raw';
+import rehypeKatex from 'rehype-katex';
+
+const preprocessMarkdown = (text) => {
+    if (!text) return '';
+    return text
+        .replace(/\\\\\[/g, '\n$$\n')
+        .replace(/\\\\\]/g, '\n$$\n')
+        .replace(/\\\[/g, '\n$$\n')
+        .replace(/\\\]/g, '\n$$\n')
+        .replace(/\\\(/g, '$')
+        .replace(/\\\)/g, '$')
+        .replace(/\$\$\$\$/g, '$$\n$$')
+        .replace(/\$ \$/g, '$$')
+        .replace(/([^\n])\$\$/g, '$1\n$$')
+        .replace(/\$\$([^\n])/g, '$$\n$1')
+        .replace(/\\bottom([a-zA-Z])/g, '\\bot $1')
+        .replace(/\\bottom/g, '\\bot');
+};
 
 const EMERALD = '#10b981';
 const AMBER = '#f59e0b';
@@ -395,7 +417,14 @@ const SessionDetail = () => {
                     <div className="relative z-10 h-[280px] overflow-y-auto pr-1">
                         {insight ? (
                             <div className="p-4 rounded-xl bg-indigo-500/[0.03] border border-indigo-500/10">
-                                <p className="text-indigo-100/80 text-[14px] leading-[1.7] whitespace-pre-wrap">{insight}</p>
+                                <div className="prose prose-sm prose-invert prose-indigo max-w-none prose-p:leading-relaxed">
+                                    <ReactMarkdown
+                                        remarkPlugins={[remarkGfm, remarkMath]}
+                                        rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                    >
+                                        {preprocessMarkdown(insight)}
+                                    </ReactMarkdown>
+                                </div>
                             </div>
                         ) : (
                             <div className="h-full flex flex-col items-center justify-center text-center p-6 border border-dashed border-indigo-500/15 rounded-xl bg-indigo-500/[0.01]">

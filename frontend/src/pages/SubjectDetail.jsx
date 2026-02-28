@@ -23,10 +23,23 @@ import rehypeKatex from 'rehype-katex';
 const preprocessMarkdown = (text) => {
     if (!text) return '';
     return text
-        .replace(/\\\[/g, '$$$$')
-        .replace(/\\\]/g, '$$$$')
+        // Handle escaped block brackets: \[ ... \] or \\[ ... \\]
+        .replace(/\\\\\[/g, '\n$$\n')
+        .replace(/\\\\\]/g, '\n$$\n')
+        .replace(/\\\[/g, '\n$$\n')
+        .replace(/\\\]/g, '\n$$\n')
+        // Handle escaped inline brackets: \( ... \) or \\( ... \\)
+        .replace(/\\\\\(*/g, '$')
+        .replace(/\\\\\)* /g, '$')
         .replace(/\\\(/g, '$')
         .replace(/\\\)/g, '$')
+        // Handle back-to-back block math or sloppy delimiters
+        .replace(/\$\$\$\$/g, '$$\n$$')
+        .replace(/\$ \$/g, '$$')
+        // Ensure standard double dollars have newlines if they are likely blocks
+        .replace(/([^\n])\$\$/g, '$1\n$$')
+        .replace(/\$\$([^\n])/g, '$$\n$1')
+        // Fix common quirk
         .replace(/\\bottom([a-zA-Z])/g, '\\bot $1')
         .replace(/\\bottom/g, '\\bot');
 };

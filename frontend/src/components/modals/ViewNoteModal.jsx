@@ -11,13 +11,23 @@ import 'katex/dist/katex.min.css';
 const preprocessMarkdown = (text) => {
     if (!text) return '';
     return text
-        // Replace block math delimiters \[ \] with $$
-        .replace(/\\\[/g, '$$$$')
-        .replace(/\\\]/g, '$$$$')
-        // Replace inline math delimiters \( \) with $
+        // Handle escaped block brackets: \[ ... \] or \\[ ... \\]
+        .replace(/\\\\\[/g, '\n$$\n')
+        .replace(/\\\\\]/g, '\n$$\n')
+        .replace(/\\\[/g, '\n$$\n')
+        .replace(/\\\]/g, '\n$$\n')
+        // Handle escaped inline brackets: \( ... \) or \\( ... \\)
+        .replace(/\\\\\(*/g, '$')
+        .replace(/\\\\\)* /g, '$')
         .replace(/\\\(/g, '$')
         .replace(/\\\)/g, '$')
-        // Fix run-on math commands, e.g. \bottomb -> \bot b
+        // Handle back-to-back block math or sloppy delimiters
+        .replace(/\$\$\$\$/g, '$$\n$$')
+        .replace(/\$ \$/g, '$$')
+        // Ensure standard double dollars have newlines if they are likely blocks
+        .replace(/([^\n])\$\$/g, '$1\n$$')
+        .replace(/\$\$([^\n])/g, '$$\n$1')
+        // Fix common quirk
         .replace(/\\bottom([a-zA-Z])/g, '\\bot $1')
         .replace(/\\bottom/g, '\\bot');
 };
