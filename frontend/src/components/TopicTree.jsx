@@ -202,15 +202,8 @@ const TopicNode = ({ topic, subjectId, depth = 0, onDeleted, onSubtopicAdded, on
     );
 };
 
-const TopicTree = ({ topics, subjectId, onTopicDeleted, onTopicsChanged }) => {
+const TopicTree = ({ topics, subjectId, onTopicDeleted, onTopicsChanged, defaultExpanded = true }) => {
     const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null, name: '' });
-    const [treeKey, setTreeKey] = useState(0);
-    const [defaultExpanded, setDefaultExpanded] = useState(true);
-
-    const toggleAll = (expand) => {
-        setDefaultExpanded(expand);
-        setTreeKey(prev => prev + 1);
-    };
 
     const handleDelete = async () => {
         const { id, name } = confirmDelete;
@@ -280,33 +273,7 @@ const TopicTree = ({ topics, subjectId, onTopicDeleted, onTopicsChanged }) => {
 
             <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
 
-            {/* Header with toggle buttons */}
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/[0.03]">
-                <div className="flex items-center gap-2">
-                    <GitBranch className="w-4 h-4 text-primary/60" />
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Hierarchy View</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <button
-                        onClick={() => toggleAll(true)}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-slate-400 hover:text-primary hover:bg-primary/10 border border-white/5 transition-all cursor-pointer"
-                        title="Expand all"
-                    >
-                        <Maximize2 className="w-3 h-3" />
-                        <span>EXPAND ALL</span>
-                    </button>
-                    <button
-                        onClick={() => toggleAll(false)}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-slate-400 hover:text-white hover:bg-white/10 border border-white/5 transition-all cursor-pointer"
-                        title="Collapse all"
-                    >
-                        <Minimize2 className="w-3 h-3" />
-                        <span>COLLAPSE ALL</span>
-                    </button>
-                </div>
-            </div>
-
-            <div className="space-y-1" key={treeKey}>
+            <div className="space-y-1">
                 {topics.map((topic) => (
                     <TopicNode
                         key={topic.id}

@@ -80,6 +80,7 @@ export const aiApi = {
 export const questionsApi = {
     list: (subjectId) => request(`/subjects/${subjectId}/questions`),
     create: (subjectId, body) => request(`/subjects/${subjectId}/questions`, { method: 'POST', body }),
+    update: (subjectId, questionId, body) => request(`/subjects/${subjectId}/questions/${questionId}`, { method: 'PUT', body }),
     delete: (subjectId, questionId) => request(`/subjects/${subjectId}/questions/${questionId}`, { method: 'DELETE' }),
     getImage: (subjectId, questionId) => request(`/subjects/${subjectId}/questions/${questionId}/image`),
 };

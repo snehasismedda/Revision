@@ -6,9 +6,10 @@ import SessionCard from '../components/SessionCard.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import RichTextRenderer from '../components/RichTextRenderer.jsx';
 import toast from 'react-hot-toast';
-import { ArrowLeft, PlusCircle, BarChart3, Wand2, BookOpen, Layers, Activity, HelpCircle, FileText, Image as ImageIcon, Trash2, Link2 as LinkIcon, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowLeft, PlusCircle, BarChart3, Wand2, BookOpen, Activity, HelpCircle, FileText, Image as ImageIcon, Trash2, ChevronDown, Pencil, Hash, Search, X, Link2 as LinkIcon, Maximize2, Minimize2 } from 'lucide-react';
 import ManageSyllabusModal from '../components/modals/ManageSyllabusModal.jsx';
 import AddQuestionModal from '../components/modals/AddQuestionModal.jsx';
+import EditQuestionModal from '../components/modals/EditQuestionModal.jsx';
 import AddNoteModal from '../components/modals/AddNoteModal.jsx';
 import ViewNoteModal from '../components/modals/ViewNoteModal.jsx';
 import CreateSessionModal from '../components/modals/CreateSessionModal.jsx';
@@ -51,8 +52,15 @@ const SubjectDetail = () => {
     const [confirmDeleteQuestion, setConfirmDeleteQuestion] = useState({ open: false, questionId: null });
     const [confirmDeleteNote, setConfirmDeleteNote] = useState({ open: false, note: null });
     const [editingSession, setEditingSession] = useState(null);
+    const [editingQuestion, setEditingQuestion] = useState(null);
+    const [showEditQuestionModal, setShowEditQuestionModal] = useState(false);
     const [fetchingImageId, setFetchingImageId] = useState(null);
     const [fetchedImages, setFetchedImages] = useState({});
+    const [searchQuery, setSearchQuery] = useState('');
+    const [noteSearchQuery, setNoteSearchQuery] = useState('');
+    const [sessionSearchQuery, setSessionSearchQuery] = useState('');
+    const [topicsDefaultExpanded, setTopicsDefaultExpanded] = useState(true);
+    const [treeKey, setTreeKey] = useState(0);
 
     // Toggle state for grouped questions
     const [expandedGroups, setExpandedGroups] = useState({});
@@ -96,6 +104,10 @@ const SubjectDetail = () => {
     const handleQuestionAdded = (newQuestions) => {
         // newQuestions is always an array (may contain 1 or more)
         setQuestions((prev) => [...newQuestions, ...prev]);
+    };
+
+    const handleQuestionUpdated = (updatedQ) => {
+        setQuestions(prev => prev.map(q => q.id === updatedQ.id ? { ...q, ...updatedQ } : q));
     };
 
     const handleNoteAdded = (newNote) => {
@@ -241,9 +253,21 @@ const SubjectDetail = () => {
 
     // Group questions by source
     const groupedQuestions = React.useMemo(() => {
+        const filtered = !searchQuery.trim() ? questions : questions.filter(q => {
+            const query = searchQuery.toLowerCase().trim();
+            let qTags = [];
+            try {
+                qTags = typeof q.tags === 'string' ? JSON.parse(q.tags) : (q.tags || []);
+            } catch (e) {
+                qTags = [];
+            }
+            return qTags.some(tag => tag.toLowerCase().includes(query)) ||
+                q.content?.toLowerCase().includes(query);
+        });
+
         const groups = {};
         // First pass: identify all potential roots and initialize groups
-        questions.forEach(q => {
+        filtered.forEach(q => {
             const rootId = q.source_image_id || q.id;
             if (!groups[rootId]) {
                 groups[rootId] = [];
@@ -251,14 +275,12 @@ const SubjectDetail = () => {
         });
 
         // Second pass: assign questions to groups
-        // We want to preserve the overall order of questions by their newest member
-        questions.forEach(q => {
+        filtered.forEach(q => {
             const rootId = q.source_image_id || q.id;
             groups[rootId].push(q);
         });
 
-        // Sort questions within groups by created_at ascending (if they have source_image_id) 
-        // or just keep them as they are. Usually q.id is the root, others are siblings.
+        // Sort questions within groups by created_at ascending
         Object.keys(groups).forEach(rootId => {
             groups[rootId].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
         });
@@ -270,7 +292,7 @@ const SubjectDetail = () => {
             isGroup: qs.length > 1,
             newestAt: new Date(Math.max(...qs.map(q => new Date(q.created_at))))
         })).sort((a, b) => b.newestAt - a.newestAt);
-    }, [questions]);
+    }, [questions, searchQuery]);
 
     if (loading) {
         return (
@@ -401,6 +423,18 @@ const SubjectDetail = () => {
                 onNavigateToQuestion={navigateToQuestion}
             />
 
+            <EditQuestionModal
+                isOpen={showEditQuestionModal}
+                onClose={() => {
+                    setShowEditQuestionModal(false);
+                    setEditingQuestion(null);
+                }}
+                subjectId={id}
+                question={editingQuestion}
+                topics={topics}
+                onQuestionUpdated={handleQuestionUpdated}
+            />
+
             {/* Header Navigation */}
             <div className="flex items-center gap-3 mb-4">
                 <Link
@@ -513,22 +547,66 @@ const SubjectDetail = () => {
             {/* Main Content Area */}
             {activeTab === 'topics' && (
                 <div className="fade-in">
-                    <div className="flex items-center justify-between mb-6 border-b border-white/[0.08] pb-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
                         <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Syllabus</h3>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => {
+                                    setTopicsDefaultExpanded(true);
+                                    setTreeKey(prev => prev + 1);
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-400 hover:text-primary hover:bg-primary/10 border border-white/5 transition-all cursor-pointer uppercase tracking-wider"
+                                title="Expand all"
+                            >
+                                <Maximize2 className="w-3.5 h-3.5" />
+                                <span>Expand All</span>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setTopicsDefaultExpanded(false);
+                                    setTreeKey(prev => prev + 1);
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white hover:bg-white/10 border border-white/5 transition-all cursor-pointer uppercase tracking-wider"
+                                title="Collapse all"
+                            >
+                                <Minimize2 className="w-3.5 h-3.5" />
+                                <span>Collapse All</span>
+                            </button>
+                        </div>
                     </div>
                     <TopicTree
+                        key={treeKey}
                         topics={topics}
                         subjectId={id}
                         onTopicDeleted={handleTopicDeleted}
                         onTopicsChanged={setTopics}
+                        defaultExpanded={topicsDefaultExpanded}
                     />
                 </div>
             )}
 
             {activeTab === 'sessions' && (
                 <div className="fade-in">
-                    <div className="flex items-center justify-between mb-6 border-b border-white/[0.08] pb-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
                         <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Study Sessions</h3>
+                        <div className="relative group min-w-[300px]">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                            <input
+                                type="text"
+                                value={sessionSearchQuery}
+                                onChange={(e) => setSessionSearchQuery(e.target.value)}
+                                placeholder="Search sessions..."
+                                className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                            />
+                            {sessionSearchQuery && (
+                                <button
+                                    onClick={() => setSessionSearchQuery('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     {sessions.length === 0 ? (
@@ -550,15 +628,32 @@ const SubjectDetail = () => {
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                            {sessions.map((s) => (
-                                <SessionCard
-                                    key={s.id}
-                                    session={s}
-                                    subjectId={id}
-                                    onDelete={(session) => setConfirmDeleteSession({ open: true, session })}
-                                    onEdit={(session) => setEditingSession(session)}
-                                />
-                            ))}
+                            {(() => {
+                                const filtered = sessions.filter(s =>
+                                    s.name?.toLowerCase().includes(sessionSearchQuery.toLowerCase()) ||
+                                    s.notes?.toLowerCase().includes(sessionSearchQuery.toLowerCase())
+                                );
+
+                                if (filtered.length === 0 && sessions.length > 0) {
+                                    return (
+                                        <div className="col-span-full py-12 flex flex-col items-center justify-center text-center bg-white/[0.02] rounded-2xl border border-white/[0.05] border-dashed">
+                                            <Search className="w-8 h-8 text-slate-600 mb-3" />
+                                            <p className="text-slate-400 font-medium">No sessions match your search</p>
+                                            <button onClick={() => setSessionSearchQuery('')} className="mt-2 text-indigo-400 text-sm hover:underline">Clear search</button>
+                                        </div>
+                                    );
+                                }
+
+                                return filtered.map((s) => (
+                                    <SessionCard
+                                        key={s.id}
+                                        session={s}
+                                        subjectId={id}
+                                        onDelete={(session) => setConfirmDeleteSession({ open: true, session })}
+                                        onEdit={(session) => setEditingSession(session)}
+                                    />
+                                ));
+                            })()}
                         </div>
                     )}
                 </div>
@@ -567,8 +662,26 @@ const SubjectDetail = () => {
             {activeTab === 'questions' && (
                 <div className="fade-in">
                     {/* Header for Questions */}
-                    <div className="flex items-center justify-between mb-6 border-b border-white/[0.08] pb-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
                         <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Question Bank</h3>
+                        <div className="relative group min-w-[300px]">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Search by content or topic tags..."
+                                className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 gap-6 items-start">
@@ -591,6 +704,20 @@ const SubjectDetail = () => {
                                     >
                                         <PlusCircle className="w-4 h-4" />
                                         <span>Add Your First Question</span>
+                                    </button>
+                                </div>
+                            ) : groupedQuestions.length === 0 ? (
+                                <div className="glass p-16 text-center rounded-xl border-dashed border-white/10 flex flex-col items-center">
+                                    <div className="w-16 h-16 rounded-2xl bg-surface-2 flex items-center justify-center mb-4 border border-white/5">
+                                        <Search className="w-8 h-8 text-slate-600" />
+                                    </div>
+                                    <h4 className="text-lg font-bold text-white mb-1">No matching questions</h4>
+                                    <p className="text-slate-500 text-sm">Try adjusting your search query or tags</p>
+                                    <button
+                                        onClick={() => setSearchQuery('')}
+                                        className="mt-6 text-indigo-400 hover:text-indigo-300 text-sm font-semibold"
+                                    >
+                                        Clear Search
                                     </button>
                                 </div>
                             ) : (
@@ -618,6 +745,16 @@ const SubjectDetail = () => {
                                                         </span>
 
                                                         <div className="flex items-center gap-1 ml-2">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setEditingQuestion(q);
+                                                                    setShowEditQuestionModal(true);
+                                                                }}
+                                                                className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer"
+                                                                title="Edit Question"
+                                                            >
+                                                                <Pencil className="w-[18px] h-[18px]" />
+                                                            </button>
                                                             <button
                                                                 onClick={() => {
                                                                     setSelectedQuestionIdForNote(q.id);
@@ -660,6 +797,27 @@ const SubjectDetail = () => {
                                                             <p className="whitespace-pre-wrap">{q.content}</p>
                                                         )}
                                                     </div>
+
+                                                    {/* Tags display */}
+                                                    {(() => {
+                                                        let qTags = [];
+                                                        try {
+                                                            qTags = typeof q.tags === 'string' ? JSON.parse(q.tags) : (q.tags || []);
+                                                        } catch (e) {
+                                                            qTags = [];
+                                                        }
+                                                        if (!qTags || qTags.length === 0) return null;
+                                                        return (
+                                                            <div className="mt-4 flex flex-wrap gap-2">
+                                                                {qTags.map((tag, idx) => (
+                                                                    <span key={idx} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                                        <Hash className="w-2.5 h-2.5" />
+                                                                        {tag}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        );
+                                                    })()}
 
                                                     {q.type === 'image' && (
                                                         <div className="mt-5">
@@ -751,6 +909,16 @@ const SubjectDetail = () => {
                                                                         <div className="flex items-center gap-1 ml-2">
                                                                             <button
                                                                                 onClick={() => {
+                                                                                    setEditingQuestion(q);
+                                                                                    setShowEditQuestionModal(true);
+                                                                                }}
+                                                                                className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer"
+                                                                                title="Edit Question"
+                                                                            >
+                                                                                <Pencil className="w-[18px] h-[18px]" />
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => {
                                                                                     setSelectedQuestionIdForNote(q.id);
                                                                                     setShowNoteModal(true);
                                                                                 }}
@@ -791,6 +959,27 @@ const SubjectDetail = () => {
                                                                             <p className="whitespace-pre-wrap">{q.content}</p>
                                                                         )}
                                                                     </div>
+
+                                                                    {/* Tags display */}
+                                                                    {(() => {
+                                                                        let qTags = [];
+                                                                        try {
+                                                                            qTags = typeof q.tags === 'string' ? JSON.parse(q.tags) : (q.tags || []);
+                                                                        } catch (e) {
+                                                                            qTags = [];
+                                                                        }
+                                                                        if (!qTags || qTags.length === 0) return null;
+                                                                        return (
+                                                                            <div className="mt-4 flex flex-wrap gap-2">
+                                                                                {qTags.map((tag, idx) => (
+                                                                                    <span key={idx} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                                                        <Hash className="w-2.5 h-2.5" />
+                                                                                        {tag}
+                                                                                    </span>
+                                                                                ))}
+                                                                            </div>
+                                                                        );
+                                                                    })()}
 
                                                                     {q.type === 'image' && qidx === 0 && (
                                                                         <div className="mt-5">
@@ -844,8 +1033,26 @@ const SubjectDetail = () => {
 
             {activeTab === 'notes' && (
                 <div className="fade-in">
-                    <div className="flex items-center justify-between mb-6 border-b border-white/[0.08] pb-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
                         <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Notes</h3>
+                        <div className="relative group min-w-[300px]">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                            <input
+                                type="text"
+                                value={noteSearchQuery}
+                                onChange={(e) => setNoteSearchQuery(e.target.value)}
+                                placeholder="Search notes by title or content..."
+                                className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                            />
+                            {noteSearchQuery && (
+                                <button
+                                    onClick={() => setNoteSearchQuery('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     <div className="w-full">
@@ -859,7 +1066,10 @@ const SubjectDetail = () => {
                                     Add your first note to start building your knowledge base.
                                 </p>
                                 <button
-                                    onClick={() => setShowNoteModal(true)}
+                                    onClick={() => {
+                                        setSelectedQuestionIdForNote(null);
+                                        setShowNoteModal(true);
+                                    }}
                                     className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
                                 >
                                     <PlusCircle className="w-4 h-4" />
@@ -868,72 +1078,87 @@ const SubjectDetail = () => {
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                                {notes.map((note) => (
-                                    <div
-                                        key={note.id}
-                                        id={`note-${note.id}`}
-                                        className="glass-panel p-5 rounded-xl border border-white/[0.06] hover:border-emerald-500/30 hover:bg-white/[0.02] cursor-pointer transition-all flex flex-col group relative overflow-hidden"
-                                        onClick={() => setViewingNote(note)}
-                                    >
-                                        {/* Optional background glow */}
-                                        <div className="absolute -right-10 -top-10 w-24 h-24 bg-emerald-500/10 blur-3xl rounded-full"></div>
+                                {(() => {
+                                    const filtered = notes.filter(n =>
+                                        n.title?.toLowerCase().includes(noteSearchQuery.toLowerCase()) ||
+                                        n.content?.toLowerCase().includes(noteSearchQuery.toLowerCase())
+                                    );
 
-                                        <div className="flex justify-between items-start mb-4 relative z-10">
-                                            <div className="flex items-start gap-3 mt-1">
-                                                <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
-                                                    <FileText className="w-4 h-4" />
+                                    if (filtered.length === 0 && notes.length > 0) {
+                                        return (
+                                            <div className="col-span-full py-12 flex flex-col items-center justify-center text-center bg-white/[0.02] rounded-2xl border border-white/[0.05] border-dashed">
+                                                <Search className="w-8 h-8 text-slate-600 mb-3" />
+                                                <p className="text-slate-400 font-medium">No notes match your search</p>
+                                                <button onClick={() => setNoteSearchQuery('')} className="mt-2 text-indigo-400 text-sm hover:underline">Clear search</button>
+                                            </div>
+                                        );
+                                    }
+
+                                    return filtered.map((note) => (
+                                        <div
+                                            key={note.id}
+                                            id={`note-${note.id}`}
+                                            className="glass-panel p-5 rounded-xl border border-white/[0.06] hover:border-emerald-500/30 hover:bg-white/[0.02] cursor-pointer transition-all flex flex-col group relative overflow-hidden"
+                                            onClick={() => setViewingNote(note)}
+                                        >
+                                            {/* Optional background glow */}
+                                            <div className="absolute -right-10 -top-10 w-24 h-24 bg-emerald-500/10 blur-3xl rounded-full"></div>
+
+                                            <div className="flex justify-between items-start mb-4 relative z-10">
+                                                <div className="flex items-start gap-3 mt-1">
+                                                    <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
+                                                        <FileText className="w-4 h-4" />
+                                                    </div>
+                                                    <h4 className="text-[15px] font-heading font-bold text-white leading-snug break-words">
+                                                        {note.title}
+                                                    </h4>
                                                 </div>
-                                                <h4 className="text-[15px] font-heading font-bold text-white leading-snug break-words">
-                                                    {note.title}
-                                                </h4>
-                                            </div>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setConfirmDeleteNote({ open: true, note });
-                                                }}
-                                                className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100 cursor-pointer shrink-0 ml-2"
-                                                title="Delete Note"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                        <div className="text-sm text-slate-300 line-clamp-5 leading-relaxed mb-5 flex-1 relative z-10 overflow-hidden">
-                                            <div className="prose prose-sm prose-invert max-w-none prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mt-0 prose-p:mb-2 prose-headings:font-bold prose-headings:text-white prose-headings:m-0 prose-headings:mb-1.5 prose-h1:text-[15px] prose-h2:text-[14px] prose-h3:text-[13px] prose-a:text-indigo-400 prose-code:text-emerald-300 prose-code:bg-emerald-500/10 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
-                                                <ReactMarkdown
-                                                    remarkPlugins={[remarkGfm, remarkMath]}
-                                                    rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
-                                                >
-                                                    {preprocessMarkdown(note.content)}
-                                                </ReactMarkdown>
-                                            </div>
-                                        </div>
-
-
-
-                                        <div className="text-[11px] font-medium text-slate-500 flex items-center justify-between pt-3 border-t border-white/[0.06] mt-auto relative z-10">
-                                            <span>
-                                                {new Date(note.created_at).toLocaleDateString(undefined, {
-                                                    day: 'numeric',
-                                                    month: 'short',
-                                                    year: 'numeric'
-                                                })}
-                                            </span>
-                                            {note.question_id && (
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        navigateToQuestion(note.question_id);
+                                                        setConfirmDeleteNote({ open: true, note });
                                                     }}
-                                                    className="flex items-center gap-1 hover:text-indigo-400 transition-colors cursor-pointer text-[12px]"
+                                                    className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100 cursor-pointer shrink-0 ml-2"
+                                                    title="Delete Note"
                                                 >
-                                                    <LinkIcon className="w-3.5 h-3.5" />
-                                                    <span>Source Question</span>
+                                                    <Trash2 className="w-4 h-4" />
                                                 </button>
-                                            )}
+                                            </div>
+                                            <div className="text-sm text-slate-300 line-clamp-5 leading-relaxed mb-5 flex-1 relative z-10 overflow-hidden">
+                                                <div className="prose prose-sm prose-invert max-w-none prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mt-0 prose-p:mb-2 prose-headings:font-bold prose-headings:text-white prose-headings:m-0 prose-headings:mb-1.5 prose-h1:text-[15px] prose-h2:text-[14px] prose-h3:text-[13px] prose-a:text-indigo-400 prose-code:text-emerald-300 prose-code:bg-emerald-500/10 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
+                                                    <ReactMarkdown
+                                                        remarkPlugins={[remarkGfm, remarkMath]}
+                                                        rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                                    >
+                                                        {preprocessMarkdown(note.content)}
+                                                    </ReactMarkdown>
+                                                </div>
+                                            </div>
+
+                                            <div className="text-[11px] font-medium text-slate-500 flex items-center justify-between pt-3 border-t border-white/[0.06] mt-auto relative z-10">
+                                                <span>
+                                                    {new Date(note.created_at).toLocaleDateString(undefined, {
+                                                        day: 'numeric',
+                                                        month: 'short',
+                                                        year: 'numeric'
+                                                    })}
+                                                </span>
+                                                {note.question_id && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            navigateToQuestion(note.question_id);
+                                                        }}
+                                                        className="flex items-center gap-1 hover:text-indigo-400 transition-colors cursor-pointer text-[12px]"
+                                                    >
+                                                        <LinkIcon className="w-3.5 h-3.5" />
+                                                        <span>Source Question</span>
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ));
+                                })()}
                             </div>
                         )}
                     </div>

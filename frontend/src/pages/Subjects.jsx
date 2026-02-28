@@ -5,7 +5,7 @@ import SubjectCard from '../components/SubjectCard.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import SubjectModal from '../components/modals/SubjectModal.jsx';
 import toast from 'react-hot-toast';
-import { LibraryBig, PlusCircle, Trash2, Edit2, BookOpen } from 'lucide-react';
+import { LibraryBig, PlusCircle, Trash2, Edit2, BookOpen, Search, X } from 'lucide-react';
 
 const Subjects = () => {
     const [subjects, setSubjects] = useState([]);
@@ -14,6 +14,7 @@ const Subjects = () => {
     const [editingSubject, setEditingSubject] = useState(null);
     const [statsMap, setStatsMap] = useState({});
     const [searchParams] = useSearchParams();
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Custom confirm state
     const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null, name: '' });
@@ -98,15 +99,36 @@ const Subjects = () => {
                     <h1 className="text-3xl font-heading font-bold text-white tracking-tight">Subjects</h1>
                     <p className="text-slate-400 text-sm mt-1.5">{subjects.length} subject{subjects.length !== 1 ? 's' : ''} in your library</p>
                 </div>
-                <button
-                    onClick={() => {
-                        setEditingSubject(null);
-                        setShowModal(true);
-                    }}
-                    className="btn-primary flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl transition-all cursor-pointer"
-                >
-                    <PlusCircle className="w-4 h-4" /> New Subject
-                </button>
+
+                <div className="flex items-center gap-4">
+                    <div className="relative group hidden md:block">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-primary transition-colors" />
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Filter subjects..."
+                            className="bg-surface-2/50 border border-white/[0.08] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white w-[240px] focus:outline-none focus:border-primary/40 focus:bg-surface-2 transition-all"
+                        />
+                        {searchQuery && (
+                            <button
+                                onClick={() => setSearchQuery('')}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
+                    <button
+                        onClick={() => {
+                            setEditingSubject(null);
+                            setShowModal(true);
+                        }}
+                        className="btn-primary flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl transition-all cursor-pointer"
+                    >
+                        <PlusCircle className="w-4 h-4" /> New Subject
+                    </button>
+                </div>
             </div>
 
             <SubjectModal
@@ -148,15 +170,18 @@ const Subjects = () => {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {subjects.map((s) => (
-                        <SubjectCard
-                            key={s.id}
-                            subject={s}
-                            stats={statsMap[s.id]}
-                            onEdit={handleEditClick}
-                            onDelete={(subj) => setConfirmDelete({ open: true, id: subj.id, name: subj.name })}
-                        />
-                    ))}
+                    {subjects
+                        .filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            s.description?.toLowerCase().includes(searchQuery.toLowerCase()))
+                        .map((s) => (
+                            <SubjectCard
+                                key={s.id}
+                                subject={s}
+                                stats={statsMap[s.id]}
+                                onEdit={handleEditClick}
+                                onDelete={(subj) => setConfirmDelete({ open: true, id: subj.id, name: subj.name })}
+                            />
+                        ))}
                 </div>
             )}
         </div>

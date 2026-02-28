@@ -9,6 +9,7 @@ router.use(authenticate);
 router.get('/', questionController.getQuestions);
 router.get('/:questionId/image', questionController.getQuestionImage);
 router.post('/', questionController.createQuestion);
+router.put('/:questionId', questionController.updateQuestion);
 router.delete('/:questionId', questionController.deleteQuestion);
 
 export default router;

@@ -91,3 +91,30 @@ export const deleteQuestion = async (req, res, next) => {
         next(error);
     }
 };
+
+export const updateQuestion = async (req, res, next) => {
+    try {
+        const { subjectId, questionId } = req.params;
+        const { topicId, content, type, tags } = req.body;
+
+        const updateData = {};
+        if (topicId !== undefined) updateData.topic_id = topicId;
+        if (content !== undefined) updateData.content = content;
+        if (type !== undefined) updateData.type = type;
+        if (tags !== undefined) updateData.tags = JSON.stringify(tags);
+
+        // If content changed, we might want to re-parse it
+        if (content) {
+            const typeValue = type || 'text';
+            const parsedQuestions = await parseQuestionToRichText({ content, type: typeValue });
+            if (parsedQuestions && parsedQuestions.length > 0) {
+                updateData.formatted_content = JSON.stringify(parsedQuestions[0]);
+            }
+        }
+
+        const question = await questionModel.updateQuestion(questionId, subjectId, updateData);
+        res.json({ question });
+    } catch (error) {
+        next(error);
+    }
+};
