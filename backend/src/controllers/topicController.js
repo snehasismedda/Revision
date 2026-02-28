@@ -2,29 +2,10 @@ import * as topicModel from '../models/topicModel.js';
 import * as subjectModel from '../models/subjectModel.js';
 import * as deletionService from '../services/deletionService.js';
 
-const buildTopicTree = (topics) => {
-    const map = {};
-    const roots = [];
-
-    topics.forEach((t) => {
-        map[t.id] = { ...t, children: [] };
-    });
-
-    topics.forEach((t) => {
-        if (t.parent_id && map[t.parent_id]) {
-            map[t.parent_id].children.push(map[t.id]);
-        } else {
-            roots.push(map[t.id]);
-        }
-    });
-
-    return roots;
-};
-
 export const getTopics = async (req, res) => {
     try {
         const topics = await topicModel.findTopicsBySubject({ subjectId: req.params.subjectId });
-        res.status(200).json({ topics: buildTopicTree(topics) });
+        res.status(200).json({ topics: topicModel.buildTopicTree(topics) });
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch topics' });
     }

@@ -1,5 +1,24 @@
 import db from '../knex/db.js';
 
+export const buildTopicTree = (topics) => {
+    const map = {};
+    const roots = [];
+
+    topics.forEach((t) => {
+        map[t.id] = { ...t, children: [] };
+    });
+
+    topics.forEach((t) => {
+        if (t.parent_id && map[t.parent_id]) {
+            map[t.parent_id].children.push(map[t.id]);
+        } else {
+            roots.push(map[t.id]);
+        }
+    });
+
+    return roots;
+};
+
 export const createTopic = async (data) => {
     const [topic] = await db('revision.topics')
         .insert({
@@ -12,21 +31,44 @@ export const createTopic = async (data) => {
     return topic;
 };
 
-export const bulkCreateTopics = async (data) => {
-    const rows = data.topics.map((t, i) => ({
-        subject_id: data.subjectId,
-        parent_id: t.parentId || null,
-        name: t.name,
-        order_index: t.orderIndex ?? i,
-    }));
-    return db('revision.topics').insert(rows).returning('*');
+export const bulkCreateTopics = async (data, trx) => {
+    const { subjectId, topics } = data;
+    const dbToUse = trx || db;
+    const created = [];
+
+    const insertNode = async (node, parentId = null, depth = 0, sortOrder = 0) => {
+        const [inserted] = await dbToUse('revision.topics')
+            .insert({
+                subject_id: subjectId,
+                parent_id: parentId,
+                name: node.name,
+                depth: depth,
+                sort_order: sortOrder,
+                order_index: sortOrder,
+            })
+            .returning('*');
+
+        created.push(inserted);
+
+        if (node.children && Array.isArray(node.children)) {
+            for (let i = 0; i < node.children.length; i++) {
+                await insertNode(node.children[i], inserted.id, depth + 1, i);
+            }
+        }
+    };
+
+    for (let i = 0; i < topics.length; i++) {
+        await insertNode(topics[i], null, 0, i);
+    }
+
+    return created;
 };
 
 export const findTopicsBySubject = async (data) => {
     return db('revision.topics')
         .where('subject_id', data.subjectId)
         .where('is_deleted', false)
-        .orderBy(['parent_id', 'order_index'])
+        .orderBy(['depth', 'sort_order'])
         .select('*');
 };
 

@@ -1,0 +1,9 @@
+-- Down migration for initial_schema
+DROP TABLE IF EXISTS revision.session_entries;
+DROP TABLE IF EXISTS revision.notes;
+DROP TABLE IF EXISTS revision.questions;
+DROP TABLE IF EXISTS revision.source_images;
+DROP TABLE IF EXISTS revision.sessions;
+DROP TABLE IF EXISTS revision.topics;
+DROP TABLE IF EXISTS revision.subjects;
+DROP TABLE IF EXISTS revision.users;

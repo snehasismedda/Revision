@@ -1,6 +1,8 @@
 import * as sessionModel from '../models/sessionModel.js';
 import * as subjectModel from '../models/subjectModel.js';
+import * as topicModel from '../models/topicModel.js';
 import * as analyticsModel from '../models/analyticsModel.js';
+import db from '../knex/db.js';
 import { ollama, models } from '../config/ollama.js';
 import { syllabusPrompt, insightPrompt, globalInsightPrompt, noteAnalysisPrompt, enhanceNotePrompt, noteDescriptionPrompt } from '../system_prompts/index.js';
 
@@ -127,38 +129,50 @@ export const parseSyllabus = async (req, res) => {
         });
 
         const rawResult = response.message?.content || '';
-        console.log('rawResult', JSON.stringify(rawResult, null, 2));
+        console.log('rawResult', JSON.stringify(JSON.parse(rawResult), null, 2));
 
+        // --- 1. Robust JSON Extraction ---
         let topics = [];
         try {
+            // First attempt: direct parse
             const parsed = JSON.parse(rawResult);
-            if (Array.isArray(parsed)) {
-                topics = parsed;
-            } else if (typeof parsed === 'object' && parsed !== null) {
-                const arrayVal = Object.values(parsed).find(v => Array.isArray(v));
-                topics = arrayVal || [];
-            }
+            topics = Array.isArray(parsed) ? parsed : (parsed.name && Array.isArray(parsed.children) ? [parsed] : Object.values(parsed).find(v => Array.isArray(v)) || []);
         } catch {
             try {
+                // Second attempt: clean markdown fences and extract by regex
                 const cleaned = rawResult.replace(/```(?:json)?\s*/gi, '').replace(/```\s*/g, '').trim();
-                const parsed = JSON.parse(cleaned);
-                topics = Array.isArray(parsed) ? parsed : (parsed.topics || parsed.data || []);
-            } catch {
-                const arrayMatch = rawResult.match(/\[[\s\S]*\]/);
-                if (arrayMatch) {
-                    topics = JSON.parse(arrayMatch[0]);
-                } else {
-                    console.error('parseSyllabus: could not extract JSON from:', rawResult);
-                    return res.status(422).json({ error: 'AI response was not valid JSON. Please try again.', raw: rawResult });
-                }
+                const arrayMatch = cleaned.match(/\[[\s\S]*\]/);
+                const objMatch = cleaned.match(/\{[\s\S]*\}/);
+
+                const jsonToParse = arrayMatch ? arrayMatch[0] : (objMatch ? objMatch[0] : cleaned);
+                const parsed = JSON.parse(jsonToParse);
+
+                topics = Array.isArray(parsed) ? parsed : (parsed.name && Array.isArray(parsed.children) ? [parsed] : Object.values(parsed).find(v => Array.isArray(v)) || []);
+            } catch (err) {
+                console.error('parseSyllabus: could not extract valid JSON from:', rawResult);
+                return res.status(422).json({ error: 'AI response was not valid JSON. Please try again.', raw: rawResult });
             }
         }
 
-        if (!Array.isArray(topics)) {
-            return res.status(422).json({ error: 'AI returned unexpected format. Please try again.', raw: rawResult });
+        if (!topics || topics.length === 0) {
+            return res.status(422).json({ error: 'AI returned an empty or invalid topic list. Please try again.', raw: rawResult });
         }
 
-        res.status(200).json({ topics });
+        // --- 2. Hierarchical Storage within Transaction ---
+        const createdTopics = await db.transaction(async (trx) => {
+            await topicModel.softDeleteTopicsBySubject({ subjectId }, trx);
+
+            return await topicModel.bulkCreateTopics({
+                subjectId,
+                topics,
+            }, trx);
+        });
+
+        // Reconstruct for frontend
+        const topicTree = topicModel.buildTopicTree(createdTopics);
+
+        console.log(`:::: Syllabus Parsed & Saved :::: Subject: ${subjectId} | Topics: ${createdTopics.length}`);
+        res.status(200).json({ topics: topicTree });
     } catch (error) {
         console.error('parseSyllabus error:', error);
         res.status(500).json({ error: error.message || 'Failed to parse syllabus' });

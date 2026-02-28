@@ -258,7 +258,12 @@ const TagTopics = () => {
                                                     const childCounts = topicEntryCounts[child.id];
                                                     return (
                                                         <div key={child.id} className="flex items-center gap-1.5 py-1.5 px-2 rounded-lg hover:bg-white/[0.03] transition-colors group/topic">
-                                                            <span className="text-sm text-slate-400 flex-1 truncate group-hover/topic:text-slate-300">{child.name}</span>
+                                                            <span
+                                                                className="text-sm text-slate-400 flex-1 truncate group-hover/topic:text-slate-100"
+                                                                style={{ marginLeft: `${(child.depth - 1) * 16}px` }}
+                                                            >
+                                                                {child.name}
+                                                            </span>
                                                             {childCounts && (
                                                                 <span className="text-[10px] font-bold text-slate-600">
                                                                     {childCounts.correct + childCounts.incorrect}
@@ -295,7 +300,10 @@ const TagTopics = () => {
                                         {t.depth === 0 && (
                                             <ChevronDown className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                                         )}
-                                        <span className={`text-sm flex-1 truncate ${t.depth === 0 ? 'font-heading font-semibold text-slate-200' : 'text-slate-400'}`}>
+                                        <span
+                                            className={`text-sm flex-1 truncate ${t.depth === 0 ? 'font-heading font-semibold text-slate-200' : 'text-slate-400 group-hover/topic:text-slate-100'}`}
+                                            style={{ marginLeft: t.depth > 0 ? `${(t.depth - 1) * 16}px` : '0px' }}
+                                        >
                                             {t.name}
                                         </span>
                                         {counts && (

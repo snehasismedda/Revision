@@ -33,27 +33,11 @@ const ManageSyllabusModal = ({ isOpen, onClose, subjectId, onTopicsUpdated }) =>
         setAiError('');
         const loadingToast = toast.loading('Analyzing syllabus with AI...');
         try {
-            const { topics: parsedTopics } = await aiApi.parseSyllabus({
+            const { topics: freshTopics } = await aiApi.parseSyllabus({
                 syllabusText: syllabus,
                 subjectId: subjectId,
             });
 
-            const topLevelTopics = parsedTopics.map((t, i) => ({ name: t.name, orderIndex: i }));
-            const { topics: created } = await topicsApi.bulkCreate(subjectId, { topics: topLevelTopics });
-
-            for (let i = 0; i < parsedTopics.length; i++) {
-                const parent = created[i];
-                if (parsedTopics[i].children?.length && parent) {
-                    const children = parsedTopics[i].children.map((c, j) => ({
-                        name: c.name,
-                        parentId: parent.id,
-                        orderIndex: j,
-                    }));
-                    await topicsApi.bulkCreate(subjectId, { topics: children });
-                }
-            }
-
-            const { topics: freshTopics } = await topicsApi.list(subjectId);
             onTopicsUpdated(freshTopics);
             setSyllabus('');
             toast.success('Topic tree generated!', { id: loadingToast });

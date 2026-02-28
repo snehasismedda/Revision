@@ -23,10 +23,11 @@ const EditQuestionModal = ({ isOpen, onClose, subjectId, question, topics, onQue
     }, [question]);
 
     // Flatten topics for easier selection
-    const flattenTopics = (nodes, result = []) => {
+    const flattenTopics = (nodes, result = [], path = '') => {
         nodes.forEach(node => {
-            result.push({ id: node.id, name: node.name });
-            if (node.children) flattenTopics(node.children, result);
+            const currentPath = path ? `${path} > ${node.name}` : node.name;
+            result.push({ id: node.id, name: node.name, path: currentPath, depth: path ? path.split('>').length : 0 });
+            if (node.children) flattenTopics(node.children, result, currentPath);
         });
         return result;
     };
@@ -126,7 +127,8 @@ const EditQuestionModal = ({ isOpen, onClose, subjectId, question, topics, onQue
                                                     }`}
                                             >
                                                 {isSelected ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Circle className="w-3.5 h-3.5 opacity-40" />}
-                                                <span className="truncate">{topic.name}</span>
+                                                {topic.depth > 0 && <span className="text-[10px] opacity-30 shrink-0">↳</span>}
+                                                <span className="truncate" title={topic.path}>{topic.name}</span>
                                             </button>
                                         );
                                     })}
