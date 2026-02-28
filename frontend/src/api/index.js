@@ -72,7 +72,8 @@ export const analyticsApi = {
 export const aiApi = {
     parseSyllabus: (body) => request('/ai/parse-syllabus', { method: 'POST', body }),
     insights: (subjectId) => request(`/ai/insights/${subjectId}`),
-    sessionInsights: (subjectId, sessionId) => request(`/ai/insights/${subjectId}/sessions/${sessionId}`)
+    sessionInsights: (subjectId, sessionId) => request(`/ai/insights/${subjectId}/sessions/${sessionId}`),
+    globalInsights: () => request('/ai/global-insights')
 };
 
 // Questions

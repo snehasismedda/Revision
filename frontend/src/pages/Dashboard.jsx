@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { subjectsApi, analyticsApi } from '../api/index.js';
+import { subjectsApi, analyticsApi, aiApi } from '../api/index.js';
 import SubjectCard from '../components/SubjectCard.jsx';
 import SubjectModal from '../components/modals/SubjectModal.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import toast from 'react-hot-toast';
-import { BookOpen, Target, Activity, CheckCircle2, AlertTriangle, PlusCircle, LayoutDashboard, TrendingUp, ArrowUpRight } from 'lucide-react';
+import {
+    BookOpen, Target, Activity, CheckCircle2,
+    AlertTriangle, PlusCircle, LayoutDashboard,
+    TrendingUp, ArrowUpRight, Sparkles, Wand2, Download,
+    Edit2, Save, CheckCircle
+} from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 /* ── Mini sparkline-style progress bar ─────────────────────── */
 const MiniProgressBar = ({ value, max, colorClass = 'bg-primary' }) => {
@@ -56,6 +63,9 @@ const Dashboard = () => {
     const [showModal, setShowModal] = useState(false);
     const [editingSubject, setEditingSubject] = useState(null);
     const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null, name: '' });
+    const [globalInsight, setGlobalInsight] = useState('');
+    const [globalInsightLoading, setGlobalInsightLoading] = useState(false);
+    const [isEditingInsight, setIsEditingInsight] = useState(false);
 
     useEffect(() => {
         const load = async () => {
@@ -107,6 +117,35 @@ const Dashboard = () => {
         } finally {
             setConfirmDelete({ open: false, id: null, name: '' });
         }
+    };
+
+    const loadGlobalInsight = async () => {
+        setGlobalInsightLoading(true);
+        const loadingToast = toast.loading('Calculating study strategy...');
+        try {
+            const { insight } = await aiApi.globalInsights();
+            setGlobalInsight(insight);
+            toast.success('Strategy generated!', { id: loadingToast });
+        } catch {
+            setGlobalInsight('Unable to generate global insights. Ensure you have recorded some sessions first.');
+            toast.error('AI Strategy failed', { id: loadingToast });
+        } finally {
+            setGlobalInsightLoading(false);
+        }
+    };
+
+    const handleDownloadTxt = () => {
+        if (!globalInsight) return;
+        const blob = new Blob([globalInsight], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Study_Strategy_${new Date().toISOString().split('T')[0]}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        toast.success('Strategy saved as .txt');
     };
 
     const totalSessions = Object.values(statsMap).reduce((a, s) => a + (s?.totalSessions || 0), 0);
@@ -223,6 +262,97 @@ const Dashboard = () => {
                     </div>
                 </div>
             )}
+
+            {/* AI Strategic Insights Section */}
+            <div className="mb-12 fade-in stagger-3">
+                <div className="glass-panel p-8 rounded-3xl border-indigo-500/20 bg-indigo-500/[0.02] relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/[0.03] rounded-full blur-3xl pointer-events-none" />
+                    <div className="absolute bottom-0 left-0 p-8 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity pointer-events-none">
+                        <Sparkles className="w-48 h-48 text-indigo-400" />
+                    </div>
+
+                    <div className="relative z-10">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3.5 rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
+                                    <Sparkles className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h2 className="text-2xl font-heading font-bold text-white tracking-tight">AI Strategic Planner</h2>
+                                    <p className="text-indigo-300/60 text-sm mt-1">Personalized study roadmap based on your global performance.</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={loadGlobalInsight}
+                                disabled={globalInsightLoading || totalQuestions === 0}
+                                className="group/btn flex items-center gap-2.5 px-6 py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm transition-all shadow-lg shadow-indigo-600/20 hover:shadow-indigo-500/40 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                            >
+                                {globalInsightLoading ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        <span>Analyzing Stats...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Wand2 className="w-4 h-4 group-hover/btn:rotate-12 transition-transform" />
+                                        <span>{globalInsight ? 'Refresh Strategy' : 'Generate Study Plan'}</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+
+                        {globalInsight ? (
+                            <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
+                                <div className="flex items-center justify-end gap-2 mb-2">
+                                    <button
+                                        onClick={() => setIsEditingInsight(!isEditingInsight)}
+                                        className="text-[11px] font-bold text-slate-500 hover:text-indigo-400 flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors cursor-pointer"
+                                    >
+                                        {isEditingInsight ? <><CheckCircle className="w-3 h-3" /> Done</> : <><Edit2 className="w-3 h-3" /> Edit Insight</>}
+                                    </button>
+                                    <button
+                                        onClick={handleDownloadTxt}
+                                        className="text-[11px] font-bold text-slate-500 hover:text-emerald-400 flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors cursor-pointer"
+                                    >
+                                        <Download className="w-3 h-3" /> Save to Disk (.txt)
+                                    </button>
+                                </div>
+                                <div className="p-6 rounded-2xl bg-surface-2/60 border border-white/5 backdrop-blur-sm relative group/editor">
+                                    {isEditingInsight ? (
+                                        <textarea
+                                            value={globalInsight}
+                                            onChange={(e) => setGlobalInsight(e.target.value)}
+                                            className="w-full bg-transparent text-slate-200 text-base leading-relaxed font-medium outline-none border-none resize-none min-h-[200px] focus:ring-0 selection:bg-indigo-500/30 font-mono"
+                                            autoFocus
+                                        />
+                                    ) : (
+                                        <div className="prose prose-invert prose-indigo max-w-none prose-p:leading-relaxed prose-headings:mb-4 prose-headings:mt-6 first:prose-headings:mt-0">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                {globalInsight}
+                                            </ReactMarkdown>
+                                        </div>
+                                    )}
+                                    <div className="absolute top-2 right-2 opacity-0 group-hover/editor:opacity-100 transition-opacity">
+                                        <div className="text-[9px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-slate-500 uppercase tracking-widest font-bold">
+                                            {isEditingInsight ? 'Editor Mode' : 'Read Only'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="p-10 rounded-2xl border border-dashed border-indigo-500/20 bg-indigo-500/[0.01] text-center">
+                                <Sparkles className="w-10 h-10 text-indigo-500/20 mx-auto mb-4" />
+                                <h3 className="text-indigo-200 font-semibold mb-2">Ready to optimize your learning?</h3>
+                                <p className="text-indigo-300/40 text-sm max-w-md mx-auto">
+                                    {totalQuestions > 0
+                                        ? "Click above to analyze your performance across all subjects and receive a curated study plan for the week."
+                                        : "Record your first few study sessions to unlock personalized AI strategy and planning."}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
 
             {/* All subjects */}
             <div className="fade-in stagger-4 pb-12">

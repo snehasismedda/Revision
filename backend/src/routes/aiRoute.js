@@ -1,5 +1,5 @@
 import express from 'express';
-import { parseSyllabus, getInsights, getSessionInsights } from '../controllers/aiController.js';
+import { parseSyllabus, getInsights, getSessionInsights, getGlobalInsights } from '../controllers/aiController.js';
 import authenticate from '../middlewares/authenticate.js';
 
 const router = express.Router();
@@ -7,6 +7,7 @@ const router = express.Router();
 router.use(authenticate);
 
 router.post('/parse-syllabus', parseSyllabus);
+router.get('/global-insights', getGlobalInsights);
 router.get('/insights/:subjectId', getInsights);
 router.get('/insights/:subjectId/sessions/:sessionId', getSessionInsights);
 

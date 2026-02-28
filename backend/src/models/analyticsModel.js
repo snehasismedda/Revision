@@ -79,3 +79,45 @@ export const getWeakAreas = async (data) => {
         .orderByRaw('accuracy ASC, total DESC')
         .limit(10);
 };
+
+export const getUserPerformanceSummary = async (userId) => {
+    return db('revision.session_entries as se')
+        .join('revision.sessions as s', 'se.session_id', 's.id')
+        .join('revision.subjects as sub', 's.subject_id', 'sub.id')
+        .where('sub.user_id', userId)
+        .where('s.is_deleted', false)
+        .where('se.is_deleted', false)
+        .where('sub.is_deleted', false)
+        .select(
+            db.raw('COUNT(*) as total_questions'),
+            db.raw('SUM(CASE WHEN se.is_correct THEN 1 ELSE 0 END) as total_correct'),
+            db.raw('COUNT(DISTINCT s.id) as total_sessions'),
+            db.raw('COUNT(DISTINCT s.subject_id) as total_subjects'),
+            db.raw('ROUND(100.0 * SUM(CASE WHEN se.is_correct THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 1) as global_accuracy'),
+        )
+        .first();
+};
+
+export const getGlobalWeakAreas = async (userId) => {
+    return db('revision.session_entries as se')
+        .join('revision.sessions as s', 'se.session_id', 's.id')
+        .join('revision.topics as t', 'se.topic_id', 't.id')
+        .join('revision.subjects as sub', 's.subject_id', 'sub.id')
+        .where('sub.user_id', userId)
+        .where('s.is_deleted', false)
+        .where('se.is_deleted', false)
+        .where('t.is_deleted', false)
+        .where('sub.is_deleted', false)
+        .groupBy('t.id', 't.name', 'sub.name')
+        .havingRaw('ROUND(100.0 * SUM(CASE WHEN se.is_correct THEN 1 ELSE 0 END) / COUNT(*), 1) < 75')
+        .select(
+            't.id as topic_id',
+            't.name as topic_name',
+            'sub.name as subject_name',
+            db.raw('COUNT(*) as total'),
+            db.raw('SUM(CASE WHEN se.is_correct THEN 1 ELSE 0 END) as correct'),
+            db.raw('ROUND(100.0 * SUM(CASE WHEN se.is_correct THEN 1 ELSE 0 END) / COUNT(*), 1) as accuracy'),
+        )
+        .orderByRaw('accuracy ASC, total DESC')
+        .limit(5);
+};

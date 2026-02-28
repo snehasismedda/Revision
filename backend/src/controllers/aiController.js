@@ -216,3 +216,40 @@ ${analyticsContext}`,
         res.status(500).json({ error: 'Failed to generate session insights' });
     }
 };
+
+export const getGlobalInsights = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const [summary, globalWeakAreas] = await Promise.all([
+            analyticsModel.getUserPerformanceSummary(userId),
+            analyticsModel.getGlobalWeakAreas(userId),
+        ]);
+
+        const analyticsContext = JSON.stringify({
+            summary,
+            globalWeakAreas,
+        });
+
+        const result = await generateResponse({
+            model: 'qwen',
+            query: `Based on this overall learning data across all subjects, provide a comprehensive performance analysis and a strategic study plan for the coming week.
+            Highlight the critical subjects and topics that need immediate attention. Provide 3 specific, data-driven study goals.
+            
+Analytics Data:
+${analyticsContext}`,
+            history: [],
+            systemPrompt: `You are an elite academic performance strategist. 
+            Provide a high-level, encouraging, and highly structured strategic study plan.
+            - Use a clear "Current Standing" summary
+            - Provide a "Priority Roadmap" for weak areas
+            - Give "Strategic Advice" for long-term retention.
+            Keep the tone professional yet motivating.`,
+        });
+
+        res.status(200).json({ insight: result });
+    } catch (error) {
+        console.error('getGlobalInsights error:', error);
+        res.status(500).json({ error: 'Failed to generate global insights' });
+    }
+};
