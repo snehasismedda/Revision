@@ -33,9 +33,9 @@ export const deleteSessionCascade = async (sessionId) => {
 
 export const deleteTopicCascade = async (topicId) => {
     try {
-        // Cascade delete subtopics and related data
-        const subtopics = await topicModel.findSubTopics(topicId);
-        const topicIds = [topicId, ...subtopics.map(t => t.id)];
+        // Find all descendants recursively
+        const descendants = await topicModel.findAllDescendants(topicId);
+        const topicIds = [topicId, ...descendants.map(t => t.id)];
 
         for (const id of topicIds) {
             // Delete entries for this topic
@@ -45,9 +45,6 @@ export const deleteTopicCascade = async (topicId) => {
             // Delete notes for this topic (via questions)
             await noteModel.softDeleteNotesByTopic({ topicId: id });
         }
-
-        // Finally soft-delete the subtopics themselves
-        await topicModel.softDeleteSubTopics(topicId);
     } catch (error) {
         console.error(`[deletionService] ❌ Failed to cascade delete topic ${topicId}:`, error.message);
         throw error;

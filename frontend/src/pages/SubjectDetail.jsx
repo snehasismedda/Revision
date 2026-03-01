@@ -427,6 +427,7 @@ const SubjectDetail = () => {
                 onClose={() => setShowTopicModal(false)}
                 subjectId={id}
                 onTopicsUpdated={setTopics}
+                topics={topics}
             />
 
             <AddQuestionModal

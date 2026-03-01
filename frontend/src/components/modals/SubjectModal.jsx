@@ -26,12 +26,19 @@ const SubjectModal = ({ isOpen, onClose, editingSubject, onSubjectSaved }) => {
         const loadingToast = toast.loading(editingSubject ? 'Updating subject...' : 'Creating subject...');
         try {
             if (editingSubject) {
-                const { subject } = await subjectsApi.update(editingSubject.id, form);
+                const { subject } = await subjectsApi.update(editingSubject.id, {
+                    name: form.name,
+                    description: form.description
+                });
                 onSubjectSaved(subject, true);
                 toast.success('Subject updated successfully!', { id: loadingToast });
                 onClose();
             } else {
-                const { subject } = await subjectsApi.create(form);
+                const { subject } = await subjectsApi.create({
+                    name: form.name,
+                    description: form.description
+                });
+
                 onSubjectSaved(subject, false);
                 toast.success('Subject created successfully!', { id: loadingToast });
                 onClose();
@@ -72,7 +79,7 @@ const SubjectModal = ({ isOpen, onClose, editingSubject, onSubjectSaved }) => {
                     </div>
 
                     {/* Body */}
-                    <form id="subject-form" onSubmit={handleSubmit} className="px-7 py-6 space-y-5">
+                    <form id="subject-form" onSubmit={handleSubmit} className="px-7 py-6 space-y-5 overflow-y-auto max-h-[70vh] custom-scrollbar">
                         {error && (
                             <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-[13px] font-medium">{error}</div>
                         )}
@@ -93,11 +100,13 @@ const SubjectModal = ({ isOpen, onClose, editingSubject, onSubjectSaved }) => {
                             <textarea
                                 value={form.description}
                                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                                rows={3}
+                                rows={2}
                                 className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 focus:bg-surface-2/70 transition-all placeholder:text-slate-600/80 resize-none"
                                 placeholder="Optional description..."
                             />
                         </div>
+
+
                     </form>
 
                     {/* Footer */}

@@ -74,10 +74,15 @@ export const updateTopic = async (req, res) => {
 
 export const deleteTopic = async (req, res) => {
     try {
-        await topicModel.softDeleteTopic({ id: req.params.id });
+        // 1. Cascade cleanup related data while topics are still "active"
         await deletionService.deleteTopicCascade(req.params.id);
+
+        // 2. Mark topic (and its descendants) as deleted
+        await topicModel.softDeleteTopic({ id: req.params.id });
+
         res.status(200).json({ message: 'Topic deleted successfully' });
     } catch (error) {
+        console.error(`[topicController] ❌ Error deleting topic ${req.params.id}:`, error);
         res.status(500).json({ error: 'Failed to delete topic' });
     }
 };

@@ -92,9 +92,27 @@ export const updateTopic = async (data) => {
     return updated;
 };
 
+export const findAllDescendants = async (topicId) => {
+    const result = await db.raw(`
+        WITH RECURSIVE descendants AS (
+            SELECT id FROM revision.topics WHERE parent_id = ? AND is_deleted = false
+            UNION ALL
+            SELECT t.id FROM revision.topics t
+            JOIN descendants d ON t.parent_id = d.id
+            WHERE t.is_deleted = false
+        )
+        SELECT id FROM descendants;
+    `, [topicId]);
+    return result.rows || [];
+};
+
 export const softDeleteTopic = async (data) => {
+    // Soft delete the topic and all its descendants
+    const descendants = await findAllDescendants(data.id);
+    const idsToDelete = [data.id, ...descendants.map(d => d.id)];
+
     return db('revision.topics')
-        .where('id', data.id)
+        .whereIn('id', idsToDelete)
         .update({ is_deleted: true, deleted_at: new Date() });
 };
 
@@ -108,10 +126,4 @@ export const findSubTopics = async (parentId) => {
     return db('revision.topics')
         .where('parent_id', parentId)
         .where('is_deleted', false);
-};
-
-export const softDeleteSubTopics = async (parentId) => {
-    return db('revision.topics')
-        .where('parent_id', parentId)
-        .update({ is_deleted: true, deleted_at: new Date() });
 };

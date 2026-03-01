@@ -189,7 +189,6 @@ const TopicNode = ({ topic, subjectId, depth = 0, onDeleted, onSubtopicAdded, on
                             topic={child}
                             subjectId={subjectId}
                             depth={depth + 1}
-                            onDeleted={onDeleted}
                             onSubtopicAdded={onSubtopicAdded}
                             onRenamed={onRenamed}
                             setConfirmDelete={setConfirmDelete}
@@ -248,7 +247,7 @@ const TopicTree = ({ topics, subjectId, onTopicDeleted, onTopicsChanged, default
                     <GitBranch className="w-5 h-5 text-slate-500" />
                 </div>
                 <p className="text-slate-400 text-sm font-medium">
-                    No topics yet. Start by adding a topic manually or paste a syllabus to generate a tree.
+                    No topics yet. Use "Manage Syllabus" to add topics to this subject.
                 </p>
             </div>
         );
@@ -279,7 +278,6 @@ const TopicTree = ({ topics, subjectId, onTopicDeleted, onTopicsChanged, default
                         key={topic.id}
                         topic={topic}
                         subjectId={subjectId}
-                        onDeleted={onTopicDeleted}
                         onSubtopicAdded={handleSubtopicAdded}
                         onRenamed={handleRenamed}
                         setConfirmDelete={setConfirmDelete}

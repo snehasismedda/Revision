@@ -1,53 +1,48 @@
 import { useState } from 'react';
-import { topicsApi, aiApi } from '../../api/index.js';
+import { topicsApi } from '../../api/index.js';
 import toast from 'react-hot-toast';
-import { X, PlusCircle, Wand2, Plus } from 'lucide-react';
+import { X, PlusCircle, Plus, GitBranch } from 'lucide-react';
 import ModalPortal from '../ModalPortal.jsx';
+import TopicTree from '../TopicTree.jsx';
 
-const ManageSyllabusModal = ({ isOpen, onClose, subjectId, onTopicsUpdated }) => {
-    const [newTopicName, setNewTopicName] = useState('');
-    const [addingTopic, setAddingTopic] = useState(false);
-    const [syllabus, setSyllabus] = useState('');
-    const [parsingAI, setParsingAI] = useState(false);
-    const [aiError, setAiError] = useState('');
+const ManageSyllabusModal = ({ isOpen, onClose, subjectId, onTopicsUpdated, topics }) => {
+    const [bulkTopics, setBulkTopics] = useState('');
+    const [addingTopics, setAddingTopics] = useState(false);
 
-    const handleAddTopic = async (e) => {
+    const handleAddTopics = async (e) => {
         e.preventDefault();
-        if (!newTopicName.trim()) return;
-        setAddingTopic(true);
+        const names = bulkTopics
+            .split(/[\n,]/)
+            .map(n => n.trim())
+            .filter(n => n.length > 0);
+
+        if (names.length === 0) return;
+
+        setAddingTopics(true);
+        const loadingToast = toast.loading(names.length === 1 ? 'Adding topic...' : `Adding ${names.length} topics...`);
+
         try {
-            const { topic } = await topicsApi.create(subjectId, { name: newTopicName.trim() });
-            onTopicsUpdated(prev => [...prev, { ...topic, children: [] }]);
-            setNewTopicName('');
-            toast.success(`Topic "${topic.name}" added`);
+            const topicsToCreate = names.map(name => ({ name }));
+            await topicsApi.bulkCreate(subjectId, { topics: topicsToCreate });
+
+            const { topics: freshTree } = await topicsApi.list(subjectId);
+            onTopicsUpdated(freshTree);
+
+            setBulkTopics('');
+            toast.success(names.length === 1 ? 'Topic added' : `${names.length} topics added`, { id: loadingToast });
         } catch {
-            toast.error('Failed to add topic');
+            toast.error('Failed to add topics', { id: loadingToast });
         } finally {
-            setAddingTopic(false);
+            setAddingTopics(false);
         }
     };
 
-    const handleParseSyllabus = async () => {
-        if (!syllabus.trim()) return;
-        setParsingAI(true);
-        setAiError('');
-        const loadingToast = toast.loading('Analyzing syllabus with AI...');
-        try {
-            const { topics: freshTopics } = await aiApi.parseSyllabus({
-                syllabusText: syllabus,
-                subjectId: subjectId,
-            });
-
-            onTopicsUpdated(freshTopics);
-            setSyllabus('');
-            toast.success('Topic tree generated!', { id: loadingToast });
-            onClose();
-        } catch (err) {
-            setAiError(err.message || 'Failed to parse syllabus');
-            toast.error('Failed to parse syllabus', { id: loadingToast });
-        } finally {
-            setParsingAI(false);
-        }
+    const handleTopicDeleted = (topicId) => {
+        const removeFromTree = (nodes) =>
+            nodes
+                .filter((n) => n.id !== topicId)
+                .map((n) => ({ ...n, children: removeFromTree(n.children || []) }));
+        onTopicsUpdated(prev => removeFromTree(prev));
     };
 
     if (!isOpen) return null;
@@ -66,12 +61,15 @@ const ManageSyllabusModal = ({ isOpen, onClose, subjectId, onTopicsUpdated }) =>
                 >
                     {/* Header */}
                     <div className="flex items-center justify-between px-8 py-6 border-b border-white/[0.06] shrink-0">
-                        <h3 className="text-lg font-heading font-semibold text-white flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                                <PlusCircle className="w-5 h-5" />
-                            </div>
-                            Manage Syllabus
-                        </h3>
+                        <div className="flex flex-col">
+                            <h3 className="text-lg font-heading font-semibold text-white flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                                    <PlusCircle className="w-5 h-5" />
+                                </div>
+                                Manage Syllabus
+                            </h3>
+                            <p className="text-[12px] text-slate-500 mt-1 ml-11">Build and organize your subject hierarchy</p>
+                        </div>
                         <button
                             onClick={onClose}
                             className="p-2.5 text-slate-500 hover:text-white hover:bg-white/[0.06] rounded-lg transition-all cursor-pointer"
@@ -81,98 +79,73 @@ const ManageSyllabusModal = ({ isOpen, onClose, subjectId, onTopicsUpdated }) =>
                     </div>
 
                     {/* Body */}
-                    <div className="px-8 py-7 overflow-y-auto custom-scrollbar">
+                    <div className="px-8 py-7 overflow-y-auto custom-scrollbar flex flex-col gap-8">
 
-                        {/* ── Section 1: Manual Add Topic ────────────────── */}
+                        {/* ── Section 1: Bulk Quick Add ────────────────── */}
                         <div
-                            className="p-6 rounded-xl"
+                            className="p-6 rounded-xl shrink-0"
                             style={{ background: 'rgba(30, 30, 44, 0.5)', border: '1px solid rgba(255,255,255,0.05)' }}
                         >
-                            <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-4">
-                                Add Root Topic
+                            <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-4 flex items-center gap-2">
+                                <Plus className="w-3 h-3" /> Quick Add Root Topics
                             </h4>
-                            <form onSubmit={handleAddTopic} className="space-y-3.5">
-                                <div className="relative group/input">
-                                    <input
-                                        value={newTopicName}
-                                        onChange={(e) => setNewTopicName(e.target.value)}
-                                        placeholder="Enter topic name..."
-                                        className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 focus:bg-surface-2/70 transition-all placeholder:text-slate-600/80"
+                            <form onSubmit={handleAddTopics} className="space-y-4">
+                                <div className="flex gap-3">
+                                    <textarea
+                                        value={bulkTopics}
+                                        onChange={(e) => setBulkTopics(e.target.value)}
+                                        placeholder="Add topics... (separate with newlines or commas)"
+                                        rows={1}
+                                        className="flex-1 bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl px-4 py-3 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 focus:bg-surface-2/70 transition-all placeholder:text-slate-600/80 resize-none h-[48px] custom-scrollbar"
                                     />
+                                    <button
+                                        type="submit"
+                                        disabled={addingTopics || !bulkTopics.trim()}
+                                        className="bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 hover:text-white px-5 rounded-xl font-semibold text-[13px] transition-all disabled:opacity-40 whitespace-nowrap active:scale-95"
+                                    >
+                                        Add Roots
+                                    </button>
                                 </div>
-                                <button
-                                    type="submit"
-                                    disabled={addingTopic || !newTopicName.trim()}
-                                    className="w-full flex items-center justify-center gap-2 text-[13px] font-semibold px-4 py-3.5 rounded-xl disabled:opacity-40 transition-all cursor-pointer active:scale-[0.98] border border-primary/25 text-primary hover:bg-primary/[0.08] hover:border-primary/40 hover:text-white"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    {addingTopic ? 'Adding...' : 'Add Topic'}
-                                </button>
                             </form>
                         </div>
 
-                        {/* ── Divider ────────────────────────────────────── */}
-                        <div className="flex items-center gap-4 my-7">
-                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
-                            <span className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.2em] select-none">or</span>
-                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
-                        </div>
-
-                        {/* ── Section 2: AI Syllabus Parser ──────────────── */}
-                        <div
-                            className="p-6 rounded-xl relative overflow-hidden group"
-                            style={{ background: 'rgba(30, 30, 44, 0.5)', border: '1px solid rgba(99,102,241,0.1)' }}
-                        >
-                            {/* Subtle gradient overlay */}
-                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.04] to-transparent pointer-events-none" />
-
-                            <div className="flex items-center gap-3 mb-2 relative z-10">
-                                <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
-                                    <Wand2 className="w-4.5 h-4.5" />
-                                </div>
-                                <h4 className="text-[13px] font-heading font-semibold text-indigo-300">AI Syllabus Parser</h4>
+                        {/* ── Section 2: Full Tree Management ───────────── */}
+                        <div className="flex flex-col min-h-0">
+                            <div className="flex items-center justify-between mb-4">
+                                <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] flex items-center gap-2">
+                                    <GitBranch className="w-3 h-3 rotate-180" /> Manage Hierarchy
+                                </h4>
+                                <span className="text-[10px] text-slate-600 font-medium">Double-click to rename • Hover for actions</span>
                             </div>
-                            <p className="text-[12px] text-slate-500 mb-5 relative z-10 leading-relaxed ml-[44px]">
-                                Paste raw syllabus text. <span className="text-indigo-400 font-semibold">AI</span> will analyze it and build a structured topic hierarchy automatically.
-                            </p>
 
-                            {aiError && (
-                                <div className="bg-red-500/10 border border-red-500/20 px-4 py-3 rounded-xl mb-5 relative z-10">
-                                    <span className="text-red-400 text-[13px] font-medium">{aiError}</span>
-                                </div>
-                            )}
-
-                            <textarea
-                                value={syllabus}
-                                onChange={(e) => setSyllabus(e.target.value)}
-                                placeholder="Paste course outline here..."
-                                rows={6}
-                                className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-indigo-500/40 focus:ring-2 focus:ring-indigo-500/15 focus:bg-surface-2/70 transition-all placeholder:text-slate-600/80 resize-y min-h-[120px] max-h-[300px] relative z-10 mb-5"
-                            />
-
-                            <button
-                                onClick={handleParseSyllabus}
-                                disabled={parsingAI || !syllabus.trim()}
-                                className="w-full relative z-10 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-[13px] font-semibold px-5 py-3.5 rounded-xl disabled:opacity-40 transition-all flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(99,102,241,0.25)] hover:shadow-[0_6px_28px_rgba(99,102,241,0.4)] cursor-pointer active:scale-[0.98]"
-                            >
-                                {parsingAI ? (
-                                    <>
-                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        <span>Analyzing with AI...</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Wand2 className="w-4 h-4" />
-                                        <span>Generate Topic Tree</span>
-                                    </>
-                                )}
-                            </button>
+                            <div className="rounded-xl overflow-hidden border border-white/[0.04] bg-white/[0.01]">
+                                <TopicTree
+                                    key={`modal-tree-${topics.length}-${topics[0]?.updated_at}`}
+                                    topics={topics}
+                                    subjectId={subjectId}
+                                    onTopicDeleted={handleTopicDeleted}
+                                    onTopicsChanged={onTopicsUpdated}
+                                    defaultExpanded={false}
+                                />
+                            </div>
                         </div>
+
+                    </div>
+
+                    {/* Footer */}
+                    <div className="px-8 py-5 border-t border-white/[0.06] flex justify-end bg-surface-1/50 shrink-0">
+                        <button
+                            onClick={onClose}
+                            className="px-6 py-2.5 rounded-xl text-[13px] font-semibold bg-white/[0.05] text-white hover:bg-white/[0.1] transition-all cursor-pointer"
+                        >
+                            Done
+                        </button>
                     </div>
                 </div>
             </div>
         </ModalPortal>
     );
 };
+
 
 export default ManageSyllabusModal;
