@@ -1,9 +1,11 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import basicSsl from '@vitejs/plugin-basic-ssl';
 
 export default defineConfig({
   plugins: [
+    basicSsl(),
     tailwindcss(),
     react({
       babel: {
@@ -12,6 +14,7 @@ export default defineConfig({
     }),
   ],
   server: {
+    host: true,
     proxy: {
       '/api': {
         target: 'http://localhost:3001',

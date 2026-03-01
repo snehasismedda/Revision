@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { LayoutDashboard, LibraryBig, LogOut, Sparkles, ChevronLeft, ChevronRight, Settings, Image as ImageIcon } from 'lucide-react';
@@ -12,7 +12,19 @@ const navItems = [
 const Sidebar = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
-    const [isCollapsed, setIsCollapsed] = useState(false);
+    const [isCollapsed, setIsCollapsed] = useState(() => window.innerWidth < 768);
+
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth < 768) {
+                setIsCollapsed(true);
+            } else {
+                setIsCollapsed(false);
+            }
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     const handleLogout = async () => {
         await logout();
@@ -31,7 +43,7 @@ const Sidebar = () => {
             {/* Toggle Button */}
             <button
                 onClick={() => setIsCollapsed(!isCollapsed)}
-                className="absolute -right-3 top-10 w-6 h-6 rounded-full bg-primary border border-white/10 flex items-center justify-center text-white shadow-lg opacity-0 group-hover/sidebar:opacity-100 transition-opacity z-50 cursor-pointer hover:scale-110 hover:shadow-[0_0_12px_rgba(139,92,246,0.5)] active:scale-95"
+                className="absolute -right-3 top-10 w-6 h-6 rounded-full bg-primary border border-white/10 flex items-center justify-center text-white shadow-lg opacity-100 transition-opacity z-50 cursor-pointer hover:scale-110 hover:shadow-[0_0_12px_rgba(139,92,246,0.5)] active:scale-95"
             >
                 {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
             </button>

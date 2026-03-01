@@ -51,7 +51,6 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
         }
     }, [cameraStream]);
 
-    // Enumerating cameras
     const getCameras = async () => {
         try {
             const devices = await navigator.mediaDevices.enumerateDevices();
@@ -59,10 +58,13 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
             setCameras(videoDevices);
             if (videoDevices.length > 0 && !selectedCameraId) {
                 setSelectedCameraId(videoDevices[0].deviceId);
+                return videoDevices[0].deviceId;
             }
+            return selectedCameraId;
         } catch (err) {
             console.error("Error enumerating cameras:", err);
             toast.error("Could not access camera list");
+            return null;
         }
     };
 
@@ -77,8 +79,11 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
         stopCamera();
         setIsCameraLoading(true);
         try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error("Camera API not available. This requires HTTPS.");
+            }
             const constraints = {
-                video: deviceId ? { deviceId: { exact: deviceId } } : true
+                video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment' }
             };
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
             setCameraStream(stream);
@@ -87,7 +92,13 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
             }
         } catch (err) {
             console.error("Error starting camera:", err);
-            toast.error("Failed to start camera. Please check permissions.");
+            if (err.name === 'NotAllowedError') {
+                toast.error("Camera access denied. Please allow permissions.");
+            } else if (err.message.includes('HTTPS')) {
+                toast.error("Camera requires a secure context (HTTPS).");
+            } else {
+                toast.error("Failed to start camera: " + (err.message || "Please check permissions."));
+            }
         } finally {
             setIsCameraLoading(false);
         }
@@ -118,6 +129,21 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
         setImageToCrop(dataUrl);
         setIsCropping(true);
     };
+
+    useEffect(() => {
+        if (isOpen) {
+            const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            if (isMobile) {
+                setNewQuestionType('camera');
+                getCameras();
+            } else {
+                setNewQuestionType('text');
+                stopCamera();
+            }
+        } else {
+            stopCamera();
+        }
+    }, [isOpen]);
 
     React.useEffect(() => {
         return () => stopCamera();
@@ -456,18 +482,18 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
                                                 </div>
                                             </>
                                         ) : (
-                                            <div className="flex flex-col items-center text-center px-10">
-                                                <div className="w-16 h-16 rounded-2xl bg-red-500/10 text-red-400 flex items-center justify-center mb-4">
+                                            <div className="flex flex-col items-center text-center px-10 py-6">
+                                                <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
                                                     <Camera className="w-8 h-8" />
                                                 </div>
-                                                <h4 className="text-white font-semibold mb-2">Camera Access Required</h4>
-                                                <p className="text-[13px] text-slate-500 mb-6">Please allow camera permissions in your browser to capture questions directly.</p>
+                                                <h4 className="text-white font-semibold mb-2">Camera Permission Required</h4>
+                                                <p className="text-[13px] text-slate-500 mb-6">Click below to allow camera access to capture questions.</p>
                                                 <button
                                                     type="button"
                                                     onClick={() => startCamera(selectedCameraId)}
                                                     className="px-6 py-2 bg-primary/20 text-primary border border-primary/30 rounded-lg text-sm font-semibold hover:bg-primary/30 transition-all"
                                                 >
-                                                    Retry Camera
+                                                    Start Camera
                                                 </button>
                                             </div>
                                         )}

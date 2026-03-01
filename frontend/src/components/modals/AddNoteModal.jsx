@@ -39,6 +39,27 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId }) =
         }
     }, [cameraStream]);
 
+    useEffect(() => {
+        if (isOpen) {
+            const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            if (isMobile) {
+                setMainType('image');
+                setImageMethod('camera');
+                getCameras();
+            } else {
+                setMainType('text');
+                setImageMethod('upload');
+                stopCamera();
+            }
+        } else {
+            stopCamera();
+        }
+    }, [isOpen]);
+
+    React.useEffect(() => {
+        return () => stopCamera();
+    }, []);
+
     const getCameras = async () => {
         try {
             const devices = await navigator.mediaDevices.enumerateDevices();
@@ -46,10 +67,13 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId }) =
             setCameras(videoDevices);
             if (videoDevices.length > 0 && !selectedCameraId) {
                 setSelectedCameraId(videoDevices[0].deviceId);
+                return videoDevices[0].deviceId;
             }
+            return selectedCameraId;
         } catch (err) {
             console.error("Error enumerating cameras:", err);
             toast.error("Could not access camera list");
+            return null;
         }
     };
 
@@ -64,8 +88,11 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId }) =
         stopCamera();
         setIsCameraLoading(true);
         try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error("Camera API not available. This requires HTTPS.");
+            }
             const constraints = {
-                video: deviceId ? { deviceId: { exact: deviceId } } : true
+                video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment' }
             };
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
             setCameraStream(stream);
@@ -74,7 +101,13 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId }) =
             }
         } catch (err) {
             console.error("Error starting camera:", err);
-            toast.error("Failed to start camera. Please check permissions.");
+            if (err.name === 'NotAllowedError') {
+                toast.error("Camera access denied. Please allow permissions.");
+            } else if (err.message.includes('HTTPS')) {
+                toast.error("Camera requires a secure context (HTTPS).");
+            } else {
+                toast.error("Failed to start camera: " + (err.message || "Please check permissions."));
+            }
         } finally {
             setIsCameraLoading(false);
         }
@@ -372,13 +405,20 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId }) =
                                                             </div>
                                                         </>
                                                     ) : (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => startCamera(selectedCameraId)}
-                                                            className="px-6 py-2.5 bg-emerald-500 text-white rounded-xl text-[13px] font-bold shadow-lg"
-                                                        >
-                                                            Start Camera
-                                                        </button>
+                                                        <div className="flex flex-col items-center text-center px-10 py-6">
+                                                            <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mb-4">
+                                                                <Camera className="w-8 h-8" />
+                                                            </div>
+                                                            <h4 className="text-white font-semibold mb-2">Camera Permission Required</h4>
+                                                            <p className="text-[13px] text-slate-500 mb-6">Click below to allow camera access to capture notes.</p>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => startCamera(selectedCameraId)}
+                                                                className="px-6 py-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-sm font-semibold hover:bg-emerald-500/30 transition-all"
+                                                            >
+                                                                Start Camera
+                                                            </button>
+                                                        </div>
                                                     )}
                                                 </div>
                                             </div>
