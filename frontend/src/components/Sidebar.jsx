@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { LayoutDashboard, LibraryBig, LogOut, Sparkles, ChevronLeft, ChevronRight, Settings } from 'lucide-react';
+import { LayoutDashboard, LibraryBig, LogOut, Sparkles, ChevronLeft, ChevronRight, Settings, Image as ImageIcon } from 'lucide-react';
 
 const navItems = [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/subjects', label: 'Subjects', icon: LibraryBig },
+    { to: '/images', label: 'Images', icon: ImageIcon },
 ];
 
 const Sidebar = () => {

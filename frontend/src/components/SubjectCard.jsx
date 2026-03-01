@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import PerformanceBadge from './PerformanceBadge.jsx';
-import { BookMarked, BrainCircuit, ActivitySquare, ArrowRight, Trash2, Edit2 } from 'lucide-react';
+import { BookMarked, BrainCircuit, Activity, ArrowRight, Trash2, Edit2 } from 'lucide-react';
 
 const SubjectCard = ({ subject, stats, variant, onEdit, onDelete }) => {
     const navigate = useNavigate();
@@ -61,13 +61,13 @@ const SubjectCard = ({ subject, stats, variant, onEdit, onDelete }) => {
             <div className="mt-auto pt-3 border-t border-white/[0.06] flex items-center justify-between">
                 <div className="flex items-center gap-3 text-[10px] font-medium text-slate-500">
                     <div className="flex items-center gap-1.5">
-                        <ActivitySquare className="w-3 h-3 text-slate-400" strokeWidth={2} />
+                        <Activity className="w-3 h-3 text-slate-400" strokeWidth={2} />
                         <span>{stats?.totalSessions ?? 0} sessions</span>
                     </div>
                     <div className="h-2.5 w-px bg-white/10" />
                     <div className="flex items-center gap-1.5">
                         <BrainCircuit className="w-3 h-3 text-slate-400" strokeWidth={2} />
-                        <span>{totalQ} Qs</span>
+                        <span>{stats?.availableQuestions ?? (stats?.totalQuestions ?? 0)} Qs</span>
                     </div>
                 </div>
 

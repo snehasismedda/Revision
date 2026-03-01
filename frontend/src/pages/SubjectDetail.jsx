@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { subjectsApi, topicsApi, sessionsApi, questionsApi, notesApi } from '../api/index.js';
+import { subjectsApi, topicsApi, sessionsApi, questionsApi, notesApi, imagesApi } from '../api/index.js';
 import TopicTree from '../components/TopicTree.jsx';
 import SessionCard from '../components/SessionCard.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
@@ -16,6 +16,7 @@ import ViewNoteModal from '../components/modals/ViewNoteModal.jsx';
 import CreateSessionModal from '../components/modals/CreateSessionModal.jsx';
 import EditSessionModal from '../components/modals/EditSessionModal.jsx';
 import EditNoteModal from '../components/modals/EditNoteModal.jsx';
+import AddImageModal from '../components/modals/AddImageModal.jsx';
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -57,11 +58,19 @@ const SubjectDetail = () => {
     const [sessions, setSessions] = useState([]);
     const [questions, setQuestions] = useState([]);
     const [notes, setNotes] = useState([]);
+    const [images, setImages] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    // Pagination for images
+    const [imagePage, setImagePage] = useState(0);
+    const [loadingMoreImages, setLoadingMoreImages] = useState(false);
+    const [hasMoreImages, setHasMoreImages] = useState(true);
+    const IMAGE_LIMIT = 20;
     const [activeTab, setActiveTab] = useState('topics');
     const [showTopicModal, setShowTopicModal] = useState(false);
     const [showQuestionModal, setShowQuestionModal] = useState(false);
     const [showNoteModal, setShowNoteModal] = useState(false);
+    const [showImageModal, setShowImageModal] = useState(false);
     const [viewingNote, setViewingNote] = useState(null);
     const [editingNote, setEditingNote] = useState(null);
     const [selectedQuestionIdForNote, setSelectedQuestionIdForNote] = useState(null);
@@ -79,6 +88,7 @@ const SubjectDetail = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [noteSearchQuery, setNoteSearchQuery] = useState('');
     const [sessionSearchQuery, setSessionSearchQuery] = useState('');
+    const [imageSearchQuery, setImageSearchQuery] = useState('');
     const [topicsDefaultExpanded, setTopicsDefaultExpanded] = useState(true);
     const [treeKey, setTreeKey] = useState(0);
     const [sessionsViewMode, setSessionsViewMode] = useState('grid'); // 'grid' or 'list'
@@ -92,21 +102,57 @@ const SubjectDetail = () => {
         setExpandedGroups(prev => ({ ...prev, [groupId]: !prev[groupId] }));
     };
 
+    // Load more images effect
+    useEffect(() => {
+        if (imagePage === 0) return; // handled by initial load
+        const loadMore = async () => {
+            setLoadingMoreImages(true);
+            try {
+                const res = await imagesApi.listBySubject(id, IMAGE_LIMIT, imagePage * IMAGE_LIMIT);
+                const newImages = res.images || [];
+                setHasMoreImages(newImages.length === IMAGE_LIMIT);
+                setImages(prev => [...prev, ...newImages]);
+            } catch {
+                toast.error('Failed to load more images');
+            } finally {
+                setLoadingMoreImages(false);
+            }
+        };
+        loadMore();
+    }, [id, imagePage]);
+
+    const imageObserver = React.useRef();
+    const lastImageElementRef = React.useCallback(node => {
+        if (loading || loadingMoreImages) return;
+        if (imageObserver.current) imageObserver.current.disconnect();
+        imageObserver.current = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting && hasMoreImages) {
+                setImagePage(prevPage => prevPage + 1);
+            }
+        });
+        if (node) imageObserver.current.observe(node);
+    }, [loading, loadingMoreImages, hasMoreImages]);
+
     useEffect(() => {
         const load = async () => {
             try {
-                const [subRes, topRes, sesRes, qsRes, notesRes] = await Promise.all([
+                const [subRes, topRes, sesRes, qsRes, notesRes, imgRes] = await Promise.all([
                     subjectsApi.get(id),
                     topicsApi.list(id),
                     sessionsApi.list(id),
                     questionsApi.list(id),
                     notesApi.list(id),
+                    imagesApi.listBySubject(id, IMAGE_LIMIT, 0),
                 ]);
                 setSubject(subRes.subject);
                 setTopics(topRes.topics);
                 setSessions(sesRes.sessions);
                 setQuestions(qsRes.questions || []);
                 setNotes(notesRes.notes || []);
+
+                const initialImages = imgRes.images || [];
+                setImages(initialImages);
+                setHasMoreImages(initialImages.length === IMAGE_LIMIT);
             } catch {
                 navigate('/subjects');
             } finally {
@@ -140,6 +186,25 @@ const SubjectDetail = () => {
     const handleNoteUpdated = (updatedNote) => {
         setNotes((prev) => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
         if (viewingNote?.id === updatedNote.id) setViewingNote(updatedNote);
+    };
+
+    const handleImageAdded = (newRes) => {
+        if (newRes.note) {
+            setNotes(prev => [newRes.note, ...prev]);
+        } else if (newRes.questions) {
+            // newRes.questions is an array
+            setQuestions(prev => [...newRes.questions, ...prev]);
+        }
+
+        // Refetch images to be thorough
+        const refreshImages = async () => {
+            setImagePage(0);
+            const res = await imagesApi.listBySubject(id, IMAGE_LIMIT, 0);
+            const newImages = res.images || [];
+            setImages(newImages);
+            setHasMoreImages(newImages.length === IMAGE_LIMIT);
+        };
+        refreshImages();
     };
 
     const handleSessionCreated = (newSession) => {
@@ -206,6 +271,77 @@ const SubjectDetail = () => {
             toast.error('Failed to load note image');
         } finally {
             setFetchingImageId(null);
+        }
+    };
+    const handlePrevImage = () => {
+        if (!viewingNote || !viewingNote.id?.toString().startsWith('img-')) return;
+        const currentId = viewingNote.source_image_id;
+        const idx = images.findIndex(img => img.id === currentId);
+        if (idx > 0) {
+            const img = images[idx - 1];
+            const fakeNote = {
+                id: `img-${img.id}`,
+                title: 'Source Image',
+                content: 'Original captured material.',
+                source_image_id: img.id,
+                created_at: img.created_at
+            };
+            setFetchedImages(prev => ({ ...prev, [`note-img-${img.id}`]: img.data }));
+            setViewingNote(fakeNote);
+        }
+    };
+
+    const handleNextImage = () => {
+        if (!viewingNote || !viewingNote.id?.toString().startsWith('img-')) return;
+        const currentId = viewingNote.source_image_id;
+        const idx = images.findIndex(img => img.id === currentId);
+        if (idx < images.length - 1) {
+            const img = images[idx + 1];
+            const fakeNote = {
+                id: `img-${img.id}`,
+                title: 'Source Image',
+                content: 'Original captured material.',
+                source_image_id: img.id,
+                created_at: img.created_at
+            };
+            setFetchedImages(prev => ({ ...prev, [`note-img-${img.id}`]: img.data }));
+            setViewingNote(fakeNote);
+        }
+    };
+
+    const handlePrevNote = () => {
+        if (!viewingNote || viewingNote.id?.toString().startsWith('img-')) return;
+
+        const filtered = notes.filter(n =>
+            n.title?.toLowerCase().includes(noteSearchQuery.toLowerCase()) ||
+            n.content?.toLowerCase().includes(noteSearchQuery.toLowerCase())
+        );
+
+        const idx = filtered.findIndex(n => n.id === viewingNote.id);
+        if (idx > 0) {
+            const nextNote = filtered[idx - 1];
+            setViewingNote(nextNote);
+            if (nextNote.source_image_id) {
+                handleFetchNoteImage(nextNote.id);
+            }
+        }
+    };
+
+    const handleNextNote = () => {
+        if (!viewingNote || viewingNote.id?.toString().startsWith('img-')) return;
+
+        const filtered = notes.filter(n =>
+            n.title?.toLowerCase().includes(noteSearchQuery.toLowerCase()) ||
+            n.content?.toLowerCase().includes(noteSearchQuery.toLowerCase())
+        );
+
+        const idx = filtered.findIndex(n => n.id === viewingNote.id);
+        if (idx < filtered.length - 1) {
+            const nextNote = filtered[idx + 1];
+            setViewingNote(nextNote);
+            if (nextNote.source_image_id) {
+                handleFetchNoteImage(nextNote.id);
+            }
         }
     };
 
@@ -301,7 +437,7 @@ const SubjectDetail = () => {
             let qTags = [];
             try {
                 qTags = typeof q.tags === 'string' ? JSON.parse(q.tags) : (q.tags || []);
-            } catch (e) {
+            } catch {
                 qTags = [];
             }
             return qTags.some(tag => tag.toLowerCase().includes(query)) ||
@@ -437,6 +573,13 @@ const SubjectDetail = () => {
                 onQuestionAdded={handleQuestionAdded}
             />
 
+            <AddImageModal
+                isOpen={showImageModal}
+                onClose={() => setShowImageModal(false)}
+                subjectId={id}
+                onImageSaved={handleImageAdded}
+            />
+
             <AddNoteModal
                 isOpen={showNoteModal}
                 onClose={() => {
@@ -479,6 +622,8 @@ const SubjectDetail = () => {
                 sourceImage={viewingNote ? fetchedImages[`note-${viewingNote.id}`] : null}
                 isFetchingImage={fetchingImageId === (viewingNote ? `note-${viewingNote.id}` : null)}
                 onEdit={setEditingNote}
+                onPrev={viewingNote?.id?.toString().startsWith('img-') ? handlePrevImage : handlePrevNote}
+                onNext={viewingNote?.id?.toString().startsWith('img-') ? handleNextImage : handleNextNote}
             />
 
             <EditNoteModal
@@ -540,8 +685,8 @@ const SubjectDetail = () => {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     {/* Segmented Tabs */}
                     <div className="flex gap-1 p-1 bg-surface-2/50 backdrop-blur-md rounded-xl border border-white/[0.06] w-fit">
-                        {['topics', 'sessions', 'questions', 'notes'].map((tab) => {
-                            const count = tab === 'topics' ? topics.length : tab === 'sessions' ? sessions.length : tab === 'questions' ? questions.length : notes.length;
+                        {['topics', 'sessions', 'questions', 'notes', 'images'].map((tab) => {
+                            const count = tab === 'topics' ? topics.length : tab === 'sessions' ? sessions.length : tab === 'questions' ? questions.length : tab === 'notes' ? notes.length : images.length;
                             return (
                                 <button
                                     key={tab}
@@ -595,6 +740,16 @@ const SubjectDetail = () => {
                             >
                                 <PlusCircle className="w-4 h-4" strokeWidth={2} />
                                 <span>Add Note</span>
+                            </button>
+                        )}
+
+                        {activeTab === 'images' && (
+                            <button
+                                onClick={() => setShowImageModal(true)}
+                                className="bg-indigo-500 text-white hover:bg-indigo-600 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
+                            >
+                                <ImageIcon className="w-4 h-4" strokeWidth={2} />
+                                <span>Add Image</span>
                             </button>
                         )}
 
@@ -895,7 +1050,7 @@ const SubjectDetail = () => {
                                                         let qTags = [];
                                                         try {
                                                             qTags = typeof q.tags === 'string' ? JSON.parse(q.tags) : (q.tags || []);
-                                                        } catch (e) {
+                                                        } catch {
                                                             qTags = [];
                                                         }
                                                         if (!qTags || qTags.length === 0) return null;
@@ -1062,7 +1217,7 @@ const SubjectDetail = () => {
                                                                         let qTags = [];
                                                                         try {
                                                                             qTags = typeof q.tags === 'string' ? JSON.parse(q.tags) : (q.tags || []);
-                                                                        } catch (e) {
+                                                                        } catch {
                                                                             qTags = [];
                                                                         }
                                                                         if (!qTags || qTags.length === 0) return null;
@@ -1358,6 +1513,131 @@ const SubjectDetail = () => {
                             </div>
                         )}
                     </div>
+                </div>
+            )}
+
+            {activeTab === 'images' && (
+                <div className="fade-in pb-12 px-1">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                        <div className="flex items-center gap-3">
+                            <ImageIcon className="w-5 h-5 text-indigo-400" />
+                            <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Image Gallery</h3>
+                        </div>
+                        <div className="relative group min-w-[300px]">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                            <input
+                                type="text"
+                                value={imageSearchQuery}
+                                onChange={(e) => setImageSearchQuery(e.target.value)}
+                                placeholder="Search by date..."
+                                className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                            />
+                            {imageSearchQuery && (
+                                <button
+                                    onClick={() => setImageSearchQuery('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {images.length === 0 ? (
+                        <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center max-w-2xl mx-auto mt-8">
+                            <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 rotate-3">
+                                <ImageIcon className="w-10 h-10 text-slate-500" />
+                            </div>
+                            <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No images yet</h3>
+                            <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                Upload diagrams, textbook snippets, or handwritten notes. They'll be saved here for easy reference and AI analysis.
+                            </p>
+                            <button
+                                onClick={() => setShowImageModal(true)}
+                                className="btn-primary flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer"
+                            >
+                                <PlusCircle className="w-4 h-4" />
+                                <span>Upload Your First Image</span>
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
+                            {images
+                                .filter(img =>
+                                    new Date(img.created_at).toLocaleDateString().includes(imageSearchQuery)
+                                )
+                                .map((img, index, arr) => {
+                                    const isLast = index === arr.length - 1;
+                                    return (
+                                        <div
+                                            key={img.id}
+                                            ref={isLast ? lastImageElementRef : null}
+                                            className="group relative aspect-square rounded-2xl overflow-hidden bg-surface-2 border border-white/[0.06] hover:border-indigo-500/50 transition-all cursor-pointer shadow-lg hover:shadow-indigo-500/20 active:scale-[0.98]"
+                                        >
+                                            {/* Source Indicator Button */}
+                                            {(img.linked_question_id || img.linked_note_id) && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (img.linked_question_id) {
+                                                            navigateToQuestion(img.linked_question_id);
+                                                        } else if (img.linked_note_id) {
+                                                            const note = notes.find(n => n.id === img.linked_note_id);
+                                                            if (note) setViewingNote(note);
+                                                        }
+                                                    }}
+                                                    className="absolute top-3 right-3 p-2 bg-black/60 backdrop-blur-md rounded-xl text-indigo-400 border border-white/[0.08] opacity-0 group-hover:opacity-100 transition-all shadow-2xl z-20 hover:scale-110 active:scale-95 hover:bg-indigo-500/20"
+                                                    title="View Linked Content"
+                                                >
+                                                    <LinkIcon className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+
+                                            <img
+                                                src={img.data}
+                                                alt="Subject material"
+                                                className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
+                                                loading="lazy"
+                                            />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-4">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <p className="text-[11px] font-bold text-white/70 flex items-center gap-1.5">
+                                                        <Activity className="w-3 h-3 text-indigo-400" />
+                                                        {new Date(img.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                    </p>
+                                                    {img.linked_question_id && <span className="text-[9px] font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">Question</span>}
+                                                    {img.linked_note_id && <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">Note</span>}
+                                                </div>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const fakeNote = {
+                                                            id: `img-${img.id}`,
+                                                            title: 'Source Image',
+                                                            content: 'Original captured material.',
+                                                            source_image_id: img.id,
+                                                            created_at: img.created_at
+                                                        };
+                                                        setFetchedImages(prev => ({ ...prev, [`note-img-${img.id}`]: img.data }));
+                                                        setViewingNote(fakeNote);
+                                                    }}
+                                                    className="w-full py-2 bg-white text-black text-[12px] font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 transition-colors shadow-lg active:scale-95"
+                                                >
+                                                    <Maximize2 className="w-3.5 h-3.5" />
+                                                    View Full
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                        </div>
+                    )}
+
+                    {loadingMoreImages && (
+                        <div className="flex justify-center mt-8 mb-4">
+                            <div className="w-6 h-6 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+                        </div>
+                    )}
                 </div>
             )}
         </div>

@@ -91,7 +91,22 @@ export const parseNote = async (req, res) => {
             format: 'json',
         });
 
-        const result = JSON.parse(response.message?.content || '{}');
+        let result = JSON.parse(response.message?.content || '{}');
+
+        // Restore LaTeX escapes
+        const restoreMathEscapes = (text) => {
+            if (typeof text !== 'string') return text;
+            return text
+                .replace(/\u000c/g, '\\f')
+                .replace(/\u0009/g, '\\t')
+                .replace(/\u0008/g, '\\b')
+                .replace(/\u000d/g, '\\r')
+                .replace(/\u000b/g, '\\v');
+        };
+
+        if (result.title) result.title = restoreMathEscapes(result.title);
+        if (result.content) result.content = restoreMathEscapes(result.content);
+
         res.status(200).json(result);
     } catch (error) {
         console.error('parseNote error:', error);

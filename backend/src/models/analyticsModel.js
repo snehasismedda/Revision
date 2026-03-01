@@ -1,7 +1,7 @@
 import db from '../knex/db.js';
 
 export const getSubjectOverview = async (data) => {
-    const result = await db('revision.session_entries as se')
+    const attempts = await db('revision.session_entries as se')
         .join('revision.sessions as s', 'se.session_id', 's.id')
         .join('revision.topics as t', 'se.topic_id', 't.id')
         .where('s.subject_id', data.subjectId)
@@ -11,11 +11,29 @@ export const getSubjectOverview = async (data) => {
         .select(
             db.raw('COUNT(*) as total_questions'),
             db.raw('SUM(CASE WHEN se.is_correct THEN 1 ELSE 0 END) as total_correct'),
-            db.raw('COUNT(DISTINCT se.session_id) as total_sessions'),
             db.raw('COUNT(DISTINCT se.topic_id) as topics_covered'),
         )
         .first();
-    return result;
+
+    const qs = await db('revision.questions')
+        .where('subject_id', data.subjectId)
+        .where('is_deleted', false)
+        .count('* as count')
+        .first();
+
+    const sess = await db('revision.sessions')
+        .where('subject_id', data.subjectId)
+        .where('is_deleted', false)
+        .count('* as count')
+        .first();
+
+    return {
+        total_questions: attempts?.total_questions || 0,
+        total_correct: attempts?.total_correct || 0,
+        topics_covered: attempts?.topics_covered || 0,
+        available_questions: qs?.count || 0,
+        total_sessions: sess?.count || 0,
+    };
 };
 
 export const getTopicPerformance = async (data) => {

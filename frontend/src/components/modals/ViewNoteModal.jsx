@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, FileText, Link2 as LinkIcon, Wand2, Pencil } from 'lucide-react';
+import { X, FileText, Link2 as LinkIcon, Wand2, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import ModalPortal from '../ModalPortal.jsx';
 import ReactMarkdown from 'react-markdown';
@@ -33,9 +33,19 @@ const preprocessMarkdown = (text) => {
         .replace(/\\bottom/g, '\\bot');
 };
 
-const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImage, isFetchingImage, onEdit }) => {
+const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImage, isFetchingImage, onEdit, onPrev, onNext }) => {
 
     if (!isOpen || !note) return null;
+
+    React.useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'ArrowLeft' && onPrev) onPrev();
+            if (e.key === 'ArrowRight' && onNext) onNext();
+            if (e.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onPrev, onNext, onClose]);
 
     const isAINote = note.title?.startsWith('AI Note');
     const processedContent = preprocessMarkdown(note.content || '');
@@ -196,6 +206,33 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                         </div>
                     )}
                 </div>
+
+                {/* Navigation Arrows for Gallery/Notes */}
+                {onPrev && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onPrev();
+                        }}
+                        className="fixed left-6 md:left-12 top-1/2 -translate-y-1/2 p-3 md:p-4 rounded-full bg-surface-2/60 backdrop-blur-md text-white/50 border border-white/5 hover:bg-surface-2 hover:text-white hover:scale-110 active:scale-95 transition-all shadow-2xl z-[60] group hidden md:flex"
+                        title="Previous"
+                    >
+                        <ChevronLeft className="w-6 h-6 group-active:-translate-x-1 transition-transform" />
+                    </button>
+                )}
+
+                {onNext && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onNext();
+                        }}
+                        className="fixed right-6 md:right-12 top-1/2 -translate-y-1/2 p-3 md:p-4 rounded-full bg-surface-2/60 backdrop-blur-md text-white/50 border border-white/5 hover:bg-surface-2 hover:text-white hover:scale-110 active:scale-95 transition-all shadow-2xl z-[60] group hidden md:flex"
+                        title="Next"
+                    >
+                        <ChevronRight className="w-6 h-6 group-active:translate-x-1 transition-transform" />
+                    </button>
+                )}
             </div>
         </ModalPortal>
     );

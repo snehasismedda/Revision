@@ -50,7 +50,13 @@ export const parseQuestionToRichText = async ({ content, type, topics = [] }) =>
     });
 
     const result = response.message?.content || '';
-    const parsed = JSON.parse(result);
+    let parsed = {};
+    try {
+      parsed = JSON.parse(result);
+    } catch (e) {
+      console.error('Failed to parse AI JSON:', result);
+      throw new Error('AI produced an invalid response format.');
+    }
 
     // Helper to restore backslashes for common LaTeX commands that JSON.parse misinterprets as control characters
     const restoreMathEscapes = (text) => {

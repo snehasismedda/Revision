@@ -107,6 +107,7 @@ const Dashboard = () => {
                         map[id] = stats;
                     }
                 });
+                console.log(map);
                 setStatsMap(map);
             } catch {
                 // silently fail

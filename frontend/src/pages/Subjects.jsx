@@ -22,7 +22,8 @@ const Subjects = () => {
     useEffect(() => {
         loadSubjects();
         if (searchParams.get('new')) setShowModal(true);
-    }, []);
+         
+    }, [searchParams]);
 
     const loadSubjects = async () => {
         try {

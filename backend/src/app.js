@@ -13,6 +13,7 @@ import analyticsRoute from './routes/analyticsRoute.js';
 import aiRoute from './routes/aiRoute.js';
 import questionRoute from './routes/questionRoute.js';
 import noteRoute from './routes/noteRoute.js';
+import imageRoute from './routes/imageRoute.js';
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use('/api/subjects/:subjectId/notes', noteRoute);
 app.use('/api/sessions/:sessionId/entries', entryRoute);
 app.use('/api/analytics', analyticsRoute);
 app.use('/api/ai', aiRoute);
+app.use('/api/images', imageRoute);
 
 // --- Health Check ---
 app.get('/health', (req, res) => res.json({ status: 'ok' }));

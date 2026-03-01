@@ -96,3 +96,22 @@ export const notesApi = {
     delete: (subjectId, noteId) => request(`/subjects/${subjectId}/notes/${noteId}`, { method: 'DELETE' }),
     getImage: (subjectId, noteId) => request(`/subjects/${subjectId}/notes/${noteId}/image`),
 };
+
+// Images
+export const imagesApi = {
+    list: (limit, offset) => {
+        let q = [];
+        if (limit != null) q.push(`limit=${limit}`);
+        if (offset != null) q.push(`offset=${offset}`);
+        const qs = q.length ? '?' + q.join('&') : '';
+        return request(`/images${qs}`);
+    },
+    listBySubject: (subjectId, limit, offset) => {
+        let q = [];
+        if (limit != null) q.push(`limit=${limit}`);
+        if (offset != null) q.push(`offset=${offset}`);
+        const qs = q.length ? '?' + q.join('&') : '';
+        return request(`/images/subject/${subjectId}${qs}`);
+    },
+    saveAs: (body) => request('/images/save-as', { method: 'POST', body }),
+};

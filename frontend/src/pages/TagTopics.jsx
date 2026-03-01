@@ -63,7 +63,8 @@ const TagTopics = () => {
             }
         };
         load();
-    }, [subjectId, sessionId]);
+         
+    }, [subjectId, sessionId, navigate]);
 
     /* ── Add an entry for a topic ─────────────────────── */
     const addEntry = (topic, isCorrect = true) => {
@@ -228,7 +229,7 @@ const TagTopics = () => {
 
                     {/* Topics list */}
                     <div className="max-h-[460px] overflow-y-auto space-y-0.5 pr-1">
-                        {topicGroups.map((group, gi) => {
+                        {topicGroups.map((group) => {
                             if (group.parent) {
                                 const isExpanded = expandedSections[group.parent.id] ?? true;
                                 const parentCounts = topicEntryCounts[group.parent.id];
