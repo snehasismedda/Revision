@@ -93,3 +93,23 @@ export const deleteNote = async (req, res, next) => {
         next(error);
     }
 };
+
+export const updateNote = async (req, res, next) => {
+    try {
+        const { subjectId, noteId } = req.params;
+        const { title, content } = req.body;
+
+        if (!title || !content) {
+            return res.status(400).json({ error: 'Title and content are required' });
+        }
+
+        const note = await noteModel.updateNote(noteId, subjectId, { title, content });
+        if (!note) {
+            return res.status(404).json({ error: 'Note not found' });
+        }
+
+        res.json({ note });
+    } catch (error) {
+        next(error);
+    }
+};

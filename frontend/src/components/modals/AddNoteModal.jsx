@@ -188,20 +188,6 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId }) =
         }
     };
 
-    const handleGetImageDescription = async () => {
-        if (!noteImage) return;
-        setIsAnalyzing(true);
-        try {
-            const result = await aiApi.describeImage({ content: noteImage });
-            if (result.title) setTitle(result.title);
-            if (result.content) setContent(result.content);
-            toast.success('Description generated');
-        } catch (error) {
-            toast.error('Failed to get description');
-        } finally {
-            setIsAnalyzing(false);
-        }
-    };
 
     const handleEnhanceContent = async () => {
         if (!content.trim()) return toast.error('Add some content first');
@@ -474,13 +460,6 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId }) =
                                                     className="text-[11px] font-bold text-emerald-400 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500/5 border border-emerald-500/10 hover:bg-emerald-500/10 transition-all flex-1 justify-center"
                                                 >
                                                     <Wand2 className="w-3.5 h-3.5" /> Generate Note with AI
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={handleGetImageDescription}
-                                                    className="text-[11px] font-bold text-indigo-400 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-500/5 border border-indigo-500/10 hover:bg-indigo-500/10 transition-all flex-1 justify-center"
-                                                >
-                                                    <Info className="w-3.5 h-3.5" /> Get Description
                                                 </button>
                                             </div>
                                         )}

@@ -6,7 +6,8 @@ import SessionCard from '../components/SessionCard.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import RichTextRenderer from '../components/RichTextRenderer.jsx';
 import toast from 'react-hot-toast';
-import { ArrowLeft, PlusCircle, BarChart3, Wand2, BookOpen, Activity, HelpCircle, FileText, Image as ImageIcon, Trash2, ChevronDown, Pencil, Hash, Search, X, Link2 as LinkIcon, Maximize2, Minimize2 } from 'lucide-react';
+import { ArrowLeft, PlusCircle, BarChart3, Wand2, BookOpen, Activity, HelpCircle, FileText, Image as ImageIcon, Trash2, ChevronDown, Pencil, Hash, Search, X, Link2 as LinkIcon, Maximize2, Minimize2, LayoutGrid, List } from 'lucide-react';
+
 import ManageSyllabusModal from '../components/modals/ManageSyllabusModal.jsx';
 import AddQuestionModal from '../components/modals/AddQuestionModal.jsx';
 import EditQuestionModal from '../components/modals/EditQuestionModal.jsx';
@@ -14,6 +15,8 @@ import AddNoteModal from '../components/modals/AddNoteModal.jsx';
 import ViewNoteModal from '../components/modals/ViewNoteModal.jsx';
 import CreateSessionModal from '../components/modals/CreateSessionModal.jsx';
 import EditSessionModal from '../components/modals/EditSessionModal.jsx';
+import EditNoteModal from '../components/modals/EditNoteModal.jsx';
+
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -60,7 +63,9 @@ const SubjectDetail = () => {
     const [showQuestionModal, setShowQuestionModal] = useState(false);
     const [showNoteModal, setShowNoteModal] = useState(false);
     const [viewingNote, setViewingNote] = useState(null);
+    const [editingNote, setEditingNote] = useState(null);
     const [selectedQuestionIdForNote, setSelectedQuestionIdForNote] = useState(null);
+
     const [generatingAINoteId, setGeneratingAINoteId] = useState(null);
     const [showSessionModal, setShowSessionModal] = useState(false);
     const [confirmDeleteSession, setConfirmDeleteSession] = useState({ open: false, session: null });
@@ -76,6 +81,9 @@ const SubjectDetail = () => {
     const [sessionSearchQuery, setSessionSearchQuery] = useState('');
     const [topicsDefaultExpanded, setTopicsDefaultExpanded] = useState(true);
     const [treeKey, setTreeKey] = useState(0);
+    const [sessionsViewMode, setSessionsViewMode] = useState('grid'); // 'grid' or 'list'
+    const [notesViewMode, setNotesViewMode] = useState('grid'); // 'grid' or 'list'
+
 
     // Toggle state for grouped questions
     const [expandedGroups, setExpandedGroups] = useState({});
@@ -127,6 +135,11 @@ const SubjectDetail = () => {
 
     const handleNoteAdded = (newNote) => {
         setNotes((prev) => [newNote, ...prev]);
+    };
+
+    const handleNoteUpdated = (updatedNote) => {
+        setNotes((prev) => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
+        if (viewingNote?.id === updatedNote.id) setViewingNote(updatedNote);
     };
 
     const handleSessionCreated = (newSession) => {
@@ -464,7 +477,17 @@ const SubjectDetail = () => {
                 onNavigateToQuestion={navigateToQuestion}
                 sourceImage={viewingNote ? fetchedImages[`note-${viewingNote.id}`] : null}
                 isFetchingImage={fetchingImageId === (viewingNote ? `note-${viewingNote.id}` : null)}
+                onEdit={setEditingNote}
             />
+
+            <EditNoteModal
+                isOpen={!!editingNote}
+                onClose={() => setEditingNote(null)}
+                subjectId={id}
+                note={editingNote}
+                onNoteUpdated={handleNoteUpdated}
+            />
+
 
             <EditQuestionModal
                 isOpen={showEditQuestionModal}
@@ -650,7 +673,24 @@ const SubjectDetail = () => {
                                 </button>
                             )}
                         </div>
+                        <div className="flex bg-surface-2/50 p-1 rounded-xl border border-white/[0.06] shrink-0">
+                            <button
+                                onClick={() => setSessionsViewMode('grid')}
+                                className={`p-1.5 rounded-lg transition-all ${sessionsViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                title="Grid View"
+                            >
+                                <LayoutGrid className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={() => setSessionsViewMode('list')}
+                                className={`p-1.5 rounded-lg transition-all ${sessionsViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                title="List View"
+                            >
+                                <List className="w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
+
 
                     {sessions.length === 0 ? (
                         <div className="glass-panel p-12 text-center rounded-2xl border-dashed border-white/10 max-w-2xl mx-auto mt-8">
@@ -670,7 +710,7 @@ const SubjectDetail = () => {
                             </button>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        <div className={`grid gap-5 ${sessionsViewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
                             {(() => {
                                 const filtered = sessions.filter(s =>
                                     (s.title || s.name || '')?.toLowerCase().includes(sessionSearchQuery.toLowerCase()) ||
@@ -692,9 +732,11 @@ const SubjectDetail = () => {
                                         key={s.id}
                                         session={s}
                                         subjectId={id}
+                                        viewMode={sessionsViewMode}
                                         onDelete={(session) => setConfirmDeleteSession({ open: true, session })}
                                         onEdit={(session) => setEditingSession(session)}
                                     />
+
                                 ));
                             })()}
                         </div>
@@ -1107,7 +1149,24 @@ const SubjectDetail = () => {
                                 </button>
                             )}
                         </div>
+                        <div className="flex bg-surface-2/50 p-1 rounded-xl border border-white/[0.06] shrink-0">
+                            <button
+                                onClick={() => setNotesViewMode('grid')}
+                                className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                title="Grid View"
+                            >
+                                <LayoutGrid className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={() => setNotesViewMode('list')}
+                                className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                title="List View"
+                            >
+                                <List className="w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
+
 
                     <div className="w-full">
                         {notes.length === 0 ? (
@@ -1131,7 +1190,7 @@ const SubjectDetail = () => {
                                 </button>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                            <div className={`grid gap-5 ${notesViewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
                                 {(() => {
                                     const filtered = notes.filter(n =>
                                         n.title?.toLowerCase().includes(noteSearchQuery.toLowerCase()) ||
@@ -1152,84 +1211,145 @@ const SubjectDetail = () => {
                                         <div
                                             key={note.id}
                                             id={`note-${note.id}`}
-                                            className="glass-panel p-5 rounded-xl border border-white/[0.06] hover:border-emerald-500/30 hover:bg-white/[0.02] cursor-pointer transition-all flex flex-col group relative overflow-hidden"
+                                            className={`glass-panel rounded-xl border border-white/[0.06] hover:border-emerald-500/30 hover:bg-white/[0.02] cursor-pointer transition-all flex group relative overflow-hidden ${notesViewMode === 'list' ? 'items-center py-3 pr-5 pl-1' : 'flex-col p-5'}`}
                                             onClick={() => setViewingNote(note)}
                                         >
-                                            {/* Optional background glow */}
-                                            <div className="absolute -right-10 -top-10 w-24 h-24 bg-emerald-500/10 blur-3xl rounded-full"></div>
-
-                                            <div className="flex justify-between items-start mb-4 relative z-10">
-                                                <div className="flex items-start gap-3 mt-1">
-                                                    <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
-                                                        <FileText className="w-4 h-4" />
-                                                    </div>
-                                                    <h4 className="text-[15px] font-heading font-bold text-white leading-snug break-words">
-                                                        {note.title}
-                                                    </h4>
-                                                </div>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setConfirmDeleteNote({ open: true, note });
-                                                    }}
-                                                    className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100 cursor-pointer shrink-0 ml-2"
-                                                    title="Delete Note"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                            <div className="text-sm text-slate-300 line-clamp-5 leading-relaxed mb-4 relative z-10 overflow-hidden">
-                                                <div className="prose prose-sm prose-invert max-w-none prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mt-0 prose-p:mb-2 prose-headings:font-bold prose-headings:text-white prose-headings:m-0 prose-headings:mb-1.5 prose-h1:text-[15px] prose-h2:text-[14px] prose-h3:text-[13px] prose-a:text-indigo-400 prose-code:text-emerald-300 prose-code:bg-emerald-500/10 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
-                                                    <ReactMarkdown
-                                                        remarkPlugins={[remarkGfm, remarkMath]}
-                                                        rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
-                                                    >
-                                                        {preprocessMarkdown(note.content || '')}
-                                                    </ReactMarkdown>
-                                                </div>
-                                            </div>
-
-                                            {note.source_image_id && (
-                                                <div className="mb-6 relative z-10">
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleFetchNoteImage(note.id);
-                                                            setViewingNote(note);
-                                                        }}
-                                                        disabled={fetchingImageId === `note-${note.id}`}
-                                                        className="flex items-center gap-2.5 px-4 py-2 rounded-xl text-[12px] font-bold bg-white/[0.04] text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/30 transition-all border border-white/[0.08] disabled:opacity-50 cursor-pointer shadow-sm shadow-black/20"
-                                                    >
-                                                        {fetchingImageId === `note-${note.id}` ? (
-                                                            <div className="w-3.5 h-3.5 border border-white/30 border-t-white rounded-full animate-spin" />
-                                                        ) : (
-                                                            <ImageIcon className="w-4 h-4" />
-                                                        )}
-                                                        <span>{fetchingImageId === `note-${note.id}` ? 'Loading...' : 'Show Source Image'}</span>
-                                                    </button>
-                                                </div>
+                                            {/* List mode progress line/indicator */}
+                                            {notesViewMode === 'list' && (
+                                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500/40" />
                                             )}
 
-                                            <div className="text-[11px] font-medium text-slate-500 flex items-center justify-between pt-3 border-t border-white/[0.06] mt-auto relative z-10">
-                                                <span>
-                                                    {new Date(note.created_at).toLocaleDateString(undefined, {
-                                                        day: 'numeric',
-                                                        month: 'short',
-                                                        year: 'numeric'
-                                                    })}
-                                                </span>
-                                                {note.question_id && (
+                                            {/* Optional background glow */}
+                                            {notesViewMode === 'grid' && (
+                                                <div className="absolute -right-10 -top-10 w-24 h-24 bg-emerald-500/10 blur-3xl rounded-full"></div>
+                                            )}
+
+                                            <div className={`flex flex-1 min-w-0 ${notesViewMode === 'list' ? 'items-center px-4 gap-6' : 'flex-col'}`}>
+                                                {/* Title Section */}
+                                                <div className={`flex items-start gap-3 relative z-10 ${notesViewMode === 'list' ? 'w-1/3 shrink-0' : 'mb-4'}`}>
+                                                    <div className={`rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0 ${notesViewMode === 'list' ? 'p-1.5' : 'p-2.5'}`}>
+                                                        <FileText className={`${notesViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <h4 className={`font-heading font-bold text-white tracking-tight break-words truncate group-hover:text-emerald-400 transition-colors ${notesViewMode === 'list' ? 'text-[14px]' : 'text-[15px]'}`}>
+                                                            {note.title}
+                                                        </h4>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap">
+                                                                {new Date(note.created_at).toLocaleDateString(undefined, {
+                                                                    day: 'numeric',
+                                                                    month: 'short',
+                                                                    year: notesViewMode === 'grid' ? 'numeric' : undefined
+                                                                })}
+                                                            </span>
+                                                            {notesViewMode === 'list' && note.question_id && (
+                                                                <>
+                                                                    <div className="w-1 h-1 rounded-full bg-slate-700" />
+                                                                    <span className="text-[10px] text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">Question Link</span>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Content Section */}
+                                                {notesViewMode === 'grid' ? (
+                                                    <div className="text-sm text-slate-300 line-clamp-5 leading-relaxed mb-4 relative z-10 overflow-hidden">
+                                                        <div className="prose prose-sm prose-invert max-w-none prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mt-0 prose-p:mb-2 prose-headings:font-bold prose-headings:text-white prose-headings:m-0 prose-headings:mb-1.5 prose-h1:text-[15px] prose-h2:text-[14px] prose-h3:text-[13px] prose-a:text-indigo-400 prose-code:text-emerald-300 prose-code:bg-emerald-500/10 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
+                                                            <ReactMarkdown
+                                                                remarkPlugins={[remarkGfm, remarkMath]}
+                                                                rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                                            >
+                                                                {preprocessMarkdown(note.content || '')}
+                                                            </ReactMarkdown>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex-1 min-w-0 relative z-10 hidden md:block">
+                                                        <p className="text-[12px] text-slate-400 truncate opacity-70 group-hover:opacity-100 transition-opacity">
+                                                            {note.content?.substring(0, 200).replace(/[#*`\n]/g, ' ')}...
+                                                        </p>
+                                                    </div>
+                                                )}
+
+                                                {/* Source Image Link Section */}
+                                                {note.source_image_id && (
+                                                    <div className={`relative z-10 shrink-0 ${notesViewMode === 'list' ? 'mb-0' : 'mb-6'}`}>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleFetchNoteImage(note.id);
+                                                                setViewingNote(note);
+                                                            }}
+                                                            disabled={fetchingImageId === `note-${note.id}`}
+                                                            className={`flex items-center gap-2 rounded-xl font-bold bg-white/[0.04] text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all border border-white/[0.08] disabled:opacity-50 cursor-pointer ${notesViewMode === 'list' ? 'p-2' : 'px-4 py-2 text-[12px]'}`}
+                                                            title="View Source Image"
+                                                        >
+                                                            {fetchingImageId === `note-${note.id}` ? (
+                                                                <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
+                                                            ) : (
+                                                                <ImageIcon className={`${notesViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
+                                                            )}
+                                                            {notesViewMode === 'grid' && <span>Source Image</span>}
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Actions Section */}
+                                            <div className={`flex items-center relative z-10 shrink-0 ${notesViewMode === 'list' ? 'py-0 border-l border-white/[0.06] pl-5 ml-2 gap-4' : 'pt-3 border-t border-white/[0.06] mt-auto justify-between'}`}>
+                                                {notesViewMode === 'grid' && (
+                                                    <div className="flex items-center gap-3">
+                                                        {note.question_id && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    navigateToQuestion(note.question_id);
+                                                                }}
+                                                                className="flex items-center gap-1 hover:text-indigo-400 transition-colors cursor-pointer text-[12px]"
+                                                                title="Go to Source Question"
+                                                            >
+                                                                <LinkIcon className="w-3.5 h-3.5" />
+                                                                <span>Source</span>
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                <div className={`flex items-center gap-1 ${notesViewMode === 'list' ? 'flex-col sm:flex-row' : 'opacity-0 group-hover:opacity-100 transition-all'}`}>
+                                                    {notesViewMode === 'list' && note.question_id && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                navigateToQuestion(note.question_id);
+                                                            }}
+                                                            className="p-1.5 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-md transition-all cursor-pointer"
+                                                            title="Go to Source Question"
+                                                        >
+                                                            <LinkIcon className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            navigateToQuestion(note.question_id);
+                                                            setEditingNote(note);
                                                         }}
-                                                        className="flex items-center gap-1 hover:text-indigo-400 transition-colors cursor-pointer text-[12px]"
+                                                        className="p-1.5 text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-md transition-all cursor-pointer"
+                                                        title="Edit Note"
                                                     >
-                                                        <LinkIcon className="w-3.5 h-3.5" />
-                                                        <span>Source Question</span>
+                                                        <Pencil className="w-3.5 h-3.5" />
                                                     </button>
-                                                )}
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setConfirmDeleteNote({ open: true, note });
+                                                        }}
+                                                        className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-all cursor-pointer"
+                                                        title="Delete Note"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     ));

@@ -41,6 +41,10 @@ Required structure:
     {
       "question": "string",
       "tags": ["string"]
+    },
+    {
+      "question": "string",
+      "tags": ["string"]
     }
   ]
 }

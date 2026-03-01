@@ -1,7 +1,6 @@
 import db from '../knex/db.js';
 
 export const createQuestions = async (data) => {
-    console.log(data);
     return await db('revision.questions')
         .insert(data)
         .returning('*');

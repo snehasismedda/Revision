@@ -129,8 +129,6 @@ export const parseSyllabus = async (req, res) => {
         });
 
         const rawResult = response.message?.content || '';
-        console.log('rawResult', JSON.stringify(JSON.parse(rawResult), null, 2));
-
         // --- 1. Robust JSON Extraction ---
         let topics = [];
         try {
@@ -170,8 +168,6 @@ export const parseSyllabus = async (req, res) => {
 
         // Reconstruct for frontend
         const topicTree = topicModel.buildTopicTree(createdTopics);
-
-        console.log(`:::: Syllabus Parsed & Saved :::: Subject: ${subjectId} | Topics: ${createdTopics.length}`);
         res.status(200).json({ topics: topicTree });
     } catch (error) {
         console.error('parseSyllabus error:', error);

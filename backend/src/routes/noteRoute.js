@@ -7,6 +7,7 @@ const router = express.Router({ mergeParams: true });
 router.get('/', noteController.getNotes);
 router.get('/:noteId/image', noteController.getNoteImage);
 router.post('/', noteController.createNote);
+router.put('/:noteId', noteController.updateNote);
 router.delete('/:noteId', noteController.deleteNote);
 
 export default router;

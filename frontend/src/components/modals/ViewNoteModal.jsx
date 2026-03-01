@@ -1,5 +1,6 @@
 import React from 'react';
-import { X, FileText, Link2 as LinkIcon, Wand2 } from 'lucide-react';
+import { X, FileText, Link2 as LinkIcon, Wand2, Pencil } from 'lucide-react';
+
 import ModalPortal from '../ModalPortal.jsx';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -32,7 +33,8 @@ const preprocessMarkdown = (text) => {
         .replace(/\\bottom/g, '\\bot');
 };
 
-const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImage, isFetchingImage }) => {
+const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImage, isFetchingImage, onEdit }) => {
+
     if (!isOpen || !note) return null;
 
     const isAINote = note.title?.startsWith('AI Note');
@@ -114,6 +116,19 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                     <span>Source Details</span>
                                 </button>
                             )}
+                            {onEdit && (
+                                <button
+                                    onClick={() => {
+                                        onClose();
+                                        onEdit(note);
+                                    }}
+                                    className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-semibold text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 transition-all border border-transparent hover:border-emerald-500/20"
+                                >
+                                    <Pencil className="w-4 h-4" />
+                                    <span>Edit</span>
+                                </button>
+                            )}
+
                             <button
                                 onClick={onClose}
                                 className="p-2.5 text-slate-400 hover:text-white hover:bg-white/[0.08] rounded-xl transition-all cursor-pointer"

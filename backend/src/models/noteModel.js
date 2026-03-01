@@ -29,6 +29,18 @@ export const deleteNote = async (noteId, subjectId) => {
         .update({ is_deleted: true, deleted_at: db.fn.now() });
 };
 
+export const updateNote = async (noteId, subjectId, data) => {
+    const [updated] = await db('revision.notes')
+        .where({ id: noteId, subject_id: subjectId })
+        .update({
+            title: data.title,
+            content: data.content,
+            updated_at: db.fn.now()
+        })
+        .returning('*');
+    return updated;
+};
+
 export const softDeleteNotesBySubject = async (data) => {
     return await db('revision.notes')
         .where('subject_id', data.subjectId)
