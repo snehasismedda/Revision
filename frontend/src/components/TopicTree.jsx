@@ -183,18 +183,21 @@ const TopicNode = ({ topic, subjectId, depth = 0, onDeleted, onSubtopicAdded, on
             {/* Children — increased spacing for top-level categories */}
             {expanded && hasChildren && (
                 <div className={depth === 0 ? 'mt-0.5 mb-2' : 'mt-0.5'}>
-                    {topic.children.map((child) => (
-                        <TopicNode
-                            key={child.id}
-                            topic={child}
-                            subjectId={subjectId}
-                            depth={depth + 1}
-                            onSubtopicAdded={onSubtopicAdded}
-                            onRenamed={onRenamed}
-                            setConfirmDelete={setConfirmDelete}
-                            defaultExpanded={defaultExpanded}
-                        />
-                    ))}
+                    {(topic.children || [])
+                        .slice()
+                        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+                        .map((child) => (
+                            <TopicNode
+                                key={child.id}
+                                topic={child}
+                                subjectId={subjectId}
+                                depth={depth + 1}
+                                onSubtopicAdded={onSubtopicAdded}
+                                onRenamed={onRenamed}
+                                setConfirmDelete={setConfirmDelete}
+                                defaultExpanded={defaultExpanded}
+                            />
+                        ))}
                 </div>
             )}
         </div>
@@ -273,17 +276,20 @@ const TopicTree = ({ topics, subjectId, onTopicDeleted, onTopicsChanged, default
             <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
 
             <div className="space-y-1">
-                {topics.map((topic) => (
-                    <TopicNode
-                        key={topic.id}
-                        topic={topic}
-                        subjectId={subjectId}
-                        onSubtopicAdded={handleSubtopicAdded}
-                        onRenamed={handleRenamed}
-                        setConfirmDelete={setConfirmDelete}
-                        defaultExpanded={defaultExpanded}
-                    />
-                ))}
+                {(topics || [])
+                    .slice()
+                    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+                    .map((topic) => (
+                        <TopicNode
+                            key={topic.id}
+                            topic={topic}
+                            subjectId={subjectId}
+                            onSubtopicAdded={handleSubtopicAdded}
+                            onRenamed={handleRenamed}
+                            setConfirmDelete={setConfirmDelete}
+                            defaultExpanded={defaultExpanded}
+                        />
+                    ))}
             </div>
         </div>
     );

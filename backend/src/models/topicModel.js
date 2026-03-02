@@ -25,6 +25,7 @@ export const createTopic = async (data) => {
             subject_id: data.subjectId,
             parent_id: data.parentId || null,
             name: data.name,
+            sort_order: data.orderIndex || 0,
             order_index: data.orderIndex || 0,
         })
         .returning('*');
@@ -68,7 +69,7 @@ export const findTopicsBySubject = async (data) => {
     return db('revision.topics')
         .where('subject_id', data.subjectId)
         .where('is_deleted', false)
-        .orderBy(['depth', 'sort_order'])
+        .orderBy(['depth', { column: 'created_at', order: 'asc' }, 'sort_order'])
         .select('*');
 };
 
@@ -86,6 +87,7 @@ export const updateTopic = async (data) => {
         .update({
             name: data.name,
             order_index: data.orderIndex,
+            sort_order: data.orderIndex,
             updated_at: new Date(),
         })
         .returning('*');

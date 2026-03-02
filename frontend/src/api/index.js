@@ -1,12 +1,34 @@
 const BASE_URL = '/api';
 
 const request = async (path, options = {}) => {
-    const res = await fetch(`${BASE_URL}${path}`, {
+    let res = await fetch(`${BASE_URL}${path}`, {
         headers: { 'Content-Type': 'application/json', ...options.headers },
         credentials: 'include',
         ...options,
         body: options.body ? JSON.stringify(options.body) : undefined,
     });
+
+    // If 401, try to refresh once
+    if (res.status === 401 && path !== '/auth/refresh' && path !== '/auth/login' && !options._retry) {
+        try {
+            const refreshRes = await fetch(`${BASE_URL}/auth/refresh`, {
+                method: 'POST',
+                credentials: 'include',
+            });
+            if (refreshRes.ok) {
+                // Retry original request
+                res = await fetch(`${BASE_URL}${path}`, {
+                    headers: { 'Content-Type': 'application/json', ...options.headers },
+                    credentials: 'include',
+                    ...options,
+                    _retry: true,
+                    body: options.body ? JSON.stringify(options.body) : undefined,
+                });
+            }
+        } catch (e) {
+            console.error('Refresh failed', e);
+        }
+    }
 
     const data = await res.json().catch(() => ({}));
 

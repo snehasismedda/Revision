@@ -6,7 +6,8 @@ import SessionCard from '../components/SessionCard.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import RichTextRenderer from '../components/RichTextRenderer.jsx';
 import toast from 'react-hot-toast';
-import { ArrowLeft, PlusCircle, BarChart3, Wand2, BookOpen, Activity, HelpCircle, FileText, Image as ImageIcon, Trash2, ChevronDown, Pencil, Hash, Search, X, Link2 as LinkIcon, Maximize2, Minimize2, LayoutGrid, List } from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import { ArrowLeft, PlusCircle, BarChart3, Wand2, BookOpen, Activity, HelpCircle, FileText, Image as ImageIcon, Trash2, ChevronDown, Pencil, Hash, Search, X, Link2 as LinkIcon, Maximize2, Minimize2, LayoutGrid, List, CheckCircle, Download } from 'lucide-react';
 
 import ManageSyllabusModal from '../components/modals/ManageSyllabusModal.jsx';
 import AddQuestionModal from '../components/modals/AddQuestionModal.jsx';
@@ -100,6 +101,270 @@ const SubjectDetail = () => {
 
     const toggleGroup = (groupId) => {
         setExpandedGroups(prev => ({ ...prev, [groupId]: !prev[groupId] }));
+    };
+
+    // PDF Export / Selection state
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [selectedItems, setSelectedItems] = useState(new Set());
+
+    useEffect(() => {
+        setIsSelectionMode(false);
+        setSelectedItems(new Set());
+    }, [activeTab]);
+
+    const handleSelectAll = () => {
+        if (activeTab === 'questions') {
+            const visibleQuestions = groupedQuestions.flatMap(g => g.questions);
+            if (selectedItems.size === visibleQuestions.length && visibleQuestions.length > 0) {
+                // If all currently visible are already selected, deselect them all
+                setSelectedItems(new Set());
+            } else {
+                // Otherwise, select exactly the visible list
+                setSelectedItems(new Set(visibleQuestions.map(q => q.id)));
+            }
+        } else if (activeTab === 'notes') {
+            const query = noteSearchQuery.toLowerCase();
+            const visibleNotes = notes.filter(n =>
+                n.title?.toLowerCase().includes(query) ||
+                n.content?.toLowerCase().includes(query)
+            );
+
+            if (selectedItems.size === visibleNotes.length && visibleNotes.length > 0) {
+                setSelectedItems(new Set());
+            } else {
+                setSelectedItems(new Set(visibleNotes.map(n => n.id)));
+            }
+        }
+    };
+
+    const handleDownloadSelected = async () => {
+        if (selectedItems.size === 0) return;
+        const loadingToast = toast.loading('Generating PDF...');
+
+        try {
+            const doc = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            const margin = 20;
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const contentWidth = pageWidth - (margin * 2);
+
+            let y = margin;
+
+            // Title
+            doc.setFontSize(20);
+            doc.setFont("times", "bold");
+            const titleText = subject?.name || 'Subject Export';
+            doc.text(titleText, margin, y);
+            y += 15;
+
+            const itemIds = Array.from(selectedItems);
+            let items = [];
+            if (activeTab === 'notes') {
+                items = itemIds.map(id => notes.find(n => n.id === id)).filter(Boolean);
+            } else {
+                items = itemIds.map(id => questions.find(q => q.id === id)).filter(Boolean);
+            }
+
+            const printedSourceIds = new Set();
+
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+
+                const itemType = activeTab === 'notes' ? 'Note' : 'Question';
+                const itemTitle = activeTab === 'notes' && item.title ? `${itemType} ${i + 1}: ${item.title}` : `${itemType} ${i + 1}`;
+
+                const imgId = item.id;
+                const sourceImgId = item.source_image_id || item.linked_question_id || item.linked_note_id;
+
+                let shouldPrintImage = false;
+
+                if (sourceImgId) {
+                    if (!printedSourceIds.has(sourceImgId)) {
+                        shouldPrintImage = true;
+                        printedSourceIds.add(sourceImgId);
+                    }
+                } else if (activeTab === 'notes' || item.type === 'image') {
+                    shouldPrintImage = true;
+                }
+
+                if (shouldPrintImage) {
+                    let imgData = fetchedImages[imgId] || fetchedImages[sourceImgId];
+
+                    if (!imgData) {
+                        try {
+                            let res;
+                            if (activeTab === 'notes') {
+                                res = await notesApi.getImage(id, imgId);
+                            } else {
+                                // Must fetch by questionId (imgId), backend resolves the source image internally
+                                res = await questionsApi.getImage(id, imgId);
+                            }
+                            if (res && res.content) {
+                                imgData = res.content;
+                                // Cache locally for the rest of this user session
+                                fetchedImages[sourceImgId || imgId] = res.content;
+                            }
+                        } catch (e) {
+                            // Question genuinely may not have an image
+                        }
+                    }
+
+                    if (imgData) {
+                        try {
+                            const imgProps = doc.getImageProperties(imgData);
+
+                            // jsPDF uses mm. Approximate conversion from pixels to mm is ~0.264583
+                            const pxToMm = 0.264583;
+                            let nativeWidthMm = imgProps.width * pxToMm;
+                            let nativeHeightMm = imgProps.height * pxToMm;
+                            const aspectRatio = imgProps.width / imgProps.height;
+
+                            // We want to avoid tiny images blowing up to fill the whole width.
+                            // We cap the max allowed width to 75% of the page content width so it's readable but not overwhelmingly huge.
+                            const maxAllowedWidth = contentWidth * 0.75;
+
+                            let finalWidth = nativeWidthMm;
+                            let finalHeight = nativeHeightMm;
+
+                            // If native size is larger than our max allowed width, scale it down proportionally
+                            if (finalWidth > maxAllowedWidth) {
+                                finalWidth = maxAllowedWidth;
+                                finalHeight = finalWidth / aspectRatio;
+                            }
+
+                            // Extra safety check: if the proportionally constrained height is STILL taller than a page, shrink again.
+                            if (finalHeight > (pageHeight - margin * 2.5)) {
+                                finalHeight = pageHeight - margin * 2.5;
+                                finalWidth = finalHeight * aspectRatio;
+                            }
+
+                            // Calculate horizontal offset to logically center the image within the bounds
+                            const xOffset = margin + ((contentWidth - finalWidth) / 2);
+
+                            if (y + finalHeight > pageHeight - margin) {
+                                doc.addPage();
+                                y = margin;
+                            }
+
+                            // Extract format from Data URI if present, fallback to PNG
+                            let format = 'PNG';
+                            if (imgData.startsWith('data:image/')) {
+                                const match = imgData.match(/data:image\/([a-zA-Z]+);/);
+                                if (match && match[1]) {
+                                    format = match[1].toUpperCase();
+                                    if (format === 'JPG') format = 'JPEG';
+                                    if (format === 'SVG+XML') format = 'SVG';
+                                }
+                            }
+
+                            // Just pass the image data natively with format explicitly from exact position
+                            doc.addImage(imgData, format, xOffset, y, finalWidth, finalHeight);
+                            y += finalHeight + 10;
+                        } catch (e) {
+                            console.warn('Could not add image:', e);
+                        }
+                    }
+                }
+
+                doc.setFontSize(14);
+                doc.setFont("times", "bold");
+                if (y + 10 > pageHeight - margin) { doc.addPage(); y = margin; }
+
+                doc.text(itemTitle, margin, y);
+                y += 8;
+
+                doc.setFontSize(12);
+                doc.setFont("times", "normal");
+
+                let textContent = item.content || '';
+                // 1. Strip basic markdown
+                textContent = textContent.replace(/#### /g, '')
+                    .replace(/### /g, '')
+                    .replace(/## /g, '')
+                    .replace(/# /g, '')
+                    .replace(/\*\*/g, '');
+
+                // 2. Strip LaTeX delimiters and clean up common math for standard PDF font compatibility
+                textContent = textContent.replace(/\\\(/g, '')
+                    .replace(/\\\)/g, '')
+                    .replace(/\\\[/g, '')
+                    .replace(/\\\]/g, '')
+                    // Replace common LaTeX math commands with ASCII-safe approximations
+                    // Since standard jsPDF 'times' font lacks advanced Unicode math glyphs
+                    .replace(/\\rightarrow/g, '->')
+                    .replace(/\\leftarrow/g, '<-')
+                    .replace(/\\leftrightarrow/g, '<->')
+                    .replace(/\\neq/g, '!=')
+                    .replace(/\\leq/g, '<=')
+                    .replace(/\\geq/g, '>=')
+                    .replace(/\\land/g, ' AND ')
+                    .replace(/\\lor/g, ' OR ')
+                    .replace(/\\neg/g, 'NOT ')
+                    .replace(/\\exists/g, 'EXISTS ')
+                    .replace(/\\forall/g, 'FORALL ')
+                    .replace(/\\in/g, ' IN ')
+                    .replace(/\\notin/g, ' NOT IN ')
+                    .replace(/\\subset/g, ' SUBSET ')
+                    .replace(/\\infty/g, 'INFINITY')
+                    .replace(/\\alpha/g, 'alpha')
+                    .replace(/\\beta/g, 'beta')
+                    .replace(/\\gamma/g, 'gamma')
+                    .replace(/\\theta/g, 'theta')
+                    .replace(/\\pi/g, 'pi')
+                    .replace(/\\cdot/g, '*')
+                    .replace(/\\times/g, '*')
+                    .replace(/\\div/g, '/')
+                    .replace(/\\pm/g, '+/-')
+                    .replace(/\\approx/g, '~=')
+                    .replace(/\\equiv/g, '==')
+                    .replace(/\\frac{([^}]*)}{([^}]*)}/g, '($1 / $2)') // Simple fraction converter
+                    // Clean up any double spaces left behind
+                    .replace(/  +/g, ' ');
+
+                const lines = doc.splitTextToSize(textContent, contentWidth);
+
+                for (const line of lines) {
+                    if (y > pageHeight - margin) {
+                        doc.addPage();
+                        y = margin;
+                    }
+                    doc.text(line, margin, y);
+                    y += 6;
+                }
+                y += 4;
+
+                if (i < items.length - 1) {
+                    if (y + 10 > pageHeight - margin) {
+                        doc.addPage();
+                        y = margin;
+                    } else {
+                        y += 5;
+                        doc.setDrawColor(200);
+                        doc.line(margin, y, pageWidth - margin, y);
+                        y += 10;
+                    }
+                }
+            }
+
+            const fileName = `${subject?.name || 'Export'}_${activeTab}.pdf`.replace(/\s+/g, '_');
+            doc.save(fileName);
+
+            setIsSelectionMode(false);
+            setSelectedItems(new Set());
+            toast.success('Generated PDF successfully.', { id: loadingToast, duration: 4000 });
+
+        } catch (error) {
+            console.error('PDF Export Error:', error);
+            toast.error(`Failed to generate PDF: ${error.message || String(error)}`, {
+                id: loadingToast,
+                duration: 6000
+            });
+        }
     };
 
     // Load more images effect
@@ -724,23 +989,97 @@ const SubjectDetail = () => {
                         )}
 
                         {activeTab === 'questions' && (
-                            <button
-                                onClick={() => setShowQuestionModal(true)}
-                                className="btn-primary flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer hover:shadow-[0_4px_20px_rgba(139,92,246,0.35)] active:scale-[0.98]"
-                            >
-                                <PlusCircle className="w-4 h-4" strokeWidth={2} />
-                                <span>Add Question</span>
-                            </button>
+                            <>
+                                {isSelectionMode ? (
+                                    <div className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-500/20 p-1.5 rounded-xl transition-all animate-in fade-in slide-in-from-right-4 duration-300">
+                                        <button
+                                            onClick={handleSelectAll}
+                                            className="px-3 py-1.5 rounded-lg text-[13px] font-bold text-indigo-400 hover:bg-indigo-500/20 transition-all cursor-pointer"
+                                        >
+                                            {selectedItems.size > 0 && selectedItems.size === groupedQuestions.flatMap(g => g.questions).length ? 'Deselect All' : 'Select All'}
+                                        </button>
+                                        <div className="w-px h-4 bg-indigo-500/20 mx-1"></div>
+                                        <button
+                                            onClick={handleDownloadSelected}
+                                            disabled={selectedItems.size === 0}
+                                            className="bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-50 flex items-center gap-2 text-[13px] font-semibold px-4 py-1.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
+                                        >
+                                            <Download className="w-4 h-4" />
+                                            <span>Download PDF ({selectedItems.size})</span>
+                                        </button>
+                                        <button
+                                            onClick={() => { setIsSelectionMode(false); setSelectedItems(new Set()); }}
+                                            className="text-slate-400 hover:text-white px-3 py-1.5 rounded-lg transition-all cursor-pointer text-[13px] font-semibold"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <button
+                                            onClick={() => setIsSelectionMode(true)}
+                                            className="bg-surface-3/50 text-slate-300 hover:text-white hover:bg-surface-3 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all border border-white/[0.08] cursor-pointer"
+                                        >
+                                            <CheckCircle className="w-4 h-4" />
+                                            <span>Select</span>
+                                        </button>
+                                        <button
+                                            onClick={() => setShowQuestionModal(true)}
+                                            className="btn-primary flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer hover:shadow-[0_4px_20px_rgba(139,92,246,0.35)] active:scale-[0.98]"
+                                        >
+                                            <PlusCircle className="w-4 h-4" strokeWidth={2} />
+                                            <span>Add Question</span>
+                                        </button>
+                                    </>
+                                )}
+                            </>
                         )}
 
                         {activeTab === 'notes' && (
-                            <button
-                                onClick={() => setShowNoteModal(true)}
-                                className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
-                            >
-                                <PlusCircle className="w-4 h-4" strokeWidth={2} />
-                                <span>Add Note</span>
-                            </button>
+                            <>
+                                {isSelectionMode ? (
+                                    <div className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-500/20 p-1.5 rounded-xl transition-all animate-in fade-in slide-in-from-right-4 duration-300">
+                                        <button
+                                            onClick={handleSelectAll}
+                                            className="px-3 py-1.5 rounded-lg text-[13px] font-bold text-indigo-400 hover:bg-indigo-500/20 transition-all cursor-pointer"
+                                        >
+                                            {selectedItems.size > 0 && selectedItems.size === notes.filter(n => n.title?.toLowerCase().includes(noteSearchQuery.toLowerCase()) || n.content?.toLowerCase().includes(noteSearchQuery.toLowerCase())).length ? 'Deselect All' : 'Select All'}
+                                        </button>
+                                        <div className="w-px h-4 bg-indigo-500/20 mx-1"></div>
+                                        <button
+                                            onClick={handleDownloadSelected}
+                                            disabled={selectedItems.size === 0}
+                                            className="bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-50 flex items-center gap-2 text-[13px] font-semibold px-4 py-1.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
+                                        >
+                                            <Download className="w-4 h-4" />
+                                            <span>Download PDF ({selectedItems.size})</span>
+                                        </button>
+                                        <button
+                                            onClick={() => { setIsSelectionMode(false); setSelectedItems(new Set()); }}
+                                            className="text-slate-400 hover:text-white px-3 py-1.5 rounded-lg transition-all cursor-pointer text-[13px] font-semibold"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <button
+                                            onClick={() => setIsSelectionMode(true)}
+                                            className="bg-surface-3/50 text-slate-300 hover:text-white hover:bg-surface-3 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all border border-white/[0.08] cursor-pointer"
+                                        >
+                                            <CheckCircle className="w-4 h-4" />
+                                            <span>Select</span>
+                                        </button>
+                                        <button
+                                            onClick={() => setShowNoteModal(true)}
+                                            className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
+                                        >
+                                            <PlusCircle className="w-4 h-4" strokeWidth={2} />
+                                            <span>Add Note</span>
+                                        </button>
+                                    </>
+                                )}
+                            </>
                         )}
 
                         {activeTab === 'images' && (
@@ -972,7 +1311,26 @@ const SubjectDetail = () => {
                                             const q = rootQ;
                                             const existingAINote = notes.find(n => n.question_id === q.id && n.title?.startsWith('AI Note'));
                                             return (
-                                                <div key={q.id} id={`question-${q.id}`} className="question-card group">
+                                                <div
+                                                    key={q.id}
+                                                    id={`question-${q.id}`}
+                                                    className={`question-card group relative transition-all ${isSelectionMode ? (selectedItems.has(q.id) ? 'ring-2 ring-indigo-500 cursor-pointer bg-indigo-500/5' : 'cursor-pointer hover:bg-white/[0.02]') : ''}`}
+                                                    onClick={() => {
+                                                        if (isSelectionMode) {
+                                                            const next = new Set(selectedItems);
+                                                            if (next.has(q.id)) next.delete(q.id);
+                                                            else next.add(q.id);
+                                                            setSelectedItems(next);
+                                                        }
+                                                    }}
+                                                >
+                                                    {isSelectionMode && (
+                                                        <div className="absolute top-4 right-4 z-20">
+                                                            <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(q.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-500 bg-surface-3/50'}`}>
+                                                                {selectedItems.has(q.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                     {/* Card Header — question number + metadata */}
                                                     <div className="flex items-center gap-3 mb-4 pb-3 border-b border-white/[0.06]">
                                                         <span className="text-[15px] font-heading font-bold text-primary tracking-tight">
@@ -1143,7 +1501,26 @@ const SubjectDetail = () => {
                                                         {group.questions.map((q, qidx) => {
                                                             const existingAINote = notes.find(n => n.question_id === q.id && n.title?.startsWith('AI Note'));
                                                             return (
-                                                                <div key={q.id} id={`question-${q.id}`} className="question-card group">
+                                                                <div
+                                                                    key={q.id}
+                                                                    id={`question-${q.id}`}
+                                                                    className={`question-card group relative transition-all ${isSelectionMode ? (selectedItems.has(q.id) ? 'ring-2 ring-indigo-500 cursor-pointer bg-indigo-500/5' : 'cursor-pointer hover:bg-white/[0.02]') : ''}`}
+                                                                    onClick={() => {
+                                                                        if (isSelectionMode) {
+                                                                            const next = new Set(selectedItems);
+                                                                            if (next.has(q.id)) next.delete(q.id);
+                                                                            else next.add(q.id);
+                                                                            setSelectedItems(next);
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    {isSelectionMode && (
+                                                                        <div className="absolute top-4 right-4 z-20">
+                                                                            <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(q.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-500 bg-surface-3/50'}`}>
+                                                                                {selectedItems.has(q.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
                                                                     {/* Card Header — question number + metadata */}
                                                                     <div className="flex items-center gap-3 mb-4 pb-3 border-b border-white/[0.06]">
                                                                         <span className="text-[15px] font-heading font-bold text-primary tracking-tight">
@@ -1367,9 +1744,25 @@ const SubjectDetail = () => {
                                         <div
                                             key={note.id}
                                             id={`note-${note.id}`}
-                                            className={`glass-panel rounded-xl border border-white/[0.06] hover:border-emerald-500/30 hover:bg-white/[0.02] cursor-pointer transition-all flex group relative overflow-hidden ${notesViewMode === 'list' ? 'items-center py-3 pr-5 pl-1' : 'flex-col p-5'}`}
-                                            onClick={() => setViewingNote(note)}
+                                            className={`glass-panel rounded-xl border transition-all flex group relative overflow-hidden ${notesViewMode === 'list' ? 'items-center py-3 pr-5 pl-1' : 'flex-col p-5'} ${isSelectionMode ? (selectedItems.has(note.id) ? 'border-indigo-400 bg-indigo-500/10 cursor-pointer shadow-[0_0_15px_rgba(99,102,241,0.2)]' : 'border-white/[0.06] hover:border-white/[0.1] cursor-pointer') : 'border-white/[0.06] hover:border-emerald-500/30 hover:bg-white/[0.02] cursor-pointer'}`}
+                                            onClick={() => {
+                                                if (isSelectionMode) {
+                                                    const next = new Set(selectedItems);
+                                                    if (next.has(note.id)) next.delete(note.id);
+                                                    else next.add(note.id);
+                                                    setSelectedItems(next);
+                                                } else {
+                                                    setViewingNote(note);
+                                                }
+                                            }}
                                         >
+                                            {isSelectionMode && (
+                                                <div className="absolute top-3 right-3 z-30">
+                                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(note.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-500 bg-surface-3/50'}`}>
+                                                        {selectedItems.has(note.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                                                    </div>
+                                                </div>
+                                            )}
                                             {/* List mode progress line/indicator */}
                                             {notesViewMode === 'list' && (
                                                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500/40" />

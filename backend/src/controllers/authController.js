@@ -9,6 +9,9 @@ const COOKIE_OPTS = {
     path: '/',
 };
 
+const ACCESS_TOKEN_MAX_AGE = 24 * 60 * 60 * 1000; // 1 day
+const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
+
 const generateTokens = (userId) => {
     const accessToken = jwt.sign({ id: userId }, process.env.JWT_ACCESS_SECRET, {
         expiresIn: process.env.JWT_ACCESS_EXPIRY || '15m',
@@ -36,8 +39,8 @@ export const register = async (req, res) => {
         const { accessToken, refreshToken } = generateTokens(user.id);
 
         res
-            .cookie('access_token', accessToken, { ...COOKIE_OPTS, maxAge: 15 * 60 * 1000 })
-            .cookie('refresh_token', refreshToken, { ...COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 })
+            .cookie('access_token', accessToken, { ...COOKIE_OPTS, maxAge: ACCESS_TOKEN_MAX_AGE })
+            .cookie('refresh_token', refreshToken, { ...COOKIE_OPTS, maxAge: REFRESH_TOKEN_MAX_AGE })
             .status(201)
             .json({ user: { id: user.id, name: user.name, email: user.email } });
     } catch (error) {
@@ -66,8 +69,8 @@ export const login = async (req, res) => {
         const { accessToken, refreshToken } = generateTokens(user.id);
 
         res
-            .cookie('access_token', accessToken, { ...COOKIE_OPTS, maxAge: 15 * 60 * 1000 })
-            .cookie('refresh_token', refreshToken, { ...COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 })
+            .cookie('access_token', accessToken, { ...COOKIE_OPTS, maxAge: ACCESS_TOKEN_MAX_AGE })
+            .cookie('refresh_token', refreshToken, { ...COOKIE_OPTS, maxAge: REFRESH_TOKEN_MAX_AGE })
             .status(200)
             .json({ user: { id: user.id, name: user.name, email: user.email } });
     } catch (error) {
@@ -100,8 +103,8 @@ export const refresh = async (req, res) => {
         const { accessToken, refreshToken } = generateTokens(user.id);
 
         res
-            .cookie('access_token', accessToken, { ...COOKIE_OPTS, maxAge: 15 * 60 * 1000 })
-            .cookie('refresh_token', refreshToken, { ...COOKIE_OPTS, maxAge: 7 * 24 * 60 * 60 * 1000 })
+            .cookie('access_token', accessToken, { ...COOKIE_OPTS, maxAge: ACCESS_TOKEN_MAX_AGE })
+            .cookie('refresh_token', refreshToken, { ...COOKIE_OPTS, maxAge: REFRESH_TOKEN_MAX_AGE })
             .status(200)
             .json({ user: { id: user.id, name: user.name, email: user.email } });
     } catch (error) {
