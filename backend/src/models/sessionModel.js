@@ -3,7 +3,8 @@ import db from '../knex/db.js';
 export const createSession = async (data) => {
     const [session] = await db('revision.sessions')
         .insert({
-            subject_id: data.subjectId,
+            subject_id: data.subjectId || null,
+            test_id: data.testId || null,
             title: data.title,
             notes: data.notes || null,
             session_date: data.sessionDate || new Date(),
@@ -12,23 +13,43 @@ export const createSession = async (data) => {
     return session;
 };
 
+export const findSessionByTestId = async (testId) => {
+    return db('revision.sessions')
+        .where('test_id', testId)
+        .where('is_deleted', false)
+        .first();
+};
+
+
 export const findSessionsBySubject = async (data) => {
+    // We want sessions where either session.subject_id matches, 
+    // OR at least one entry in the session belongs to a topic in this subject.
+    const subquery = db('revision.session_entries as se')
+        .join('revision.topics as t', 'se.topic_id', 't.id')
+        .where('t.subject_id', data.subjectId)
+        .where('se.is_deleted', false)
+        .select('se.session_id');
+
     return db('revision.sessions as s')
-        .leftJoin('revision.session_entries as se', function () {
-            this.on('se.session_id', 's.id').andOn('se.is_deleted', db.raw('false'));
+        .leftJoin('revision.session_entries as se_all', function () {
+            this.on('se_all.session_id', 's.id').andOn('se_all.is_deleted', db.raw('false'));
         })
-        .where('s.subject_id', data.subjectId)
+        .where(function () {
+            this.where('s.subject_id', data.subjectId)
+                .orWhereIn('s.id', subquery);
+        })
         .where('s.is_deleted', false)
-        .groupBy('s.id', 's.subject_id', 's.title', 's.notes', 's.session_date', 's.created_at')
+        .groupBy('s.id', 's.subject_id', 's.test_id', 's.title', 's.notes', 's.session_date', 's.created_at')
         .select([
-            's.id', 's.subject_id', 's.title', 's.notes', 's.session_date', 's.created_at',
-            db.raw('COALESCE(COUNT(se.id), 0)::int as total_questions'),
-            db.raw('COALESCE(SUM(CASE WHEN se.is_correct THEN 1 ELSE 0 END), 0)::int as total_correct'),
-            db.raw('COALESCE(COUNT(se.id) - SUM(CASE WHEN se.is_correct THEN 1 ELSE 0 END), 0)::int as total_incorrect'),
-            db.raw('CASE WHEN COUNT(se.id) > 0 THEN ROUND(100.0 * SUM(CASE WHEN se.is_correct THEN 1 ELSE 0 END) / COUNT(se.id), 1) ELSE 0 END as accuracy'),
+            's.id', 's.subject_id', 's.test_id', 's.title', 's.notes', 's.session_date', 's.created_at',
+            db.raw('COUNT(se_all.id)::int as total_questions'),
+            db.raw('SUM(CASE WHEN se_all.is_correct THEN 1 ELSE 0 END)::int as total_correct'),
+            db.raw('COUNT(se_all.id) - SUM(CASE WHEN se_all.is_correct THEN 1 ELSE 0 END)::int as total_incorrect'),
+            db.raw('CASE WHEN COUNT(se_all.id) > 0 THEN ROUND(100.0 * SUM(CASE WHEN se_all.is_correct THEN 1 ELSE 0 END) / COUNT(se_all.id), 1) ELSE 0 END as accuracy'),
         ])
         .orderBy('s.session_date', 'desc');
 };
+
 
 export const findSessionById = async (data) => {
     return db('revision.sessions')

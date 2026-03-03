@@ -67,9 +67,17 @@ const SessionCard = ({ subjectId, session, onDelete, onEdit, viewMode = 'grid' }
                 <div className={`flex-1 min-w-0 ${isList ? 'flex items-center gap-6' : ''}`}>
                     {/* Title and Date */}
                     <div className="min-w-0 shrink-0" style={isList ? { width: '40%' } : {}}>
-                        <h4 className="font-heading font-semibold text-white tracking-tight text-[15px] truncate group-hover:text-primary-light transition-colors">
-                            {session.title}
-                        </h4>
+                        <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-heading font-semibold text-white tracking-tight text-[15px] truncate group-hover:text-primary-light transition-colors">
+                                {session.title}
+                            </h4>
+                            {session.testId && (
+                                <span className="shrink-0 px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-400 text-[9px] font-bold uppercase tracking-wider border border-pink-500/20">
+                                    Test Attempt
+                                </span>
+                            )}
+                        </div>
+
                         <div className="flex items-center gap-3 mt-2 text-[11px] font-medium text-slate-500">
                             <span className="flex items-center gap-1.5 shrink-0">
                                 <Calendar className="w-3.5 h-3.5 text-slate-400" />

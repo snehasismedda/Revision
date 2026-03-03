@@ -20,6 +20,7 @@ export const getAllSourceImagesByUser = async (userId, limit, offset) => {
     let query = db('revision.source_images as si')
         .join('revision.subjects as s', 'si.subject_id', 's.id')
         .where('s.user_id', userId)
+        .where('s.is_deleted', false)
         .select(
             'si.*',
             's.name as subject_name',
@@ -37,6 +38,7 @@ export const getSourceImagesBySubject = async (subjectId, limit, offset) => {
     let query = db('revision.source_images as si')
         .join('revision.subjects as s', 'si.subject_id', 's.id')
         .where('si.subject_id', subjectId)
+        .where('s.is_deleted', false)
         .select(
             'si.*',
             's.name as subject_name',

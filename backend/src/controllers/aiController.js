@@ -349,3 +349,69 @@ export const getGlobalInsights = async (req, res) => {
         res.status(500).json({ error: 'Failed to generate global insights' });
     }
 };
+
+export const getTestInsights = async (req, res) => {
+    try {
+        const { testId } = req.params;
+
+        const analytics = await analyticsModel.getTestAnalytics(testId);
+        const { global, attempts, stats } = analytics;
+
+        const weakSubjects = (global.subjectPerformance || [])
+            .filter(s => Number(s.accuracy) < 75)
+            .sort((a, b) => Number(a.accuracy) - Number(b.accuracy))
+            .slice(0, 5)
+            .map(s => ({ subject: s.subject_name, accuracy: s.accuracy, correct: s.total_correct, total: s.total_questions }));
+
+        const weakTopics = (global.topicPerformance || [])
+            .filter(t => Number(t.accuracy) < 75)
+            .sort((a, b) => Number(a.accuracy) - Number(b.accuracy))
+            .slice(0, 8)
+            .map(t => ({ topic: t.topic_name, accuracy: t.accuracy, correct: t.total_correct, total: t.total_questions }));
+
+        const mostAskedTopics = (global.topicPerformance || [])
+            .sort((a, b) => Number(b.total_questions) - Number(a.total_questions))
+            .slice(0, 5)
+            .map(t => ({ topic: t.topic_name, count: t.total_questions, accuracy: t.accuracy }));
+
+        const context = JSON.stringify({
+            totalAttempts: stats.totalAttempts,
+            avgAccuracy: stats.avgAccuracy,
+            bestAccuracy: stats.bestAccuracy,
+            worstAccuracy: stats.worstAccuracy,
+            improvement: stats.improvement,
+            weakSubjects,
+            weakTopics,
+            mostAskedTopics,
+            attemptHistory: attempts.map((a, i) => ({
+                attempt: i + 1,
+                score: `${a.result.my_score}/${a.result.total_score}`,
+                accuracy: a.accuracy,
+                date: a.result.created_at
+            }))
+        });
+
+        const response = await ollama.chat({
+            model: models.TEXT,
+            messages: [
+                { role: 'system', content: insightPrompt },
+                {
+                    role: 'user',
+                    content: `Analyze this test performance data and generate specific, actionable improvement advice.
+Focus on: which subjects/topics have the lowest accuracy, whether performance is improving, and what to study next.
+Structure your response as: Key Insights → Weak Areas → Recommended Next Focus → Action Plan.
+
+Test Analytics Data:
+${context}`
+                }
+            ],
+            stream: false
+        });
+
+        const insight = response.message?.content || 'AI insights unavailable at this time.';
+        res.status(200).json({ insight });
+    } catch (error) {
+        console.error('getTestInsights error:', error);
+        res.status(500).json({ error: 'Failed to generate test insights' });
+    }
+};

@@ -1,5 +1,5 @@
 -- Up migration for initial_schema
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE SCHEMA IF NOT EXISTS revision;
 
 -- 1. Users
 CREATE TABLE revision.users (

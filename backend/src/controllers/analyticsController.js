@@ -112,3 +112,42 @@ export const getSessionTopicDistribution = async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch session topic distribution' });
     }
 };
+
+export const getTestSeriesAnalytics = async (req, res) => {
+    try {
+        const { seriesId } = req.params;
+
+        const overview = await analyticsModel.getTestSeriesOverview(seriesId);
+        const subjectPerformance = await analyticsModel.getTestSeriesSubjectPerformance(seriesId);
+
+        let strongest = null;
+        let weakest = null;
+
+        if (subjectPerformance.length > 0) {
+            strongest = subjectPerformance[0];
+            weakest = subjectPerformance[subjectPerformance.length - 1];
+        }
+
+        res.status(200).json({
+            overview,
+            subjectPerformance,
+            strongest,
+            weakest
+        });
+    } catch (error) {
+        console.error('[getTestSeriesAnalytics]', error);
+        res.status(500).json({ error: 'Failed to fetch test series analytics' });
+    }
+};
+
+export const getTestAnalytics = async (req, res) => {
+    try {
+        const { testId } = req.params;
+        const analytics = await analyticsModel.getTestAnalytics(testId);
+
+        res.status(200).json(analytics);
+    } catch (error) {
+        console.error('[getTestAnalytics]', error);
+        res.status(500).json({ error: 'Failed to fetch test analytics' });
+    }
+};

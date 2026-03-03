@@ -1,4 +1,5 @@
 -- Down migration for initial_schema
+DROP SCHEMA IF EXISTS revision;
 DROP TABLE IF EXISTS revision.session_entries;
 DROP TABLE IF EXISTS revision.notes;
 DROP TABLE IF EXISTS revision.questions;

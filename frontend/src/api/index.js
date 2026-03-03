@@ -1,6 +1,6 @@
 const BASE_URL = '/api';
 
-const request = async (path, options = {}) => {
+export const request = async (path, options = {}) => {
     let res = await fetch(`${BASE_URL}${path}`, {
         headers: { 'Content-Type': 'application/json', ...options.headers },
         credentials: 'include',
@@ -88,6 +88,9 @@ export const analyticsApi = {
     topicPerformance: (subjectId) => request(`/analytics/${subjectId}/topic-performance`),
     trends: (subjectId) => request(`/analytics/${subjectId}/trends`),
     weakAreas: (subjectId) => request(`/analytics/${subjectId}/weak-areas`),
+    testSeries: (seriesId) => request(`/analytics/test-series/${seriesId}`),
+    test: (seriesId, testId) => request(`/analytics/test-series/${seriesId}/tests/${testId}`),
+    testInsights: (seriesId, testId) => request(`/analytics/test-series/${seriesId}/tests/${testId}/insights`),
 };
 
 // AI

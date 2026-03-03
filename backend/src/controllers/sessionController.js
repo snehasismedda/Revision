@@ -10,6 +10,7 @@ export const getSessions = async (req, res) => {
         const sessions = raw.map((s) => ({
             id: s.id,
             subjectId: s.subject_id,
+            testId: s.test_id, // New field from migration
             title: s.title,
             notes: s.notes,
             sessionDate: s.session_date,
@@ -19,6 +20,7 @@ export const getSessions = async (req, res) => {
             totalIncorrect: parseInt(s.total_incorrect) || 0,
             accuracy: parseFloat(s.accuracy) || 0,
         }));
+
         res.status(200).json({ sessions });
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch sessions' });

@@ -11,6 +11,10 @@ import SessionDetail from './pages/SessionDetail.jsx';
 import TagTopics from './pages/TagTopics.jsx';
 import Reports from './pages/Reports.jsx';
 import Images from './pages/Images.jsx';
+import TestSeriesList from './pages/TestSeriesList.jsx';
+import TestSeriesDetail from './pages/TestSeriesDetail.jsx';
+import TestDetail from './pages/TestDetail.jsx';
+import TestAnalytics from './pages/TestAnalytics.jsx';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -43,6 +47,10 @@ const AppRoutes = () => (
       <Route path="subjects/:subjectId/reports" element={<Reports />} />
       <Route path="subjects/:subjectId/sessions/:id" element={<SessionDetail />} />
       <Route path="subjects/:subjectId/sessions/:id/tag" element={<TagTopics />} />
+      <Route path="tests" element={<TestSeriesList />} />
+      <Route path="tests/:seriesId" element={<TestSeriesDetail />} />
+      <Route path="tests/:seriesId/test/:testId" element={<TestDetail />} />
+      <Route path="tests/:seriesId/test/:testId/analytics" element={<TestAnalytics />} />
       <Route path="images" element={<Images />} />
     </Route>
 

@@ -14,6 +14,8 @@ import aiRoute from './routes/aiRoute.js';
 import questionRoute from './routes/questionRoute.js';
 import noteRoute from './routes/noteRoute.js';
 import imageRoute from './routes/imageRoute.js';
+import testSeriesRoute from './routes/testSeriesRoute.js';
+import testRoute from './routes/testRoute.js';
 
 const app = express();
 
@@ -37,6 +39,8 @@ app.use('/api/sessions/:sessionId/entries', entryRoute);
 app.use('/api/analytics', analyticsRoute);
 app.use('/api/ai', aiRoute);
 app.use('/api/images', imageRoute);
+app.use('/api/test-series', testSeriesRoute);
+app.use('/api/test-series/:seriesId/tests', testRoute);
 
 // --- Health Check ---
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
