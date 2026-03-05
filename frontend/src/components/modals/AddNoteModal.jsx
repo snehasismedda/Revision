@@ -7,7 +7,7 @@ import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import getCroppedImg from '../../utils/cropImage.js';
 
-const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId }) => {
+const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, initialTitle, initialContent, parentNoteId }) => {
     const [mainType, setMainType] = useState('text'); // 'text' or 'image'
     const [imageMethod, setImageMethod] = useState('upload'); // 'upload' or 'camera'
     const [title, setTitle] = useState('');
@@ -51,6 +51,9 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId }) =
                 setImageMethod('upload');
                 stopCamera();
             }
+            // Pre-fill from props if provided
+            if (initialTitle) setTitle(initialTitle);
+            if (initialContent) setContent(initialContent);
         } else {
             stopCamera();
         }
@@ -250,7 +253,8 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId }) =
                 title: title.trim(),
                 content: content.trim(),
                 questionId,
-                sourceImageContent: mainType === 'image' ? noteImage : null
+                sourceImageContent: mainType === 'image' ? noteImage : null,
+                parentNoteId: parentNoteId || null
             });
             onNoteAdded(note);
             handleModalClose();

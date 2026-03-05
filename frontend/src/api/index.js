@@ -102,6 +102,7 @@ export const aiApi = {
     parseNote: (body) => request('/ai/parse-note', { method: 'POST', body }),
     describeImage: (body) => request('/ai/describe-image', { method: 'POST', body }),
     enhanceNote: (body) => request('/ai/enhance-note', { method: 'POST', body }),
+    editSection: (body) => request('/ai/edit-section', { method: 'POST', body }),
 };
 
 // Questions

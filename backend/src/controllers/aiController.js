@@ -4,7 +4,45 @@ import * as topicModel from '../models/topicModel.js';
 import * as analyticsModel from '../models/analyticsModel.js';
 import db from '../knex/db.js';
 import { ollama, models } from '../config/ollama.js';
-import { syllabusPrompt, insightPrompt, globalInsightPrompt, noteAnalysisPrompt, enhanceNotePrompt, noteDescriptionPrompt } from '../system_prompts/index.js';
+import { syllabusPrompt, insightPrompt, globalInsightPrompt, noteAnalysisPrompt, enhanceNotePrompt, noteDescriptionPrompt, editSectionPrompt } from '../system_prompts/index.js';
+
+export const editSection = async (req, res) => {
+    try {
+        const { selectedText, instruction, noteTitle, contentBefore, contentAfter } = req.body;
+        if (!selectedText || !instruction) return res.status(400).json({ error: 'selectedText and instruction are required' });
+
+        // Build a structured user message with all available context
+        let userMessage = '';
+        if (noteTitle) {
+            userMessage += `NOTE TITLE:\n${noteTitle}\n\n`;
+        }
+        if (contentBefore) {
+            userMessage += `CONTENT BEFORE SELECTION (for context only — do NOT include in output):\n...\n${contentBefore}\n\n`;
+        }
+        userMessage += `SELECTED SECTION (modify THIS only):\n${selectedText}\n\n`;
+        if (contentAfter) {
+            userMessage += `CONTENT AFTER SELECTION (for context only — do NOT include in output):\n${contentAfter}\n...\n\n`;
+        }
+        userMessage += `USER INSTRUCTION:\n${instruction}`;
+
+        const messages = [
+            { role: "system", content: editSectionPrompt },
+            { role: "user", content: userMessage }
+        ];
+
+        const response = await ollama.chat({
+            model: models.TEXT,
+            messages,
+            stream: false,
+            format: 'json'
+        });
+        const result = JSON.parse(response.message?.content || '{}');
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('editSection error:', error);
+        res.status(500).json({ error: 'Failed to edit section' });
+    }
+};
 
 export const enhanceNote = async (req, res) => {
     try {

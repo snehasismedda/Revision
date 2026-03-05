@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { subjectsApi, topicsApi, sessionsApi, questionsApi, notesApi, imagesApi } from '../api/index.js';
+import { subjectsApi, topicsApi, sessionsApi, questionsApi, notesApi, imagesApi, aiApi } from '../api/index.js';
 import TopicTree from '../components/TopicTree.jsx';
 import SessionCard from '../components/SessionCard.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import RichTextRenderer from '../components/RichTextRenderer.jsx';
 import toast from 'react-hot-toast';
 import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { marked } from 'marked';
 import { ArrowLeft, PlusCircle, BarChart3, Wand2, BookOpen, Activity, HelpCircle, FileText, Image as ImageIcon, Trash2, ChevronDown, Pencil, Hash, Search, X, Link2 as LinkIcon, Maximize2, Minimize2, LayoutGrid, List, CheckCircle, Download } from 'lucide-react';
 
 import ManageSyllabusModal from '../components/modals/ManageSyllabusModal.jsx';
@@ -75,6 +77,8 @@ const SubjectDetail = () => {
     const [viewingNote, setViewingNote] = useState(null);
     const [editingNote, setEditingNote] = useState(null);
     const [selectedQuestionIdForNote, setSelectedQuestionIdForNote] = useState(null);
+    const [noteStack, setNoteStack] = useState([]); // Stack for parent note navigation
+    const [addToNoteData, setAddToNoteData] = useState(null); // { selectedText, parentNoteId }
 
     const [generatingAINoteId, setGeneratingAINoteId] = useState(null);
     const [showSessionModal, setShowSessionModal] = useState(false);
@@ -137,6 +141,392 @@ const SubjectDetail = () => {
         }
     };
 
+    // ─── Markdown → PDF renderer (marked + jspdf-autotable) ────────────────
+
+    // LaTeX math cleanup (for display in plain-text PDF)
+    const stripLatexMath = (str) => {
+        if (!str) return '';
+        return str
+            .replace(/\$\$[\s\S]*?\$\$/g, '[Math]')
+            .replace(/\$[^$\n]+\$/g, '[Math]')
+            .replace(/\\\[|\\\]/g, '[Math]')
+            .replace(/\\\(|\\\)/g, '')
+            .replace(/\\rightarrow/g, '->')
+            .replace(/\\leftarrow/g, '<-')
+            .replace(/\\leftrightarrow/g, '<->')
+            .replace(/\\neq/g, '!=')
+            .replace(/\\leq/g, '<=')
+            .replace(/\\geq/g, '>=')
+            .replace(/\\land/g, 'AND')
+            .replace(/\\lor/g, 'OR')
+            .replace(/\\neg/g, 'NOT')
+            .replace(/\\exists/g, 'EXISTS')
+            .replace(/\\forall/g, 'FORALL')
+            .replace(/\\in\b/g, 'in')
+            .replace(/\\notin/g, 'not in')
+            .replace(/\\subset/g, 'subset of')
+            .replace(/\\infty/g, '∞')
+            .replace(/\\alpha/g, 'α')
+            .replace(/\\beta/g, 'β')
+            .replace(/\\gamma/g, 'γ')
+            .replace(/\\theta/g, 'θ')
+            .replace(/\\pi\b/g, 'π')
+            .replace(/\\sigma/g, 'σ')
+            .replace(/\\lambda/g, 'λ')
+            .replace(/\\mu/g, 'μ')
+            .replace(/\\delta/g, 'δ')
+            .replace(/\\omega/g, 'ω')
+            .replace(/\\cdot/g, '·')
+            .replace(/\\times/g, '×')
+            .replace(/\\div/g, '÷')
+            .replace(/\\pm/g, '±')
+            .replace(/\\approx/g, '≈')
+            .replace(/\\equiv/g, '≡')
+            .replace(/\\frac\{([^}]*)\}\{([^}]*)\}/g, '($1/$2)')
+            .replace(/\\sqrt\{([^}]*)\}/g, '√($1)')
+            .replace(/\\[a-zA-Z]+/g, '')
+            .replace(/[{}]/g, '')
+            .replace(/  +/g, ' ')
+            .trim();
+    };
+
+    // Flatten a marked inline token tree into styled segments [{text, bold, italic, code}]
+    const flattenInlineTokens = (tokens) => {
+        if (!tokens) return [];
+        const segs = [];
+        for (const t of tokens) {
+            if (t.type === 'text' || t.type === 'escape') {
+                const raw = stripLatexMath(t.text || t.raw || '');
+                if (raw) segs.push({ text: raw, bold: false, italic: false, code: false });
+            } else if (t.type === 'strong') {
+                for (const s of flattenInlineTokens(t.tokens)) segs.push({ ...s, bold: true });
+            } else if (t.type === 'em') {
+                for (const s of flattenInlineTokens(t.tokens)) segs.push({ ...s, italic: true });
+            } else if (t.type === 'codespan') {
+                segs.push({ text: t.text || '', bold: false, italic: false, code: true });
+            } else if (t.type === 'link') {
+                // Show link text only, not the URL
+                for (const s of flattenInlineTokens(t.tokens)) segs.push(s);
+            } else if (t.type === 'image') {
+                // skip images in text flow
+            } else if (t.type === 'br') {
+                segs.push({ text: ' ', bold: false, italic: false, code: false });
+            } else if (t.raw) {
+                const raw = stripLatexMath(t.raw);
+                if (raw) segs.push({ text: raw, bold: false, italic: false, code: false });
+            }
+        }
+        return segs;
+    };
+
+    // Plain text from inline tokens (for headings, table cells, etc.)
+    const inlineToPlain = (tokens) =>
+        flattenInlineTokens(tokens || []).map(s => s.text).join('');
+
+    // Flatten a marked list item's tokens — handles nested lists too
+    const flattenListItems = (items, indent = 0) => {
+        const result = [];
+        for (const item of items) {
+            result.push({
+                segments: flattenInlineTokens(item.tokens?.[0]?.tokens || item.tokens || []),
+                indent,
+                ordered: false, // set by caller
+                num: 0,
+            });
+            // Nested list
+            for (const sub of (item.tokens || [])) {
+                if (sub.type === 'list') {
+                    const nested = flattenListItems(sub.items, indent + 1);
+                    result.push(...nested);
+                }
+            }
+        }
+        return result;
+    };
+
+    // Use marked.lexer() to parse markdown into a block token array,
+    // then normalise to a simpler format our renderer understands.
+    const tokenizeMarkdown = (raw) => {
+        if (!raw) return [];
+        let blockTokens;
+        try {
+            blockTokens = marked.lexer(stripLatexMath(raw));
+        } catch {
+            return [{ type: 'paragraph', segments: [{ text: raw, bold: false, italic: false, code: false }] }];
+        }
+
+        const tokens = [];
+
+        const walk = (list) => {
+            for (const t of list) {
+                if (t.type === 'heading') {
+                    tokens.push({ type: 'heading', level: t.depth, text: inlineToPlain(t.tokens) });
+
+                } else if (t.type === 'paragraph') {
+                    const segs = flattenInlineTokens(t.tokens || []);
+                    if (segs.length > 0) tokens.push({ type: 'paragraph', segments: segs });
+
+                } else if (t.type === 'list') {
+                    const items = flattenListItems(t.items);
+                    tokens.push({
+                        type: t.ordered ? 'ol' : 'ul',
+                        items: items.map((it, idx) => ({
+                            ...it,
+                            ordered: t.ordered,
+                            num: idx + 1,
+                        })),
+                    });
+
+                } else if (t.type === 'table') {
+                    const header = (t.header || []).map(h => inlineToPlain(h.tokens));
+                    const rows = (t.rows || []).map(row =>
+                        row.map(cell => inlineToPlain(cell.tokens))
+                    );
+                    tokens.push({ type: 'table', header, rows });
+
+                } else if (t.type === 'code') {
+                    tokens.push({ type: 'code', lang: t.lang || '', content: t.text || '' });
+
+                } else if (t.type === 'blockquote') {
+                    // Flatten blockquote to paragraph segments
+                    const inner = [];
+                    for (const bt of (t.tokens || [])) {
+                        if (bt.type === 'paragraph') inner.push(...flattenInlineTokens(bt.tokens || []));
+                    }
+                    if (inner.length > 0) tokens.push({ type: 'blockquote', segments: inner });
+
+                } else if (t.type === 'hr') {
+                    tokens.push({ type: 'hr' });
+
+                } else if (t.type === 'space') {
+                    // intentionally ignored
+                }
+            }
+        };
+
+        walk(blockTokens);
+        return tokens;
+    };
+
+    // Render normalised tokens to a jsPDF document.
+    // INVARIANT: y = TOP of the next block at all times.
+    const renderTokensToPDF = (doc, tokens, startY, margin, contentWidth, pageHeight) => {
+        let y = startY; // y = TOP of next block
+        const PT_TO_MM = 0.352778; // 1 pt → mm
+
+        const ensureSpace = (needed) => {
+            if (y + needed > pageHeight - margin) {
+                doc.addPage();
+                y = margin;
+            }
+        };
+
+        // Render inline-styled segments on one text line.
+        // `baseline` is the jsPDF text y coordinate (font baseline, not top).
+        const renderInlineLine = (segments, x, baseline, fontSize) => {
+            let curX = x;
+            doc.setFontSize(fontSize);
+            for (const seg of segments) {
+                const style = seg.bold && seg.italic ? 'bolditalic' : seg.bold ? 'bold' : seg.italic ? 'italic' : 'normal';
+                doc.setFont(seg.code ? 'courier' : 'helvetica', style);
+                doc.setFontSize(fontSize);
+                doc.text(seg.text, curX, baseline);
+                curX += doc.getTextWidth(seg.text);
+            }
+        };
+
+        // Word-wrap inline segments to fit within maxWidth mm.
+        const wrapInlineSegments = (segments, maxWidth, fontSize) => {
+            const lines = [[]];
+            let lineWidth = 0;
+            doc.setFontSize(fontSize);
+            for (const seg of segments) {
+                const style = seg.bold && seg.italic ? 'bolditalic' : seg.bold ? 'bold' : seg.italic ? 'italic' : 'normal';
+                doc.setFont(seg.code ? 'courier' : 'helvetica', style);
+                doc.setFontSize(fontSize);
+                const words = seg.text.split(' ');
+                for (let wi = 0; wi < words.length; wi++) {
+                    const word = wi < words.length - 1 ? words[wi] + ' ' : words[wi];
+                    const wordW = doc.getTextWidth(word);
+                    if (lineWidth + wordW > maxWidth && lineWidth > 0) {
+                        lines.push([]);
+                        lineWidth = 0;
+                    }
+                    lines[lines.length - 1].push({ ...seg, text: word });
+                    lineWidth += wordW;
+                }
+            }
+            return lines;
+        };
+
+        for (const token of tokens) {
+            if (token.type === 'heading') {
+                const sizes = { 1: 18, 2: 15, 3: 13, 4: 12, 5: 11, 6: 10 };
+                const fs = sizes[token.level] || 12;
+                const fsMm = fs * PT_TO_MM;
+                const lineH = fsMm + 3;   // line slot height
+                const topPad = token.level <= 2 ? 6 : 3;
+                const botPad = token.level <= 2 ? 4 : 2;
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(fs);
+                const wrapped = doc.splitTextToSize(token.text, contentWidth);
+                ensureSpace(topPad + wrapped.length * lineH + botPad);
+                y += topPad;
+                for (const wline of wrapped) {
+                    ensureSpace(lineH);
+                    const baseline = y + lineH * 0.72; // baseline inside slot
+                    doc.text(wline, margin, baseline);
+                    if (token.level <= 2) {
+                        const lineW = Math.min(doc.getTextWidth(wline), contentWidth);
+                        doc.setDrawColor(180, 180, 180);
+                        doc.setLineWidth(0.3);
+                        doc.line(margin, y + lineH - 0.5, margin + lineW, y + lineH - 0.5);
+                    }
+                    y += lineH;
+                }
+                y += botPad;
+
+            } else if (token.type === 'paragraph') {
+                const fs = 10.5;
+                const lineH = fs * PT_TO_MM + 2.5;
+                const wrappedLines = wrapInlineSegments(token.segments, contentWidth, fs);
+                for (const wline of wrappedLines) {
+                    ensureSpace(lineH);
+                    renderInlineLine(wline, margin, y + lineH * 0.76, fs);
+                    y += lineH;
+                }
+                y += 3;
+
+            } else if (token.type === 'ul' || token.type === 'ol') {
+                const fs = 10.5;
+                const lineH = fs * PT_TO_MM + 2.5;
+                for (const item of token.items) {
+                    const xIndent = margin + item.indent * 7;
+                    const label = token.type === 'ol' ? `${item.num}.` : (item.indent === 0 ? '\u2022' : '\u25E6');
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(fs);
+                    const labelW = doc.getTextWidth(label);
+                    const textX = xIndent + labelW + 1.5;
+                    const availW = margin + contentWidth - textX;
+                    const wrappedLines = wrapInlineSegments(item.segments, availW, fs);
+                    ensureSpace(wrappedLines.length * lineH + 0.5);
+                    doc.text(label, xIndent, y + lineH * 0.76);
+                    for (let li = 0; li < wrappedLines.length; li++) {
+                        ensureSpace(lineH);
+                        renderInlineLine(wrappedLines[li], textX, y + lineH * 0.76, fs);
+                        y += lineH;
+                    }
+                }
+                y += 2;
+
+            } else if (token.type === 'blockquote') {
+                // y = TOP of the blockquote block
+                const fs = 10;
+                const lineH = fs * PT_TO_MM + 2.5;
+                const quoteX = margin + 5.5;
+                const quoteW = contentWidth - 5.5;
+                const wrappedLines = wrapInlineSegments(token.segments, quoteW, fs);
+                const blockH = wrappedLines.length * lineH + 2;
+                ensureSpace(blockH + 3);
+                // Left accent bar: from y (top) to y+blockH (bottom)
+                doc.setDrawColor(150, 150, 200);
+                doc.setLineWidth(1.2);
+                doc.line(margin + 0.6, y, margin + 0.6, y + blockH);
+                doc.setTextColor(80, 80, 110);
+                for (const wline of wrappedLines) {
+                    ensureSpace(lineH);
+                    renderInlineLine(wline, quoteX, y + lineH * 0.76, fs);
+                    y += lineH;
+                }
+                doc.setTextColor(0, 0, 0);
+                y += 4;
+
+            } else if (token.type === 'code') {
+                // y = TOP of the code block
+                const fs = 9;
+                const lineH = fs * PT_TO_MM + 2;
+                const codeLines = token.content.split('\n');
+                doc.setFont('courier', 'normal');
+                doc.setFontSize(fs);
+                // Pre-calculate total wrapped line count for block height
+                let totalLines = 0;
+                for (const cl of codeLines) {
+                    totalLines += doc.splitTextToSize(cl || ' ', contentWidth - 6).length;
+                }
+                const blockH = totalLines * lineH + 5;
+                ensureSpace(blockH + 2);
+                // Draw background rect from y (top of block) downward
+                doc.setFillColor(240, 240, 245);
+                doc.setDrawColor(200, 200, 210);
+                doc.setLineWidth(0.3);
+                doc.roundedRect(margin, y, contentWidth, blockH, 2, 2, 'FD');
+                doc.setTextColor(40, 40, 80);
+                y += 2.5; // inner top padding before text starts
+                for (const cl of codeLines) {
+                    const wlines = doc.splitTextToSize(cl || ' ', contentWidth - 6);
+                    for (const wl of wlines) {
+                        ensureSpace(lineH);
+                        doc.text(wl, margin + 3, y + lineH * 0.76);
+                        y += lineH;
+                    }
+                }
+                doc.setTextColor(0, 0, 0);
+                y += 4;
+
+            } else if (token.type === 'table') {
+                // Use jspdf-autotable for perfect table layout with auto column widths
+                const { header, rows } = token;
+                if ((!header || !header.length) && (!rows || !rows.length)) continue;
+
+                autoTable(doc, {
+                    startY: y,
+                    margin: { left: margin, right: margin },
+                    head: header && header.length > 0 ? [header] : undefined,
+                    body: rows || [],
+                    styles: {
+                        font: 'helvetica',
+                        fontSize: 9.5,
+                        cellPadding: 2,
+                        overflow: 'linebreak',
+                        lineColor: [195, 195, 215],
+                        lineWidth: 0.2,
+                    },
+                    headStyles: {
+                        fillColor: [225, 225, 245],
+                        textColor: [30, 30, 100],
+                        fontStyle: 'bold',
+                        lineColor: [140, 140, 200],
+                        lineWidth: 0.4,
+                    },
+                    alternateRowStyles: {
+                        fillColor: [248, 248, 252],
+                    },
+                    bodyStyles: {
+                        textColor: [40, 40, 40],
+                    },
+                    tableLineColor: [155, 155, 195],
+                    tableLineWidth: 0.5,
+                    didDrawPage: (data) => {
+                        // keep y in sync if autotable spills to a new page
+                    },
+                });
+
+                // Move y past the table that autoTable just drew
+                y = doc.lastAutoTable.finalY + 5;
+
+            } else if (token.type === 'hr') {
+                ensureSpace(6);
+                y += 2;
+                doc.setDrawColor(180, 180, 190);
+                doc.setLineWidth(0.4);
+                doc.line(margin, y, margin + contentWidth, y);
+                y += 4;
+            }
+        }
+
+        return y;
+    };
+
     const handleDownloadSelected = async () => {
         if (selectedItems.size === 0) return;
         const loadingToast = toast.loading('Generating PDF...');
@@ -148,26 +538,41 @@ const SubjectDetail = () => {
                 format: 'a4'
             });
 
-            const margin = 20;
+            const margin = 18;
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
-            const contentWidth = pageWidth - (margin * 2);
+            const contentWidth = pageWidth - margin * 2;
 
             let y = margin;
 
-            // Title
+            // ── Cover / document title ──
+            doc.setFont('helvetica', 'bold');
             doc.setFontSize(20);
-            doc.setFont("times", "bold");
-            const titleText = subject?.name || 'Subject Export';
+            const titleText = subject?.name || 'Export';
             doc.text(titleText, margin, y);
-            y += 15;
+            y += 10;
+
+            const tabLabel = activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            doc.setTextColor(100, 100, 120);
+            doc.text(`${tabLabel} Export  ·  ${new Date().toLocaleDateString()}`, margin, y);
+            doc.setTextColor(0, 0, 0);
+            y += 3;
+
+            // Thick decorative line under cover
+            doc.setDrawColor(80, 80, 200);
+            doc.setLineWidth(1.2);
+            doc.line(margin, y, margin + contentWidth, y);
+            doc.setLineWidth(0.3);
+            y += 8;
 
             const itemIds = Array.from(selectedItems);
             let items = [];
             if (activeTab === 'notes') {
-                items = itemIds.map(id => notes.find(n => n.id === id)).filter(Boolean);
+                items = itemIds.map(iid => notes.find(n => n.id === iid)).filter(Boolean);
             } else {
-                items = itemIds.map(id => questions.find(q => q.id === id)).filter(Boolean);
+                items = itemIds.map(iid => questions.find(q => q.id === iid)).filter(Boolean);
             }
 
             const printedSourceIds = new Set();
@@ -176,13 +581,15 @@ const SubjectDetail = () => {
                 const item = items[i];
 
                 const itemType = activeTab === 'notes' ? 'Note' : 'Question';
-                const itemTitle = activeTab === 'notes' && item.title ? `${itemType} ${i + 1}: ${item.title}` : `${itemType} ${i + 1}`;
+                const itemTitle = activeTab === 'notes' && item.title
+                    ? `${itemType} ${i + 1}: ${item.title}`
+                    : `${itemType} ${i + 1}`;
 
+                // ── Source image (if any) ──
                 const imgId = item.id;
                 const sourceImgId = item.source_image_id || item.linked_question_id || item.linked_note_id;
 
                 let shouldPrintImage = false;
-
                 if (sourceImgId) {
                     if (!printedSourceIds.has(sourceImgId)) {
                         shouldPrintImage = true;
@@ -194,161 +601,94 @@ const SubjectDetail = () => {
 
                 if (shouldPrintImage) {
                     let imgData = fetchedImages[imgId] || fetchedImages[sourceImgId];
-
                     if (!imgData) {
                         try {
-                            let res;
-                            if (activeTab === 'notes') {
-                                res = await notesApi.getImage(id, imgId);
-                            } else {
-                                // Must fetch by questionId (imgId), backend resolves the source image internally
-                                res = await questionsApi.getImage(id, imgId);
-                            }
-                            if (res && res.content) {
+                            const res = activeTab === 'notes'
+                                ? await notesApi.getImage(id, imgId)
+                                : await questionsApi.getImage(id, imgId);
+                            if (res?.content) {
                                 imgData = res.content;
-                                // Cache locally for the rest of this user session
                                 fetchedImages[sourceImgId || imgId] = res.content;
                             }
-                        } catch (e) {
-                            // Question genuinely may not have an image
-                        }
+                        } catch { /* no image */ }
                     }
-
                     if (imgData) {
                         try {
                             const imgProps = doc.getImageProperties(imgData);
-
-                            // jsPDF uses mm. Approximate conversion from pixels to mm is ~0.264583
                             const pxToMm = 0.264583;
-                            let nativeWidthMm = imgProps.width * pxToMm;
-                            let nativeHeightMm = imgProps.height * pxToMm;
                             const aspectRatio = imgProps.width / imgProps.height;
-
-                            // We want to avoid tiny images blowing up to fill the whole width.
-                            // We cap the max allowed width to 75% of the page content width so it's readable but not overwhelmingly huge.
-                            const maxAllowedWidth = contentWidth * 0.75;
-
-                            let finalWidth = nativeWidthMm;
-                            let finalHeight = nativeHeightMm;
-
-                            // If native size is larger than our max allowed width, scale it down proportionally
-                            if (finalWidth > maxAllowedWidth) {
-                                finalWidth = maxAllowedWidth;
-                                finalHeight = finalWidth / aspectRatio;
+                            const maxW = contentWidth * 0.75;
+                            let fw = Math.min(imgProps.width * pxToMm, maxW);
+                            let fh = fw / aspectRatio;
+                            if (fh > pageHeight - margin * 2.5) {
+                                fh = pageHeight - margin * 2.5;
+                                fw = fh * aspectRatio;
                             }
-
-                            // Extra safety check: if the proportionally constrained height is STILL taller than a page, shrink again.
-                            if (finalHeight > (pageHeight - margin * 2.5)) {
-                                finalHeight = pageHeight - margin * 2.5;
-                                finalWidth = finalHeight * aspectRatio;
-                            }
-
-                            // Calculate horizontal offset to logically center the image within the bounds
-                            const xOffset = margin + ((contentWidth - finalWidth) / 2);
-
-                            if (y + finalHeight > pageHeight - margin) {
-                                doc.addPage();
-                                y = margin;
-                            }
-
-                            // Extract format from Data URI if present, fallback to PNG
-                            let format = 'PNG';
+                            const xOff = margin + (contentWidth - fw) / 2;
+                            if (y + fh > pageHeight - margin) { doc.addPage(); y = margin; }
+                            let fmt = 'PNG';
                             if (imgData.startsWith('data:image/')) {
-                                const match = imgData.match(/data:image\/([a-zA-Z]+);/);
-                                if (match && match[1]) {
-                                    format = match[1].toUpperCase();
-                                    if (format === 'JPG') format = 'JPEG';
-                                    if (format === 'SVG+XML') format = 'SVG';
+                                const m = imgData.match(/data:image\/([a-zA-Z]+);/);
+                                if (m?.[1]) {
+                                    fmt = m[1].toUpperCase();
+                                    if (fmt === 'JPG') fmt = 'JPEG';
+                                    if (fmt === 'SVG+XML') fmt = 'SVG';
                                 }
                             }
-
-                            // Just pass the image data natively with format explicitly from exact position
-                            doc.addImage(imgData, format, xOffset, y, finalWidth, finalHeight);
-                            y += finalHeight + 10;
-                        } catch (e) {
-                            console.warn('Could not add image:', e);
-                        }
+                            doc.addImage(imgData, fmt, xOff, y, fw, fh);
+                            y += fh + 8;
+                        } catch (e) { console.warn('Image skip:', e); }
                     }
                 }
 
-                doc.setFontSize(14);
-                doc.setFont("times", "bold");
-                if (y + 10 > pageHeight - margin) { doc.addPage(); y = margin; }
-
-                doc.text(itemTitle, margin, y);
-                y += 8;
-
+                // ── Item title heading ──
+                const badgeH = 9; // total height of badge box in mm
+                if (y + badgeH + 2 > pageHeight - margin) { doc.addPage(); y = margin; }
+                doc.setFillColor(245, 245, 255);
+                doc.setDrawColor(160, 160, 210);
+                doc.setLineWidth(0.3);
+                doc.roundedRect(margin, y, contentWidth, badgeH, 1.5, 1.5, 'FD');
+                doc.setFont('helvetica', 'bold');
                 doc.setFontSize(12);
-                doc.setFont("times", "normal");
+                doc.setTextColor(40, 40, 120);
+                doc.text(itemTitle, margin + 3, y + badgeH * 0.72);
+                doc.setTextColor(0, 0, 0);
+                y += badgeH + 2;
 
-                let textContent = item.content || '';
-                // 1. Strip basic markdown
-                textContent = textContent.replace(/#### /g, '')
-                    .replace(/### /g, '')
-                    .replace(/## /g, '')
-                    .replace(/# /g, '')
-                    .replace(/\*\*/g, '');
+                // ── Markdown content ──
+                const rawContent = item.content || '';
+                const tokens = tokenizeMarkdown(rawContent);
+                y = renderTokensToPDF(doc, tokens, y, margin, contentWidth, pageHeight);
 
-                // 2. Strip LaTeX delimiters and clean up common math for standard PDF font compatibility
-                textContent = textContent.replace(/\\\(/g, '')
-                    .replace(/\\\)/g, '')
-                    .replace(/\\\[/g, '')
-                    .replace(/\\\]/g, '')
-                    // Replace common LaTeX math commands with ASCII-safe approximations
-                    // Since standard jsPDF 'times' font lacks advanced Unicode math glyphs
-                    .replace(/\\rightarrow/g, '->')
-                    .replace(/\\leftarrow/g, '<-')
-                    .replace(/\\leftrightarrow/g, '<->')
-                    .replace(/\\neq/g, '!=')
-                    .replace(/\\leq/g, '<=')
-                    .replace(/\\geq/g, '>=')
-                    .replace(/\\land/g, ' AND ')
-                    .replace(/\\lor/g, ' OR ')
-                    .replace(/\\neg/g, 'NOT ')
-                    .replace(/\\exists/g, 'EXISTS ')
-                    .replace(/\\forall/g, 'FORALL ')
-                    .replace(/\\in/g, ' IN ')
-                    .replace(/\\notin/g, ' NOT IN ')
-                    .replace(/\\subset/g, ' SUBSET ')
-                    .replace(/\\infty/g, 'INFINITY')
-                    .replace(/\\alpha/g, 'alpha')
-                    .replace(/\\beta/g, 'beta')
-                    .replace(/\\gamma/g, 'gamma')
-                    .replace(/\\theta/g, 'theta')
-                    .replace(/\\pi/g, 'pi')
-                    .replace(/\\cdot/g, '*')
-                    .replace(/\\times/g, '*')
-                    .replace(/\\div/g, '/')
-                    .replace(/\\pm/g, '+/-')
-                    .replace(/\\approx/g, '~=')
-                    .replace(/\\equiv/g, '==')
-                    .replace(/\\frac{([^}]*)}{([^}]*)}/g, '($1 / $2)') // Simple fraction converter
-                    // Clean up any double spaces left behind
-                    .replace(/  +/g, ' ');
-
-                const lines = doc.splitTextToSize(textContent, contentWidth);
-
-                for (const line of lines) {
-                    if (y > pageHeight - margin) {
-                        doc.addPage();
-                        y = margin;
-                    }
-                    doc.text(line, margin, y);
-                    y += 6;
-                }
-                y += 4;
-
+                // ── Divider between items ──
                 if (i < items.length - 1) {
-                    if (y + 10 > pageHeight - margin) {
+                    if (y + 12 > pageHeight - margin) {
                         doc.addPage();
                         y = margin;
                     } else {
-                        y += 5;
-                        doc.setDrawColor(200);
-                        doc.line(margin, y, pageWidth - margin, y);
-                        y += 10;
+                        y += 4;
+                        doc.setDrawColor(200, 200, 215);
+                        doc.setLineWidth(0.5);
+                        doc.line(margin, y, margin + contentWidth, y);
+                        y += 8;
                     }
                 }
+            }
+
+            // ── Page numbers ──
+            const totalPages = doc.getNumberOfPages();
+            for (let p = 1; p <= totalPages; p++) {
+                doc.setPage(p);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(8);
+                doc.setTextColor(150, 150, 170);
+                doc.text(
+                    `${subject?.name || 'Export'}  ·  ${tabLabel}  ·  Page ${p} of ${totalPages}`,
+                    pageWidth / 2,
+                    pageHeight - 8,
+                    { align: 'center' }
+                );
+                doc.setTextColor(0, 0, 0);
             }
 
             const fileName = `${subject?.name || 'Export'}_${activeTab}.pdf`.replace(/\s+/g, '_');
@@ -356,7 +696,7 @@ const SubjectDetail = () => {
 
             setIsSelectionMode(false);
             setSelectedItems(new Set());
-            toast.success('Generated PDF successfully.', { id: loadingToast, duration: 4000 });
+            toast.success('PDF generated successfully!', { id: loadingToast, duration: 4000 });
 
         } catch (error) {
             console.error('PDF Export Error:', error);
@@ -846,14 +1186,28 @@ const SubjectDetail = () => {
             />
 
             <AddNoteModal
-                isOpen={showNoteModal}
+                isOpen={showNoteModal || !!addToNoteData}
                 onClose={() => {
                     setShowNoteModal(false);
                     setSelectedQuestionIdForNote(null);
+                    setAddToNoteData(null);
                 }}
                 subjectId={id}
-                onNoteAdded={handleNoteAdded}
+                onNoteAdded={(newNote) => {
+                    handleNoteAdded(newNote);
+                    // If this was a child note from "Add to Note", open it with back-nav
+                    if (addToNoteData) {
+                        if (viewingNote) {
+                            setNoteStack(prev => [...prev, viewingNote]);
+                        }
+                        setViewingNote(newNote);
+                        setAddToNoteData(null);
+                    }
+                }}
                 questionId={selectedQuestionIdForNote}
+                initialTitle={addToNoteData ? `Note: ${addToNoteData.selectedText.substring(0, 60)}${addToNoteData.selectedText.length > 60 ? '...' : ''}` : ''}
+                initialContent={addToNoteData ? `> ${addToNoteData.selectedText.replace(/\n/g, '\n> ')}\n\n` : ''}
+                parentNoteId={addToNoteData?.parentNoteId || null}
             />
 
             <CreateSessionModal
@@ -881,7 +1235,16 @@ const SubjectDetail = () => {
 
             <ViewNoteModal
                 isOpen={!!viewingNote}
-                onClose={() => setViewingNote(null)}
+                onClose={() => {
+                    if (noteStack.length > 0) {
+                        // Pop the parent note from the stack
+                        const parentNote = noteStack[noteStack.length - 1];
+                        setNoteStack(prev => prev.slice(0, -1));
+                        setViewingNote(parentNote);
+                    } else {
+                        setViewingNote(null);
+                    }
+                }}
                 note={viewingNote}
                 onNavigateToQuestion={navigateToQuestion}
                 sourceImage={viewingNote ? fetchedImages[`note-${viewingNote.id}`] : null}
@@ -889,6 +1252,61 @@ const SubjectDetail = () => {
                 onEdit={setEditingNote}
                 onPrev={viewingNote?.id?.toString().startsWith('img-') ? handlePrevImage : handlePrevNote}
                 onNext={viewingNote?.id?.toString().startsWith('img-') ? handleNextImage : handleNextNote}
+                onAddToNote={(selectedText) => {
+                    setAddToNoteData({
+                        selectedText,
+                        parentNoteId: viewingNote?.id || null,
+                    });
+                }}
+                parentNoteTitle={noteStack.length > 0 ? noteStack[noteStack.length - 1]?.title : null}
+                childNotes={viewingNote ? notes.filter(n => n.parent_note_id === viewingNote.id) : []}
+                onOpenChildNote={(childNote) => {
+                    if (viewingNote) {
+                        setNoteStack(prev => [...prev, viewingNote]);
+                    }
+                    setViewingNote(childNote);
+                }}
+                onUpdateNoteContent={async (noteId, newContent) => {
+                    try {
+                        const existingNote = notes.find(n => n.id === noteId) || viewingNote;
+                        await notesApi.update(id, noteId, { title: existingNote?.title || '', content: newContent });
+                        // Update local state
+                        setNotes(prev => prev.map(n => n.id === noteId ? { ...n, content: newContent } : n));
+                        if (viewingNote?.id === noteId) {
+                            setViewingNote(prev => ({ ...prev, content: newContent }));
+                        }
+                        toast.success('Note updated');
+                    } catch {
+                        toast.error('Failed to update note');
+                    }
+                }}
+                onAIEditSection={async (selectedText, instruction) => {
+                    try {
+                        // Extract surrounding content for context (buffer ~500 chars each side)
+                        const fullContent = viewingNote?.content || '';
+                        const selectionIndex = fullContent.indexOf(selectedText);
+                        const BUFFER = 500;
+                        let contentBefore = '';
+                        let contentAfter = '';
+                        if (selectionIndex >= 0) {
+                            const beforeStart = Math.max(0, selectionIndex - BUFFER);
+                            contentBefore = fullContent.substring(beforeStart, selectionIndex);
+                            const afterEnd = Math.min(fullContent.length, selectionIndex + selectedText.length + BUFFER);
+                            contentAfter = fullContent.substring(selectionIndex + selectedText.length, afterEnd);
+                        }
+                        const result = await aiApi.editSection({
+                            selectedText,
+                            instruction,
+                            noteTitle: viewingNote?.title || '',
+                            contentBefore,
+                            contentAfter,
+                        });
+                        return result.editedText || '';
+                    } catch {
+                        toast.error('AI edit failed');
+                        throw new Error('AI edit failed');
+                    }
+                }}
             />
 
             <EditNoteModal
@@ -1753,6 +2171,9 @@ const SubjectDetail = () => {
                                                     setSelectedItems(next);
                                                 } else {
                                                     setViewingNote(note);
+                                                    if (note.source_image_id) {
+                                                        handleFetchNoteImage(note.id);
+                                                    }
                                                 }
                                             }}
                                         >
@@ -1976,7 +2397,10 @@ const SubjectDetail = () => {
                                                             navigateToQuestion(img.linked_question_id);
                                                         } else if (img.linked_note_id) {
                                                             const note = notes.find(n => n.id === img.linked_note_id);
-                                                            if (note) setViewingNote(note);
+                                                            if (note) {
+                                                                setViewingNote(note);
+                                                                if (note.source_image_id) handleFetchNoteImage(note.id);
+                                                            }
                                                         }
                                                     }}
                                                     className="absolute top-3 right-3 p-2 bg-black/60 backdrop-blur-md rounded-xl text-indigo-400 border border-white/[0.08] opacity-0 group-hover:opacity-100 transition-all shadow-2xl z-20 hover:scale-110 active:scale-95 hover:bg-indigo-500/20"

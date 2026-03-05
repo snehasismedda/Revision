@@ -31,7 +31,7 @@ export const getNotes = async (req, res, next) => {
 export const createNote = async (req, res, next) => {
     try {
         const { subjectId } = req.params;
-        const { questionId, title, content, sourceImageId: existingSourceImageId, sourceImageContent } = req.body;
+        const { questionId, title, content, sourceImageId: existingSourceImageId, sourceImageContent, parentNoteId } = req.body;
 
         let finalContent = content;
         let finalTitle = title;
@@ -77,7 +77,7 @@ export const createNote = async (req, res, next) => {
             return res.status(400).json({ error: 'Title and content are required' });
         }
 
-        const note = await noteModel.createNote(subjectId, questionId, finalTitle, finalContent, sourceImageId);
+        const note = await noteModel.createNote(subjectId, questionId, finalTitle, finalContent, sourceImageId, parentNoteId);
         res.status(201).json({ note });
     } catch (error) {
         next(error);
