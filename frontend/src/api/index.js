@@ -123,6 +123,18 @@ export const notesApi = {
     getImage: (subjectId, noteId) => request(`/subjects/${subjectId}/notes/${noteId}/image`),
 };
 
+// Revision Tracker
+export const revisionApi = {
+    listSessions: (subjectId) => request(`/subjects/${subjectId}/revision-tracker/sessions`),
+    createSession: (subjectId, name, topicIds) =>
+        request(`/subjects/${subjectId}/revision-tracker/sessions`, { method: 'POST', body: { name, topicIds } }),
+    deleteSession: (subjectId, sessionId) =>
+        request(`/subjects/${subjectId}/revision-tracker/sessions/${sessionId}`, { method: 'DELETE' }),
+    toggleStatus: (subjectId, sessionId, topicId, status) =>
+        request(`/subjects/${subjectId}/revision-tracker/sessions/${sessionId}/topics/${topicId}`, { method: 'PUT', body: { status } }),
+    analytics: (subjectId) => request(`/subjects/${subjectId}/revision-tracker/analytics`),
+};
+
 // Images
 export const imagesApi = {
     list: (limit, offset) => {
