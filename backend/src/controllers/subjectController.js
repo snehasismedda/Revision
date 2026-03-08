@@ -12,13 +12,14 @@ export const getSubjects = async (req, res) => {
 
 export const createSubject = async (req, res) => {
     try {
-        const { name, description } = req.body;
+        const { name, description, tags } = req.body;
         if (!name) return res.status(400).json({ error: 'name is required' });
 
         const subject = await subjectModel.createSubject({
             userId: req.user.id,
             name,
             description,
+            tags: Array.isArray(tags) ? tags : [],
         });
         res.status(201).json({ subject });
     } catch (error) {
@@ -41,12 +42,13 @@ export const getSubject = async (req, res) => {
 
 export const updateSubject = async (req, res) => {
     try {
-        const { name, description } = req.body;
+        const { name, description, tags } = req.body;
         const updated = await subjectModel.updateSubject({
             id: req.params.id,
             userId: req.user.id,
             name,
             description,
+            tags: Array.isArray(tags) ? tags : [],
         });
         if (!updated) return res.status(404).json({ error: 'Subject not found' });
         res.status(200).json({ subject: updated });

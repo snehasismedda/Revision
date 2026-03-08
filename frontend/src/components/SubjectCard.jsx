@@ -12,6 +12,12 @@ const SubjectCard = ({ subject, stats, variant, onEdit, onDelete }) => {
 
     const isAttention = variant === 'attention';
 
+    let tags = subject.tags || [];
+    if (typeof tags === 'string') {
+        try { tags = JSON.parse(tags); } catch { tags = []; }
+    }
+    tags = Array.isArray(tags) ? tags : [];
+
     return (
         <div
             onClick={() => navigate(`/subjects/${subject.id}`)}
@@ -40,6 +46,17 @@ const SubjectCard = ({ subject, stats, variant, onEdit, onDelete }) => {
                     </div>
                 )}
             </div>
+
+            {/* Tags */}
+            {tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-3 px-1 mt-1">
+                    {tags.map(tag => (
+                        <span key={tag} className="px-1.5 py-0.5 text-[9px] font-bold tracking-wider uppercase bg-primary/10 text-primary border border-primary/20 rounded">
+                            {tag}
+                        </span>
+                    ))}
+                </div>
+            )}
 
             {/* Progress bar */}
             {totalQ > 0 && (

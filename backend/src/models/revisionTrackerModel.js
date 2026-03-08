@@ -84,6 +84,47 @@ export const deleteSession = async (sessionId, subjectId, userId) => {
     return true;
 };
 
+export const updateSession = async (sessionId, subjectId, userId, name, topicIds) => {
+    return await db.transaction(async (trx) => {
+        const session = await trx('revision.revision_sessions')
+            .where({ id: sessionId, subject_id: subjectId, user_id: userId })
+            .first();
+
+        if (!session) throw new Error('Session not found or unauthorized');
+
+        await trx('revision.revision_sessions')
+            .where({ id: sessionId })
+            .update({ name, updated_at: new Date() });
+
+        const existingTrackers = await trx('revision.revision_session_tracker')
+            .where({ revision_session_id: sessionId });
+
+        const existingTopicIds = existingTrackers.map(t => t.topic_id);
+        const newTopicIds = new Set(topicIds || []);
+
+        const toDeleteIds = existingTopicIds.filter(id => !newTopicIds.has(id));
+        const toAddIds = (topicIds || []).filter(id => !existingTopicIds.includes(id));
+
+        if (toDeleteIds.length > 0) {
+            await trx('revision.revision_session_tracker')
+                .where({ revision_session_id: sessionId })
+                .whereIn('topic_id', toDeleteIds)
+                .del();
+        }
+
+        if (toAddIds.length > 0) {
+            const trackerRows = toAddIds.map(topicId => ({
+                revision_session_id: sessionId,
+                topic_id: topicId,
+                status: 'pending'
+            }));
+            await trx('revision.revision_session_tracker').insert(trackerRows);
+        }
+
+        return { id: sessionId, name };
+    });
+};
+
 export const getRevisionAnalytics = async (subjectId, userId) => {
     // Total breakdown
     const totalStats = await db('revision.topics')

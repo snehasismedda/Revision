@@ -21,6 +21,7 @@ import EditSessionModal from '../components/modals/EditSessionModal.jsx';
 import EditNoteModal from '../components/modals/EditNoteModal.jsx';
 import AddImageModal from '../components/modals/AddImageModal.jsx';
 import CreateRevisionSessionModal from '../components/modals/CreateRevisionSessionModal.jsx';
+import EditRevisionSessionModal from '../components/modals/EditRevisionSessionModal.jsx';
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -106,6 +107,7 @@ const SubjectDetail = () => {
     const [expandedRevisionGroups, setExpandedRevisionGroups] = useState({});
     const [activeRevisionSessionId, setActiveRevisionSessionId] = useState(null);
     const [showCreateRevisionSession, setShowCreateRevisionSession] = useState(false);
+    const [editingRevisionSession, setEditingRevisionSession] = useState(null);
     const [confirmDeleteRevisionSession, setConfirmDeleteRevisionSession] = useState({ open: false, sessionId: null });
 
 
@@ -119,6 +121,7 @@ const SubjectDetail = () => {
     // PDF Export / Selection state
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedItems, setSelectedItems] = useState(new Set());
+    const [isDownloadingSyllabus, setIsDownloadingSyllabus] = useState(false);
 
     useEffect(() => {
         setIsSelectionMode(false);
@@ -147,6 +150,134 @@ const SubjectDetail = () => {
             } else {
                 setSelectedItems(new Set(visibleNotes.map(n => n.id)));
             }
+        }
+    };
+
+    const handleDownloadSyllabus = async () => {
+        setIsDownloadingSyllabus(true);
+        const loadingToast = toast.loading('Generating Syllabus PDF...');
+
+        try {
+            const doc = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            const margin = 18;
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const contentWidth = pageWidth - margin * 2;
+
+            let y = margin;
+
+            // ── Cover / document title ──
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(20);
+            const titleText = subject?.name || 'Syllabus';
+            doc.text(titleText, margin, y);
+            y += 10;
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            doc.setTextColor(100, 100, 120);
+            doc.text(`Syllabus  ·  ${new Date().toLocaleDateString()}`, margin, y);
+            doc.setTextColor(0, 0, 0);
+            y += 3;
+
+            // Thick decorative line under cover
+            doc.setDrawColor(80, 80, 200);
+            doc.setLineWidth(1.2);
+            doc.line(margin, y, margin + contentWidth, y);
+            doc.setLineWidth(0.3);
+            y += 12;
+
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(14);
+            doc.text('Topics', margin, y);
+            y += 8;
+
+            // Render topics recursively
+            let currentNumbering = [];
+            const renderTopic = (topic, depth) => {
+                if (depth > 0) {
+                    currentNumbering[depth - 1] = (currentNumbering[depth - 1] || 0) + 1;
+                    currentNumbering = currentNumbering.slice(0, depth);
+                }
+
+                const sizes = { 0: 12, 1: 11, 2: 10, 3: 10 };
+                const fs = sizes[depth] || 10;
+
+                doc.setFont('helvetica', depth === 0 ? 'bold' : 'normal');
+                doc.setFontSize(fs);
+
+                const indent = margin + (depth * 6);
+
+                let prefix = '';
+                if (depth > 0) {
+                    prefix = currentNumbering.join('.') + '. ';
+                }
+
+                if (y + 6 > pageHeight - margin) {
+                    doc.addPage();
+                    y = margin;
+                }
+
+                doc.text(prefix + topic.name, indent, y);
+                y += 6;
+
+                if (topic.children && topic.children.length > 0) {
+                    // Reset numbering for children
+                    if (currentNumbering.length <= depth) {
+                        currentNumbering.push(0);
+                    } else {
+                        currentNumbering[depth] = 0;
+                    }
+
+                    topic.children.forEach(child => renderTopic(child, depth + 1));
+                }
+            };
+
+            if (topics && topics.length > 0) {
+                topics.forEach(topic => {
+                    currentNumbering = []; // Reset sub-topic numbering per main topic
+                    renderTopic(topic, 0);
+                    y += 4; // Add some spacing between main topics
+                });
+            } else {
+                doc.setFont('helvetica', 'italic');
+                doc.setFontSize(10);
+                doc.text('No topics added to syllabus yet.', margin, y);
+            }
+
+            // ── Page numbers ──
+            const totalPages = doc.getNumberOfPages();
+            for (let p = 1; p <= totalPages; p++) {
+                doc.setPage(p);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(8);
+                doc.setTextColor(150, 150, 170);
+                doc.text(
+                    `${subject?.name || 'Syllabus'}  ·  Page ${p} of ${totalPages}`,
+                    pageWidth / 2,
+                    pageHeight - 8,
+                    { align: 'center' }
+                );
+                doc.setTextColor(0, 0, 0);
+            }
+
+            const fileName = `${subject?.name || 'Subject'}_Syllabus.pdf`.replace(/\s+/g, '_');
+            doc.save(fileName);
+
+            toast.success('Syllabus PDF generated successfully!', { id: loadingToast, duration: 4000 });
+        } catch (error) {
+            console.error('Syllabus PDF Export Error:', error);
+            toast.error(`Failed to generate Syllabus PDF: ${error.message || String(error)}`, {
+                id: loadingToast,
+                duration: 6000
+            });
+        } finally {
+            setIsDownloadingSyllabus(false);
         }
     };
 
@@ -859,6 +990,18 @@ const SubjectDetail = () => {
         }
     };
 
+    const handleEditRevisionSession = async (data) => {
+        try {
+            await revisionApi.updateSession(id, data.sessionId, data.name, data.topicIds);
+            const loadRes = await revisionApi.listSessions(id); // Reload to get full nested data
+            setRevisionSessions(loadRes.sessions || []);
+            setEditingRevisionSession(null);
+            toast.success('Revision session updated');
+        } catch (err) {
+            toast.error(err.response?.data?.error || 'Failed to update revision session');
+        }
+    };
+
     const handleDeleteRevisionSession = async (sessionId) => {
         try {
             await revisionApi.deleteSession(id, sessionId);
@@ -1431,10 +1574,11 @@ const SubjectDetail = () => {
                     </div>
                     <Link
                         to={`/subjects/${id}/reports`}
-                        className="flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shrink-0 md:mt-1 cursor-pointer border border-white/[0.08] bg-surface-3/50 text-slate-300 hover:text-white hover:bg-surface-3 hover:border-white/[0.12] group"
+                        className="flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all cursor-pointer border border-white/[0.08] bg-surface-3/50 text-slate-300 hover:text-white hover:bg-surface-3 hover:border-white/[0.12] group"
                     >
                         <BarChart3 className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform" strokeWidth={2} />
-                        <span>View Analytics</span>
+                        <span className="hidden sm:inline">View Analytics</span>
+                        <span className="sm:hidden">Analytics</span>
                     </Link>
                 </div>
 
@@ -1640,7 +1784,20 @@ const SubjectDetail = () => {
                             <BookOpen className="w-6 h-6 text-indigo-400" />
                             <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Syllabus</h3>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button
+                                onClick={handleDownloadSyllabus}
+                                disabled={isDownloadingSyllabus}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 border border-emerald-500/20 transition-all cursor-pointer uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Download Syllabus as PDF"
+                            >
+                                {isDownloadingSyllabus ? (
+                                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                    <Download className="w-3.5 h-3.5" />
+                                )}
+                                <span>Export PDF</span>
+                            </button>
                             <button
                                 onClick={() => {
                                     setTopicsDefaultExpanded(true);
@@ -2516,6 +2673,16 @@ const SubjectDetail = () => {
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
+                                            setEditingRevisionSession(session);
+                                        }}
+                                        className="p-2 rounded-lg text-slate-500 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                                        title="Edit Session"
+                                    >
+                                        <Pencil className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
                                             setConfirmDeleteRevisionSession({ open: true, sessionId: session.id });
                                         }}
                                         className="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
@@ -2802,6 +2969,14 @@ const SubjectDetail = () => {
                 isOpen={showCreateRevisionSession}
                 onClose={() => setShowCreateRevisionSession(false)}
                 onSubmit={handleCreateRevisionSession}
+                topics={topics}
+            />
+
+            <EditRevisionSessionModal
+                isOpen={!!editingRevisionSession}
+                onClose={() => setEditingRevisionSession(null)}
+                onSubmit={handleEditRevisionSession}
+                session={editingRevisionSession}
                 topics={topics}
             />
 

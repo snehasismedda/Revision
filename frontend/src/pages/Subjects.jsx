@@ -15,6 +15,7 @@ const Subjects = () => {
     const [statsMap, setStatsMap] = useState({});
     const [searchParams] = useSearchParams();
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedTag, setSelectedTag] = useState('');
 
     // Custom confirm state
     const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null, name: '' });
@@ -22,7 +23,7 @@ const Subjects = () => {
     useEffect(() => {
         loadSubjects();
         if (searchParams.get('new')) setShowModal(true);
-         
+
     }, [searchParams]);
 
     const loadSubjects = async () => {
@@ -78,6 +79,15 @@ const Subjects = () => {
         }
     };
 
+    // Derived unique tags (defensively parse stringified JSON if needed)
+    const allTags = Array.from(new Set(subjects.flatMap(s => {
+        let t = s.tags || [];
+        if (typeof t === 'string') {
+            try { t = JSON.parse(t); } catch { t = []; }
+        }
+        return Array.isArray(t) ? t : [];
+    }))).sort();
+
     return (
         <div className="fade-in max-w-6xl mx-auto">
             {/* Custom Confirm Dialog */}
@@ -102,6 +112,26 @@ const Subjects = () => {
                 </div>
 
                 <div className="flex items-center gap-4">
+                    {allTags.length > 0 && (
+                        <div className="hidden md:block">
+                            <select
+                                value={selectedTag}
+                                onChange={(e) => setSelectedTag(e.target.value)}
+                                className="bg-surface-2/50 border border-white/[0.08] text-slate-200 rounded-xl px-4 py-2 text-[13px] focus:outline-none focus:border-primary/40 focus:bg-surface-2 transition-all appearance-none cursor-pointer pr-10 hover:border-white/[0.15]"
+                                style={{
+                                    backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(148, 163, 184, 1)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                                    backgroundRepeat: 'no-repeat',
+                                    backgroundPosition: 'right 0.75rem center',
+                                    backgroundSize: '1em'
+                                }}
+                            >
+                                <option value="">All Tags</option>
+                                {allTags.map(tag => (
+                                    <option key={tag} value={tag}>{tag}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                     <div className="relative group hidden md:block">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-primary transition-colors" />
                         <input
@@ -114,7 +144,7 @@ const Subjects = () => {
                         {searchQuery && (
                             <button
                                 onClick={() => setSearchQuery('')}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white cursor-pointer"
                             >
                                 <X className="w-4 h-4" />
                             </button>
@@ -137,6 +167,7 @@ const Subjects = () => {
                 onClose={() => setShowModal(false)}
                 editingSubject={editingSubject}
                 onSubjectSaved={handleSubjectSaved}
+                existingTags={allTags}
             />
 
 
@@ -172,8 +203,17 @@ const Subjects = () => {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {subjects
-                        .filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            s.description?.toLowerCase().includes(searchQuery.toLowerCase()))
+                        .filter(s => {
+                            const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.description?.toLowerCase().includes(searchQuery.toLowerCase());
+                            let sTags = s.tags || [];
+                            if (typeof sTags === 'string') {
+                                try { sTags = JSON.parse(sTags); } catch { sTags = []; }
+                            }
+                            sTags = Array.isArray(sTags) ? sTags : [];
+
+                            const matchesTag = selectedTag ? sTags.includes(selectedTag) : true;
+                            return matchesSearch && matchesTag;
+                        })
                         .map((s) => (
                             <SubjectCard
                                 key={s.id}

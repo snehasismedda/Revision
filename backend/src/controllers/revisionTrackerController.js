@@ -59,6 +59,24 @@ export const deleteSession = async (req, res) => {
     }
 }
 
+export const updateSession = async (req, res) => {
+    try {
+        const { subjectId, sessionId } = req.params;
+        const userId = req.user.id;
+        const { name, topicIds } = req.body;
+
+        if (!name || !topicIds || topicIds.length === 0) {
+            return res.status(400).json({ error: 'Session name and topicIds are required.' });
+        }
+
+        await revisionTrackerModel.updateSession(sessionId, subjectId, userId, name, topicIds);
+        res.status(200).json({ success: true });
+    } catch (error) {
+        console.error('[revisionTracker.updateSession]', error);
+        res.status(500).json({ error: 'Failed to update revision session' });
+    }
+};
+
 export const getRevisionAnalytics = async (req, res) => {
     try {
         const { subjectId } = req.params;

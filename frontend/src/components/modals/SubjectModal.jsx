@@ -5,17 +5,23 @@ import { X, LibraryBig, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ModalPortal from '../ModalPortal.jsx';
 
-const SubjectModal = ({ isOpen, onClose, editingSubject, onSubjectSaved }) => {
-    const [form, setForm] = useState({ name: '', description: '' });
+const SubjectModal = ({ isOpen, onClose, editingSubject, onSubjectSaved, existingTags = [] }) => {
+    const [form, setForm] = useState({ name: '', description: '', tags: [] });
+    const [tagInput, setTagInput] = useState('');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const navigate = useNavigate();
 
     useEffect(() => {
         if (editingSubject) {
-            setForm({ name: editingSubject.name, description: editingSubject.description || '' });
+            let t = editingSubject.tags || [];
+            if (typeof t === 'string') {
+                try { t = JSON.parse(t); } catch { t = []; }
+            }
+            t = Array.isArray(t) ? t : [];
+            setForm({ name: editingSubject.name, description: editingSubject.description || '', tags: t });
         } else {
-            setForm({ name: '', description: '' });
+            setForm({ name: '', description: '', tags: [] });
         }
     }, [editingSubject, isOpen]);
 
@@ -24,11 +30,20 @@ const SubjectModal = ({ isOpen, onClose, editingSubject, onSubjectSaved }) => {
         setError('');
         setSaving(true);
         const loadingToast = toast.loading(editingSubject ? 'Updating subject...' : 'Creating subject...');
+
+        // Auto-add any leftover tagInput
+        const finalTags = [...form.tags];
+        const trimmedTag = tagInput.trim();
+        if (trimmedTag && !finalTags.includes(trimmedTag)) {
+            finalTags.push(trimmedTag);
+        }
+
         try {
             if (editingSubject) {
                 const { subject } = await subjectsApi.update(editingSubject.id, {
                     name: form.name,
-                    description: form.description
+                    description: form.description,
+                    tags: finalTags
                 });
                 onSubjectSaved(subject, true);
                 toast.success('Subject updated successfully!', { id: loadingToast });
@@ -36,7 +51,8 @@ const SubjectModal = ({ isOpen, onClose, editingSubject, onSubjectSaved }) => {
             } else {
                 const { subject } = await subjectsApi.create({
                     name: form.name,
-                    description: form.description
+                    description: form.description,
+                    tags: finalTags
                 });
 
                 onSubjectSaved(subject, false);
@@ -104,6 +120,57 @@ const SubjectModal = ({ isOpen, onClose, editingSubject, onSubjectSaved }) => {
                                 className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 focus:bg-surface-2/70 transition-all placeholder:text-slate-600/80 resize-none"
                                 placeholder="Optional description..."
                             />
+                        </div>
+
+                        <div>
+                            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-2.5">Tags</label>
+                            <div className="flex flex-wrap gap-2 mb-2">
+                                {form.tags.map(tag => (
+                                    <span key={tag} className="px-2.5 py-1 text-[12px] font-medium bg-primary/10 text-primary border border-primary/20 rounded-lg flex items-center gap-1.5">
+                                        {tag}
+                                        <button
+                                            type="button"
+                                            onClick={() => setForm(f => ({ ...f, tags: f.tags.filter(t => t !== tag) }))}
+                                            className="hover:text-white transition-colors"
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </span>
+                                ))}
+                            </div>
+                            <input
+                                value={tagInput}
+                                onChange={(e) => setTagInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ',') {
+                                        e.preventDefault();
+                                        const t = tagInput.trim();
+                                        if (t && !form.tags.includes(t)) {
+                                            setForm(f => ({ ...f, tags: [...f.tags, t] }));
+                                        }
+                                        setTagInput('');
+                                    }
+                                }}
+                                className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 focus:bg-surface-2/70 transition-all placeholder:text-slate-600/80"
+                                placeholder="Type a tag and press Enter..."
+                            />
+                            {existingTags.filter(t => !form.tags.includes(t)).length > 0 && (
+                                <div className="mt-3">
+                                    <p className="text-[10px] text-slate-500 mb-2 uppercase tracking-wider font-semibold">Available Tags</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {existingTags.filter(t => !form.tags.includes(t)).map(tag => (
+                                            <button
+                                                key={tag}
+                                                type="button"
+                                                onClick={() => setForm(f => ({ ...f, tags: [...f.tags, tag] }))}
+                                                className="px-2 py-1 text-[11px] font-medium bg-surface-3/50 text-slate-300 hover:text-white hover:bg-surface-3 border border-white/[0.06] hover:border-white/[0.12] rounded-md transition-all cursor-pointer shadow-sm active:scale-95"
+                                            >
+                                                + {tag}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
 

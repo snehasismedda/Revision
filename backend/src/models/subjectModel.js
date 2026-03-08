@@ -6,6 +6,7 @@ export const createSubject = async (data) => {
             user_id: data.userId,
             name: data.name,
             description: data.description || null,
+            tags: JSON.stringify(Array.isArray(data.tags) ? data.tags : []),
         })
         .returning('*');
     return subject;
@@ -16,7 +17,7 @@ export const findSubjectsByUser = async (data) => {
         .where('user_id', data.userId)
         .where('is_deleted', false)
         .select([
-            'id', 'name', 'description', 'created_at',
+            'id', 'name', 'description', 'tags', 'created_at',
         ])
         .orderBy('created_at', 'desc');
 };
@@ -44,6 +45,7 @@ export const updateSubject = async (data) => {
         .update({
             name: data.name,
             description: data.description,
+            tags: JSON.stringify(Array.isArray(data.tags) ? data.tags : []),
             updated_at: new Date(),
         })
         .returning('*');

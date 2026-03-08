@@ -128,6 +128,8 @@ export const revisionApi = {
     listSessions: (subjectId) => request(`/subjects/${subjectId}/revision-tracker/sessions`),
     createSession: (subjectId, name, topicIds) =>
         request(`/subjects/${subjectId}/revision-tracker/sessions`, { method: 'POST', body: { name, topicIds } }),
+    updateSession: (subjectId, sessionId, name, topicIds) =>
+        request(`/subjects/${subjectId}/revision-tracker/sessions/${sessionId}`, { method: 'PUT', body: { name, topicIds } }),
     deleteSession: (subjectId, sessionId) =>
         request(`/subjects/${subjectId}/revision-tracker/sessions/${sessionId}`, { method: 'DELETE' }),
     toggleStatus: (subjectId, sessionId, topicId, status) =>

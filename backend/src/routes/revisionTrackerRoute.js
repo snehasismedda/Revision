@@ -1,5 +1,5 @@
 import express from 'express';
-import { listSessions, createSession, toggleStatus, deleteSession, getRevisionAnalytics } from '../controllers/revisionTrackerController.js';
+import { listSessions, createSession, toggleStatus, deleteSession, updateSession, getRevisionAnalytics } from '../controllers/revisionTrackerController.js';
 import authenticate from '../middlewares/authenticate.js';
 
 const router = express.Router({ mergeParams: true });
@@ -9,6 +9,8 @@ router.use(authenticate);
 router.get('/sessions', listSessions);
 // POST /subjects/:subjectId/revision-tracker/sessions
 router.post('/sessions', createSession);
+// PUT  /subjects/:subjectId/revision-tracker/sessions/:sessionId
+router.put('/sessions/:sessionId', updateSession);
 // DELETE /subjects/:subjectId/revision-tracker/sessions/:sessionId
 router.delete('/sessions/:sessionId', deleteSession);
 // PUT  /subjects/:subjectId/revision-tracker/sessions/:sessionId/topics/:topicId
