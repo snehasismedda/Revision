@@ -1,6 +1,8 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import * as userModel from '../models/userModel.js';
+import { sendPasswordResetEmail } from '../services/mailService.js';
 
 const COOKIE_OPTS = {
     httpOnly: true,
@@ -42,7 +44,7 @@ export const register = async (req, res) => {
             .cookie('access_token', accessToken, { ...COOKIE_OPTS, maxAge: ACCESS_TOKEN_MAX_AGE })
             .cookie('refresh_token', refreshToken, { ...COOKIE_OPTS, maxAge: REFRESH_TOKEN_MAX_AGE })
             .status(201)
-            .json({ user: { id: user.id, name: user.name, email: user.email } });
+            .json({ user: { id: user.id, name: user.name, email: user.email, profile_picture: user.profile_picture } });
     } catch (error) {
         console.error('register error:', error);
         res.status(500).json({ error: 'Failed to register user' });
@@ -72,10 +74,43 @@ export const login = async (req, res) => {
             .cookie('access_token', accessToken, { ...COOKIE_OPTS, maxAge: ACCESS_TOKEN_MAX_AGE })
             .cookie('refresh_token', refreshToken, { ...COOKIE_OPTS, maxAge: REFRESH_TOKEN_MAX_AGE })
             .status(200)
-            .json({ user: { id: user.id, name: user.name, email: user.email } });
+            .json({ user: { id: user.id, name: user.name, email: user.email, profile_picture: user.profile_picture } });
     } catch (error) {
         console.error('login error:', error);
         res.status(500).json({ error: 'Failed to login user' });
+    }
+};
+
+export const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ error: 'email is required' });
+        }
+
+        const user = await userModel.findUserByEmail({ email });
+        if (!user) {
+            // Prevent user enumeration by returning a generic success message
+            return res.status(200).json({ message: 'If an account with that email exists, we have sent a new password.' });
+        }
+
+        // Generate a random default password of length 8
+        const newPassword = crypto.randomBytes(4).toString('hex');
+
+        // Hash it and update user
+        const passwordHash = await bcrypt.hash(newPassword, 12);
+        await userModel.updateUser(user.id, { password_hash: passwordHash });
+
+        // Send email with new password
+        const { previewUrl } = await sendPasswordResetEmail(user.email, newPassword);
+
+        res.status(200).json({
+            message: 'If an account with that email exists, we have sent a new password.',
+            previewUrl
+        });
+    } catch (error) {
+        console.error('forgotPassword error:', error);
+        res.status(500).json({ error: 'Failed to process forgot password request' });
     }
 };
 
@@ -106,7 +141,7 @@ export const refresh = async (req, res) => {
             .cookie('access_token', accessToken, { ...COOKIE_OPTS, maxAge: ACCESS_TOKEN_MAX_AGE })
             .cookie('refresh_token', refreshToken, { ...COOKIE_OPTS, maxAge: REFRESH_TOKEN_MAX_AGE })
             .status(200)
-            .json({ user: { id: user.id, name: user.name, email: user.email } });
+            .json({ user: { id: user.id, name: user.name, email: user.email, profile_picture: user.profile_picture } });
     } catch (error) {
         res.status(401).json({ error: 'Invalid refresh token' });
     }
@@ -119,5 +154,41 @@ export const getMe = async (req, res) => {
         res.status(200).json({ user });
     } catch (error) {
         res.status(500).json({ error: 'Failed to get user' });
+    }
+};
+
+export const updateMe = async (req, res) => {
+    try {
+        const { name, email, password, profile_picture } = req.body;
+
+        // Validate
+        if (!name && !email && !password && profile_picture === undefined) {
+            return res.status(400).json({ error: 'Nothing to update' });
+        }
+
+        const updateData = {};
+        if (name) updateData.name = name;
+
+        if (email) {
+            const existing = await userModel.findUserByEmail({ email });
+            if (existing && existing.id !== req.user.id) {
+                return res.status(409).json({ error: 'Email already in use' });
+            }
+            updateData.email = email;
+        }
+
+        if (password) {
+            updateData.password_hash = await bcrypt.hash(password, 12);
+        }
+
+        if (profile_picture !== undefined) {
+            updateData.profile_picture = profile_picture;
+        }
+
+        const user = await userModel.updateUser(req.user.id, updateData);
+        res.status(200).json({ user: { id: user.id, name: user.name, email: user.email, profile_picture: user.profile_picture } });
+    } catch (error) {
+        console.error('updateMe error:', error);
+        res.status(500).json({ error: 'Failed to update profile' });
     }
 };

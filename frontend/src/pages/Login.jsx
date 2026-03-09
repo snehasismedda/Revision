@@ -6,11 +6,12 @@ import { Sparkles, Mail, Lock, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Login = () => {
-    const { login } = useAuth();
+    const { login, forgotPassword } = useAuth();
     const navigate = useNavigate();
     const [form, setForm] = useState({ email: '', password: '' });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [resetLoading, setResetLoading] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -27,6 +28,32 @@ const Login = () => {
             toast.error(msg, { id: loadingToast });
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleForgotPassword = async () => {
+        if (!form.email) {
+            toast.error('Please enter your email address to reset your password');
+            return;
+        }
+        setResetLoading(true);
+        const loadingToast = toast.loading('Sending reset email...');
+        try {
+            const data = await forgotPassword({ email: form.email });
+            toast.success('Password reset email sent!', { id: loadingToast });
+
+            // If smart developer mode (Ethereal Preview URL exists), open it automatically
+            if (data?.previewUrl) {
+                setTimeout(() => {
+                    window.open(data.previewUrl, '_blank');
+                    toast.success('Opened preview in new tab!', { duration: 5000 });
+                }, 1000);
+            }
+        } catch (err) {
+            const msg = err.message || 'Failed to send reset email';
+            toast.error(msg, { id: loadingToast });
+        } finally {
+            setResetLoading(false);
         }
     };
 
@@ -84,9 +111,19 @@ const Login = () => {
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-3">
-                                Password
-                            </label>
+                            <div className="flex justify-between items-center mb-3">
+                                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em]">
+                                    Password
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={handleForgotPassword}
+                                    disabled={resetLoading}
+                                    className="text-[12px] font-medium text-primary hover:text-primary-light transition-colors disabled:opacity-50"
+                                >
+                                    {resetLoading ? 'Sending...' : 'Forgot password?'}
+                                </button>
+                            </div>
                             <div className="flex items-center gap-3 bg-surface-2/50 border border-white/[0.08] rounded-xl px-4 transition-all focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/15 focus-within:bg-surface-2/70 group/input">
                                 <Lock className="w-[18px] h-[18px] text-slate-600 shrink-0 transition-colors group-focus-within/input:text-primary/70" />
                                 <input

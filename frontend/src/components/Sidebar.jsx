@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { LayoutDashboard, LibraryBig, LogOut, Sparkles, ChevronLeft, ChevronRight, Settings, Image as ImageIcon, Target } from 'lucide-react';
+import EditProfileModal from './modals/EditProfileModal.jsx';
 
 const navItems = [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -14,6 +15,7 @@ const Sidebar = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const [isCollapsed, setIsCollapsed] = useState(() => window.innerWidth < 768);
+    const [showEditProfile, setShowEditProfile] = useState(false);
 
     useEffect(() => {
         const handleResize = () => {
@@ -137,16 +139,20 @@ const Sidebar = () => {
                     <div className={`flex items-center relative z-10 ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
                         {/* Avatar with purple accent glow */}
                         <div
-                            className="w-9 h-9 shrink-0 rounded-full bg-gradient-to-tr from-primary to-indigo-500 flex items-center justify-center text-sm font-heading font-bold text-white"
+                            className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-sm font-heading font-bold text-white overflow-hidden transition-all ${!user?.profile_picture ? 'bg-gradient-to-tr from-primary to-indigo-500' : 'bg-surface-2'}`}
                             style={{
                                 boxShadow: '0 0 0 2px rgba(139,92,246,0.25), inset 0 1px 2px rgba(0,0,0,0.3)',
                             }}
                         >
-                            {user?.name?.charAt(0)?.toUpperCase()}
+                            {user?.profile_picture ? (
+                                <img src={user.profile_picture} alt="Profile" className="w-full h-full object-cover" />
+                            ) : (
+                                user?.name?.charAt(0)?.toUpperCase()
+                            )}
                         </div>
                         {!isCollapsed && (
                             <div className="flex-1 min-w-0">
-                                <p className="text-[13px] font-heading font-semibold text-white truncate leading-tight">{user?.name}</p>
+                                <p className="text-[13px] font-heading font-semibold text-white truncate leading-tight group-hover/user:text-primary-light transition-colors">{user?.name}</p>
                                 <p className="text-[10px] text-slate-500 truncate mt-0.5">{user?.email}</p>
                             </div>
                         )}
@@ -157,27 +163,52 @@ const Sidebar = () => {
                             {/* Inner divider */}
                             <div className="h-px w-full bg-white/[0.05] my-3 relative z-10" />
 
-                            <button
-                                onClick={handleLogout}
-                                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[11px] font-semibold text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all duration-200 relative z-10 cursor-pointer border border-transparent hover:border-red-500/15 group/logout"
-                            >
-                                <LogOut className="w-3.5 h-3.5 transition-transform group-hover/logout:-translate-x-0.5" />
-                                <span>Sign out</span>
-                            </button>
+                            <div className="flex gap-2 relative z-10">
+                                <button
+                                    onClick={() => setShowEditProfile(true)}
+                                    title="Edit Profile"
+                                    className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-[11px] font-semibold text-slate-400 hover:text-white bg-white/[0.02] hover:bg-white/[0.06] rounded-lg border border-white/5 hover:border-white/10 transition-all duration-200 cursor-pointer"
+                                >
+                                    <Settings className="w-3.5 h-3.5" />
+                                    <span>Profile</span>
+                                </button>
+                                <button
+                                    onClick={handleLogout}
+                                    title="Sign out"
+                                    className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-[11px] font-semibold text-slate-400 hover:text-red-400 bg-white/[0.02] hover:bg-red-500/10 rounded-lg border border-white/5 hover:border-red-500/15 transition-all duration-200 cursor-pointer group/logout"
+                                >
+                                    <LogOut className="w-3.5 h-3.5 transition-transform group-hover/logout:-translate-x-0.5" />
+                                    <span>Logout</span>
+                                </button>
+                            </div>
                         </>
                     )}
 
                     {isCollapsed && (
-                        <button
-                            onClick={handleLogout}
-                            title="Sign out"
-                            className="mt-2 w-full flex items-center justify-center p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all z-10 cursor-pointer"
-                        >
-                            <LogOut className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="mt-3 space-y-2 relative z-10">
+                            <button
+                                onClick={() => setShowEditProfile(true)}
+                                title="Edit Profile"
+                                className="w-full flex items-center justify-center p-2.5 text-slate-400 hover:text-white bg-white/[0.02] hover:bg-white/[0.08] rounded-lg transition-all cursor-pointer border border-white/5"
+                            >
+                                <Settings className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                                onClick={handleLogout}
+                                title="Sign out"
+                                className="w-full flex items-center justify-center p-2.5 text-slate-400 hover:text-red-400 bg-white/[0.02] hover:bg-red-500/10 rounded-lg transition-all cursor-pointer border border-white/5 hover:border-red-500/15"
+                            >
+                                <LogOut className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
                     )}
                 </div>
             </div>
+
+            <EditProfileModal
+                isOpen={showEditProfile}
+                onClose={() => setShowEditProfile(false)}
+            />
         </aside>
     );
 };

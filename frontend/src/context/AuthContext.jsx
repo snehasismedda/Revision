@@ -26,13 +26,23 @@ export const AuthProvider = ({ children }) => {
         return data.user;
     };
 
+    const forgotPassword = async (info) => {
+        return await authApi.forgotPassword(info);
+    };
+
     const logout = async () => {
         await authApi.logout();
         setUser(null);
     };
 
+    const updateProfile = async (info) => {
+        const data = await authApi.updateProfile(info);
+        setUser(data.user);
+        return data.user;
+    };
+
     return (
-        <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+        <AuthContext.Provider value={{ user, loading, login, register, logout, updateProfile, forgotPassword }}>
             {children}
         </AuthContext.Provider>
     );

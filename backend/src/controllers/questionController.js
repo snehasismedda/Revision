@@ -43,18 +43,38 @@ export const getQuestionImage = async (req, res, next) => {
 export const createQuestion = async (req, res, next) => {
     try {
         const { subjectId } = req.params;
-        const { topicId, content, type } = req.body;
+        const { topicId, content, type, skipAI } = req.body;
 
         if (!content) {
             return res.status(400).json({ error: 'Content is required' });
         }
+
+        const typeValue = type === 'image' ? 'image' : 'text';
+
+        // Check for Skip AI
+        if (skipAI) {
+            let sourceImageId = null;
+            if (typeValue === 'image') {
+                const savedImage = await sourceImageModel.createSourceImage(subjectId, content);
+                sourceImageId = savedImage.id;
+            }
+
+            const [question] = await questionModel.createQuestions({
+                subject_id: subjectId,
+                topic_id: topicId,
+                content: typeValue === 'text' ? content : 'Captured Question',
+                type: typeValue,
+                source_image_id: sourceImageId,
+                tags: JSON.stringify([])
+            });
+            return res.status(201).json({ questions: [question] });
+        }
+
         const subjectTopics = await topicModel.findTopicsBySubject({ subjectId });
 
         const allParentIds = new Set(subjectTopics.map(t => t.parent_id).filter(id => id !== null));
         const leafTopics = subjectTopics.filter(t => !allParentIds.has(t.id));
         const topicNames = leafTopics.map(t => t.name);
-
-        const typeValue = type === 'image' ? 'image' : 'text';
 
         const parsedQuestions = await parseQuestionToRichText({
             content,

@@ -43,8 +43,10 @@ export const request = async (path, options = {}) => {
 export const authApi = {
     register: (body) => request('/auth/register', { method: 'POST', body }),
     login: (body) => request('/auth/login', { method: 'POST', body }),
+    forgotPassword: (body) => request('/auth/forgot-password', { method: 'POST', body }),
     logout: () => request('/auth/logout', { method: 'POST' }),
     me: () => request('/auth/me'),
+    updateProfile: (body) => request('/auth/me', { method: 'PUT', body }),
     refresh: () => request('/auth/refresh', { method: 'POST' }),
 };
 
