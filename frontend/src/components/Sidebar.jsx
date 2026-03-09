@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { LayoutDashboard, LibraryBig, LogOut, Sparkles, ChevronLeft, ChevronRight, Settings, Image as ImageIcon, Target } from 'lucide-react';
+import { LayoutDashboard, LibraryBig, LogOut, Activity, ChevronLeft, ChevronRight, Settings, Image as ImageIcon, Target } from 'lucide-react';
 import EditProfileModal from './modals/EditProfileModal.jsx';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const navItems = [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -21,12 +22,22 @@ const Sidebar = () => {
         const handleResize = () => {
             if (window.innerWidth < 768) {
                 setIsCollapsed(true);
-            } else {
-                setIsCollapsed(false);
             }
         };
+
+        const handleKeyDown = (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+                e.preventDefault();
+                setIsCollapsed(prev => !prev);
+            }
+        };
+
         window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            window.removeEventListener('keydown', handleKeyDown);
+        };
     }, []);
 
     const handleLogout = async () => {
@@ -36,41 +47,61 @@ const Sidebar = () => {
 
     return (
         <aside
-            className={`flex-shrink-0 flex flex-col backdrop-blur-xl h-[100dvh] sticky top-0 transition-all duration-300 ease-in-out group/sidebar
+            className={`flex-shrink-0 flex flex-col backdrop-blur-3xl h-[100dvh] sticky top-0 transition-all duration-500 ease-in-out group/sidebar z-[50]
             ${isCollapsed ? 'w-[80px]' : 'w-[260px]'}`}
             style={{
-                background: 'linear-gradient(180deg, rgba(22, 22, 32, 0.92) 0%, rgba(15, 15, 20, 0.96) 100%)',
-                borderRight: '1px solid rgba(255,255,255,0.05)',
+                background: 'linear-gradient(180deg, rgba(15, 15, 20, 0.98) 0%, rgba(10, 10, 15, 0.99) 100%)',
+                borderRight: '1px solid rgba(255,255,255,0.04)',
             }}
         >
-            {/* Toggle Button */}
-            <button
-                onClick={() => setIsCollapsed(!isCollapsed)}
-                className="absolute -right-3 top-10 w-6 h-6 rounded-full bg-primary border border-white/10 flex items-center justify-center text-white shadow-lg opacity-100 transition-opacity z-50 cursor-pointer hover:scale-110 hover:shadow-[0_0_12px_rgba(139,92,246,0.5)] active:scale-95"
-            >
-                {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
-            </button>
+            {/* Atmospheric Background Layers - Contained */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-40">
+                <div className="absolute top-[-10%] left-[-20%] w-[120%] h-[40%] bg-primary/5 blur-[120px] rounded-full animate-drift" />
+                <div className="absolute bottom-[-10%] right-[-20%] w-[100%] h-[40%] bg-indigo-500/5 blur-[100px] rounded-full animate-drift" style={{ animationDelay: '-5s' }} />
+            </div>
 
-            {/* Logo */}
-            <div className={`pt-7 pb-8 transition-all ${isCollapsed ? 'px-4' : 'px-7'}`}>
-                <div className="flex items-center gap-3 cursor-default group/logo">
-                    <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center shadow-[0_0_20px_rgba(139,92,246,0.35)] group-hover/logo:shadow-[0_0_28px_rgba(139,92,246,0.55)] transition-shadow duration-500">
-                        <Sparkles className="w-5 h-5 text-white" />
+            {/* Toggle Button */}
+            <div
+                className="absolute -right-4 top-10 z-[60] transition-all duration-300 opacity-100"
+            >
+                <button
+                    onClick={() => setIsCollapsed(!isCollapsed)}
+                    className="w-8 h-8 rounded-full bg-primary border border-white/20 flex items-center justify-center text-white shadow-[0_4px_12px_rgba(0,0,0,0.5)] cursor-pointer transition-all duration-300 hover:scale-110 active:scale-95 group/btn"
+                    title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                >
+                    <div className={`transition-transform duration-500 ${isCollapsed ? '' : 'rotate-180'}`}>
+                        <ChevronRight className="w-4 h-4" />
                     </div>
-                    {!isCollapsed && (
-                        <h1 className="text-lg font-heading font-bold tracking-tight text-white leading-tight">Revision AI</h1>
-                    )}
+                </button>
+            </div>
+
+            {/* Logo Section */}
+            <div className={`pt-7 pb-6 transition-all duration-300 z-10 ${isCollapsed ? 'px-3' : 'px-4'}`}>
+                <div
+                    className={`rounded-2xl relative overflow-hidden transition-all duration-500
+                        ${isCollapsed ? 'p-2' : 'p-3.5'}`}
+                    style={{
+                        background: 'linear-gradient(145deg, rgba(30, 30, 45, 0.4) 0%, rgba(15, 15, 25, 0.6) 100%)',
+                        border: '1px solid rgba(255,255,255,0.05)',
+                        boxShadow: '0 8px 32px -4px rgba(0,0,0,0.5)',
+                    }}
+                >
+                    <div className="flex items-center gap-3 cursor-default relative z-10">
+                        <div className="w-11 h-11 shrink-0 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center shadow-lg shadow-primary/30 relative overflow-hidden">
+                            <Activity className="w-6.5 h-6.5 text-white" />
+                        </div>
+                        {!isCollapsed && (
+                            <h1 className="text-xl font-heading font-bold tracking-tight text-white leading-tight">
+                                Prep<span className="text-primary">Tracker</span>
+                            </h1>
+                        )}
+                    </div>
                 </div>
             </div>
 
             {/* Nav */}
-            <nav className={`flex-1 transition-all ${isCollapsed ? 'px-3' : 'px-5'}`}>
-                {!isCollapsed && (
-                    <p className="px-4 text-[9px] font-extrabold text-slate-600 uppercase tracking-[0.2em] mb-5 select-none">
-                        Main Menu
-                    </p>
-                )}
-                <div className="space-y-1 font-sans">
+            <nav className={`flex-1 overflow-y-auto overflow-x-hidden pt-2 transition-all z-10 ${isCollapsed ? 'px-3' : 'px-4'}`}>
+                <div className="space-y-1.5 font-sans pb-4">
                     {navItems.map((item) => {
                         const Icon = item.icon;
                         return (
@@ -80,38 +111,40 @@ const Sidebar = () => {
                                 to={item.to}
                                 end={item.to === '/'}
                                 className={({ isActive }) =>
-                                    `flex items-center text-[13px] font-semibold transition-all duration-200 relative overflow-hidden
-                                    ${isActive
-                                        ? 'text-white'
-                                        : 'text-slate-500 hover:text-slate-200'
-                                    }
-                                    ${isCollapsed
-                                        ? `justify-center p-3 rounded-xl ${isActive ? 'bg-primary/[0.12]' : 'hover:bg-white/[0.04]'}`
-                                        : `gap-3.5 px-4 py-2.5 mx-2 rounded-lg ${isActive ? 'bg-primary/[0.10]' : 'hover:bg-white/[0.04]'}`
-                                    }`
+                                    `flex items-center text-[13px] font-semibold transition-all duration-300 relative rounded-xl group/nav
+                                    ${isActive ? 'text-white' : 'text-slate-400 hover:text-slate-100'}
+                                    ${isCollapsed ? 'justify-center p-3' : 'gap-3.5 px-4 py-2.5 mx-1'}`
                                 }
+                                onClick={() => {
+                                    if (window.innerWidth < 768) setIsCollapsed(true);
+                                }}
                             >
                                 {({ isActive }) => (
                                     <>
-                                        {/* Vertical accent bar — left edge */}
+                                        {/* Simple Selection Indicator */}
                                         {isActive && (
-                                            <div
-                                                className="absolute left-0 top-[15%] bottom-[15%] w-[3px] rounded-r-full bg-primary"
-                                                style={{ boxShadow: '0 0 8px rgba(139,92,246,0.8), 0 0 20px rgba(139,92,246,0.3)' }}
+                                            <motion.div
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                className="absolute inset-0 bg-primary/15 border border-primary/20 backdrop-blur-md shadow-[0_8px_32px_-8px_rgba(139,92,246,0.3)] rounded-xl z-0"
                                             />
                                         )}
-                                        {/* Soft hover glow overlay */}
-                                        <div className="absolute inset-0 bg-gradient-to-r from-primary/[0.06] to-transparent opacity-0 hover:opacity-100 transition-opacity pointer-events-none" />
+
+                                        {/* Glass Glow Edge */}
+                                        {isActive && (
+                                            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary-light/40 to-transparent z-10" />
+                                        )}
 
                                         <Icon
-                                            className={`shrink-0 w-[18px] h-[18px] transition-all duration-200 ${isActive ? 'text-primary-light' : ''}`}
+                                            className={`shrink-0 w-[18px] h-[18px] transition-all duration-300 relative z-10 ${isActive ? 'text-primary-light' : 'group-hover/nav:text-primary-light'}`}
                                             strokeWidth={isActive ? 2.4 : 1.8}
                                         />
                                         {!isCollapsed && (
-                                            <span className={`transition-colors duration-200 ${isActive ? 'tracking-tight' : ''}`}>
+                                            <span className={`transition-colors duration-200 relative z-10 ${isActive ? 'tracking-tight text-white' : ''}`}>
                                                 {item.label}
                                             </span>
                                         )}
+
                                     </>
                                 )}
                             </NavLink>
@@ -121,84 +154,74 @@ const Sidebar = () => {
             </nav>
 
             {/* User Profile Section */}
-            <div className={`mt-auto transition-all ${isCollapsed ? 'px-3 pb-5' : 'px-5 pb-6'}`}>
-                {/* Gradient divider to separate profile from nav */}
-                <div className="h-px w-full bg-gradient-to-r from-transparent via-white/[0.07] to-transparent mb-5" />
+            <div className={`mt-auto transition-all duration-300 z-10 ${isCollapsed ? 'px-3 pb-4' : 'px-4 pb-4'}`}>
+                <div className="h-px w-full bg-gradient-to-r from-transparent via-white/[0.08] to-transparent mb-4" />
 
                 <div
-                    className={`rounded-xl relative overflow-hidden group/user transition-all
-                        ${isCollapsed ? 'p-2.5' : 'p-4'}`}
+                    className={`rounded-2xl relative overflow-hidden transition-all duration-500
+                        ${isCollapsed ? 'p-2' : 'p-3.5'}`}
                     style={{
-                        background: 'rgba(30, 30, 44, 0.45)',
-                        border: '1px solid rgba(255,255,255,0.06)',
+                        background: 'linear-gradient(145deg, rgba(30, 30, 45, 0.4) 0%, rgba(15, 15, 25, 0.6) 100%)',
+                        border: '1px solid rgba(255,255,255,0.05)',
+                        boxShadow: '0 8px 32px -4px rgba(0,0,0,0.5)',
                     }}
                 >
-                    {/* Hover glow */}
-                    <div className="absolute inset-0 bg-gradient-to-tr from-primary/[0.05] to-transparent opacity-0 group-hover/user:opacity-100 transition-opacity duration-500 pointer-events-none" />
-
-                    <div className={`flex items-center relative z-10 ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
-                        {/* Avatar with purple accent glow */}
-                        <div
-                            className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-sm font-heading font-bold text-white overflow-hidden transition-all ${!user?.profile_picture ? 'bg-gradient-to-tr from-primary to-indigo-500' : 'bg-surface-2'}`}
-                            style={{
-                                boxShadow: '0 0 0 2px rgba(139,92,246,0.25), inset 0 1px 2px rgba(0,0,0,0.3)',
-                            }}
-                        >
-                            {user?.profile_picture ? (
-                                <img src={user.profile_picture} alt="Profile" className="w-full h-full object-cover" />
-                            ) : (
-                                user?.name?.charAt(0)?.toUpperCase()
-                            )}
+                    <div className="flex items-center relative z-10 ${isCollapsed ? 'justify-center' : 'gap-3'}">
+                        <div className="relative">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-heading font-bold text-white overflow-hidden bg-gradient-to-tr from-primary to-indigo-500 shadow-lg shadow-primary/30`}>
+                                {user?.profile_picture ? (
+                                    <img src={user.profile_picture} alt="Profile" className="w-full h-full object-cover" />
+                                ) : (
+                                    user?.name?.charAt(0)?.toUpperCase()
+                                )}
+                            </div>
+                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-[#0c0c14] rounded-full flex items-center justify-center border border-white/5">
+                                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                            </div>
                         </div>
+
                         {!isCollapsed && (
-                            <div className="flex-1 min-w-0">
-                                <p className="text-[13px] font-heading font-semibold text-white truncate leading-tight group-hover/user:text-primary-light transition-colors">{user?.name}</p>
-                                <p className="text-[10px] text-slate-500 truncate mt-0.5">{user?.email}</p>
+                            <div className="flex-1 min-w-0 ml-3">
+                                <p className="text-[13px] font-heading font-bold text-white truncate leading-tight">{user?.name}</p>
+                                <p className="text-[10px] text-slate-500 truncate mt-1 font-medium">{user?.email}</p>
                             </div>
                         )}
                     </div>
 
                     {!isCollapsed && (
-                        <>
-                            {/* Inner divider */}
-                            <div className="h-px w-full bg-white/[0.05] my-3 relative z-10" />
-
-                            <div className="flex gap-2 relative z-10">
-                                <button
-                                    onClick={() => setShowEditProfile(true)}
-                                    title="Edit Profile"
-                                    className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-[11px] font-semibold text-slate-400 hover:text-white bg-white/[0.02] hover:bg-white/[0.06] rounded-lg border border-white/5 hover:border-white/10 transition-all duration-200 cursor-pointer"
-                                >
-                                    <Settings className="w-3.5 h-3.5" />
-                                    <span>Profile</span>
-                                </button>
-                                <button
-                                    onClick={handleLogout}
-                                    title="Sign out"
-                                    className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-[11px] font-semibold text-slate-400 hover:text-red-400 bg-white/[0.02] hover:bg-red-500/10 rounded-lg border border-white/5 hover:border-red-500/15 transition-all duration-200 cursor-pointer group/logout"
-                                >
-                                    <LogOut className="w-3.5 h-3.5 transition-transform group-hover/logout:-translate-x-0.5" />
-                                    <span>Logout</span>
-                                </button>
-                            </div>
-                        </>
-                    )}
-
-                    {isCollapsed && (
-                        <div className="mt-3 space-y-2 relative z-10">
+                        <div className="mt-3 flex gap-2 relative z-10">
                             <button
                                 onClick={() => setShowEditProfile(true)}
-                                title="Edit Profile"
-                                className="w-full flex items-center justify-center p-2.5 text-slate-400 hover:text-white bg-white/[0.02] hover:bg-white/[0.08] rounded-lg transition-all cursor-pointer border border-white/5"
+                                className="flex-1 flex items-center justify-center gap-2 px-2 py-2 text-[11px] font-bold text-slate-300 bg-white/[0.05] rounded-xl border border-white/5 transition-all hover:bg-white/[0.1] hover:text-white cursor-pointer"
                             >
                                 <Settings className="w-3.5 h-3.5" />
+                                <span>Settings</span>
                             </button>
                             <button
                                 onClick={handleLogout}
-                                title="Sign out"
-                                className="w-full flex items-center justify-center p-2.5 text-slate-400 hover:text-red-400 bg-white/[0.02] hover:bg-red-500/10 rounded-lg transition-all cursor-pointer border border-white/5 hover:border-red-500/15"
+                                className="flex-1 flex items-center justify-center gap-2 px-2 py-2 text-[11px] font-bold text-slate-300 bg-white/[0.05] rounded-xl border border-white/5 transition-all hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 cursor-pointer"
                             >
                                 <LogOut className="w-3.5 h-3.5" />
+                                <span>Logout</span>
+                            </button>
+                        </div>
+                    )}
+
+                    {isCollapsed && (
+                        <div className="mt-4 space-y-2 relative z-10">
+                            <button
+                                onClick={() => setShowEditProfile(true)}
+                                title="Settings"
+                                className="w-full flex items-center justify-center p-2.5 text-slate-400 bg-white/[0.03] rounded-xl hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer border border-white/5"
+                            >
+                                <Settings className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={handleLogout}
+                                title="Logout"
+                                className="w-full flex items-center justify-center p-2.5 text-slate-400 bg-white/[0.03] rounded-xl hover:bg-red-500/10 hover:text-red-400 transition-all cursor-pointer border border-white/5"
+                            >
+                                <LogOut className="w-4 h-4" />
                             </button>
                         </div>
                     )}

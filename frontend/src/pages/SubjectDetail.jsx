@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { subjectsApi, topicsApi, sessionsApi, questionsApi, notesApi, imagesApi, aiApi, revisionApi } from '../api/index.js';
 import TopicTree from '../components/TopicTree.jsx';
 import SessionCard from '../components/SessionCard.jsx';
@@ -55,9 +55,11 @@ const preprocessMarkdown = (text) => {
         .replace(/([^\n])\n([^\n])/g, '$1\n\n$2');
 };
 
+
 const SubjectDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [subject, setSubject] = useState(null);
     const [topics, setTopics] = useState([]);
     const [sessions, setSessions] = useState([]);
@@ -908,6 +910,33 @@ const SubjectDetail = () => {
         };
         load();
     }, [id, navigate]);
+
+    // Handle deep linking from query params
+    useEffect(() => {
+        if (loading) return;
+
+        const tab = searchParams.get('tab');
+        const contentId = searchParams.get('id') || searchParams.get('questionId') || searchParams.get('noteId');
+
+        if (tab) {
+            setActiveTab(tab);
+
+            // If it's a question or note, we might need a small delay to ensure the tab's content is rendered
+            if (contentId) {
+                setTimeout(() => {
+                    if (tab === 'questions') {
+                        navigateToQuestion(contentId);
+                    } else if (tab === 'notes') {
+                        const note = notes.find(n => n.id.toString() === contentId.toString());
+                        if (note) {
+                            setViewingNote(note);
+                            if (note.source_image_id) handleFetchNoteImage(note.id);
+                        }
+                    }
+                }, 300);
+            }
+        }
+    }, [loading, searchParams, notes]);
 
     const handleTopicDeleted = (topicId) => {
         const removeFromTree = (nodes) =>

@@ -633,10 +633,10 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                         onClose();
                                         onNavigateToQuestion(note.question_id);
                                     }}
-                                    className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-semibold text-indigo-400 hover:bg-indigo-500/10 hover:text-indigo-300 transition-all border border-transparent hover:border-indigo-500/20"
+                                    className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-semibold text-indigo-400 hover:bg-indigo-500/10 hover:text-indigo-300 transition-all border border-transparent hover:border-indigo-500/20 cursor-pointer"
                                 >
                                     <LinkIcon className="w-4 h-4" />
-                                    <span>Source Details</span>
+                                    <span>{note.is_note_link ? 'View Note' : 'View Question'}</span>
                                 </button>
                             )}
                             {onEdit && (

@@ -27,14 +27,14 @@ export const sendPasswordResetEmail = async (toEmail, newPassword) => {
         const mailTransporter = await createTransporter();
 
         const info = await mailTransporter.sendMail({
-            from: '"Revision AI" <noreply@revision.ai>',
+            from: '"PrepTracker" <noreply@preptracker.ai>',
             to: toEmail,
             subject: 'Your New Password Request',
             text: `Hello, you requested a password reset. Your new temporary password is: ${newPassword}\nPlease login and change your password in the Profile section.`,
             html: `
                 <div style="font-family: 'Inter', system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; background-color: #0f172a; color: #f8fafc; border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1);">
                     <div style="padding: 40px 20px; text-align: center; background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);">
-                        <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.025em; color: white;">Revision AI</h1>
+                        <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.025em; color: white;">PrepTracker</h1>
                         <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.8); font-size: 14px;">Master your concepts intelligently</p>
                     </div>
                     
@@ -57,7 +57,7 @@ export const sendPasswordResetEmail = async (toEmail, newPassword) => {
                         <div style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 24px;">
                             <p style="margin: 0; font-size: 14px; color: #94a3b8;">
                                 Best regards,<br>
-                                <strong style="color: #ffffff;">The Revision AI Team</strong>
+                                <strong style="color: #ffffff;">The PrepTracker Team</strong>
                             </p>
                         </div>
                     </div>
