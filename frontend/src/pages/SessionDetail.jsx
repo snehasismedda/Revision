@@ -174,13 +174,15 @@ const SessionDetail = () => {
                     Back
                 </Link>
                 <div className="flex items-center gap-2">
-                    <Link
-                        to={`/subjects/${subjectId}/sessions/${id}/tag`}
-                        className="flex items-center gap-2 text-[13px] font-semibold text-slate-300 hover:text-white transition-all bg-white/5 hover:bg-white/10 px-4 py-2 rounded-lg border border-white/5"
-                    >
-                        <Tags className="w-4 h-4 text-indigo-400" />
-                        Tag Topics
-                    </Link>
+                    {!session.testId && (
+                        <Link
+                            to={`/subjects/${subjectId}/sessions/${id}/tag`}
+                            className="flex items-center gap-2 text-[13px] font-semibold text-slate-300 hover:text-white transition-all bg-white/5 hover:bg-white/10 px-4 py-2 rounded-lg border border-white/5"
+                        >
+                            <Tags className="w-4 h-4 text-indigo-400" />
+                            Tag Topics
+                        </Link>
+                    )}
                     <button
                         onClick={() => setShowConfirm(true)}
                         className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all cursor-pointer border border-transparent hover:border-red-500/10"

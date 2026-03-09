@@ -280,266 +280,260 @@ const TestDetail = () => {
     }
 
     return (
-        <div className="flex-1 min-w-0 flex flex-col h-[100dvh]">
-            <header className="flex-shrink-0 border-b border-white/5 bg-[#0f0f1a]/80 backdrop-blur-md sticky top-0 z-20">
-                <div className="px-6 py-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                        <button
-                            onClick={() => navigate(`/tests/${seriesId}`)}
-                            className="w-10 h-10 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] flex items-center justify-center transition-colors border border-white/10"
-                        >
-                            <ArrowLeft className="w-5 h-5 text-slate-300" />
-                        </button>
-                        <div>
-                            <div className="flex items-center gap-2 mb-1">
-                                <div className="w-6 h-6 rounded bg-pink-500/10 flex items-center justify-center">
-                                    <Target className="w-3.5 h-3.5 text-pink-400" />
-                                </div>
-                                <h1 className="text-xl font-heading font-bold text-white leading-tight">
-                                    {testData.name}{" "}
-                                    <span className="opacity-50 font-medium text-lg ml-2">
-                                        {series.name}
-                                    </span>
-                                </h1>
-                            </div>
-                            <div className="flex items-center gap-2 text-slate-400 text-sm">
-                                <Calendar className="w-4 h-4 text-emerald-400" />
-                                <span>{new Date(testData.test_date).toLocaleDateString()}</span>
-                            </div>
+        <div className="fade-in max-w-6xl mx-auto">
+            {/* Back Button Row */}
+            <div className="flex items-center gap-3 mb-4">
+                <button
+                    onClick={() => navigate(`/tests/${seriesId}`)}
+                    className="flex items-center gap-2 text-[13px] font-semibold text-slate-400 hover:text-white transition-all hover:bg-white/[0.06] px-3 py-1.5 rounded-lg border border-white/[0.06] hover:border-white/[0.1] transition-all cursor-pointer"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Back</span>
+                </button>
+            </div>
+
+            {/* Header Content */}
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-8">
+                <div>
+                    <h1 className="text-[22px] md:text-[24px] font-heading font-semibold text-white tracking-tight leading-tight mb-2">
+                        {testData?.name || 'Mock Test'}
+                    </h1>
+                    <div className="flex items-center gap-2 text-slate-500 text-[14px] ml-0.5">
+                        <Calendar className="w-4 h-4 text-emerald-500/80" />
+                        <span>{testData?.test_date ? new Date(testData.test_date).toLocaleDateString() : 'No date'}</span>
+                        <span className="mx-2 opacity-20">•</span>
+                        <span className="text-slate-500/80 font-medium">{series?.name}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div className="space-y-6">
+                {/* Marks Entry block */}
+                <div className="glass p-6 rounded-3xl border border-white/10 shadow-xl">
+                    <h2 className="text-lg font-heading font-semibold text-white mb-6">
+                        Test Score
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-400">
+                                Total Possible Score
+                            </label>
+                            <input
+                                type="number"
+                                value={totalScore}
+                                onChange={(e) => setTotalScore(e.target.value)}
+                                className="w-full h-11 px-4 bg-white/[0.03] border border-white/10 rounded-xl text-white text-lg focus:outline-none focus:border-pink-500/50 transition-colors"
+                                placeholder="e.g. 100"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-400">
+                                Your Score Achieved
+                            </label>
+                            <input
+                                type="number"
+                                value={myScore}
+                                onChange={(e) => setMyScore(e.target.value)}
+                                className="w-full h-11 px-4 bg-emerald-500/[0.05] border border-emerald-500/20 rounded-xl text-emerald-400 text-lg font-bold focus:outline-none focus:border-emerald-500/50 transition-colors"
+                                placeholder="e.g. 85"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-400">
+                                Total Questions Attempted
+                            </label>
+                            <input
+                                type="number"
+                                value={totalQs}
+                                onChange={(e) => setTotalQs(e.target.value)}
+                                // Auto-generate empty fields based on expected total questions
+
+                                onBlur={(e) => {
+                                    const count = parseInt(e.target.value) || 0;
+                                    if (count === questions.length) return;
+                                    if (count < questions.length) {
+                                        if (window.confirm(`This will remove the last ${questions.length - count} questions. Continue?`)) {
+                                            setQuestions(prev => prev.slice(0, count));
+                                        } else {
+                                            setTotalQs(questions.length.toString());
+                                        }
+                                    } else {
+                                        const defaultSubjectId = testData?.subjects?.[0]?.id || "";
+                                        const needed = count - questions.length;
+                                        const newQs = [];
+                                        for (let i = 0; i < needed; i++) {
+                                            newQs.push({
+                                                id: `q-${Date.now()}-${Math.random()}-${questions.length + i}`,
+                                                subject_id: defaultSubjectId,
+                                                topic_ids: [],
+                                                is_correct: true,
+                                            });
+                                        }
+                                        setQuestions(prev => [...prev, ...newQs]);
+                                    }
+                                }}
+
+                                className="w-full h-11 px-4 bg-white/[0.03] border border-white/10 rounded-xl text-white text-lg focus:outline-none focus:border-pink-500/50 transition-colors"
+                                placeholder="e.g. 25"
+                            />
                         </div>
                     </div>
                 </div>
-            </header>
 
-            <main className="flex-1 overflow-y-auto w-full p-6">
-                <div className="max-w-[1000px] mx-auto space-y-6">
-                    {/* Marks Entry block */}
-                    <div className="glass p-6 rounded-3xl border border-white/10 shadow-xl">
-                        <h2 className="text-lg font-heading font-semibold text-white mb-6">
-                            Test Score
-                        </h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-slate-400">
-                                    Total Possible Score
-                                </label>
-                                <input
-                                    type="number"
-                                    value={totalScore}
-                                    onChange={(e) => setTotalScore(e.target.value)}
-                                    className="w-full h-11 px-4 bg-white/[0.03] border border-white/10 rounded-xl text-white text-lg focus:outline-none focus:border-pink-500/50 transition-colors"
-                                    placeholder="e.g. 100"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-slate-400">
-                                    Your Score Achieved
-                                </label>
-                                <input
-                                    type="number"
-                                    value={myScore}
-                                    onChange={(e) => setMyScore(e.target.value)}
-                                    className="w-full h-11 px-4 bg-emerald-500/[0.05] border border-emerald-500/20 rounded-xl text-emerald-400 text-lg font-bold focus:outline-none focus:border-emerald-500/50 transition-colors"
-                                    placeholder="e.g. 85"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-slate-400">
-                                    Total Questions Attempted
-                                </label>
-                                <input
-                                    type="number"
-                                    value={totalQs}
-                                    onChange={(e) => setTotalQs(e.target.value)}
-                                    // Auto-generate empty fields based on expected total questions
-
-                                    onBlur={(e) => {
-                                        const count = parseInt(e.target.value) || 0;
-                                        if (count === questions.length) return;
-                                        if (count < questions.length) {
-                                            if (window.confirm(`This will remove the last ${questions.length - count} questions. Continue?`)) {
-                                                setQuestions(prev => prev.slice(0, count));
-                                            } else {
-                                                setTotalQs(questions.length.toString());
-                                            }
-                                        } else {
-                                            const defaultSubjectId = testData?.subjects?.[0]?.id || "";
-                                            const needed = count - questions.length;
-                                            const newQs = [];
-                                            for (let i = 0; i < needed; i++) {
-                                                newQs.push({
-                                                    id: `q-${Date.now()}-${Math.random()}-${questions.length + i}`,
-                                                    subject_id: defaultSubjectId,
-                                                    topic_ids: [],
-                                                    is_correct: true,
-                                                });
-                                            }
-                                            setQuestions(prev => [...prev, ...newQs]);
-                                        }
-                                    }}
-
-                                    className="w-full h-11 px-4 bg-white/[0.03] border border-white/10 rounded-xl text-white text-lg focus:outline-none focus:border-pink-500/50 transition-colors"
-                                    placeholder="e.g. 25"
-                                />
-                            </div>
+                {/* Question Breakdown Block */}
+                <div className="glass p-6 rounded-3xl border border-white/10 shadow-xl space-y-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="text-lg font-heading font-semibold text-white">
+                                Question Breakdown
+                            </h2>
+                            <p className="text-sm text-slate-400 mt-1">
+                                Tag multiple topics per question to fuel your global subject
+                                analytics
+                            </p>
                         </div>
+                        <button
+                            onClick={handleAddQuestion}
+                            className="h-10 px-4 rounded-xl bg-pink-500/10 hover:bg-pink-500/20 text-pink-400 font-medium text-sm transition-colors border border-pink-400/20 flex items-center gap-2"
+                        >
+                            <Plus className="w-4 h-4" /> Add Question
+                        </button>
                     </div>
 
-                    {/* Question Breakdown Block */}
-                    <div className="glass p-6 rounded-3xl border border-white/10 shadow-xl space-y-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h2 className="text-lg font-heading font-semibold text-white">
-                                    Question Breakdown
-                                </h2>
-                                <p className="text-sm text-slate-400 mt-1">
-                                    Tag multiple topics per question to fuel your global subject
-                                    analytics
+                    <div className="space-y-3">
+                        {questions.length === 0 ? (
+                            <div className="text-center py-10 border-2 border-dashed border-white/5 rounded-2xl">
+                                <p className="text-slate-500 text-sm">
+                                    No questions added yet.
+                                    <br />
+                                    Type in Total Questions to automatically generate fields, or
+                                    click above.
                                 </p>
                             </div>
-                            <button
-                                onClick={handleAddQuestion}
-                                className="h-10 px-4 rounded-xl bg-pink-500/10 hover:bg-pink-500/20 text-pink-400 font-medium text-sm transition-colors border border-pink-400/20 flex items-center gap-2"
-                            >
-                                <Plus className="w-4 h-4" /> Add Question
-                            </button>
-                        </div>
+                        ) : (
+                            questions.map((q, index) => {
+                                const availableTopics = topicsBySubject[q.subject_id] || [];
+                                return (
+                                    <div
+                                        key={q.id}
+                                        className="flex flex-col sm:flex-row gap-3 items-center bg-white/[0.02] border border-white/10 p-3 rounded-xl hover:border-pink-500/30 transition-colors"
+                                    >
+                                        <span className="text-xs font-bold text-slate-500 w-6">
+                                            Q{index + 1}
+                                        </span>
 
-                        <div className="space-y-3">
-                            {questions.length === 0 ? (
-                                <div className="text-center py-10 border-2 border-dashed border-white/5 rounded-2xl">
-                                    <p className="text-slate-500 text-sm">
-                                        No questions added yet.
-                                        <br />
-                                        Type in Total Questions to automatically generate fields, or
-                                        click above.
-                                    </p>
-                                </div>
-                            ) : (
-                                questions.map((q, index) => {
-                                    const availableTopics = topicsBySubject[q.subject_id] || [];
-                                    return (
-                                        <div
-                                            key={q.id}
-                                            className="flex flex-col sm:flex-row gap-3 items-center bg-white/[0.02] border border-white/10 p-3 rounded-xl hover:border-pink-500/30 transition-colors"
+                                        <select
+                                            value={q.subject_id}
+                                            onChange={(e) =>
+                                                handleUpdateQuestion(
+                                                    q.id,
+                                                    "subject_id",
+                                                    e.target.value,
+                                                )
+                                            }
+                                            className="flex-1 min-w-[140px] h-10 px-3 bg-[#0f0f1a] border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-pink-500/50 custom-select"
                                         >
-                                            <span className="text-xs font-bold text-slate-500 w-6">
-                                                Q{index + 1}
-                                            </span>
-
-                                            <select
-                                                value={q.subject_id}
-                                                onChange={(e) =>
-                                                    handleUpdateQuestion(
-                                                        q.id,
-                                                        "subject_id",
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                className="flex-1 min-w-[140px] h-10 px-3 bg-[#0f0f1a] border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-pink-500/50 custom-select"
-                                            >
-                                                <option value="" disabled>
-                                                    Select Subject
+                                            <option value="" disabled>
+                                                Select Subject
+                                            </option>
+                                            {testData.subjects?.map((s) => (
+                                                <option key={s.id} value={s.id}>
+                                                    {s.name}
                                                 </option>
-                                                {testData.subjects?.map((s) => (
-                                                    <option key={s.id} value={s.id}>
-                                                        {s.name}
-                                                    </option>
-                                                ))}
-                                            </select>
+                                            ))}
+                                        </select>
 
-                                            <TopicMultiSelect
-                                                options={availableTopics}
-                                                value={q.topic_ids}
-                                                onChange={(newVal) =>
-                                                    handleUpdateQuestion(q.id, "topic_ids", newVal)
-                                                }
-                                            />
+                                        <TopicMultiSelect
+                                            options={availableTopics}
+                                            value={q.topic_ids}
+                                            onChange={(newVal) =>
+                                                handleUpdateQuestion(q.id, "topic_ids", newVal)
+                                            }
+                                        />
 
-                                            <button
-                                                onClick={() =>
-                                                    handleUpdateQuestion(
-                                                        q.id,
-                                                        "is_correct",
-                                                        !q.is_correct,
-                                                    )
-                                                }
-                                                className={`w-[120px] h-10 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors ${q.is_correct
-                                                    ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20"
-                                                    : "bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20"
-                                                    }`}
-                                            >
-                                                {q.is_correct ? (
-                                                    <CheckSquare className="w-4 h-4" />
-                                                ) : (
-                                                    <XSquare className="w-4 h-4" />
-                                                )}
-                                                {q.is_correct ? "Correct" : "Incorrect"}
-                                            </button>
+                                        <button
+                                            onClick={() =>
+                                                handleUpdateQuestion(
+                                                    q.id,
+                                                    "is_correct",
+                                                    !q.is_correct,
+                                                )
+                                            }
+                                            className={`w-[120px] h-10 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors ${q.is_correct
+                                                ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20"
+                                                : "bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20"
+                                                }`}
+                                        >
+                                            {q.is_correct ? (
+                                                <CheckSquare className="w-4 h-4" />
+                                            ) : (
+                                                <XSquare className="w-4 h-4" />
+                                            )}
+                                            {q.is_correct ? "Correct" : "Incorrect"}
+                                        </button>
 
-                                            <button
-                                                onClick={() => handleRemoveQuestion(q.id)}
-                                                className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors border border-transparent hover:border-rose-500/20"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
+                                        <button
+                                            onClick={() => handleRemoveQuestion(q.id)}
+                                            className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors border border-transparent hover:border-rose-500/20"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
+
+                <button
+                    onClick={handleSaveResults}
+                    disabled={saving || !totalScore || !myScore || !totalQs}
+                    className="w-full h-14 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 text-white font-semibold flex items-center justify-center gap-3 transition-all disabled:opacity-50 disabled:grayscale shadow-[0_4px_20px_-5px_rgba(236,72,153,0.4)]"
+                >
+                    <Save className="w-5 h-5" />
+                    <span className="text-lg">Log This Attempt</span>
+                </button>
+
+                {/* Past Attempts Section */}
+                {testData.results && testData.results.length > 0 && (
+                    <div className="mt-12 space-y-4">
+                        <h2 className="text-xl font-heading font-bold text-white flex items-center gap-2">
+                            Past Attempts <span className="px-2 py-0.5 rounded-full bg-white/10 text-xs text-white/70">{testData.results.length}</span>
+                        </h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {testData.results.map((result, idx) => {
+                                const percent = Math.round((result.my_score / result.total_score) * 100) || 0;
+                                const attemptNumber = testData.results.length - idx;
+
+                                return (
+                                    <div key={result.id} className="glass p-5 rounded-2xl border border-white/5 relative overflow-hidden group">
+                                        <div className="absolute top-0 left-0 w-1 h-full bg-pink-500/50"></div>
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                                <p className="text-xs text-slate-400 font-medium">Attempt #{attemptNumber}</p>
+                                                <p className="text-sm font-semibold text-white mt-0.5">{new Date(result.created_at).toLocaleDateString()}</p>
+                                            </div>
+                                            <div className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold text-sm">
+                                                {percent}%
+                                            </div>
                                         </div>
-                                    );
-                                })
-                            )}
+
+                                        <div className="flex items-end gap-2 mb-4 mt-2">
+                                            <span className="text-3xl font-heading font-bold text-white leading-none">{result.my_score}</span>
+                                            <span className="text-sm text-slate-400 font-medium mb-1">/ {result.total_score}</span>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-pink-500/50"></div>
+                                            {result.total_qs} Questions Attempted
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
-
-                    <button
-                        onClick={handleSaveResults}
-                        disabled={saving || !totalScore || !myScore || !totalQs}
-                        className="w-full h-14 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 text-white font-semibold flex items-center justify-center gap-3 transition-all disabled:opacity-50 disabled:grayscale shadow-[0_4px_20px_-5px_rgba(236,72,153,0.4)]"
-                    >
-                        <Save className="w-5 h-5" />
-                        <span className="text-lg">Log This Attempt</span>
-                    </button>
-
-                    {/* Past Attempts Section */}
-                    {testData.results && testData.results.length > 0 && (
-                        <div className="mt-12 space-y-4">
-                            <h2 className="text-xl font-heading font-bold text-white flex items-center gap-2">
-                                Past Attempts <span className="px-2 py-0.5 rounded-full bg-white/10 text-xs text-white/70">{testData.results.length}</span>
-                            </h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {testData.results.map((result, idx) => {
-                                    const percent = Math.round((result.my_score / result.total_score) * 100) || 0;
-                                    const attemptNumber = testData.results.length - idx;
-
-                                    return (
-                                        <div key={result.id} className="glass p-5 rounded-2xl border border-white/5 relative overflow-hidden group">
-                                            <div className="absolute top-0 left-0 w-1 h-full bg-pink-500/50"></div>
-                                            <div className="flex justify-between items-start mb-4">
-                                                <div>
-                                                    <p className="text-xs text-slate-400 font-medium">Attempt #{attemptNumber}</p>
-                                                    <p className="text-sm font-semibold text-white mt-0.5">{new Date(result.created_at).toLocaleDateString()}</p>
-                                                </div>
-                                                <div className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold text-sm">
-                                                    {percent}%
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-end gap-2 mb-4 mt-2">
-                                                <span className="text-3xl font-heading font-bold text-white leading-none">{result.my_score}</span>
-                                                <span className="text-sm text-slate-400 font-medium mb-1">/ {result.total_score}</span>
-                                            </div>
-
-                                            <div className="flex items-center gap-2 text-xs text-slate-500">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-pink-500/50"></div>
-                                                {result.total_qs} Questions Attempted
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </main>
+                )}
+            </div>
         </div>
     );
 };

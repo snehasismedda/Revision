@@ -153,14 +153,16 @@ const SessionCard = ({ subjectId, session, onDelete, onEdit, viewMode = 'grid' }
                         <BarChart3 className="w-3.5 h-3.5 text-indigo-400" />
                         <span className={isList ? 'hidden sm:inline' : ''}>Analytics</span>
                     </button>
-                    <button
-                        onClick={(e) => { e.stopPropagation(); navigate(`/subjects/${subjectId}/sessions/${session.id}/tag`); }}
-                        className={`flex items-center gap-1.5 rounded-lg text-[11px] font-semibold text-primary hover:text-white hover:bg-primary/15 border border-primary/20 hover:border-primary/40 transition-all cursor-pointer ${isList ? 'p-1.5 sm:px-3 sm:py-1.5' : 'px-3 py-1.5'}`}
-                        title="Tag Topics"
-                    >
-                        <Tags className="w-3.5 h-3.5" />
-                        <span className={isList ? 'hidden sm:inline' : ''}>Tag Topics</span>
-                    </button>
+                    {!session.testId && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); navigate(`/subjects/${subjectId}/sessions/${session.id}/tag`); }}
+                            className={`flex items-center gap-1.5 rounded-lg text-[11px] font-semibold text-primary hover:text-white hover:bg-primary/15 border border-primary/20 hover:border-primary/40 transition-all cursor-pointer ${isList ? 'p-1.5 sm:px-3 sm:py-1.5' : 'px-3 py-1.5'}`}
+                            title="Tag Topics"
+                        >
+                            <Tags className="w-3.5 h-3.5" />
+                            <span className={isList ? 'hidden sm:inline' : ''}>Tag Topics</span>
+                        </button>
+                    )}
                 </div>
 
                 {!isList && <div className="flex-1" />}

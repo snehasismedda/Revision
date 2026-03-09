@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Target, ArrowLeft, Plus, Calendar, Activity, TrendingUp, TrendingDown, BookOpen, Trash2, Edit2, ChevronRight, X, Brain, CheckCircle2 } from 'lucide-react';
+import { Target, ArrowLeft, Plus, Calendar, Activity, TrendingUp, TrendingDown, BookOpen, Trash2, Edit2, ChevronRight, X, Brain, CheckCircle2, BarChart3, Notebook } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 
 import * as testSeriesApi from '../api/testSeriesApi';
@@ -10,6 +10,8 @@ import CreateTestModal from '../components/modals/CreateTestModal';
 import toast from 'react-hot-toast';
 
 
+
+import ModalPortal from '../components/ModalPortal.jsx';
 
 const TestSeriesDetail = () => {
     const { seriesId } = useParams();
@@ -88,8 +90,19 @@ const TestSeriesDetail = () => {
 
     if (loading) {
         return (
-            <div className="flex-1 flex items-center justify-center h-[100dvh]">
-                <div className="w-8 h-8 rounded-full border-2 border-pink-500 border-t-transparent animate-spin"></div>
+            <div className="fade-in max-w-6xl mx-auto">
+                <div className="flex items-center gap-4 mb-8">
+                    <div className="w-10 h-10 rounded-xl bg-surface-2 animate-pulse" />
+                    <div className="space-y-2">
+                        <div className="h-4 w-24 bg-surface-2 animate-pulse rounded" />
+                        <div className="h-8 w-48 bg-surface-2 animate-pulse rounded" />
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {[1, 2, 3, 4, 5, 6].map(i => (
+                        <div key={i} className="glass p-8 animate-pulse h-[160px] rounded-xl border-white/5" />
+                    ))}
+                </div>
             </div>
         );
     }
@@ -97,144 +110,158 @@ const TestSeriesDetail = () => {
     if (!series) return null;
 
     return (
-        <div className="flex-1 min-w-0 flex flex-col h-[100dvh]">
-            {/* Header */}
-            <header className="flex-shrink-0 border-b border-white/5 bg-[#0f0f1a]/80 backdrop-blur-md sticky top-0 z-20">
-                <div className="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                        <button
-                            onClick={() => navigate('/tests')}
-                            className="w-10 h-10 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] flex items-center justify-center transition-colors border border-white/10"
-                        >
-                            <ArrowLeft className="w-5 h-5 text-slate-300" />
-                        </button>
-                        <div>
-                            <div className="flex items-center gap-2 mb-1">
-                                <div className="w-6 h-6 rounded bg-pink-500/10 flex items-center justify-center">
-                                    <Target className="w-3.5 h-3.5 text-pink-400" />
-                                </div>
-                                <h1 className="text-xl font-heading font-bold text-white leading-tight">
-                                    {series.name}
-                                </h1>
-                            </div>
-                            {series.description && (
-                                <p className="text-sm text-slate-400 line-clamp-1">{series.description}</p>
-                            )}
+        <div className="fade-in max-w-6xl mx-auto">
+            {/* Back Button Row */}
+            <div className="flex items-center gap-3 mb-4">
+                <button
+                    onClick={() => navigate('/tests')}
+                    className="flex items-center gap-2 text-[13px] font-semibold text-slate-400 hover:text-white transition-all hover:bg-white/[0.06] px-3 py-1.5 rounded-lg border border-white/[0.06] hover:border-white/[0.1] transition-all cursor-pointer"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Back</span>
+                </button>
+            </div>
+
+            {/* Header Content matching SubjectDetail approach */}
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-6">
+                <div>
+                    <h1 className="text-[22px] md:text-[24px] font-heading font-semibold text-white tracking-tight leading-tight mb-1.5">
+                        {series.name}
+                    </h1>
+                    {series.description && (
+                        <p className="text-slate-500 text-[14px] max-w-2xl leading-[1.6]">{series.description}</p>
+                    )}
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setIsInsightsOpen(true)}
+                        className="flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all cursor-pointer border border-white/[0.08] bg-surface-3/50 text-slate-300 hover:text-white hover:bg-surface-3 hover:border-white/[0.12] group"
+                    >
+                        <BarChart3 className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" strokeWidth={2} />
+                        <span className="hidden sm:inline">Series Insights</span>
+                        <span className="sm:hidden">Insights</span>
+                    </button>
+                    <button
+                        onClick={() => setIsCreateTestModalOpen(true)}
+                        className="flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all cursor-pointer border border-pink-500/20 bg-pink-500/10 text-pink-400 hover:text-white hover:bg-pink-500/20 group"
+                    >
+                        <Plus className="w-4 h-4 text-pink-400 group-hover:rotate-90 transition-transform" strokeWidth={2} />
+                        <span>Add Test</span>
+                    </button>
+                </div>
+            </div>
+
+            {/* Divider and section Heading */}
+            <div className="h-px bg-gradient-to-r from-white/[0.08] via-white/[0.06] to-transparent mb-8" />
+
+            <div className="flex items-center gap-2.5 mb-8">
+                <div className="p-1.5 rounded-lg bg-pink-500/10 border border-pink-500/20">
+                    <Notebook className="w-4 h-4 text-pink-400" />
+                </div>
+                <h2 className="text-[20px] font-heading font-bold text-white tracking-tight">All Tests</h2>
+            </div>
+
+            {/* Tests Section */}
+            <div>
+                {tests.length === 0 ? (
+                    <div className="glass-panel rounded-xl p-16 text-center border-dashed border-pink-500/20 max-w-xl mx-auto relative overflow-hidden group">
+                        <div className="absolute inset-0 bg-gradient-to-br from-pink-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+                        <div className="w-20 h-20 mx-auto bg-pink-500/10 rounded-full flex items-center justify-center mb-6 border border-pink-500/20 pulse-ring">
+                            <Calendar className="w-10 h-10 text-pink-400" strokeWidth={1.5} />
                         </div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                        <button
-                            onClick={() => setIsInsightsOpen(true)}
-                            className="h-10 px-4 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] text-slate-300 font-medium text-sm transition-all border border-white/10 flex items-center gap-2"
-                        >
-                            <Brain className="w-4 h-4 text-purple-400" />
-                            <span className="hidden sm:inline">Series Insights</span>
-                        </button>
+                        <h3 className="text-2xl font-heading font-bold text-white mb-3 tracking-tight">No tests yet</h3>
+                        <p className="text-slate-400 text-sm max-w-sm mx-auto mb-8 leading-relaxed">
+                            Schedule your first test to start tracking scores against the subjects in this series.
+                        </p>
                         <button
                             onClick={() => setIsCreateTestModalOpen(true)}
-                            className="h-10 px-5 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 text-white font-medium text-sm transition-all flex items-center gap-2 shrink-0 shadow-[0_0_15px_rgba(236,72,153,0.25)]"
+                            className="btn-primary-pink flex items-center gap-2 mx-auto px-6 py-3 rounded-xl text-sm font-semibold cursor-pointer bg-pink-500/10 text-pink-400 border border-pink-500/20 hover:bg-pink-500/20"
                         >
                             <Plus className="w-4 h-4" />
-                            <span>Add Test</span>
+                            <span>Add First Test</span>
                         </button>
                     </div>
-
-                </div>
-            </header>
-
-            <main className="flex-1 overflow-y-auto w-full p-6">
-                <div className="max-w-[1200px] mx-auto space-y-8">
-
-
-
-                    {/* Tests List */}
-                    <div>
-                        <div className="flex items-center gap-2 mb-6">
-                            <BookOpen className="w-5 h-5 text-pink-400" />
-                            <h2 className="text-lg font-heading font-semibold text-white">Tests</h2>
-                        </div>
-
-                        {tests.length === 0 ? (
-                            <div className="text-center py-16 bg-white/[0.02] border border-white/5 rounded-3xl">
-                                <Calendar className="w-12 h-12 text-slate-600 mx-auto mb-4 opacity-50" />
-                                <h3 className="text-base font-semibold text-white mb-2">No tests created yet</h3>
-                                <p className="text-sm text-slate-400 max-w-sm mx-auto">
-                                    Schedule your first test to start tracking scores against the subjects in this series.
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                                {tests.map(test => (
-                                    <div
-                                        key={test.id}
-                                        onClick={() => navigate(`/tests/${series.id}/test/${test.id}/analytics`)}
-                                        className="group relative bg-white/[0.02] border border-white/5 hover:border-pink-500/30 rounded-2xl p-6 cursor-pointer transition-all duration-300 flex flex-col min-h-[180px]"
-                                    >
-                                        <div className="absolute top-4 right-4 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button
-                                                onClick={(e) => handleEditTest(e, test)}
-                                                className="p-1.5 text-slate-500 hover:text-white transition-colors"
-                                            >
-                                                <Edit2 className="w-3.5 h-3.5" />
-                                            </button>
-                                            <button
-                                                onClick={(e) => handleDeleteTest(e, test.id)}
-                                                className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"
-                                            >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
-                                        </div>
-
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <div className="w-1 h-1 rounded-full bg-pink-500/60" />
-                                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {tests.map(test => (
+                            <div
+                                key={test.id}
+                                onClick={() => navigate(`/tests/${seriesId}/test/${test.id}/analytics`)}
+                                className="glass-card glass p-6 cursor-pointer group flex flex-col justify-between transition-all hover:border-pink-500/30 min-h-[160px] relative active:scale-[0.99]"
+                            >
+                                {/* Top: Info + Actions */}
+                                <div className="flex items-start justify-between gap-3 mb-4">
+                                    <div className="flex-1 min-w-0">
+                                        <h2 className="text-[17px] font-heading font-semibold text-slate-100 transition-colors truncate tracking-tight leading-tight mb-2">
+                                            {test.name.toUpperCase()}
+                                        </h2>
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-1.5">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-pink-500/60 shadow-[0_0_8px_rgba(236,72,153,0.4)]" />
+                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                                                     {test.subjects?.length || 0} Subjects
                                                 </span>
                                             </div>
-
-
-                                            <h3 className="text-lg font-heading font-semibold text-white group-hover:text-pink-400 transition-colors duration-300 line-clamp-2 leading-snug">
-                                                {test.name}
-                                            </h3>
-                                        </div>
-
-                                        <div className="mt-6 flex items-center justify-between gap-2">
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); navigate(`/tests/${series.id}/test/${test.id}`); }}
-                                                className="h-8 px-2.5 rounded-lg bg-pink-500/10 hover:bg-pink-500/20 text-[10px] font-bold text-pink-400 border border-pink-500/10 hover:border-pink-500/20 uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-sm shrink-0"
-                                            >
-                                                <Plus className="w-3.5 h-3.5" />
-                                                <span>Add Scores</span>
-                                            </button>
-
-
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); navigate(`/tests/${series.id}/test/${test.id}/analytics`); }}
-                                                className="h-8 px-2.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-[10px] font-bold text-indigo-400 border border-indigo-500/10 hover:border-indigo-500/20 uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-sm shrink-0"
-                                            >
-                                                <span>Analytics</span>
-                                                <ChevronRight className="w-3.5 h-3.5" />
-                                            </button>
+                                            <div className="h-3 w-px bg-white/10" />
+                                            <div className="flex items-center gap-1.5">
+                                                <Calendar className="w-3 h-3 text-slate-600" />
+                                                <span className="text-[10px] font-bold text-slate-600">
+                                                    {new Date(test.test_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </main>
+                                    <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                                        <button
+                                            onClick={(e) => handleEditTest(e, test)}
+                                            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-500 hover:text-pink-400 transition-colors"
+                                            title="Edit Test"
+                                        >
+                                            <Edit2 className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                            onClick={(e) => handleDeleteTest(e, test.id)}
+                                            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-500 hover:text-red-400 transition-colors"
+                                            title="Delete Test"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                </div>
 
-            {series && (
-                <CreateTestModal
-                    isOpen={isCreateTestModalOpen}
-                    onClose={handleModalClose}
-                    onSuccess={loadData}
-                    seriesId={seriesId}
-                    seriesSubjects={series.subjects || []}
-                    initialData={editingTest}
-                />
-            )}
+                                {/* Footer: Score Actions & Analytics */}
+                                <div className="mt-auto pt-4 border-t border-white/[0.06] flex items-center gap-3">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); navigate(`/tests/${seriesId}/test/${test.id}`); }}
+                                        className="flex-1 h-10 px-3 rounded-lg bg-pink-500/10 hover:bg-pink-500 text-pink-400 hover:text-white border border-pink-500/10 flex items-center justify-center gap-2 text-[11px] font-bold uppercase tracking-widest transition-all"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" />
+                                        Add Scores
+                                    </button>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); navigate(`/tests/${seriesId}/test/${test.id}/analytics`); }}
+                                        className="flex-1 h-10 px-3 rounded-lg bg-indigo-500/10 hover:bg-indigo-500 text-indigo-400 hover:text-white border border-indigo-500/10 flex items-center justify-center gap-2 text-[11px] font-bold uppercase tracking-widest transition-all"
+                                    >
+                                        <BarChart3 className="w-3.5 h-3.5" />
+                                        Analytics
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Modals & Dialogs */}
+            <CreateTestModal
+                isOpen={isCreateTestModalOpen}
+                onClose={handleModalClose}
+                onSuccess={loadData}
+                seriesId={seriesId}
+                seriesSubjects={series.subjects || []}
+                initialData={editingTest}
+            />
 
             <TestSeriesInsightsModal
                 isOpen={isInsightsOpen}
@@ -262,76 +289,90 @@ const TestSeriesInsightsModal = ({ isOpen, onClose, analytics }) => {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative w-full max-w-2xl bg-[#0f0f1a] border border-white/10 rounded-[32px] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-                <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-purple-500/10 to-pink-500/10">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-purple-500/20 flex items-center justify-center border border-purple-500/30">
-                            <Brain className="w-5 h-5 text-purple-400" />
+        <ModalPortal>
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm fade-in" onClick={onClose}>
+                <div
+                    className="w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+                    style={{ background: 'rgba(22, 22, 34, 0.95)', border: '1px solid rgba(255,255,255,0.08)' }}
+                    onClick={e => e.stopPropagation()}
+                >
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-7 py-5 border-b border-white/[0.06] shrink-0">
+                        <div className="flex items-center gap-4">
+                            <div className="p-2 rounded-lg bg-pink-500/10 text-pink-400">
+                                <BarChart3 className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-heading font-semibold text-white leading-tight">Series Insights</h3>
+                                <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mt-0.5">Performance Analysis</p>
+                            </div>
                         </div>
-                        <div>
-                            <h2 className="text-lg font-heading font-bold text-white leading-tight text-left">Series Insights</h2>
-                            <p className="text-xs text-slate-500 text-left">Overall performance analysis</p>
-                        </div>
+                        <button
+                            onClick={onClose}
+                            className="p-2 text-slate-500 hover:text-white hover:bg-white/[0.06] rounded-lg transition-all cursor-pointer"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
                     </div>
-                    <button onClick={onClose} className="w-10 h-10 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] flex items-center justify-center transition-colors">
-                        <X className="w-5 h-5 text-slate-400" />
-                    </button>
-                </div>
 
-                <div className="p-6 space-y-6">
-                    {analytics ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl relative overflow-hidden group">
-                                <Activity className="absolute -right-2 -top-2 w-12 h-12 text-pink-500/10" />
-                                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 text-left">Total Tests</h3>
-                                <p className="text-2xl font-heading font-bold text-white text-left">{analytics.overview?.total_tests || 0}</p>
-                            </div>
+                    {/* Body */}
+                    <div className="px-7 py-6 space-y-8 overflow-y-auto max-h-[70vh] custom-scrollbar">
+                        {analytics ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                                <div className="bg-white/[0.02] border border-white/5 p-5 rounded-2xl relative overflow-hidden group hover:border-pink-500/20 transition-all">
+                                    <Activity className="absolute -right-3 -top-3 w-16 h-16 text-pink-500/5 group-hover:text-pink-500/10 transition-colors" />
+                                    <h3 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.2em] mb-1.5">Total Tests</h3>
+                                    <p className="text-3xl font-heading font-bold text-white tracking-tight">{analytics.overview?.total_tests || 0}</p>
+                                </div>
 
-                            <div className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl relative overflow-hidden group">
-                                <TrendingUp className="absolute -right-2 -top-2 w-12 h-12 text-emerald-500/10" />
-                                <h3 className="text-[10px] font-bold text-emerald-400/80 uppercase tracking-widest mb-1 text-left">Strongest</h3>
-                                <p className="text-lg font-heading font-bold text-white truncate text-left">{analytics.strongest?.subject_name || 'N/A'}</p>
-                                <p className="text-[10px] text-slate-500 mt-0.5 text-left">{analytics.strongest ? `${analytics.strongest.overall_accuracy}% Accuracy` : '—'}</p>
-                            </div>
+                                <div className="bg-white/[0.02] border border-white/5 p-5 rounded-2xl relative overflow-hidden group hover:border-emerald-500/20 transition-all">
+                                    <TrendingUp className="absolute -right-3 -top-3 w-16 h-16 text-emerald-500/5 group-hover:text-emerald-500/10 transition-colors" />
+                                    <h4 className="text-[10px] font-extrabold text-emerald-500/80 uppercase tracking-[0.2em] mb-1.5">Strongest</h4>
+                                    <p className="text-[15px] font-heading font-bold text-white tracking-tight truncate mb-1">{analytics.strongest?.subject_name || 'N/A'}</p>
+                                    <p className="text-[11px] font-bold text-slate-500">{analytics.strongest ? `${analytics.strongest.overall_accuracy}% Accuracy` : '—'}</p>
+                                </div>
 
-                            <div className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl relative overflow-hidden group">
-                                <TrendingDown className="absolute -right-2 -top-2 w-12 h-12 text-rose-500/10" />
-                                <h3 className="text-[10px] font-bold text-rose-400/80 uppercase tracking-widest mb-1 text-left">Weakest</h3>
-                                <p className="text-lg font-heading font-bold text-white truncate text-left">{analytics.weakest?.subject_name || 'N/A'}</p>
-                                <p className="text-[10px] text-slate-500 mt-0.5 text-left">{analytics.weakest ? `${analytics.weakest.overall_accuracy}% Accuracy` : '—'}</p>
+                                <div className="bg-white/[0.02] border border-white/5 p-5 rounded-2xl relative overflow-hidden group hover:border-rose-500/20 transition-all">
+                                    <TrendingDown className="absolute -right-3 -top-3 w-16 h-16 text-rose-500/5 group-hover:text-rose-500/10 transition-colors" />
+                                    <h4 className="text-[10px] font-extrabold text-rose-500/80 uppercase tracking-[0.2em] mb-1.5">Weakest</h4>
+                                    <p className="text-[15px] font-heading font-bold text-white tracking-tight truncate mb-1">{analytics.weakest?.subject_name || 'N/A'}</p>
+                                    <p className="text-[11px] font-bold text-slate-500">{analytics.weakest ? `${analytics.weakest.overall_accuracy}% Accuracy` : '—'}</p>
+                                </div>
                             </div>
-                        </div>
-                    ) : (
-                        <div className="py-12 text-center bg-white/[0.02] rounded-2xl border border-dashed border-white/10">
-                            <Activity className="w-10 h-10 text-slate-700 mx-auto mb-3" />
-                            <p className="text-slate-500 text-sm">No analytics data available yet.</p>
-                        </div>
-                    )}
+                        ) : (
+                            <div className="py-16 text-center bg-white/[0.02] rounded-3xl border border-dashed border-white/10">
+                                <Activity className="w-12 h-12 text-slate-700 mx-auto mb-4 opacity-50" />
+                                <p className="text-slate-400 text-sm font-medium">No analytics data available for this series yet.</p>
+                            </div>
+                        )}
 
-                    {analytics?.strongest && (
-                        <div className="p-4 rounded-2xl bg-emerald-500/[0.03] border border-emerald-500/10 flex items-start gap-3">
-                            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
-                                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        {analytics?.strongest && (
+                            <div className="p-5 rounded-2xl bg-emerald-500/[0.03] border border-emerald-500/15 flex items-start gap-4 transition-all hover:bg-emerald-500/[0.05]">
+                                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0 border border-emerald-500/20">
+                                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-[14px] font-bold text-emerald-400">Great progress in {analytics.strongest.subject_name}!</p>
+                                    <p className="text-[13px] text-slate-400 leading-relaxed max-w-lg">
+                                        You've maintained exceptional performance in this subject. To improve further, balance your effort by targeting {analytics.weakest?.subject_name || 'weaker areas'} in your next session.
+                                    </p>
+                                </div>
                             </div>
-                            <div className="text-left">
-                                <p className="text-sm font-semibold text-emerald-400">Great progress in {analytics.strongest.subject_name}!</p>
-                                <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-                                    You've maintained a high performance in this subject. Keep focused on weaker areas like {analytics.weakest?.subject_name || 'other topics'} to balance your preparation.
-                                </p>
-                            </div>
-                        </div>
-                    )}
-                </div>
+                        )}
+                    </div>
 
-                <div className="px-6 py-4 bg-white/[0.02] border-t border-white/5 flex justify-end">
-                    <button onClick={onClose} className="h-10 px-6 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-white text-sm font-semibold transition-all border border-white/10">
-                        Got it
-                    </button>
+                    {/* Footer */}
+                    <div className="px-7 py-5 border-t border-white/[0.06] flex shrink-0">
+                        <button
+                            onClick={onClose}
+                            className="w-full py-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-white text-[13px] font-bold transition-all border border-white/10 uppercase tracking-widest cursor-pointer shadow-md active:scale-95"
+                        >
+                            Got it
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
+        </ModalPortal>
     );
 };
 

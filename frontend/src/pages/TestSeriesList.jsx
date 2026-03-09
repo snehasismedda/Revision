@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Target, Plus, Search, Calendar, BookOpen, Trash2, Edit2, Activity, ArrowRight } from 'lucide-react';
+import { Target, Plus, Search, Calendar, BookOpen, Trash2, Edit2, Activity, ArrowRight, X } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 
 
@@ -77,145 +77,137 @@ const TestSeriesList = () => {
     );
 
     return (
-        <div className="flex-1 min-w-0 flex flex-col h-[100dvh]">
-            {/* Header */}
-            <header className="flex-shrink-0 h-16 border-b border-white/5 bg-[#0f0f1a]/80 backdrop-blur-md px-6 flex items-center justify-between z-10 sticky top-0">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-pink-500/10 flex items-center justify-center">
-                        <Target className="w-4 h-4 text-pink-400" />
+        <div className="fade-in max-w-6xl mx-auto">
+            {/* Header section similar to Subjects.jsx */}
+            <div className="flex items-end justify-between mb-8">
+                <div>
+                    <div className="flex items-center gap-2 mb-2">
+                        <Target className="w-5 h-5 text-pink-500" />
+                        <span className="text-[11px] font-bold tracking-widest text-pink-500 uppercase">Preparation</span>
                     </div>
-                    <h1 className="text-lg font-heading font-semibold text-white">Test Series</h1>
+                    <h1 className="text-3xl font-heading font-bold text-white tracking-tight">Test Series</h1>
+                    <p className="text-slate-400 text-sm mt-1.5">{series.length} series available for practice</p>
                 </div>
-            </header>
 
-            {/* Main Content */}
-            <main className="flex-1 overflow-y-auto w-full">
-                <div className="max-w-[1200px] mx-auto w-full p-6">
-                    {/* Toolbar */}
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-8">
-                        {/* Search */}
-                        <div className="relative group flex-1 max-w-md">
-                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-pink-400 transition-colors" />
-                            <input
-                                type="text"
-                                placeholder="Search test series..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full h-11 pl-10 pr-4 bg-white/[0.03] border border-white/10 rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-pink-500/50 focus:bg-white/[0.05] transition-all"
-                            />
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-4">
+                    <div className="relative group hidden md:block">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-pink-500 transition-colors" />
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Filter series..."
+                            className="bg-surface-2/50 border border-white/[0.08] rounded-xl py-2.5 pl-10 pr-4 text-[13px] text-white w-[240px] focus:outline-none focus:border-pink-500/40 focus:bg-surface-2 transition-all"
+                        />
+                        {searchQuery && (
                             <button
-                                onClick={() => setIsCreateModalOpen(true)}
-                                className="h-11 px-5 rounded-xl bg-pink-500/10 hover:bg-pink-500/20 text-pink-400 font-medium text-sm transition-all flex items-center gap-2 border border-pink-500/20"
+                                onClick={() => setSearchQuery('')}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white cursor-pointer"
                             >
-                                <Plus className="w-4 h-4" />
-                                <span>New Series</span>
+                                <X className="w-4 h-4" />
                             </button>
-                        </div>
+                        )}
                     </div>
+                    <button
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="btn-primary-pink flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl transition-all cursor-pointer bg-pink-500/10 text-pink-400 border border-pink-500/20 hover:bg-pink-500/20"
+                    >
+                        <Plus className="w-4 h-4" /> New Series
+                    </button>
+                </div>
+            </div>
 
-                    {/* Content Grid */}
-                    {loading ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {[1, 2, 3].map(i => (
-                                <div key={i} className="h-44 rounded-2xl bg-white/[0.02] border border-white/5 animate-pulse" />
-                            ))}
-                        </div>
-                    ) : filteredSeries.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {filteredSeries.map(s => (
-                                <div
-                                    key={s.id}
-                                    onClick={() => navigate(`/tests/${s.id}`)}
-                                    className="group relative bg-[#131320] border border-white/[0.08] hover:border-pink-500/40 rounded-3xl p-6 cursor-pointer transition-all duration-500 hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-pink-500/10 flex flex-col min-h-[220px]"
-                                >
-
-                                    {/* Ambient Background Glow */}
-                                    <div className="absolute -right-8 -top-8 w-24 h-24 bg-pink-500/5 rounded-full blur-3xl group-hover:bg-pink-500/10 transition-colors duration-500" />
-
-                                    <div className="absolute top-5 right-5 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 z-10">
-                                        <button
-                                            onClick={(e) => handleEdit(e, s)}
-                                            className="w-9 h-9 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 flex items-center justify-center transition-colors border border-white/10 backdrop-blur-md"
-                                        >
-                                            <Edit2 className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            onClick={(e) => handleDelete(e, s.id)}
-                                            className="w-9 h-9 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center transition-colors border border-red-500/20 backdrop-blur-md"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    </div>
-
-                                    <div className="flex-1 relative py-2">
-                                        <div className="flex items-start justify-between mb-3">
-                                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500/20 to-rose-500/20 flex items-center justify-center border border-pink-500/20 group-hover:scale-110 transition-transform duration-500 shrink-0">
-                                                <Target className="w-5 h-5 text-pink-400" />
-                                            </div>
+            {/* Content Grid area */}
+            {loading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="glass p-8 animate-pulse h-[160px] rounded-xl border-white/5" />
+                    ))}
+                </div>
+            ) : filteredSeries.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {filteredSeries.map(s => (
+                        <div
+                            key={s.id}
+                            onClick={() => navigate(`/tests/${s.id}`)}
+                            className="glass-card glass p-5 cursor-pointer group flex flex-col justify-between transition-all hover:border-pink-500/30 min-h-[160px]"
+                        >
+                            {/* Top: Icon + Title + Actions */}
+                            <div className="flex items-start justify-between gap-3 mb-3">
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2.5 mb-1">
+                                        <div className="p-1.5 rounded-lg border shrink-0 bg-pink-500/10 border-pink-500/20 text-pink-400 group-hover:scale-110 transition-transform">
+                                            <Target className="w-3.5 h-3.5" strokeWidth={2.2} />
                                         </div>
-
-                                        <h3 className="text-xl font-heading font-bold text-white mb-2 pr-12 group-hover:text-pink-400 transition-colors duration-300 line-clamp-1">
+                                        <h3 className="text-[17px] font-heading font-semibold text-slate-100 group-hover:text-pink-400 transition-colors truncate tracking-tight leading-tight">
                                             {s.name}
                                         </h3>
-                                        <p className="text-sm text-slate-400 line-clamp-2 leading-relaxed font-medium opacity-80 group-hover:opacity-100 transition-opacity">
-                                            {s.description || 'Track your progress and practice mock exams.'}
-                                        </p>
                                     </div>
-
-
-                                    <div className="mt-auto pt-4 border-t border-white/[0.06] flex items-center justify-between gap-2">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-pink-500/10 border border-pink-500/20 shrink-0">
-                                                <Activity className="w-3 h-3 text-pink-400" />
-                                                <span className="text-[10px] font-bold text-pink-400">
-                                                    {s.testCount || 0} TESTS
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 shrink-0">
-                                                <BookOpen className="w-3 h-3 text-purple-400" />
-                                                <span className="text-[10px] font-bold text-purple-400">
-                                                    {s.subjects?.length || 0} SUBJECTS
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <button className="w-8 h-8 rounded-full bg-white/[0.05] flex items-center justify-center text-slate-400 hover:text-white transition-colors border border-white/5 shrink-0">
-                                            <ArrowRight className="w-4 h-4" />
-                                        </button>
-                                    </div>
-
+                                    {s.description && (
+                                        <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed mt-1 ml-[30px]">{s.description}</p>
+                                    )}
                                 </div>
-                            ))}
-
-
-                        </div>
-                    ) : (
-                        <div className="text-center py-20 bg-white/[0.02] border border-white/5 rounded-2xl">
-                            <div className="w-16 h-16 rounded-full bg-pink-500/10 flex items-center justify-center mx-auto mb-4">
-                                <Target className="w-8 h-8 text-pink-400" />
+                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                                    <button
+                                        onClick={(e) => handleEdit(e, s)}
+                                        className="p-1 text-slate-500 hover:text-pink-400 transition-colors"
+                                        title="Edit Series"
+                                    >
+                                        <Edit2 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                        onClick={(e) => handleDelete(e, s.id)}
+                                        className="p-1 text-slate-500 hover:text-red-400 transition-colors"
+                                        title="Delete Series"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
                             </div>
-                            <h3 className="text-lg font-heading font-semibold text-white mb-2">No Test Series Found</h3>
-                            <p className="text-sm text-slate-400 max-w-md mx-auto mb-6">
-                                {searchQuery
-                                    ? `No series match your search "${searchQuery}".`
-                                    : "Create a test series to track your practice and mock exam performances."}
-                            </p>
-                            {!searchQuery && (
-                                <button
-                                    onClick={() => setIsCreateModalOpen(true)}
-                                    className="h-10 px-5 rounded-lg bg-white/5 hover:bg-white/10 text-white font-medium text-sm transition-all"
-                                >
-                                    Create First Series
+
+                            {/* Footer: Stats + Arrow */}
+                            <div className="mt-auto pt-3 border-t border-white/[0.06] flex items-center justify-between">
+                                <div className="flex items-center gap-3 text-[10px] font-medium text-slate-500 font-bold tracking-tight uppercase">
+                                    <div className="flex items-center gap-1.5">
+                                        <Activity className="w-3 h-3 text-pink-400" strokeWidth={2} />
+                                        <span>{s.testCount || 0} Tests</span>
+                                    </div>
+                                    <div className="h-2.5 w-px bg-white/10" />
+                                    <div className="flex items-center gap-1.5">
+                                        <BookOpen className="w-3 h-3 text-purple-400" strokeWidth={2} />
+                                        <span>{s.subjects?.length || 0} Subjects</span>
+                                    </div>
+                                </div>
+                                <button className="w-7 h-7 rounded-full bg-white/[0.05] flex items-center justify-center text-slate-500 group-hover:text-white transition-colors border border-white/5 group-hover:bg-pink-500/20">
+                                    <ArrowRight className="w-3.5 h-3.5" />
                                 </button>
-                            )}
+                            </div>
                         </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="glass-panel rounded-xl p-16 text-center border-dashed border-pink-500/20 w-full relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-gradient-to-br from-pink-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+                    <div className="w-20 h-20 mx-auto bg-pink-500/10 rounded-full flex items-center justify-center mb-6 border border-pink-500/20 pulse-ring">
+                        <Target className="w-10 h-10 text-pink-400" strokeWidth={1.5} />
+                    </div>
+                    <h3 className="text-2xl font-heading font-bold text-white mb-3 tracking-tight">No test series found</h3>
+                    <p className="text-slate-400 text-sm max-w-sm mx-auto mb-8 leading-relaxed">
+                        {searchQuery
+                            ? `No series match your search "${searchQuery}".`
+                            : "Create your first test series to track your practice and mock exam performances."}
+                    </p>
+                    {!searchQuery && (
+                        <button
+                            onClick={() => setIsCreateModalOpen(true)}
+                            className="btn-primary-pink flex items-center gap-2 mx-auto px-6 py-3 rounded-xl text-sm font-semibold cursor-pointer bg-pink-500/10 text-pink-400 border border-pink-500/20 hover:bg-pink-500/20"
+                        >
+                            <Plus className="w-4 h-4" />
+                            <span>Create Series</span>
+                        </button>
                     )}
                 </div>
-            </main>
-
+            )}
             <CreateTestSeriesModal
                 isOpen={isCreateModalOpen}
                 onClose={handleModalClose}
@@ -234,9 +226,8 @@ const TestSeriesList = () => {
                 }}
                 confirmText="Delete Series"
             />
-
-
         </div>
+
     );
 };
 

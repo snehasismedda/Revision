@@ -28,12 +28,25 @@ export const getSubjectOverview = async (data) => {
         .count('* as count')
         .first();
 
+    const revSess = await db('revision.revision_sessions')
+        .where('subject_id', data.subjectId)
+        .count('* as count')
+        .first();
+
+    const tpc = await db('revision.topics')
+        .where('subject_id', data.subjectId)
+        .where('is_deleted', false)
+        .count('* as count')
+        .first();
+
     return {
         total_questions: attempts?.total_questions || 0,
         total_correct: attempts?.total_correct || 0,
         topics_covered: attempts?.topics_covered || 0,
+        total_topics: tpc?.count || 0,
         available_questions: qs?.count || 0,
         total_sessions: sess?.count || 0,
+        total_revision_sessions: revSess?.count || 0,
     };
 };
 
@@ -265,7 +278,7 @@ export const getTestAnalytics = async (testId) => {
         const topicPerformance = await db('revision.session_entries as se')
             .join('revision.sessions as s', 'se.session_id', 's.id')
             .join('revision.topics as t', 'se.topic_id', 't.id')
-            .join('revision.subjects as sub', 's.subject_id', 'sub.id')
+            .join('revision.subjects as sub', 't.subject_id', 'sub.id')
             .whereIn('s.id', sessionIds)
             .where('se.is_deleted', false)
             .groupBy('t.id', 't.name', 'sub.name')

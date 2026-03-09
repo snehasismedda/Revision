@@ -180,7 +180,7 @@ const Subjects = () => {
                     ))}
                 </div>
             ) : subjects.length === 0 ? (
-                <div className="glass-panel rounded-xl p-16 text-center border-dashed border-primary/20 max-w-xl mx-auto relative overflow-hidden group">
+                <div className="glass-panel rounded-xl p-16 text-center border-dashed border-primary/20 w-full relative overflow-hidden group">
                     <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
                     <div className="w-20 h-20 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-6 border border-primary/20 pulse-ring">
                         <BookOpen className="w-10 h-10 text-primary" strokeWidth={1.5} />

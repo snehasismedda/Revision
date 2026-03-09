@@ -24,6 +24,8 @@ export const getOverview = async (req, res) => {
                 accuracy,
                 totalSessions,
                 topicsCovered: parseInt(overview?.topics_covered || 0),
+                totalTopics: parseInt(overview?.total_topics || 0),
+                totalRevisionSessions: parseInt(overview?.total_revision_sessions || 0),
             },
         });
     } catch (error) {

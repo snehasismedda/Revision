@@ -52,8 +52,26 @@ export const createSession = async (req, res) => {
 
 export const getSession = async (req, res) => {
     try {
-        const session = await sessionModel.findSessionWithEntries({ id: req.params.id });
-        if (!session) return res.status(404).json({ error: 'Session not found' });
+        const raw = await sessionModel.findSessionWithEntries({ id: req.params.id });
+        if (!raw) return res.status(404).json({ error: 'Session not found' });
+
+        const session = {
+            id: raw.id,
+            subjectId: raw.subject_id,
+            testId: raw.test_id,
+            title: raw.title,
+            notes: raw.notes,
+            sessionDate: raw.session_date,
+            createdAt: raw.created_at,
+            entries: (raw.entries || []).map(e => ({
+                id: e.id,
+                topicId: e.topic_id,
+                topicName: e.topic_name,
+                parentId: e.parent_id,
+                isCorrect: !!e.is_correct,
+            })),
+        };
+
         res.status(200).json({ session });
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch session' });

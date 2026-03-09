@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { subjectsApi, analyticsApi, aiApi } from '../api/index.js';
+import { getTestSeries } from '../api/testSeriesApi.js';
 import SubjectCard from '../components/SubjectCard.jsx';
 import SubjectModal from '../components/modals/SubjectModal.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
@@ -9,7 +10,7 @@ import {
     BookOpen, Target, Activity, CheckCircle2,
     AlertTriangle, PlusCircle, LayoutDashboard,
     TrendingUp, ArrowUpRight, Sparkles, Wand2, Download,
-    Edit2, Save, CheckCircle
+    Edit2, Save, CheckCircle, ArrowRight
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -48,8 +49,9 @@ const MiniProgressBar = ({ value, max, colorClass = 'bg-primary' }) => {
 };
 
 /* ── Stat Card ─────────────────────────────────────────────── */
-const StatCard = ({ label, value, sub, icon: Icon, colorClass, delayClass, trend, progressValue, progressMax, progressColor }) => (
-    <div className={`glass-card glass p-6 min-h-[150px] flex flex-col justify-between fade-in ${delayClass} relative overflow-hidden group`}>
+// eslint-disable-next-line no-unused-vars
+const StatCard = ({ label, value, sub, icon: Icon, colorClass, delayClass, trend, progressValue, progressMax, progressColor, className = '' }) => (
+    <div className={`glass-card glass p-6 min-h-[150px] flex flex-col justify-between fade-in ${delayClass} relative overflow-hidden group ${className}`}>
         {/* Subtle Background Glow */}
         <div className={`absolute -right-6 -bottom-6 w-28 h-28 rounded-full blur-3xl opacity-[0.07] group-hover:opacity-[0.14] transition-opacity duration-500 ${colorClass.split(' ')[0].replace('text-', 'bg-')}`} />
 
@@ -78,6 +80,7 @@ const StatCard = ({ label, value, sub, icon: Icon, colorClass, delayClass, trend
 const Dashboard = () => {
     const navigate = useNavigate();
     const [subjects, setSubjects] = useState([]);
+    const [testSeries, setTestSeries] = useState([]);
     const [statsMap, setStatsMap] = useState({});
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -107,8 +110,11 @@ const Dashboard = () => {
                         map[id] = stats;
                     }
                 });
-                console.log(map);
+
                 setStatsMap(map);
+
+                const { testSeries: seriesData } = await getTestSeries();
+                setTestSeries(seriesData || []);
             } catch {
                 // silently fail
             } finally {
@@ -170,14 +176,25 @@ const Dashboard = () => {
     };
 
     const totalSessions = Object.values(statsMap).reduce((a, s) => a + (s?.totalSessions || 0), 0);
+    const totalRevisionSessions = Object.values(statsMap).reduce((a, s) => a + (s?.totalRevisionSessions || 0), 0);
     const totalQuestions = Object.values(statsMap).reduce((a, s) => a + (s?.totalQuestions || 0), 0);
     const totalCorrect = Object.values(statsMap).reduce((a, s) => a + (s?.totalCorrect || 0), 0);
     const globalAccuracy = totalQuestions > 0 ? ((totalCorrect / totalQuestions) * 100).toFixed(1) : '--';
+
+    const totalIncorrect = totalQuestions - totalCorrect;
+
+    const needsAttentionCount = subjects.filter((s) => statsMap[s.id]?.accuracy != null && statsMap[s.id].totalQuestions > 0 && statsMap[s.id].accuracy < 75).length;
 
     const weakSubjects = subjects
         .filter((s) => statsMap[s.id]?.accuracy != null && statsMap[s.id].totalQuestions > 0 && statsMap[s.id].accuracy < 75)
         .sort((a, b) => (statsMap[a.id]?.accuracy ?? 100) - (statsMap[b.id]?.accuracy ?? 100))
         .slice(0, 3);
+
+    const topSubject = subjects.length > 0
+        ? [...subjects]
+            .filter(s => statsMap[s.id]?.totalQuestions > 0)
+            .sort((a, b) => (statsMap[b.id]?.accuracy ?? 0) - (statsMap[a.id]?.accuracy ?? 0))[0]
+        : null;
 
     return (
         <div className="fade-in max-w-6xl mx-auto">
@@ -208,52 +225,226 @@ const Dashboard = () => {
                     <p className="text-slate-400 text-sm mt-2 leading-relaxed">Your learning performance at a glance.</p>
                 </div>
             </div>
+            {/* AI Strategic Insights Section — Top Level Analysis
+            <div className="mb-10 fade-in stagger-1">
+                <div className="glass-card glass p-8 rounded-[2rem] border-indigo-500/20 bg-indigo-500/[0.03] relative overflow-hidden group shadow-2xl shadow-indigo-900/10">
+                    <div className="absolute -top-24 -right-24 w-96 h-96 bg-indigo-600/10 rounded-full blur-[100px] pointer-events-none" />
+                    <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-purple-600/10 rounded-full blur-[80px] pointer-events-none" />
 
-            {/* Global Stats Grid — 4 even columns */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
-                <StatCard
-                    delayClass="stagger-1"
-                    label="Total Subjects"
-                    value={subjects.length}
-                    icon={BookOpen}
-                    colorClass="text-primary"
-                    trend={subjects.length > 0 ? `${subjects.length} active` : '--'}
-                    progressValue={subjects.length}
-                    progressMax={Math.max(subjects.length, 5)}
-                    progressColor="bg-primary"
-                />
+                    <div className="relative z-10">
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 mb-8">
+                            <div className="flex items-center gap-5">
+                                <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/10 text-indigo-400 border border-indigo-500/30 shadow-xl shadow-indigo-500/10 group-hover:scale-110 transition-transform duration-500">
+                                    <Sparkles className="w-7 h-7" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <h2 className="text-2xl font-heading font-bold text-white tracking-tight">AI Strategic Planner</h2>
+                                        <div className="px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Powered by AI</div>
+                                    </div>
+                                    <p className="text-slate-400 text-sm leading-relaxed max-w-xl">Intelligent analysis of your global performance with a curated roadmap for your upcoming study sessions.</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                {globalInsight && (
+                                    <div className="hidden md:flex flex-col items-end mr-2">
+                                        <span className="text-[10px] uppercase tracking-tighter text-indigo-400/60 font-black">Plan Strength</span>
+                                        <div className="flex gap-1 mt-1">
+                                            {[...Array(5)].map((_, i) => (
+                                                <div key={i} className={`h-1 w-4 rounded-full ${i < 4 ? 'bg-indigo-500' : 'bg-white/10'}`} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                <button
+                                    onClick={loadGlobalInsight}
+                                    disabled={globalInsightLoading || totalQuestions === 0}
+                                    className="group/btn relative overflow-hidden flex items-center gap-3 px-7 py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm transition-all shadow-xl shadow-indigo-600/30 hover:shadow-indigo-500/50 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                                >
+                                    {globalInsightLoading ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            <span>Synthesizing Strategy...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover/btn:animate-[shimmer_1.5s_infinite] pointer-events-none" />
+                                            <Wand2 className="w-4 h-4 group-hover/btn:rotate-12 transition-transform" />
+                                            <span>{globalInsight ? 'Regenerate Roadmap' : 'Initialize Planner'}</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
+                        {globalInsight ? (
+                            <div className="animate-in fade-in slide-in-from-top-4 duration-700">
+                                <div className="flex items-center justify-between mb-3 px-2">
+                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                                        <Activity className="w-3 h-3 text-indigo-400" /> Current Strategy
+                                    </span>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => setIsEditingInsight(!isEditingInsight)}
+                                            className={`text-[11px] font-bold flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer border ${isEditingInsight ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400' : 'text-slate-500 hover:text-white border-transparent hover:bg-white/5'}`}
+                                        >
+                                            {isEditingInsight ? <><CheckCircle className="w-3 h-3" /> Save Changes</> : <><Edit2 className="w-3 h-3" /> Edit Mode</>}
+                                        </button>
+                                        <button
+                                            onClick={handleDownloadTxt}
+                                            className="text-[11px] font-bold text-slate-500 hover:text-emerald-400 flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer border border-transparent hover:bg-emerald-500/5 hover:border-emerald-500/10"
+                                        >
+                                            <Download className="w-3 h-3" /> Export (.txt)
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className={`p-8 rounded-[1.5rem] bg-indigo-500/[0.02] border transition-colors duration-500 relative group/editor ${isEditingInsight ? 'border-indigo-500/40 bg-indigo-500/[0.04]' : 'border-white/[0.05]'}`}>
+                                    {isEditingInsight ? (
+                                        <textarea
+                                            value={globalInsight}
+                                            onChange={(e) => setGlobalInsight(e.target.value)}
+                                            className="w-full bg-transparent text-slate-200 text-base leading-relaxed font-medium outline-none border-none resize-none min-h-[300px] focus:ring-0 selection:bg-indigo-500/30 font-mono scrollbar-hide"
+                                            autoFocus
+                                            placeholder="Craft your master study plan here..."
+                                        />
+                                    ) : (
+                                        <div className="prose prose-invert prose-indigo max-w-none prose-p:text-slate-300 prose-p:leading-relaxed prose-headings:text-white prose-headings:font-heading prose-headings:tracking-tight prose-strong:text-indigo-400 prose-code:text-indigo-300 prose-code:bg-indigo-500/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded">
+                                            <ReactMarkdown
+                                                remarkPlugins={[remarkGfm, remarkMath]}
+                                                rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                            >
+                                                {preprocessMarkdown(globalInsight)}
+                                            </ReactMarkdown>
+                                        </div>
+                                    )}
+                                    <div className="absolute top-4 right-4 opacity-0 group-hover/editor:opacity-100 transition-opacity pointer-events-none">
+                                        <div className="text-[9px] px-2 py-1 rounded bg-black/40 border border-white/10 text-slate-500 uppercase tracking-widest font-black backdrop-blur-md">
+                                            {isEditingInsight ? 'MASTER EDITOR' : 'SECURE VIEW'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="p-16 rounded-[2rem] border-2 border-dashed border-indigo-500/10 bg-indigo-500/[0.01] text-center group/empty transition-colors hover:border-indigo-500/20 hover:bg-indigo-500/[0.02]">
+                                <div className="w-20 h-20 mx-auto bg-indigo-500/10 rounded-3xl flex items-center justify-center mb-6 shadow-xl border border-indigo-500/20 group-hover/empty:scale-110 group-hover/empty:bg-indigo-500/20 transition-all duration-500">
+                                    <Sparkles className="w-10 h-10 text-indigo-400 animate-pulse" />
+                                </div>
+                                <h3 className="text-2xl font-heading font-bold text-indigo-100 mb-3 tracking-tight">Unlock AI Strategy</h3>
+                                <p className="text-slate-400 text-sm max-w-lg mx-auto leading-relaxed">
+                                    {totalQuestions > 0
+                                        ? "Your data is ready for analysis. Our AI is waiting to synthesize your performance patterns into a high-performance study roadmap."
+                                        : "Record a few study sessions first. Once we have enough data points, we'll unlock the ability to generate personalized strategic plans."}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+            */}
+
+            {/* Global Stats Grid — Bento Layout */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
+                {/* Global Accuracy & Questions Attempted - Hero Card */}
+                <div className="md:col-span-2 glass-card glass p-8 relative overflow-hidden group border-indigo-500/20 bg-indigo-500/[0.02] flex flex-col justify-between fade-in stagger-1 min-h-[220px]">
+                    {/* Subtle Background Glow */}
+                    <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl group-hover:bg-indigo-500/20 transition-colors duration-700 pointer-events-none" />
+
+                    <div className="flex justify-between items-start mb-2 z-10 relative">
+                        <div className="flex items-center gap-3">
+                            <div className="p-3.5 rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shadow-inner">
+                                <Target className="w-6 h-6" strokeWidth={2.2} />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-heading font-bold text-white tracking-tight">Performance Summary</h3>
+                                <p className="text-slate-400 text-sm mt-0.5">{totalQuestions} Questions Attempted</p>
+                            </div>
+                        </div>
+
+                        {globalAccuracy !== '--' && (
+                            <div className={`px-3 py-1.5 rounded-full text-[11px] font-bold tracking-wider flex items-center gap-1.5 uppercase
+                                ${globalAccuracy >= 75 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                    : globalAccuracy >= 50 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                        : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                                {globalAccuracy >= 75 ? <><TrendingUp className="w-3.5 h-3.5" /> Excellent</>
+                                    : globalAccuracy >= 50 ? <><Activity className="w-3.5 h-3.5" /> Good</>
+                                        : <><AlertTriangle className="w-3.5 h-3.5" /> Needs Work</>}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="z-10 relative mt-6 grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
+                        <div>
+                            <div className="flex items-baseline gap-2 mb-1">
+                                <span className="text-6xl md:text-7xl font-heading font-black text-white tracking-tighter leading-none">
+                                    {globalAccuracy === '--' ? '--' : globalAccuracy}
+                                </span>
+                                {globalAccuracy !== '--' && <span className="text-2xl font-bold text-slate-500 mb-1">%</span>}
+                            </div>
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Global Accuracy</p>
+                        </div>
+
+                        {totalQuestions > 0 && (
+                            <div className="w-full pb-1">
+                                <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider mb-2 px-0.5">
+                                    <span className="text-emerald-400">Correct: {totalCorrect}</span>
+                                    <span className="text-red-400">Incorrect: {totalIncorrect}</span>
+                                </div>
+                                <div className="w-full h-2.5 bg-white/5 rounded-full overflow-hidden">
+                                    <div
+                                        className={`h-full rounded-full transition-all duration-1000 ease-out 
+                                            ${globalAccuracy >= 75 ? 'bg-emerald-400'
+                                                : globalAccuracy >= 50 ? 'bg-amber-400' : 'bg-red-400'}`}
+                                        style={{ width: `${globalAccuracy}%` }}
+                                    />
+                                </div>
+                                <div className="flex justify-between items-center text-[10px] font-semibold text-slate-500 mt-2 px-0.5">
+                                    <span>{totalQuestions} Total Attempts</span>
+                                    <span className="text-emerald-400/80">Keep going!</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Active Subjects */}
                 <StatCard
                     delayClass="stagger-2"
-                    label="Study Sessions"
-                    value={totalSessions}
-                    icon={Activity}
-                    colorClass="text-blue-400"
-                    trend={totalSessions > 0 ? `${totalSessions} total` : '--'}
-                    progressValue={totalSessions}
-                    progressMax={Math.max(totalSessions, 10)}
-                    progressColor="bg-blue-400"
+                    label="Active Subjects"
+                    value={subjects.length}
+                    sub={needsAttentionCount > 0 ? `${needsAttentionCount} ${needsAttentionCount === 1 ? 'subject needs' : 'subjects need'} attention` : (subjects.length > 0 ? 'All subjects performing well' : 'No active subjects')}
+                    icon={BookOpen}
+                    colorClass="text-primary"
                 />
+
+                {/* Test Series */}
                 <StatCard
                     delayClass="stagger-3"
-                    label="Questions Attempted"
-                    value={totalQuestions}
+                    label="Active Test Series"
+                    value={testSeries.length}
+                    sub="Examination roadmap"
                     icon={Target}
-                    colorClass="text-indigo-400"
-                    trend={totalQuestions > 0 ? `${totalCorrect} correct` : '--'}
-                    progressValue={totalCorrect}
-                    progressMax={Math.max(totalQuestions, 1)}
-                    progressColor="bg-indigo-400"
+                    colorClass="text-pink-500"
                 />
+
+                {/* Total Sessions */}
                 <StatCard
                     delayClass="stagger-4"
-                    label="Global Accuracy"
-                    value={globalAccuracy === '--' ? '--' : `${globalAccuracy}%`}
-                    sub={totalQuestions > 0 ? `${totalCorrect} correct answers` : null}
-                    icon={CheckCircle2}
-                    colorClass={globalAccuracy >= 75 ? 'text-emerald-400' : globalAccuracy >= 50 ? 'text-amber-400' : 'text-red-400'}
-                    progressValue={totalCorrect}
-                    progressMax={Math.max(totalQuestions, 1)}
-                    progressColor={globalAccuracy >= 75 ? 'bg-emerald-400' : globalAccuracy >= 50 ? 'bg-amber-400' : 'bg-red-400'}
+                    label="Study Sessions"
+                    value={totalSessions}
+                    sub="Recorded study segments"
+                    icon={Activity}
+                    colorClass="text-blue-400"
+                />
+
+                {/* Revision Sessions */}
+                <StatCard
+                    delayClass="stagger-5"
+                    label="Revision Sessions"
+                    value={totalRevisionSessions}
+                    sub="Completed revision sessions"
+                    icon={TrendingUp}
+                    colorClass="text-purple-400"
                 />
             </div>
 
@@ -284,99 +475,7 @@ const Dashboard = () => {
                 </div>
             )}
 
-            {/* AI Strategic Insights Section */}
-            <div className="mb-12 fade-in stagger-3">
-                <div className="glass-panel p-8 rounded-3xl border-indigo-500/20 bg-indigo-500/[0.02] relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/[0.03] rounded-full blur-3xl pointer-events-none" />
-                    <div className="absolute bottom-0 left-0 p-8 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity pointer-events-none">
-                        <Sparkles className="w-48 h-48 text-indigo-400" />
-                    </div>
 
-                    <div className="relative z-10">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-                            <div className="flex items-center gap-4">
-                                <div className="p-3.5 rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
-                                    <Sparkles className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <h2 className="text-2xl font-heading font-bold text-white tracking-tight">AI Strategic Planner</h2>
-                                    <p className="text-indigo-300/60 text-sm mt-1">Personalized study roadmap based on your global performance.</p>
-                                </div>
-                            </div>
-                            <button
-                                onClick={loadGlobalInsight}
-                                disabled={globalInsightLoading || totalQuestions === 0}
-                                className="group/btn flex items-center gap-2.5 px-6 py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm transition-all shadow-lg shadow-indigo-600/20 hover:shadow-indigo-500/40 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                            >
-                                {globalInsightLoading ? (
-                                    <>
-                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        <span>Analyzing Stats...</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Wand2 className="w-4 h-4 group-hover/btn:rotate-12 transition-transform" />
-                                        <span>{globalInsight ? 'Refresh Strategy' : 'Generate Study Plan'}</span>
-                                    </>
-                                )}
-                            </button>
-                        </div>
-
-                        {globalInsight ? (
-                            <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
-                                <div className="flex items-center justify-end gap-2 mb-2">
-                                    <button
-                                        onClick={() => setIsEditingInsight(!isEditingInsight)}
-                                        className="text-[11px] font-bold text-slate-500 hover:text-indigo-400 flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors cursor-pointer"
-                                    >
-                                        {isEditingInsight ? <><CheckCircle className="w-3 h-3" /> Done</> : <><Edit2 className="w-3 h-3" /> Edit Insight</>}
-                                    </button>
-                                    <button
-                                        onClick={handleDownloadTxt}
-                                        className="text-[11px] font-bold text-slate-500 hover:text-emerald-400 flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors cursor-pointer"
-                                    >
-                                        <Download className="w-3 h-3" /> Save to Disk (.txt)
-                                    </button>
-                                </div>
-                                <div className="p-6 rounded-2xl bg-surface-2/60 border border-white/5 backdrop-blur-sm relative group/editor">
-                                    {isEditingInsight ? (
-                                        <textarea
-                                            value={globalInsight}
-                                            onChange={(e) => setGlobalInsight(e.target.value)}
-                                            className="w-full bg-transparent text-slate-200 text-base leading-relaxed font-medium outline-none border-none resize-none min-h-[200px] focus:ring-0 selection:bg-indigo-500/30 font-mono"
-                                            autoFocus
-                                        />
-                                    ) : (
-                                        <div className="prose prose-invert prose-indigo max-w-none prose-p:leading-relaxed prose-headings:mb-4 prose-headings:mt-6 first:prose-headings:mt-0">
-                                            <ReactMarkdown
-                                                remarkPlugins={[remarkGfm, remarkMath]}
-                                                rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
-                                            >
-                                                {preprocessMarkdown(globalInsight)}
-                                            </ReactMarkdown>
-                                        </div>
-                                    )}
-                                    <div className="absolute top-2 right-2 opacity-0 group-hover/editor:opacity-100 transition-opacity">
-                                        <div className="text-[9px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-slate-500 uppercase tracking-widest font-bold">
-                                            {isEditingInsight ? 'Editor Mode' : 'Read Only'}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="p-10 rounded-2xl border border-dashed border-indigo-500/20 bg-indigo-500/[0.01] text-center">
-                                <Sparkles className="w-10 h-10 text-indigo-500/20 mx-auto mb-4" />
-                                <h3 className="text-indigo-200 font-semibold mb-2">Ready to optimize your learning?</h3>
-                                <p className="text-indigo-300/40 text-sm max-w-md mx-auto">
-                                    {totalQuestions > 0
-                                        ? "Click above to analyze your performance across all subjects and receive a curated study plan for the week."
-                                        : "Record your first few study sessions to unlock personalized AI strategy and planning."}
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
 
             {/* All subjects */}
             <div className="fade-in stagger-4 pb-12">
@@ -393,7 +492,7 @@ const Dashboard = () => {
                         ))}
                     </div>
                 ) : subjects.length === 0 ? (
-                    <div className="glass-panel rounded-xl p-12 text-center border-dashed border-primary/30 relative overflow-hidden group">
+                    <div className="glass-panel rounded-xl p-12 text-center border-dashed border-primary/30 w-full relative overflow-hidden group">
                         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
                         <div className="w-20 h-20 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-6 shadow-inner border border-primary/20 pulse-ring">
                             <BookOpen className="w-10 h-10 text-primary" strokeWidth={1.5} />
@@ -423,6 +522,84 @@ const Dashboard = () => {
                                 }}
                                 onDelete={(subj) => setConfirmDelete({ open: true, id: subj.id, name: subj.name })}
                             />
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Active Test Series */}
+            <div className="fade-in stagger-5 pb-12">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2 rounded-lg bg-pink-500/10 border border-pink-500/20">
+                        <Target className="w-5 h-5 text-pink-500" />
+                    </div>
+                    <h2 className="text-xl font-heading font-bold text-white tracking-tight">Active Test Series</h2>
+                </div>
+                {loading ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {[...Array(3)].map((_, i) => (
+                            <div key={i} className="glass p-6 animate-pulse h-[100px] rounded-xl border-white/5" />
+                        ))}
+                    </div>
+                ) : testSeries.length === 0 ? (
+                    <div className="glass-panel p-16 rounded-xl text-center border-dashed border-white/10 w-full relative overflow-hidden group">
+                        <div className="w-16 h-16 mx-auto bg-pink-500/10 rounded-full flex items-center justify-center mb-4 border border-pink-500/20 pulse-ring">
+                            <Target className="w-8 h-8 text-pink-500" strokeWidth={1.5} />
+                        </div>
+                        <h3 className="text-xl font-heading font-bold text-white mb-2 tracking-tight">No active test series</h3>
+                        <p className="text-slate-400 text-xs max-w-sm mx-auto mb-6 leading-relaxed">
+                            Create or join a test series to track your exam performance.
+                        </p>
+                        <button
+                            onClick={() => navigate('/tests')}
+                            className="bg-pink-500/20 hover:bg-pink-500/30 text-pink-400 border border-pink-500/20 flex items-center gap-2 mx-auto px-5 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors"
+                        >
+                            <PlusCircle className="w-3.5 h-3.5" />
+                            <span>Go to Tests</span>
+                        </button>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {testSeries.map((ts) => (
+                            <div key={ts.id}
+                                onClick={() => navigate(`/tests/${ts.id}`)}
+                                className="glass-card glass p-5 cursor-pointer group flex flex-col justify-between transition-all hover:border-pink-500/30 min-h-[160px]"
+                            >
+                                {/* Top: Icon + Title */}
+                                <div className="flex items-start justify-between gap-3 mb-3">
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2.5 mb-1">
+                                            <div className="p-1.5 rounded-lg border shrink-0 bg-pink-500/10 border-pink-500/20 text-pink-400 group-hover:scale-110 transition-transform">
+                                                <Target className="w-3.5 h-3.5" strokeWidth={2.2} />
+                                            </div>
+                                            <h3 className="text-[17px] font-heading font-semibold text-slate-100 group-hover:text-pink-400 transition-colors truncate tracking-tight leading-tight">
+                                                {ts.name}
+                                            </h3>
+                                        </div>
+                                        {ts.description && (
+                                            <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed mt-1 ml-[30px]">{ts.description}</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Footer: Stats + Arrow */}
+                                <div className="mt-auto pt-3 border-t border-white/[0.06] flex items-center justify-between">
+                                    <div className="flex items-center gap-3 text-[10px] font-medium text-slate-500 font-bold tracking-tight uppercase">
+                                        <div className="flex items-center gap-1.5">
+                                            <Activity className="w-3 h-3 text-pink-400" strokeWidth={2} />
+                                            <span>{ts.testCount || 0} Tests</span>
+                                        </div>
+                                        <div className="h-2.5 w-px bg-white/10" />
+                                        <div className="flex items-center gap-1.5">
+                                            <BookOpen className="w-3 h-3 text-purple-400" strokeWidth={2} />
+                                            <span>{ts.subjects?.length || 0} Subjects</span>
+                                        </div>
+                                    </div>
+                                    <button className="w-7 h-7 rounded-full bg-white/[0.05] flex items-center justify-center text-slate-500 group-hover:text-white transition-colors border border-white/5 group-hover:bg-pink-500/20">
+                                        <ArrowRight className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                            </div>
                         ))}
                     </div>
                 )}

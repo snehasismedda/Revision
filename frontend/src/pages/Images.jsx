@@ -106,54 +106,57 @@ const Images = () => {
 
     return (
         <div className="fade-in max-w-6xl mx-auto pb-20">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+            <div className="flex items-end justify-between mb-8">
                 <div>
-                    <h1 className="text-[28px] font-heading font-bold text-white tracking-tight mb-2 flex items-center gap-3">
-                        <ImageIcon className="w-8 h-8 text-primary" />
-                        My Images
-                    </h1>
-                    <p className="text-slate-500 text-sm">All uploaded educational materials across your subjects.</p>
+                    <div className="flex items-center gap-2 mb-2">
+                        <ImageIcon className="w-5 h-5 text-primary" />
+                        <span className="text-[11px] font-bold tracking-widest text-primary uppercase">Gallery</span>
+                    </div>
+                    <h1 className="text-3xl font-heading font-bold text-white tracking-tight">My Images</h1>
+                    <p className="text-slate-400 text-sm mt-1.5">{images.length} image{images.length !== 1 ? 's' : ''} in your library</p>
                 </div>
 
                 <div className="flex items-center gap-4">
-                    <div className="relative group min-w-[280px]">
+                    <div className="relative group hidden md:block">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-primary transition-colors" />
                         <input
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search by subject or date..."
-                            className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2.5 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-primary/40 focus:bg-surface-2 transition-all"
+                            placeholder="Filter images..."
+                            className="bg-surface-2/50 border border-white/[0.08] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white w-[240px] focus:outline-none focus:border-primary/40 focus:bg-surface-2 transition-all"
                         />
                         {searchQuery && (
-                            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white">
+                            <button
+                                onClick={() => setSearchQuery('')}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white cursor-pointer"
+                            >
                                 <X className="w-4 h-4" />
                             </button>
                         )}
                     </div>
-
                     <button
                         onClick={() => setShowAddModal(true)}
-                        className="btn-primary flex items-center gap-2 text-[13px] font-semibold px-5 py-2.5 rounded-xl transition-all shadow-lg hover:shadow-primary/20 active:scale-95 cursor-pointer"
+                        className="btn-primary flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl transition-all cursor-pointer"
                     >
-                        <PlusCircle className="w-4 h-4" />
-                        <span>Add Image</span>
+                        <PlusCircle className="w-4 h-4" /> Add Image
                     </button>
                 </div>
             </div>
 
             {filteredImages.length === 0 ? (
-                <div className="glass-panel p-20 text-center rounded-3xl border-dashed border-white/10 max-w-2xl mx-auto mt-12 flex flex-col items-center">
-                    <div className="w-24 h-24 rounded-3xl bg-surface-3 flex items-center justify-center mb-8 shadow-inner border border-white/5 rotate-6">
-                        <ImageIcon className="w-12 h-12 text-slate-600" />
+                <div className="glass-panel p-20 text-center rounded-3xl border-dashed border-white/10 w-full mt-12 flex flex-col items-center relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+                    <div className="w-20 h-20 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-6 border border-primary/20 pulse-ring relative z-10">
+                        <ImageIcon className="w-10 h-10 text-primary" strokeWidth={1.5} />
                     </div>
-                    <h3 className="text-2xl font-heading font-bold text-white mb-3 tracking-tight">No images found</h3>
-                    <p className="text-slate-400 text-sm mb-10 leading-relaxed max-w-sm mx-auto">
+                    <h3 className="text-2xl font-heading font-bold text-white mb-3 tracking-tight relative z-10">No images found</h3>
+                    <p className="text-slate-400 text-sm mb-10 leading-relaxed max-w-sm mx-auto relative z-10">
                         {searchQuery ? "No images match your search criteria. Try a different subject or date." : "You haven't uploaded any study materials yet. Upload images to generate notes and questions automatically."}
                     </p>
                     <button
                         onClick={() => setShowAddModal(true)}
-                        className="btn-primary flex items-center gap-2 text-sm font-semibold px-8 py-3.5 rounded-xl transition-all shadow-xl hover:shadow-primary/30"
+                        className="btn-primary flex items-center gap-2 text-sm font-semibold px-8 py-3.5 rounded-xl transition-all shadow-xl hover:shadow-primary/30 relative z-10"
                     >
                         <PlusCircle className="w-5 h-5" />
                         <span>Upload Your First Image</span>

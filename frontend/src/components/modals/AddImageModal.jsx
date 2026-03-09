@@ -33,6 +33,7 @@ const AddImageModal = ({ isOpen, onClose, onImageSaved }) => {
     const [isSaving, setIsSaving] = useState(false);
     const [isEnhancing, setIsEnhancing] = useState(false);
     const [isLoadingSubjects, setIsLoadingSubjects] = useState(false);
+    const [analyzeWithAI, setAnalyzeWithAI] = useState(true);
 
     // Cropping State
     const [imageToCrop, setImageToCrop] = useState(null);
@@ -243,9 +244,13 @@ const AddImageModal = ({ isOpen, onClose, onImageSaved }) => {
                 type: saveType,
                 subjectId: selectedSubjectId,
                 title: saveType === 'note' ? title : undefined,
-                noteContent: saveType === 'note' ? content : undefined
+                noteContent: saveType === 'note' ? content : undefined,
+                skipAI: !analyzeWithAI
             });
-            toast.success(`${saveType.charAt(0).toUpperCase() + saveType.slice(1)} saved successfully`, { id: loadingToast });
+            const successMsg = saveType === 'question'
+                ? (analyzeWithAI ? 'Question saved and parsed with AI' : 'Question saved directly')
+                : 'Note saved successfully';
+            toast.success(successMsg, { id: loadingToast });
             onImageSaved(res);
             setNewImage('');
             setTitle('');
@@ -573,9 +578,32 @@ const AddImageModal = ({ isOpen, onClose, onImageSaved }) => {
 
                     {/* Footer */}
                     <div className="px-7 py-5 border-t border-white/[0.06] shrink-0 flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-[11px] text-slate-500 bg-indigo-500/[0.06] px-3 py-1.5 rounded-lg border border-indigo-500/10">
-                            <Wand2 className="w-3.5 h-3.5 text-indigo-400" />
-                            <span>AI analysis will start after saving</span>
+                        <div className="flex flex-col gap-1.5">
+                            {saveType === 'question' ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setAnalyzeWithAI(!analyzeWithAI)}
+                                    className={`flex items-center gap-3 px-4 py-2 rounded-xl border transition-all active:scale-95 group/mode ${analyzeWithAI
+                                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.1)]'
+                                        : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                                        }`}
+                                >
+                                    <div className={`p-1.5 rounded-lg transition-transform ${analyzeWithAI ? 'bg-emerald-500 text-white scale-110 shadow-lg' : 'bg-rose-500 text-white'}`}>
+                                        <Wand2 className={`w-3.5 h-3.5 ${analyzeWithAI ? 'animate-pulse' : ''}`} />
+                                    </div>
+                                    <div className="text-[12px] font-bold uppercase tracking-wider">
+                                        AI MODE: <span className={analyzeWithAI ? 'text-emerald-400' : 'text-rose-400'}>{analyzeWithAI ? 'ON' : 'OFF'}</span>
+                                    </div>
+                                    <div className={`ml-1 w-7 h-3.5 rounded-full relative transition-colors ${analyzeWithAI ? 'bg-emerald-500/40' : 'bg-rose-500/40'}`}>
+                                        <div className={`absolute top-0.5 w-2.5 h-2.5 rounded-full transition-all ${analyzeWithAI ? 'right-0.5 bg-white' : 'left-0.5 bg-white'}`} />
+                                    </div>
+                                </button>
+                            ) : (
+                                <div className="flex items-center gap-2 text-[11px] text-slate-500 bg-emerald-500/[0.06] px-3 py-1.5 rounded-lg border border-emerald-500/10 hidden sm:flex">
+                                    <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                                    <span>Note will be saved as shown</span>
+                                </div>
+                            )}
                         </div>
                         <div className="flex gap-3">
                             <button

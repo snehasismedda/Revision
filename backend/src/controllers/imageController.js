@@ -38,7 +38,7 @@ export const getImagesBySubject = async (req, res) => {
 };
 
 export const saveImageAs = async (req, res) => {
-    const { content, type, subjectId } = req.body;
+    const { content, type, subjectId, skipAI } = req.body;
     if (!content || !type || !subjectId) {
         return res.status(400).json({ error: 'content, type, and subjectId are required' });
     }
@@ -49,6 +49,17 @@ export const saveImageAs = async (req, res) => {
         const sourceImageId = savedImage.id;
 
         if (type === 'question') {
+            if (skipAI) {
+                const results = await questionModel.createQuestions({
+                    subject_id: subjectId,
+                    content: 'Captured Question',
+                    type: 'image',
+                    source_image_id: sourceImageId,
+                    tags: '[]'
+                });
+                return res.status(201).json({ questions: results });
+            }
+
             const subjectTopics = await topicModel.findTopicsBySubject({ subjectId });
             const allParentIds = new Set(subjectTopics.map(t => t.parent_id).filter(id => id !== null));
             const leafTopics = subjectTopics.filter(t => !allParentIds.has(t.id));
