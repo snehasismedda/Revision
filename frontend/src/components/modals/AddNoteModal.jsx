@@ -12,10 +12,13 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
     const [imageMethod, setImageMethod] = useState('upload'); // 'upload' or 'camera'
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
+    const [tags, setTags] = useState([]);
+    const [tagInput, setTagInput] = useState('');
     const [addingNote, setAddingNote] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isEnhancing, setIsEnhancing] = useState(false);
     const [noteImage, setNoteImage] = useState('');
+    const [availableTags, setAvailableTags] = useState([]);
 
     // Cropping State
     const [imageToCrop, setImageToCrop] = useState(null);
@@ -54,10 +57,22 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
             // Pre-fill from props if provided
             if (initialTitle) setTitle(initialTitle);
             if (initialContent) setContent(initialContent);
+
+            // Fetch existing tags for suggestions
+            fetchAvailableTags();
         } else {
             stopCamera();
         }
-    }, [isOpen]);
+    }, [isOpen, subjectId]);
+
+    const fetchAvailableTags = async () => {
+        try {
+            const { tags } = await notesApi.getTags(subjectId);
+            setAvailableTags(tags || []);
+        } catch (err) {
+            console.error('Failed to fetch tags:', err);
+        }
+    };
 
     React.useEffect(() => {
         return () => stopCamera();
@@ -247,6 +262,12 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
             return toast.error('Please provide both title and content');
         }
 
+        const finalTags = [...tags];
+        const trimmedTag = tagInput.trim();
+        if (trimmedTag && !finalTags.includes(trimmedTag)) {
+            finalTags.push(trimmedTag);
+        }
+
         setAddingNote(true);
         try {
             const { note } = await notesApi.create(subjectId, {
@@ -254,7 +275,8 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
                 content: content.trim(),
                 questionId,
                 sourceImageContent: mainType === 'image' ? noteImage : null,
-                parentNoteId: parentNoteId || null
+                parentNoteId: parentNoteId || null,
+                tags: finalTags
             });
             onNoteAdded(note);
             handleModalClose();
@@ -270,6 +292,8 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
         stopCamera();
         setTitle('');
         setContent('');
+        setTags([]);
+        setTagInput('');
         setNoteImage('');
         setMainType('text');
         setImageMethod('upload');
@@ -510,7 +534,7 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
                                     </div>
                                 )}
 
-                                <form id="add-note-form" onSubmit={handleAddNote} className={`space-y-5 ${mainType === 'image' ? 'mt-6 border-t border-white/[0.06] pt-6' : ''}`}>
+                                <form id="add-note-form" onSubmit={handleAddNote} className={`space-y-5 flex flex-col ${mainType === 'image' ? 'mt-6 border-t border-white/[0.06] pt-6' : 'flex-1'}`}>
                                     <div>
                                         <div className="flex justify-between items-center mb-2.5">
                                             <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em]">
@@ -554,9 +578,70 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
                                             value={content}
                                             onChange={(e) => setContent(e.target.value)}
                                             placeholder="Type or paste your notes here..."
-                                            rows={8}
-                                            className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-emerald-400/40 focus:ring-2 focus:ring-emerald-400/15 transition-all resize-none font-mono"
+                                            rows={12}
+                                            className="w-full min-h-[300px] bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-emerald-400/40 focus:ring-2 focus:ring-emerald-400/15 transition-all resize-y font-mono"
                                         />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-2.5">Tags</label>
+                                        <div className="flex flex-wrap gap-2 mb-2">
+                                            {tags.map(tag => (
+                                                <span key={tag} className="px-2.5 py-1 text-[12px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg flex items-center gap-1.5">
+                                                    {tag}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setTags(t => t.filter(x => x !== tag))}
+                                                        className="hover:text-white transition-colors"
+                                                    >
+                                                        <X className="w-3 h-3" />
+                                                    </button>
+                                                </span>
+                                            ))}
+                                        </div>
+                                        <input
+                                            value={tagInput}
+                                            onChange={(e) => setTagInput(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ',') {
+                                                    e.preventDefault();
+                                                    const t = tagInput.trim();
+                                                    if (t && !tags.includes(t)) {
+                                                        setTags([...tags, t]);
+                                                    }
+                                                    setTagInput('');
+                                                }
+                                            }}
+                                            className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-emerald-400/40 focus:ring-2 focus:ring-emerald-400/15 transition-all placeholder:text-slate-600/80"
+                                            placeholder="Type a tag and press Enter..."
+                                        />
+                                        
+                                        {/* Tag Suggestions */}
+                                        {availableTags.length > 0 && (
+                                            <div className="mt-3">
+                                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 opacity-60">Suggestions</div>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {availableTags
+                                                        .filter(tag => !tags.includes(tag))
+                                                        .filter(tag => !tagInput || tag.toLowerCase().includes(tagInput.toLowerCase()))
+                                                        .slice(0, 10)
+                                                        .map(tag => (
+                                                            <button
+                                                                key={tag}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    if (!tags.includes(tag)) {
+                                                                        setTags([...tags, tag]);
+                                                                    }
+                                                                    setTagInput('');
+                                                                }}
+                                                                className="px-2 py-1 text-[11px] font-medium text-slate-400 hover:text-emerald-400 bg-white/5 hover:bg-emerald-500/10 border border-white/5 hover:border-emerald-500/20 rounded-md transition-all"
+                                                            >
+                                                                + {tag}
+                                                            </button>
+                                                        ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </form>
                             </div>

@@ -7,9 +7,12 @@ import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import RichTextRenderer from '../components/RichTextRenderer.jsx';
 import toast from 'react-hot-toast';
 import { jsPDF } from 'jspdf';
+import unidecode from 'unidecode';
 import autoTable from 'jspdf-autotable';
 import { marked } from 'marked';
-import { ArrowLeft, PlusCircle, BarChart3, Wand2, BookOpen, Activity, ListChecks, FileText, Image as ImageIcon, Trash2, ChevronDown, Pencil, Hash, Search, X, Link2 as LinkIcon, Maximize2, Minimize2, LayoutGrid, List, CheckCircle, Download, ClipboardList, RotateCcw, Clock, RefreshCw, Notebook } from 'lucide-react';
+import { saveAs } from 'file-saver';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, ImageRun, Table, TableRow, TableCell, WidthType, AlignmentType } from 'docx';
+import { ArrowLeft, PlusCircle, BarChart3, Wand2, BookOpen, Activity, ListChecks, FileText, Image as ImageIcon, Trash2, ChevronDown, Pencil, Hash, Search, X, Link2 as LinkIcon, Maximize2, Minimize2, LayoutGrid, List, CheckCircle, Download, ClipboardList, RotateCcw, Clock, RefreshCw, Notebook, MoreHorizontal } from 'lucide-react';
 
 import ManageSyllabusModal from '../components/modals/ManageSyllabusModal.jsx';
 import AddQuestionModal from '../components/modals/AddQuestionModal.jsx';
@@ -96,6 +99,7 @@ const SubjectDetail = () => {
     const [fetchedImages, setFetchedImages] = useState({});
     const [searchQuery, setSearchQuery] = useState('');
     const [noteSearchQuery, setNoteSearchQuery] = useState('');
+    const [selectedNoteTag, setSelectedNoteTag] = useState('');
     const [sessionSearchQuery, setSessionSearchQuery] = useState('');
     const [imageSearchQuery, setImageSearchQuery] = useState('');
     const [topicsDefaultExpanded, setTopicsDefaultExpanded] = useState(true);
@@ -123,12 +127,28 @@ const SubjectDetail = () => {
     // PDF Export / Selection state
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedItems, setSelectedItems] = useState(new Set());
+    const [showExportMenu, setShowExportMenu] = useState(false);
+    const [confirmBulkDelete, setConfirmBulkDelete] = useState({ open: false, type: null, count: 0 });
     const [isDownloadingSyllabus, setIsDownloadingSyllabus] = useState(false);
 
     useEffect(() => {
         setIsSelectionMode(false);
         setSelectedItems(new Set());
     }, [activeTab]);
+
+    const getFilteredNotes = () => {
+        const query = (noteSearchQuery || '').toLowerCase();
+        return notes.filter(n => {
+            const matchesSearch = n.title?.toLowerCase().includes(query) || n.content?.toLowerCase().includes(query);
+            let nTags = n.tags || [];
+            if (typeof nTags === 'string') {
+                try { nTags = JSON.parse(nTags); } catch { nTags = []; }
+            }
+            if (!Array.isArray(nTags)) nTags = [];
+            const matchesTag = selectedNoteTag ? nTags.includes(selectedNoteTag) : true;
+            return matchesSearch && matchesTag;
+        });
+    };
 
     const handleSelectAll = () => {
         if (activeTab === 'questions') {
@@ -141,17 +161,39 @@ const SubjectDetail = () => {
                 setSelectedItems(new Set(visibleQuestions.map(q => q.id)));
             }
         } else if (activeTab === 'notes') {
-            const query = noteSearchQuery.toLowerCase();
-            const visibleNotes = notes.filter(n =>
-                n.title?.toLowerCase().includes(query) ||
-                n.content?.toLowerCase().includes(query)
-            );
+            const visibleNotes = getFilteredNotes();
 
             if (selectedItems.size === visibleNotes.length && visibleNotes.length > 0) {
                 setSelectedItems(new Set());
             } else {
                 setSelectedItems(new Set(visibleNotes.map(n => n.id)));
             }
+        }
+    };
+
+    const handleBulkDeleteConfirm = async () => {
+        const { type } = confirmBulkDelete;
+        const isNotes = type === 'notes';
+        const api = isNotes ? notesApi : questionsApi;
+        const itemsToDelete = Array.from(selectedItems);
+
+        const loadingToast = toast.loading(`Deleting ${itemsToDelete.length} ${isNotes ? 'note(s)' : 'question(s)'}...`);
+        try {
+            await Promise.all(itemsToDelete.map(itemId => api.delete(id, itemId)));
+
+            if (isNotes) {
+                setNotes(prev => prev.filter(n => !selectedItems.has(n.id)));
+            } else {
+                setQuestions(prev => prev.filter(q => !selectedItems.has(q.id)));
+            }
+
+            setSelectedItems(new Set());
+            setIsSelectionMode(false);
+            setConfirmBulkDelete({ open: false, type: null, count: 0 });
+            toast.success(`Deleted ${itemsToDelete.length} ${isNotes ? 'note(s)' : 'question(s)'}`, { id: loadingToast });
+        } catch (err) {
+            console.error(err);
+            toast.error('Failed to delete some items', { id: loadingToast });
         }
     };
 
@@ -291,8 +333,8 @@ const SubjectDetail = () => {
         return str
             .replace(/\$\$[\s\S]*?\$\$/g, '[Math]')
             .replace(/\$[^$\n]+\$/g, '[Math]')
-            .replace(/\\\[|\\\]/g, '[Math]')
-            .replace(/\\\(|\\\)/g, '')
+            .replace(/\\\[[\s\S]*?\\\]/g, '[Math]')
+            .replace(/\\\([\s\S]*?\\\)/g, '[Math]')
             .replace(/\\rightarrow/g, '->')
             .replace(/\\leftarrow/g, '<-')
             .replace(/\\leftrightarrow/g, '<->')
@@ -326,8 +368,6 @@ const SubjectDetail = () => {
             .replace(/\\equiv/g, '≡')
             .replace(/\\frac\{([^}]*)\}\{([^}]*)\}/g, '($1/$2)')
             .replace(/\\sqrt\{([^}]*)\}/g, '√($1)')
-            .replace(/\\[a-zA-Z]+/g, '')
-            .replace(/[{}]/g, '')
             .replace(/  +/g, ' ')
             .trim();
     };
@@ -386,13 +426,27 @@ const SubjectDetail = () => {
         return result;
     };
 
+    // Convert complex unicode (like boxes, arrows) to standard ASCII for jsPDF (WinAnsi fallback)
+    const sanitizeForPDF = (text) => {
+        if (!text) return '';
+        // Unidecode universally handles standard unicode blocks
+        let sanitized = unidecode(text);
+
+        // Minor clean up for specific known cases where unidecode falls short on certain typography
+        return sanitized
+            .replace(/[“”]/g, '"')
+            .replace(/[‘’]/g, "'")
+            .replace(/…/g, '...');
+    };
+
     // Use marked.lexer() to parse markdown into a block token array,
     // then normalise to a simpler format our renderer understands.
     const tokenizeMarkdown = (raw) => {
         if (!raw) return [];
+        raw = sanitizeForPDF(raw);
         let blockTokens;
         try {
-            blockTokens = marked.lexer(stripLatexMath(raw));
+            blockTokens = marked.lexer(raw);
         } catch {
             return [{ type: 'paragraph', segments: [{ text: raw, bold: false, italic: false, code: false }] }];
         }
@@ -849,6 +903,219 @@ const SubjectDetail = () => {
         }
     };
 
+    const handleDownloadWordSelected = async () => {
+        if (selectedItems.size === 0) return;
+        const loadingToast = toast.loading('Generating Word document...');
+
+        try {
+            const itemIds = Array.from(selectedItems);
+            let items = [];
+            if (activeTab === 'notes') {
+                items = itemIds.map(iid => notes.find(n => n.id === iid)).filter(Boolean);
+            } else {
+                items = itemIds.map(iid => questions.find(q => q.id === iid)).filter(Boolean);
+            }
+
+            const tabLabel = activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
+            // We will parse the raw Markdown to plain paragraphs and headings, as DOCX JS builder does not consume raw HTML directly
+            // For a lightweight reliable converter without bringing in an entire HTML parse tree:
+
+            const docChildren = [
+                new Paragraph({
+                    text: `${subject?.name || 'Export'} - ${tabLabel} Export`,
+                    heading: HeadingLevel.HEADING_1,
+                }),
+                new Paragraph({
+                    text: `Generated on ${new Date().toLocaleDateString()}`,
+                    style: "wellSpaced"
+                }),
+                new Paragraph({ text: "" }), // Spacing
+            ];
+
+            const printedSourceIds = new Set();
+
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                const itemType = activeTab === 'notes' ? 'Note' : 'Question';
+                const itemTitle = activeTab === 'notes' && item.title
+                    ? `${itemType} ${i + 1}: ${item.title}`
+                    : `${itemType} ${i + 1}`;
+
+                docChildren.push(
+                    new Paragraph({
+                        text: itemTitle,
+                        heading: HeadingLevel.HEADING_2,
+                    })
+                );
+
+                // Try fetching / parsing the image to pass as ArrayBuffer to docx
+                const imgId = item.id;
+                const sourceImgId = item.source_image_id || item.linked_question_id || item.linked_note_id;
+                let shouldPrintImage = false;
+
+                if (sourceImgId) {
+                    if (!printedSourceIds.has(sourceImgId)) {
+                        shouldPrintImage = true;
+                        printedSourceIds.add(sourceImgId);
+                    }
+                } else if (activeTab === 'notes' || item.type === 'image') {
+                    shouldPrintImage = true;
+                }
+
+                if (shouldPrintImage) {
+                    let imgData = fetchedImages[imgId] || fetchedImages[sourceImgId];
+                    if (!imgData) {
+                        try {
+                            const res = activeTab === 'notes'
+                                ? await notesApi.getImage(id, imgId)
+                                : await questionsApi.getImage(id, imgId);
+                            if (res?.content) {
+                                imgData = res.content;
+                                fetchedImages[sourceImgId || imgId] = res.content;
+                            }
+                        } catch { /* no image */ }
+                    }
+                    if (imgData) {
+                        try {
+                            // Extract Base64 cleanly for docx parser
+                            const base64Data = imgData.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
+                            const uint8Array = new Uint8Array(atob(base64Data).split('').map(c => c.charCodeAt(0)));
+
+                            docChildren.push(
+                                new Paragraph({
+                                    children: [
+                                        new ImageRun({
+                                            data: uint8Array,
+                                            transformation: {
+                                                width: 500,
+                                                height: 300,
+                                            },
+                                        }),
+                                    ],
+                                })
+                            );
+                        } catch (e) {
+                            console.warn("Could not parse image buffer for Docx", e);
+                        }
+                    }
+                }
+
+                // ── Markdown content ──
+                const rawContent = item.content || '';
+                const tokens = tokenizeMarkdown(rawContent);
+
+                for (const token of tokens) {
+                    if (token.type === 'heading') {
+                        const headingMap = {
+                            1: HeadingLevel.HEADING_1,
+                            2: HeadingLevel.HEADING_2,
+                            3: HeadingLevel.HEADING_3,
+                            4: HeadingLevel.HEADING_4,
+                            5: HeadingLevel.HEADING_5,
+                            6: HeadingLevel.HEADING_6,
+                        };
+                        docChildren.push(new Paragraph({
+                            text: token.text,
+                            heading: headingMap[token.level] || HeadingLevel.HEADING_6,
+                            spacing: { before: 240, after: 120 }
+                        }));
+                    } else if (token.type === 'paragraph' || token.type === 'blockquote') {
+                        if (!token.segments || token.segments.length === 0) continue;
+                        docChildren.push(new Paragraph({
+                            children: token.segments.map(seg => new TextRun({
+                                text: seg.text || "",
+                                bold: seg.bold,
+                                italics: seg.italic,
+                                font: seg.code ? "Courier" : undefined,
+                            })),
+                            spacing: { before: 120, after: 120 },
+                            indent: token.type === 'blockquote' ? { left: 720 } : undefined
+                        }));
+                    } else if (token.type === 'ul' || token.type === 'ol') {
+                        for (const li of token.items) {
+                            const prefix = token.type === 'ol' ? `${li.num}. ` : '• ';
+                            docChildren.push(new Paragraph({
+                                indent: { left: (li.indent + 1) * 720, hanging: 360 },
+                                children: [
+                                    new TextRun({ text: prefix }),
+                                    ...(li.segments || []).map(seg => new TextRun({
+                                        text: seg.text || "",
+                                        bold: seg.bold,
+                                        italics: seg.italic,
+                                        font: seg.code ? "Courier" : undefined,
+                                    }))
+                                ],
+                                spacing: { before: 60, after: 60 }
+                            }));
+                        }
+                    } else if (token.type === 'code') {
+                        const lines = (token.content || '').split('\n');
+                        for (const line of lines) {
+                            docChildren.push(new Paragraph({
+                                children: [new TextRun({ text: line, font: "Courier" })],
+                                spacing: { before: 0, after: 0 },
+                                indent: { left: 360 }
+                            }));
+                        }
+                        docChildren.push(new Paragraph({ text: "", spacing: { after: 120 } }));
+                    } else if (token.type === 'table') {
+                        const allRows = [];
+                        if (token.header && token.header.length > 0) allRows.push(token.header);
+                        if (token.rows && token.rows.length > 0) allRows.push(...token.rows);
+
+                        if (allRows.length > 0) {
+                            docChildren.push(new Table({
+                                width: { size: 100, type: WidthType.PERCENTAGE },
+                                rows: allRows.map(row =>
+                                    new TableRow({
+                                        children: row.map(cell =>
+                                            new TableCell({
+                                                children: [new Paragraph({ text: cell || "" })],
+                                            })
+                                        )
+                                    })
+                                )
+                            }));
+                            docChildren.push(new Paragraph({ text: "", spacing: { after: 120 } }));
+                        }
+                    } else if (token.type === 'hr') {
+                        docChildren.push(new Paragraph({
+                            text: "--------------------------------------------------",
+                            alignment: AlignmentType.CENTER,
+                            spacing: { before: 120, after: 120 }
+                        }));
+                    }
+                }
+
+                docChildren.push(new Paragraph({ text: "", spacing: { after: 240 } })); // Spacing between items
+            }
+
+            const doc = new Document({
+                sections: [
+                    {
+                        properties: {},
+                        children: docChildren,
+                    },
+                ],
+            });
+
+            const blob = await Packer.toBlob(doc);
+            const fileName = `${subject?.name || 'Export'}_${activeTab}.docx`.replace(/\s+/g, '_');
+            saveAs(blob, fileName);
+
+            setIsSelectionMode(false);
+            setSelectedItems(new Set());
+            toast.success('Word document generated successfully!', { id: loadingToast, duration: 4000 });
+
+        } catch (error) {
+            console.error('Word Export Error:', error);
+            toast.error(`Failed to generate Word document: ${error.message || String(error)}`, {
+                id: loadingToast,
+                duration: 6000
+            });
+        }
+    };
+
     // Load more images effect
     useEffect(() => {
         if (imagePage === 0) return; // handled by initial load
@@ -1114,12 +1381,12 @@ const SubjectDetail = () => {
     };
 
     const handleFetchNoteImage = async (noteId) => {
-        if (fetchedImages[`note-${noteId}`]) return;
+        if (fetchedImages[`note - ${noteId} `]) return;
         try {
-            setFetchingImageId(`note-${noteId}`);
+            setFetchingImageId(`note - ${noteId} `);
             const res = await notesApi.getImage(id, noteId);
             if (res.content) {
-                setFetchedImages((prev) => ({ ...prev, [`note-${noteId}`]: res.content }));
+                setFetchedImages((prev) => ({ ...prev, [`note - ${noteId} `]: res.content }));
             }
         } catch {
             toast.error('Failed to load note image');
@@ -1134,13 +1401,13 @@ const SubjectDetail = () => {
         if (idx > 0) {
             const img = images[idx - 1];
             const fakeNote = {
-                id: `img-${img.id}`,
+                id: `img - ${img.id} `,
                 title: 'Source Image',
                 content: 'Original captured material.',
                 source_image_id: img.id,
                 created_at: img.created_at
             };
-            setFetchedImages(prev => ({ ...prev, [`note-img-${img.id}`]: img.data }));
+            setFetchedImages(prev => ({ ...prev, [`note - img - ${img.id} `]: img.data }));
             setViewingNote(fakeNote);
         }
     };
@@ -1152,13 +1419,13 @@ const SubjectDetail = () => {
         if (idx < images.length - 1) {
             const img = images[idx + 1];
             const fakeNote = {
-                id: `img-${img.id}`,
+                id: `img - ${img.id} `,
                 title: 'Source Image',
                 content: 'Original captured material.',
                 source_image_id: img.id,
                 created_at: img.created_at
             };
-            setFetchedImages(prev => ({ ...prev, [`note-img-${img.id}`]: img.data }));
+            setFetchedImages(prev => ({ ...prev, [`note - img - ${img.id} `]: img.data }));
             setViewingNote(fakeNote);
         }
     };
@@ -1166,10 +1433,7 @@ const SubjectDetail = () => {
     const handlePrevNote = () => {
         if (!viewingNote || viewingNote.id?.toString().startsWith('img-')) return;
 
-        const filtered = notes.filter(n =>
-            n.title?.toLowerCase().includes(noteSearchQuery.toLowerCase()) ||
-            n.content?.toLowerCase().includes(noteSearchQuery.toLowerCase())
-        );
+        const filtered = getFilteredNotes();
 
         const idx = filtered.findIndex(n => n.id === viewingNote.id);
         if (idx > 0) {
@@ -1184,10 +1448,7 @@ const SubjectDetail = () => {
     const handleNextNote = () => {
         if (!viewingNote || viewingNote.id?.toString().startsWith('img-')) return;
 
-        const filtered = notes.filter(n =>
-            n.title?.toLowerCase().includes(noteSearchQuery.toLowerCase()) ||
-            n.content?.toLowerCase().includes(noteSearchQuery.toLowerCase())
-        );
+        const filtered = getFilteredNotes();
 
         const idx = filtered.findIndex(n => n.id === viewingNote.id);
         if (idx < filtered.length - 1) {
@@ -1232,7 +1493,7 @@ const SubjectDetail = () => {
     const navigateToQuestion = (questionId) => {
         setActiveTab('questions');
         setTimeout(() => {
-            let el = document.getElementById(`question-${questionId}`);
+            let el = document.getElementById(`question - ${questionId} `);
             if (!el) {
                 // If the element is hidden inside a collapsed group, expand it
                 const group = groupedQuestions.find(g => g.questions.some(q => q.id === questionId));
@@ -1242,7 +1503,7 @@ const SubjectDetail = () => {
             }
 
             setTimeout(() => {
-                el = document.getElementById(`question-${questionId}`);
+                el = document.getElementById(`question - ${questionId} `);
                 if (el) {
                     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     // Optional styling ping
@@ -1260,7 +1521,7 @@ const SubjectDetail = () => {
         if (existingNote) {
             setActiveTab('notes');
             setTimeout(() => {
-                const el = document.getElementById(`note-${existingNote.id}`);
+                const el = document.getElementById(`note - ${existingNote.id} `);
                 if (el) {
                     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     el.style.transition = 'box-shadow 0.3s ease';
@@ -1338,6 +1599,14 @@ const SubjectDetail = () => {
         }).sort((a, b) => b.newestAt - a.newestAt);
     }, [questions, searchQuery]);
 
+    const allNoteTags = Array.from(new Set(notes.flatMap(n => {
+        let t = n.tags || [];
+        if (typeof t === 'string') {
+            try { t = JSON.parse(t); } catch { t = []; }
+        }
+        return Array.isArray(t) ? t : [];
+    }))).sort();
+
     if (loading) {
         return (
             <div className="max-w-6xl mx-auto animate-pulse">
@@ -1389,7 +1658,7 @@ const SubjectDetail = () => {
             <ConfirmDialog
                 isOpen={confirmDeleteSession.open}
                 title="Delete Session"
-                message={`Are you sure you want to delete "${confirmDeleteSession.session?.title}"? This will also remove all entries in this session.`}
+                message={`Are you sure you want to delete "${confirmDeleteSession.session?.title}" ? This will also remove all entries in this session.`}
                 onConfirm={handleDeleteSession}
                 onCancel={() => setConfirmDeleteSession({ open: false, session: null })}
             />
@@ -1407,9 +1676,20 @@ const SubjectDetail = () => {
             <ConfirmDialog
                 isOpen={confirmDeleteNote.open}
                 title="Delete Note"
-                message={`Are you sure you want to delete "${confirmDeleteNote.note?.title}"? This action cannot be undone.`}
+                message={`Are you sure you want to delete "${confirmDeleteNote.note?.title}" ? This action cannot be undone.`}
                 onConfirm={handleDeleteNote}
                 onCancel={() => setConfirmDeleteNote({ open: false, note: null })}
+            />
+
+            <ConfirmDialog
+                isOpen={confirmBulkDelete.open}
+                title={`Delete ${confirmBulkDelete.count} ${confirmBulkDelete.type === 'notes' ? 'Note(s)' : 'Question(s)'}`}
+                message={`Are you sure you want to permanently delete these ${confirmBulkDelete.count} selected ${confirmBulkDelete.type}? This action cannot be undone.`}
+                onConfirm={handleBulkDeleteConfirm}
+                onCancel={() => setConfirmBulkDelete({ open: false, type: null, count: 0 })}
+                confirmText={`Delete ${confirmBulkDelete.count} Items`}
+                requireInput={true}
+                expectedInput="CONFIRM"
             />
 
             <ManageSyllabusModal
@@ -1454,8 +1734,8 @@ const SubjectDetail = () => {
                     }
                 }}
                 questionId={selectedQuestionIdForNote}
-                initialTitle={addToNoteData ? `Note: ${addToNoteData.selectedText.substring(0, 60)}${addToNoteData.selectedText.length > 60 ? '...' : ''}` : ''}
-                initialContent={addToNoteData ? `> ${addToNoteData.selectedText.replace(/\n/g, '\n> ')}\n\n` : ''}
+                initialTitle={addToNoteData ? `Note: ${addToNoteData.selectedText.substring(0, 60)}${addToNoteData.selectedText.length > 60 ? '...' : ''} ` : ''}
+                initialContent={addToNoteData ? `> ${addToNoteData.selectedText.replace(/\n/g, '\n> ')} \n\n` : ''}
                 parentNoteId={addToNoteData?.parentNoteId || null}
             />
 
@@ -1496,8 +1776,8 @@ const SubjectDetail = () => {
                 }}
                 note={viewingNote}
                 onNavigateToQuestion={navigateToQuestion}
-                sourceImage={viewingNote ? fetchedImages[`note-${viewingNote.id}`] : null}
-                isFetchingImage={fetchingImageId === (viewingNote ? `note-${viewingNote.id}` : null)}
+                sourceImage={viewingNote ? fetchedImages[`note - ${viewingNote.id} `] : null}
+                isFetchingImage={fetchingImageId === (viewingNote ? `note - ${viewingNote.id} ` : null)}
                 onEdit={setEditingNote}
                 onPrev={viewingNote?.id?.toString().startsWith('img-') ? handlePrevImage : handlePrevNote}
                 onNext={viewingNote?.id?.toString().startsWith('img-') ? handleNextImage : handleNextNote}
@@ -1608,66 +1888,67 @@ const SubjectDetail = () => {
                         <BarChart3 className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform" strokeWidth={2} />
                         <span className="hidden sm:inline">View Analytics</span>
                         <span className="sm:hidden">Analytics</span>
-                    </Link>
-                </div>
+                    </Link >
+                </div >
 
                 {/* Gradient separator */}
-                <div className="h-px bg-gradient-to-r from-white/[0.08] via-white/[0.06] to-transparent" />
+                < div className="h-px bg-gradient-to-r from-white/[0.08] via-white/[0.06] to-transparent" />
 
                 {/* Controls (Sub-Nav + Action) — single row, vertically aligned */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-50">
                     {/* Segmented Tabs */}
-                    <div className="flex gap-1 p-1 bg-surface-2/50 backdrop-blur-md rounded-xl border border-white/[0.06] w-fit">
-                        {['topics', 'sessions', 'questions', 'notes', 'revision', 'images'].map((tab) => {
-                            let count;
-                            let icon;
-                            switch (tab) {
-                                case 'topics':
-                                    count = topics.length;
-                                    break;
-                                case 'sessions':
-                                    count = sessions.length;
-                                    break;
-                                case 'questions':
-                                    count = questions.length;
-                                    break;
-                                case 'notes':
-                                    count = notes.length;
-                                    break;
-                                case 'images':
-                                    count = images.length;
-                                    break;
-                                case 'revision':
-                                    count = revisionSessions.length;
-                                    break;
-                            }
-                            return (
-                                <button
-                                    key={tab}
-                                    onClick={() => setActiveTab(tab)}
-                                    className={`flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-[13px] font-semibold capitalize transition-all duration-200 cursor-pointer
+                    < div className="flex gap-1 p-1 bg-surface-2/50 backdrop-blur-md rounded-xl border border-white/[0.06] w-fit" >
+                        {
+                            ['topics', 'sessions', 'questions', 'notes', 'revision', 'images'].map((tab) => {
+                                let count;
+                                switch (tab) {
+                                    case 'topics':
+                                        count = topics.length;
+                                        break;
+                                    case 'sessions':
+                                        count = sessions.length;
+                                        break;
+                                    case 'questions':
+                                        count = questions.length;
+                                        break;
+                                    case 'notes':
+                                        count = notes.length;
+                                        break;
+                                    case 'images':
+                                        count = images.length;
+                                        break;
+                                    case 'revision':
+                                        count = revisionSessions.length;
+                                        break;
+                                }
+                                return (
+                                    <button
+                                        key={tab}
+                                        onClick={() => setActiveTab(tab)}
+                                        className={`flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-[13px] font-semibold capitalize transition-all duration-200 cursor-pointer
                                         ${activeTab === tab
-                                            ? 'bg-primary text-white shadow-[0_2px_12px_rgba(139,92,246,0.35)]'
-                                            : 'text-slate-500 hover:text-slate-200 hover:bg-white/[0.05]'
-                                        }`}
-                                >
-                                    {tab}
-
-                                    <span className={`min-w-5 h-5 px-1 flex items-center justify-center rounded-full text-[10px] font-bold leading-none
-                                        ${activeTab === tab
-                                            ? 'bg-white/20 text-white'
-                                            : 'bg-white/[0.06] text-slate-500'
-                                        }`}
+                                                ? 'bg-primary text-white shadow-[0_2px_12px_rgba(139,92,246,0.35)]'
+                                                : 'text-slate-500 hover:text-slate-200 hover:bg-white/[0.05]'
+                                            }`}
                                     >
-                                        {count}
-                                    </span>
-                                </button>
-                            );
-                        })}
-                    </div>
+                                        {tab}
+
+                                        <span className={`min-w-5 h-5 px-1 flex items-center justify-center rounded-full text-[10px] font-bold leading-none
+                                        ${activeTab === tab
+                                                ? 'bg-white/20 text-white'
+                                                : 'bg-white/[0.06] text-slate-500'
+                                            }`}
+                                        >
+                                            {count}
+                                        </span>
+                                    </button>
+                                );
+                            })
+                        }
+                    </div >
 
                     {/* Action Bar — same row height as tabs */}
-                    <div className="flex items-center gap-3">
+                    < div className="flex items-center gap-3" >
                         {activeTab === 'sessions' && (
                             <button
                                 onClick={() => setShowSessionModal(true)}
@@ -1678,1321 +1959,1519 @@ const SubjectDetail = () => {
                             </button>
                         )}
 
-                        {activeTab === 'questions' && (
-                            <>
-                                {isSelectionMode ? (
-                                    <div className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-500/20 p-1.5 rounded-xl transition-all animate-in fade-in slide-in-from-right-4 duration-300">
-                                        <button
-                                            onClick={handleSelectAll}
-                                            className="px-3 py-1.5 rounded-lg text-[13px] font-bold text-indigo-400 hover:bg-indigo-500/20 transition-all cursor-pointer"
-                                        >
-                                            {selectedItems.size > 0 && selectedItems.size === groupedQuestions.flatMap(g => g.questions).length ? 'Deselect All' : 'Select All'}
-                                        </button>
-                                        <div className="w-px h-4 bg-indigo-500/20 mx-1"></div>
-                                        <button
-                                            onClick={handleDownloadSelected}
-                                            disabled={selectedItems.size === 0}
-                                            className="bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-50 flex items-center gap-2 text-[13px] font-semibold px-4 py-1.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
-                                        >
-                                            <Download className="w-4 h-4" />
-                                            <span>Download PDF ({selectedItems.size})</span>
-                                        </button>
-                                        <button
-                                            onClick={() => { setIsSelectionMode(false); setSelectedItems(new Set()); }}
-                                            className="text-slate-400 hover:text-white px-3 py-1.5 rounded-lg transition-all cursor-pointer text-[13px] font-semibold"
-                                        >
-                                            Cancel
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <button
-                                            onClick={() => setIsSelectionMode(true)}
-                                            className="bg-surface-3/50 text-slate-300 hover:text-white hover:bg-surface-3 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all border border-white/[0.08] cursor-pointer"
-                                        >
-                                            <CheckCircle className="w-4 h-4" />
-                                            <span>Select</span>
-                                        </button>
-                                        <button
-                                            onClick={() => setShowQuestionModal(true)}
-                                            className="btn-primary flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer hover:shadow-[0_4px_20px_rgba(139,92,246,0.35)] active:scale-[0.98]"
-                                        >
-                                            <PlusCircle className="w-4 h-4" strokeWidth={2} />
-                                            <span>Add Question</span>
-                                        </button>
-                                    </>
-                                )}
-                            </>
-                        )}
+                        {
+                            activeTab === 'questions' && (
+                                <>
+                                    {isSelectionMode ? (
+                                        <div className="flex items-center h-[44px] bg-[#121214]/60 backdrop-blur-2xl border border-white/[0.04] rounded-full px-1.5 shadow-[0_8px_30px_rgb(0,0,0,0.4)] transition-all animate-in fade-in zoom-in-95 duration-300">
+                                            <div className="flex items-center pl-3 pr-2">
+                                                <div className="w-5 h-5 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center text-[11px] font-bold mr-2">
+                                                    {selectedItems.size}
+                                                </div>
+                                                <span className="text-[13px] text-slate-300 font-medium hidden sm:inline">selected</span>
+                                            </div>
 
-                        {activeTab === 'notes' && (
-                            <>
-                                {isSelectionMode ? (
-                                    <div className="flex items-center gap-1.5 bg-indigo-500/10 border border-indigo-500/20 p-1.5 rounded-xl transition-all animate-in fade-in slide-in-from-right-4 duration-300">
-                                        <button
-                                            onClick={handleSelectAll}
-                                            className="px-3 py-1.5 rounded-lg text-[13px] font-bold text-indigo-400 hover:bg-indigo-500/20 transition-all cursor-pointer"
-                                        >
-                                            {selectedItems.size > 0 && selectedItems.size === notes.filter(n => n.title?.toLowerCase().includes(noteSearchQuery.toLowerCase()) || n.content?.toLowerCase().includes(noteSearchQuery.toLowerCase())).length ? 'Deselect All' : 'Select All'}
-                                        </button>
-                                        <div className="w-px h-4 bg-indigo-500/20 mx-1"></div>
-                                        <button
-                                            onClick={handleDownloadSelected}
-                                            disabled={selectedItems.size === 0}
-                                            className="bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-50 flex items-center gap-2 text-[13px] font-semibold px-4 py-1.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
-                                        >
-                                            <Download className="w-4 h-4" />
-                                            <span>Download PDF ({selectedItems.size})</span>
-                                        </button>
-                                        <button
-                                            onClick={() => { setIsSelectionMode(false); setSelectedItems(new Set()); }}
-                                            className="text-slate-400 hover:text-white px-3 py-1.5 rounded-lg transition-all cursor-pointer text-[13px] font-semibold"
-                                        >
-                                            Cancel
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <button
-                                            onClick={() => setIsSelectionMode(true)}
-                                            className="bg-surface-3/50 text-slate-300 hover:text-white hover:bg-surface-3 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all border border-white/[0.08] cursor-pointer"
-                                        >
-                                            <CheckCircle className="w-4 h-4" />
-                                            <span>Select</span>
-                                        </button>
-                                        <button
-                                            onClick={() => setShowNoteModal(true)}
-                                            className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
-                                        >
-                                            <PlusCircle className="w-4 h-4" strokeWidth={2} />
-                                            <span>Add Note</span>
-                                        </button>
-                                    </>
-                                )}
-                            </>
-                        )}
+                                            <div className="w-px h-5 bg-white/[0.08] mx-1"></div>
 
-                        {activeTab === 'images' && (
-                            <button
-                                onClick={() => setShowImageModal(true)}
-                                className="bg-indigo-500 text-white hover:bg-indigo-600 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
-                            >
-                                <ImageIcon className="w-4 h-4" strokeWidth={2} />
-                                <span>Add Image</span>
-                            </button>
-                        )}
+                                            <button
+                                                onClick={handleSelectAll}
+                                                className="text-[12px] font-medium text-slate-300 hover:text-white px-3 py-1.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
+                                            >
+                                                {selectedItems.size > 0 && selectedItems.size === groupedQuestions.flatMap(g => g.questions).length ? 'Clear' : 'All'}
+                                            </button>
 
-                        {activeTab === 'topics' && (
-                            <button
-                                onClick={() => setShowTopicModal(true)}
-                                className="btn-primary flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer hover:shadow-[0_4px_20px_rgba(139,92,246,0.35)] active:scale-[0.98]"
-                            >
-                                <PlusCircle className="w-4 h-4" strokeWidth={2} />
-                                <span>Manage Syllabus</span>
-                            </button>
-                        )}
+                                            <div className="w-px h-5 bg-white/[0.08] mx-1"></div>
 
-                        {activeTab === 'revision' && (
-                            <button
-                                onClick={() => setShowCreateRevisionSession(true)}
-                                className="bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 hover:border-violet-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
-                            >
-                                <PlusCircle className="w-4 h-4" strokeWidth={2} />
-                                <span>New Session</span>
-                            </button>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* Main Content Area */}
-            {activeTab === 'topics' && (
-                <div className="fade-in">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
-                        <div className="flex items-center gap-2">
-                            <BookOpen className="w-6 h-6 text-indigo-400" />
-                            <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Syllabus</h3>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                            <button
-                                onClick={handleDownloadSyllabus}
-                                disabled={isDownloadingSyllabus}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 border border-emerald-500/20 transition-all cursor-pointer uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Download Syllabus as PDF"
-                            >
-                                {isDownloadingSyllabus ? (
-                                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                    <Download className="w-3.5 h-3.5" />
-                                )}
-                                <span>Export PDF</span>
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setTopicsDefaultExpanded(true);
-                                    setTreeKey(prev => prev + 1);
-                                }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-400 hover:text-primary hover:bg-primary/10 border border-white/5 transition-all cursor-pointer uppercase tracking-wider"
-                                title="Expand all"
-                            >
-                                <Maximize2 className="w-3.5 h-3.5" />
-                                <span>Expand All</span>
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setTopicsDefaultExpanded(false);
-                                    setTreeKey(prev => prev + 1);
-                                }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white hover:bg-white/10 border border-white/5 transition-all cursor-pointer uppercase tracking-wider"
-                                title="Collapse all"
-                            >
-                                <Minimize2 className="w-3.5 h-3.5" />
-                                <span>Collapse All</span>
-                            </button>
-                        </div>
-                    </div>
-                    <TopicTree
-                        key={treeKey}
-                        topics={topics}
-                        subjectId={id}
-                        onTopicDeleted={handleTopicDeleted}
-                        onTopicsChanged={setTopics}
-                        defaultExpanded={topicsDefaultExpanded}
-                    />
-                </div>
-            )}
-
-            {activeTab === 'sessions' && (
-                <div className="fade-in">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
-                        <div className="flex items-center gap-2">
-                            <Activity className="w-6 h-6 text-indigo-400" />
-                            <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Study Sessions</h3>
-                        </div>
-                        <div className="relative group min-w-[300px]">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
-                            <input
-                                type="text"
-                                value={sessionSearchQuery}
-                                onChange={(e) => setSessionSearchQuery(e.target.value)}
-                                placeholder="Search sessions..."
-                                className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
-                            />
-                            {sessionSearchQuery && (
-                                <button
-                                    onClick={() => setSessionSearchQuery('')}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
-                                >
-                                    <X className="w-4 h-4" />
-                                </button>
-                            )}
-                        </div>
-                        <div className="flex bg-surface-2/50 p-1 rounded-xl border border-white/[0.06] shrink-0">
-                            <button
-                                onClick={() => setSessionsViewMode('grid')}
-                                className={`p-1.5 rounded-lg transition-all ${sessionsViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
-                                title="Grid View"
-                            >
-                                <LayoutGrid className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={() => setSessionsViewMode('list')}
-                                className={`p-1.5 rounded-lg transition-all ${sessionsViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
-                                title="List View"
-                            >
-                                <List className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </div>
-
-
-                    {sessions.length === 0 ? (
-                        <div className="glass-panel p-12 text-center rounded-2xl border-dashed border-white/10 max-w-2xl mx-auto mt-8">
-                            <div className="w-20 h-20 rounded-xl bg-surface-3 mx-auto flex items-center justify-center mb-6 shadow-inner border border-white/5">
-                                <Activity className="w-8 h-8 text-primary opacity-80" />
-                            </div>
-                            <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No learning sessions</h3>
-                            <p className="text-slate-400 text-sm mb-8 leading-relaxed max-w-md mx-auto">
-                                You haven't recorded any sessions for this subject yet. Start a session to log your correct and incorrect topics.
-                            </p>
-                            <button
-                                onClick={() => setShowSessionModal(true)}
-                                className="btn-primary flex items-center gap-2 text-sm font-semibold px-6 py-3 rounded-lg transition-all mx-auto w-fit cursor-pointer"
-                            >
-                                <PlusCircle className="w-4 h-4" />
-                                <span>Record First Session</span>
-                            </button>
-                        </div>
-                    ) : (
-                        <div className={`grid gap-5 ${sessionsViewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
-                            {(() => {
-                                const filtered = sessions.filter(s =>
-                                    (s.title || s.name || '')?.toLowerCase().includes(sessionSearchQuery.toLowerCase()) ||
-                                    s.notes?.toLowerCase().includes(sessionSearchQuery.toLowerCase())
-                                );
-
-                                if (filtered.length === 0 && sessions.length > 0) {
-                                    return (
-                                        <div className="col-span-full py-12 flex flex-col items-center justify-center text-center bg-white/[0.02] rounded-2xl border border-white/[0.05] border-dashed">
-                                            <Search className="w-8 h-8 text-slate-600 mb-3" />
-                                            <p className="text-slate-400 font-medium">No sessions match your search</p>
-                                            <button onClick={() => setSessionSearchQuery('')} className="mt-2 text-indigo-400 text-sm hover:underline">Clear search</button>
-                                        </div>
-                                    );
-                                }
-
-                                return filtered.map((s) => (
-                                    <SessionCard
-                                        key={s.id}
-                                        session={s}
-                                        subjectId={id}
-                                        viewMode={sessionsViewMode}
-                                        onDelete={(session) => setConfirmDeleteSession({ open: true, session })}
-                                        onEdit={(session) => setEditingSession(session)}
-                                    />
-
-                                ));
-                            })()}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {activeTab === 'questions' && (
-                <div className="fade-in">
-                    {/* Header for Questions */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
-                        <div className="flex items-center gap-2">
-                            <ListChecks className="w-6 h-6 text-indigo-400" />
-                            <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Question Bank</h3>
-                        </div>
-                        <div className="relative group min-w-[300px]">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Search by content or topic tags..."
-                                className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
-                            />
-                            {searchQuery && (
-                                <button
-                                    onClick={() => setSearchQuery('')}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
-                                >
-                                    <X className="w-4 h-4" />
-                                </button>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-6 items-start">
-                        {/* Form moved to Modal */}
-
-                        {/* Questions List (Full Width) */}
-                        <div className="w-full">
-                            {questions.length === 0 ? (
-                                <div className="glass p-16 text-center rounded-xl border-dashed border-white/10 flex flex-col items-center">
-                                    <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 rotate-3">
-                                        <ListChecks className="w-10 h-10 text-slate-500" />
-                                    </div>
-                                    <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">Your question bank is empty</h3>
-                                    <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
-                                        Start adding questions from your books or notes. AI will automatically format them for better readability.
-                                    </p>
-                                    <button
-                                        onClick={() => setShowQuestionModal(true)}
-                                        className="btn-primary flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer"
-                                    >
-                                        <PlusCircle className="w-4 h-4" />
-                                        <span>Add Your First Question</span>
-                                    </button>
-                                </div>
-                            ) : groupedQuestions.length === 0 ? (
-                                <div className="glass p-16 text-center rounded-xl border-dashed border-white/10 flex flex-col items-center">
-                                    <div className="w-16 h-16 rounded-2xl bg-surface-2 flex items-center justify-center mb-4 border border-white/5">
-                                        <Search className="w-8 h-8 text-slate-600" />
-                                    </div>
-                                    <h4 className="text-lg font-bold text-white mb-1">No matching questions</h4>
-                                    <p className="text-slate-500 text-sm">Try adjusting your search query or tags</p>
-                                    <button
-                                        onClick={() => setSearchQuery('')}
-                                        className="mt-6 text-indigo-400 hover:text-indigo-300 text-sm font-semibold"
-                                    >
-                                        Clear Search
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-1 gap-7">
-                                    {groupedQuestions.map((group) => {
-                                        const isExpanded = expandedGroups[group.rootId];
-                                        const rootQ = group.questions[0] || group.parent;
-                                        if (!rootQ) return null;
-
-                                        if (!group.isGroup) {
-                                            const q = rootQ;
-                                            const existingAINote = notes.find(n => n.question_id === q.id && n.title?.startsWith('AI Note'));
-                                            return (
-                                                <div
-                                                    key={q.id}
-                                                    id={`question-${q.id}`}
-                                                    className={`question-card group relative transition-all ${isSelectionMode ? (selectedItems.has(q.id) ? 'ring-2 ring-indigo-500 cursor-pointer bg-indigo-500/5' : 'cursor-pointer hover:bg-white/[0.02]') : ''}`}
-                                                    onClick={() => {
-                                                        if (isSelectionMode) {
-                                                            const next = new Set(selectedItems);
-                                                            if (next.has(q.id)) next.delete(q.id);
-                                                            else next.add(q.id);
-                                                            setSelectedItems(next);
-                                                        }
-                                                    }}
+                                            <div className="flex items-center gap-1 px-1 relative">
+                                                <button
+                                                    onClick={() => setShowExportMenu(!showExportMenu)}
+                                                    disabled={selectedItems.size === 0}
+                                                    title="More Options"
+                                                    className={`flex items-center justify-center w-8 h-8 rounded-full transition-all cursor-pointer ${showExportMenu ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
                                                 >
-                                                    {isSelectionMode && (
-                                                        <div className="absolute top-4 right-4 z-20">
-                                                            <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(q.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-500 bg-surface-3/50'}`}>
-                                                                {selectedItems.has(q.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {/* Card Header — question number + metadata */}
-                                                    <div className="flex items-center gap-3 mb-4 pb-3 border-b border-white/[0.06]">
-                                                        <span className="text-[15px] font-heading font-bold text-primary tracking-tight">
-                                                            Q
-                                                        </span>
-                                                        <span className="flex items-center gap-1.5 px-2.5 py-1 bg-surface-3/80 text-slate-300 rounded-md text-[12px] font-semibold border border-white/5">
-                                                            {q.type === 'image' ? <ImageIcon className="w-4 h-4 text-indigo-400" /> : <FileText className="w-4 h-4 text-emerald-400" />}
-                                                            {q.type === 'image' ? 'Image' : 'Text'}
-                                                        </span>
-                                                        <span className="text-[12px] text-slate-500 ml-auto font-medium">
-                                                            {new Date(q.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                        </span>
+                                                    <MoreHorizontal className="w-5 h-5" />
+                                                </button>
 
-                                                        <div className="flex items-center gap-1 ml-2">
+                                                {/* Export Dropdown */}
+                                                {showExportMenu && selectedItems.size > 0 && (
+                                                    <div className="absolute top-full right-0 mt-2 w-48 bg-[#121214]/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 z-50">
+                                                        <div className="p-1 space-y-0.5">
+                                                            <button
+                                                                onClick={() => { handleDownloadSelected(); setShowExportMenu(false); }}
+                                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium text-slate-300 hover:text-white hover:bg-indigo-500/20 rounded-xl transition-colors cursor-pointer group"
+                                                            >
+                                                                <FileText className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform" />
+                                                                Download as PDF
+                                                            </button>
+                                                            <button
+                                                                onClick={() => { handleDownloadWordSelected(); setShowExportMenu(false); }}
+                                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium text-slate-300 hover:text-white hover:bg-sky-500/20 rounded-xl transition-colors cursor-pointer group"
+                                                            >
+                                                                <FileText className="w-4 h-4 text-sky-400 group-hover:scale-110 transition-transform" />
+                                                                Download as Word
+                                                            </button>
+
+                                                            <div className="h-px bg-white/10 my-1 mx-2"></div>
                                                             <button
                                                                 onClick={() => {
-                                                                    setEditingQuestion(q);
-                                                                    setShowEditQuestionModal(true);
+                                                                    setConfirmBulkDelete({ open: true, type: 'questions', count: selectedItems.size });
+                                                                    setShowExportMenu(false);
                                                                 }}
-                                                                className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer"
-                                                                title="Edit Question"
+                                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium text-red-400 hover:text-white hover:bg-red-500/20 rounded-xl transition-colors cursor-pointer group"
                                                             >
-                                                                <Pencil className="w-[18px] h-[18px]" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => {
-                                                                    setSelectedQuestionIdForNote(q.id);
-                                                                    setShowNoteModal(true);
-                                                                }}
-                                                                className="p-2 text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-all cursor-pointer"
-                                                                title="Manual Note"
-                                                            >
-                                                                <FileText className="w-[18px] h-[18px]" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleGenerateAINote(q.id)}
-                                                                disabled={generatingAINoteId === q.id}
-                                                                className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer disabled:opacity-50"
-                                                                title={existingAINote ? "View AI Note" : "AI Note"}
-                                                            >
-                                                                {generatingAINoteId === q.id ? (
-                                                                    <div className="w-[18px] h-[18px] border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
-                                                                ) : existingAINote ? (
-                                                                    <BookOpen className="w-[18px] h-[18px]" />
-                                                                ) : (
-                                                                    <Wand2 className="w-[18px] h-[18px]" />
-                                                                )}
-                                                            </button>
-                                                            <button
-                                                                onClick={() => setConfirmDeleteQuestion({ open: true, questionId: q.id })}
-                                                                className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all cursor-pointer"
-                                                                title="Delete Question"
-                                                            >
-                                                                <Trash2 className="w-[18px] h-[18px]" />
+                                                                <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                                                                Delete Selected
                                                             </button>
                                                         </div>
-                                                    </div>
-
-                                                    {/* Card Body — question content */}
-                                                    <div className="prose prose-invert prose-lg max-w-none text-slate-200 text-[15px] leading-[1.7]">
-                                                        {q.formatted_content && q.formatted_content.root ? (
-                                                            <RichTextRenderer content={q.formatted_content} />
-                                                        ) : (
-                                                            <ReactMarkdown
-                                                                remarkPlugins={[remarkGfm, remarkMath]}
-                                                                rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
-                                                            >
-                                                                {preprocessMarkdown(q.content)}
-                                                            </ReactMarkdown>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Tags display */}
-                                                    {(() => {
-                                                        let qTags = [];
-                                                        try {
-                                                            qTags = typeof q.tags === 'string' ? JSON.parse(q.tags) : (q.tags || []);
-                                                        } catch {
-                                                            qTags = [];
-                                                        }
-                                                        if (!qTags || qTags.length === 0) return null;
-                                                        return (
-                                                            <div className="mt-4 flex flex-wrap gap-2">
-                                                                {qTags.map((tag, idx) => (
-                                                                    <span key={idx} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                                                        <Hash className="w-2.5 h-2.5" />
-                                                                        {tag}
-                                                                    </span>
-                                                                ))}
-                                                            </div>
-                                                        );
-                                                    })()}
-
-                                                    {q.type === 'image' && (
-                                                        <div className="mt-5">
-                                                            {fetchedImages[q.id] || fetchedImages[q.source_image_id] ? (
-                                                                <div className="rounded-xl overflow-hidden border border-white/10 inline-block bg-black/40 group/img relative">
-                                                                    <img
-                                                                        src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
-                                                                        alt="Original Question"
-                                                                        className="max-h-80 object-contain transition-all group-hover/img:opacity-50"
-                                                                    />
-                                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
-                                                                        <span className="bg-black/60 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/10">
-                                                                            Original Attachment
-                                                                        </span>
-                                                                    </div>
-                                                                </div>
-                                                            ) : (
-                                                                <button
-                                                                    onClick={() => handleFetchImage(q.id)}
-                                                                    disabled={fetchingImageId === q.id}
-                                                                    className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-surface-3/80 text-slate-300 hover:text-white hover:bg-surface-3 transition-all border border-white/5 shadow-sm disabled:opacity-50 cursor-pointer"
-                                                                >
-                                                                    {fetchingImageId === q.id ? (
-                                                                        <div className="w-3.5 h-3.5 border border-white/30 border-t-white rounded-full animate-spin" />
-                                                                    ) : (
-                                                                        <ImageIcon className="w-4 h-4 text-indigo-400" />
-                                                                    )}
-                                                                    <span>
-                                                                        {fetchingImageId === q.id ? 'Loading...' : 'Show Source Image'}
-                                                                    </span>
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    )}
-
-
-                                                </div>
-                                            );
-                                        }
-
-                                        return (
-                                            <div key={group.rootId} className="flex flex-col gap-3">
-                                                {/* Group Header */}
-                                                <div
-                                                    onClick={() => toggleGroup(group.rootId)}
-                                                    className="flex items-center justify-between p-4 rounded-xl bg-surface-2 border border-white/[0.06] cursor-pointer hover:bg-surface-3 transition-colors group/header"
-                                                >
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
-                                                            {rootQ.type === 'image' ? <ImageIcon className="w-5 h-5 text-indigo-400" /> : <FileText className="w-5 h-5 text-emerald-400" />}
-                                                        </div>
-                                                        <div>
-                                                            <div className="flex items-center gap-3">
-                                                                <h4 className="text-[15px] font-heading font-bold text-white tracking-tight">
-                                                                    {rootQ.type === 'image' ? 'Image' : 'Text'} Collection
-                                                                </h4>
-                                                                <span className="px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-                                                                    {group.questions.length} Items
-                                                                </span>
-                                                            </div>
-                                                            <p className="text-[12px] text-slate-500 mt-0.5">
-                                                                Uploaded {new Date(group.newestAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={`p-2 rounded-lg bg-white/[0.03] text-slate-500 group-hover/header:text-white transition-all ${isExpanded ? 'rotate-180' : ''}`}>
-                                                            <ChevronDown className="w-4 h-4" />
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Group Content */}
-                                                {isExpanded && (
-                                                    <div className="flex flex-col gap-5 pl-8 border-l-2 border-white/[0.06] mt-2 mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                                                        {group.questions.map((q, qidx) => {
-                                                            const existingAINote = notes.find(n => n.question_id === q.id && n.title?.startsWith('AI Note'));
-                                                            return (
-                                                                <div
-                                                                    key={q.id}
-                                                                    id={`question-${q.id}`}
-                                                                    className={`question-card group relative transition-all ${isSelectionMode ? (selectedItems.has(q.id) ? 'ring-2 ring-indigo-500 cursor-pointer bg-indigo-500/5' : 'cursor-pointer hover:bg-white/[0.02]') : ''}`}
-                                                                    onClick={() => {
-                                                                        if (isSelectionMode) {
-                                                                            const next = new Set(selectedItems);
-                                                                            if (next.has(q.id)) next.delete(q.id);
-                                                                            else next.add(q.id);
-                                                                            setSelectedItems(next);
-                                                                        }
-                                                                    }}
-                                                                >
-                                                                    {isSelectionMode && (
-                                                                        <div className="absolute top-4 right-4 z-20">
-                                                                            <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(q.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-500 bg-surface-3/50'}`}>
-                                                                                {selectedItems.has(q.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
-                                                                            </div>
-                                                                        </div>
-                                                                    )}
-                                                                    {/* Card Header — question number + metadata */}
-                                                                    <div className="flex items-center gap-3 mb-4 pb-3 border-b border-white/[0.06]">
-                                                                        <span className="text-[15px] font-heading font-bold text-primary tracking-tight">
-                                                                            #{qidx + 1}
-                                                                        </span>
-                                                                        <span className="text-[12px] text-slate-500 ml-auto font-medium">
-                                                                            {new Date(q.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                                        </span>
-
-                                                                        <div className="flex items-center gap-1 ml-2">
-                                                                            <button
-                                                                                onClick={() => {
-                                                                                    setEditingQuestion(q);
-                                                                                    setShowEditQuestionModal(true);
-                                                                                }}
-                                                                                className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer"
-                                                                                title="Edit Question"
-                                                                            >
-                                                                                <Pencil className="w-[18px] h-[18px]" />
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() => {
-                                                                                    setSelectedQuestionIdForNote(q.id);
-                                                                                    setShowNoteModal(true);
-                                                                                }}
-                                                                                className="p-2 text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-all cursor-pointer"
-                                                                                title="Manual Note"
-                                                                            >
-                                                                                <FileText className="w-[18px] h-[18px]" />
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() => handleGenerateAINote(q.id)}
-                                                                                disabled={generatingAINoteId === q.id}
-                                                                                className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer disabled:opacity-50"
-                                                                                title={existingAINote ? "View AI Note" : "AI Note"}
-                                                                            >
-                                                                                {generatingAINoteId === q.id ? (
-                                                                                    <div className="w-[18px] h-[18px] border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
-                                                                                ) : existingAINote ? (
-                                                                                    <BookOpen className="w-[18px] h-[18px]" />
-                                                                                ) : (
-                                                                                    <Wand2 className="w-[18px] h-[18px]" />
-                                                                                )}
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() => setConfirmDeleteQuestion({ open: true, questionId: q.id })}
-                                                                                className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all cursor-pointer"
-                                                                                title="Delete Question"
-                                                                            >
-                                                                                <Trash2 className="w-[18px] h-[18px]" />
-                                                                            </button>
-                                                                        </div>
-                                                                    </div>
-
-                                                                    {/* Card Body — question content */}
-                                                                    <div className="prose prose-invert prose-lg max-w-none text-slate-200 text-[15px] leading-[1.7]">
-                                                                        {q.formatted_content && q.formatted_content.root ? (
-                                                                            <RichTextRenderer content={q.formatted_content} />
-                                                                        ) : (
-                                                                            <ReactMarkdown
-                                                                                remarkPlugins={[remarkGfm, remarkMath]}
-                                                                                rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
-                                                                            >
-                                                                                {preprocessMarkdown(q.content)}
-                                                                            </ReactMarkdown>
-                                                                        )}
-                                                                    </div>
-
-                                                                    {/* Tags display */}
-                                                                    {(() => {
-                                                                        let qTags = [];
-                                                                        try {
-                                                                            qTags = typeof q.tags === 'string' ? JSON.parse(q.tags) : (q.tags || []);
-                                                                        } catch {
-                                                                            qTags = [];
-                                                                        }
-                                                                        if (!qTags || qTags.length === 0) return null;
-                                                                        return (
-                                                                            <div className="mt-4 flex flex-wrap gap-2">
-                                                                                {qTags.map((tag, idx) => (
-                                                                                    <span key={idx} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                                                                        <Hash className="w-2.5 h-2.5" />
-                                                                                        {tag}
-                                                                                    </span>
-                                                                                ))}
-                                                                            </div>
-                                                                        );
-                                                                    })()}
-
-                                                                    {q.type === 'image' && qidx === 0 && (
-                                                                        <div className="mt-5">
-                                                                            {fetchedImages[q.id] || fetchedImages[q.source_image_id] ? (
-                                                                                <div className="rounded-xl overflow-hidden border border-white/10 inline-block bg-black/40 group/img relative">
-                                                                                    <img
-                                                                                        src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
-                                                                                        alt="Original Question"
-                                                                                        className="max-h-80 object-contain transition-all group-hover/img:opacity-50"
-                                                                                    />
-                                                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
-                                                                                        <span className="bg-black/60 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/10">
-                                                                                            Source Image
-                                                                                        </span>
-                                                                                    </div>
-                                                                                </div>
-                                                                            ) : (
-                                                                                <button
-                                                                                    onClick={() => handleFetchImage(q.id)}
-                                                                                    disabled={fetchingImageId === q.id}
-                                                                                    className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-surface-3/80 text-slate-300 hover:text-white hover:bg-surface-3 transition-all border border-white/5 shadow-sm disabled:opacity-50 cursor-pointer"
-                                                                                >
-                                                                                    {fetchingImageId === q.id ? (
-                                                                                        <div className="w-3.5 h-3.5 border border-white/30 border-t-white rounded-full animate-spin" />
-                                                                                    ) : (
-                                                                                        <ImageIcon className="w-4 h-4 text-indigo-400" />
-                                                                                    )}
-                                                                                    <span>
-                                                                                        {fetchingImageId === q.id ? 'Loading...' : 'Show Shared Source Image'}
-                                                                                    </span>
-                                                                                </button>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-
-
-                                                                </div>
-                                                            );
-                                                        })}
                                                     </div>
                                                 )}
                                             </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
 
-            {activeTab === 'notes' && (
-                <div className="fade-in">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
-                        <div className="flex items-center gap-2">
-                            <FileText className="w-6 h-6 text-indigo-400" />
-                            <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Notes</h3>
-                        </div>
-                        <div className="relative group min-w-[300px]">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
-                            <input
-                                type="text"
-                                value={noteSearchQuery}
-                                onChange={(e) => setNoteSearchQuery(e.target.value)}
-                                placeholder="Search notes by title or content..."
-                                className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
-                            />
-                            {noteSearchQuery && (
+                                            <div className="w-px h-5 bg-white/[0.08] mx-1"></div>
+
+                                            <button
+                                                onClick={() => { setIsSelectionMode(false); setSelectedItems(new Set()); setShowExportMenu(false); }}
+                                                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-red-500/20 hover:text-red-400 transition-colors cursor-pointer"
+                                                title="Cancel"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <button
+                                                onClick={() => setIsSelectionMode(true)}
+                                                className="bg-surface-3/50 text-slate-300 hover:text-white hover:bg-surface-3 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all border border-white/[0.08] cursor-pointer"
+                                            >
+                                                <CheckCircle className="w-4 h-4" />
+                                                <span>Select</span>
+                                            </button>
+                                            <button
+                                                onClick={() => setShowQuestionModal(true)}
+                                                className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
+                                            >
+                                                <PlusCircle className="w-4 h-4" strokeWidth={2} />
+                                                <span>Add Question</span>
+                                            </button>
+                                        </>
+                                    )}
+                                </>
+                            )
+                        }
+
+                        {
+                            activeTab === 'notes' && (
+                                <>
+                                    {isSelectionMode ? (
+                                        <div className="flex items-center h-[44px] bg-[#121214]/60 backdrop-blur-2xl border border-white/[0.04] rounded-full px-1.5 shadow-[0_8px_30px_rgb(0,0,0,0.4)] transition-all animate-in fade-in zoom-in-95 duration-300">
+                                            <div className="flex items-center pl-3 pr-2">
+                                                <div className="w-5 h-5 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center text-[11px] font-bold mr-2">
+                                                    {selectedItems.size}
+                                                </div>
+                                                <span className="text-[13px] text-slate-300 font-medium hidden sm:inline">selected</span>
+                                            </div>
+
+                                            <div className="w-px h-5 bg-white/[0.08] mx-1"></div>
+
+                                            <button
+                                                onClick={handleSelectAll}
+                                                className="text-[12px] font-medium text-slate-300 hover:text-white px-3 py-1.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
+                                            >
+                                                {selectedItems.size > 0 && selectedItems.size === getFilteredNotes().length ? 'Clear' : 'All'}
+                                            </button>
+
+                                            <div className="w-px h-5 bg-white/[0.08] mx-1"></div>
+
+                                            <div className="flex items-center gap-1 px-1 relative">
+                                                <button
+                                                    onClick={() => setShowExportMenu(!showExportMenu)}
+                                                    disabled={selectedItems.size === 0}
+                                                    title="More Options"
+                                                    className={`flex items-center justify-center w-8 h-8 rounded-full transition-all cursor-pointer ${showExportMenu ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+                                                >
+                                                    <MoreHorizontal className="w-5 h-5" />
+                                                </button>
+
+                                                {/* Export Dropdown */}
+                                                {showExportMenu && selectedItems.size > 0 && (
+                                                    <div className="absolute top-full right-0 mt-2 w-48 bg-[#121214]/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 z-50">
+                                                        <div className="p-1 space-y-0.5">
+                                                            <button
+                                                                onClick={() => { handleDownloadSelected(); setShowExportMenu(false); }}
+                                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium text-slate-300 hover:text-white hover:bg-indigo-500/20 rounded-xl transition-colors cursor-pointer group"
+                                                            >
+                                                                <FileText className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform" />
+                                                                Download as PDF
+                                                            </button>
+                                                            <button
+                                                                onClick={() => { handleDownloadWordSelected(); setShowExportMenu(false); }}
+                                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium text-slate-300 hover:text-white hover:bg-sky-500/20 rounded-xl transition-colors cursor-pointer group"
+                                                            >
+                                                                <FileText className="w-4 h-4 text-sky-400 group-hover:scale-110 transition-transform" />
+                                                                Download as Word
+                                                            </button>
+
+                                                            <div className="h-px bg-white/10 my-1 mx-2"></div>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setConfirmBulkDelete({ open: true, type: 'notes', count: selectedItems.size });
+                                                                    setShowExportMenu(false);
+                                                                }}
+                                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium text-red-400 hover:text-white hover:bg-red-500/20 rounded-xl transition-colors cursor-pointer group"
+                                                            >
+                                                                <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                                                                Delete Selected
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="w-px h-5 bg-white/[0.08] mx-1"></div>
+
+                                            <button
+                                                onClick={() => { setIsSelectionMode(false); setSelectedItems(new Set()); setShowExportMenu(false); }}
+                                                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-red-500/20 hover:text-red-400 transition-colors cursor-pointer"
+                                                title="Cancel"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <button
+                                                onClick={() => setIsSelectionMode(true)}
+                                                className="bg-surface-3/50 text-slate-300 hover:text-white hover:bg-surface-3 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all border border-white/[0.08] cursor-pointer"
+                                            >
+                                                <CheckCircle className="w-4 h-4" />
+                                                <span>Select</span>
+                                            </button>
+                                            <button
+                                                onClick={() => setShowNoteModal(true)}
+                                                className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
+                                            >
+                                                <PlusCircle className="w-4 h-4" strokeWidth={2} />
+                                                <span>Add Note</span>
+                                            </button>
+                                        </>
+                                    )}
+                                </>
+                            )
+                        }
+
+                        {
+                            activeTab === 'images' && (
                                 <button
-                                    onClick={() => setNoteSearchQuery('')}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                    onClick={() => setShowImageModal(true)}
+                                    className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
                                 >
-                                    <X className="w-4 h-4" />
+                                    <PlusCircle className="w-4 h-4" strokeWidth={2} />
+                                    <span>Add Image</span>
                                 </button>
-                            )}
-                        </div>
-                        <div className="flex bg-surface-2/50 p-1 rounded-xl border border-white/[0.06] shrink-0">
-                            <button
-                                onClick={() => setNotesViewMode('grid')}
-                                className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
-                                title="Grid View"
-                            >
-                                <LayoutGrid className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={() => setNotesViewMode('list')}
-                                className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
-                                title="List View"
-                            >
-                                <List className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </div>
+                            )
+                        }
 
+                        {
+                            activeTab === 'topics' && (
+                                <button
+                                    onClick={() => setShowTopicModal(true)}
+                                    className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
+                                >
+                                    <PlusCircle className="w-4 h-4" strokeWidth={2} />
+                                    <span>Manage Syllabus</span>
+                                </button>
+                            )
+                        }
 
-                    <div className="w-full">
-                        {notes.length === 0 ? (
-                            <div className="glass p-16 text-center rounded-xl border-dashed border-white/10 flex flex-col items-center">
-                                <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 -rotate-3">
-                                    <FileText className="w-10 h-10 text-emerald-500/70" />
-                                </div>
-                                <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No notes yet</h3>
-                                <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
-                                    Add your first note to start building your knowledge base.
-                                </p>
+                        {
+                            activeTab === 'revision' && (
+                                <button
+                                    onClick={() => setShowCreateRevisionSession(true)}
+                                    className="bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 hover:border-violet-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
+                                >
+                                    <PlusCircle className="w-4 h-4" strokeWidth={2} />
+                                    <span>New Session</span>
+                                </button>
+                            )
+                        }
+                    </div >
+                </div >
+            </div >
+
+            {/* Main Content Area */}
+            {
+                activeTab === 'topics' && (
+                    <div className="fade-in">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                            <div className="flex items-center gap-2">
+                                <BookOpen className="w-6 h-6 text-indigo-400" />
+                                <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Syllabus</h3>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                    onClick={handleDownloadSyllabus}
+                                    disabled={isDownloadingSyllabus}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 border border-emerald-500/20 transition-all cursor-pointer uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Download Syllabus as PDF"
+                                >
+                                    {isDownloadingSyllabus ? (
+                                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                        <Download className="w-3.5 h-3.5" />
+                                    )}
+                                    <span>Export PDF</span>
+                                </button>
                                 <button
                                     onClick={() => {
-                                        setSelectedQuestionIdForNote(null);
-                                        setShowNoteModal(true);
+                                        setTopicsDefaultExpanded(true);
+                                        setTreeKey(prev => prev + 1);
                                     }}
-                                    className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-400 hover:text-primary hover:bg-primary/10 border border-white/5 transition-all cursor-pointer uppercase tracking-wider"
+                                    title="Expand all"
+                                >
+                                    <Maximize2 className="w-3.5 h-3.5" />
+                                    <span>Expand All</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setTopicsDefaultExpanded(false);
+                                        setTreeKey(prev => prev + 1);
+                                    }}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white hover:bg-white/10 border border-white/5 transition-all cursor-pointer uppercase tracking-wider"
+                                    title="Collapse all"
+                                >
+                                    <Minimize2 className="w-3.5 h-3.5" />
+                                    <span>Collapse All</span>
+                                </button>
+                            </div>
+                        </div>
+                        {topics.length === 0 ? (
+                            <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
+                                <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5">
+                                    <BookOpen className="w-10 h-10 text-indigo-500/70" />
+                                </div>
+                                <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No topics yet</h3>
+                                <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                    Build your syllabus by adding topics and subtopics to organize your study material.
+                                </p>
+                                <button
+                                    onClick={() => setShowTopicModal(true)}
+                                    className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
                                 >
                                     <PlusCircle className="w-4 h-4" />
-                                    <span>Add Your First Note</span>
+                                    <span>Manage Syllabus</span>
                                 </button>
                             </div>
                         ) : (
-                            <div className={`grid gap-5 ${notesViewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
+                            <TopicTree
+                                key={treeKey}
+                                topics={topics}
+                                subjectId={id}
+                                onTopicDeleted={handleTopicDeleted}
+                                onTopicsChanged={setTopics}
+                                defaultExpanded={topicsDefaultExpanded}
+                            />
+                        )}
+                    </div>
+                )
+            }
+
+            {
+                activeTab === 'sessions' && (
+                    <div className="fade-in">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                            <div className="flex items-center gap-2">
+                                <Activity className="w-6 h-6 text-indigo-400" />
+                                <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Study Sessions</h3>
+                            </div>
+                            <div className="relative group min-w-[300px]">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                                <input
+                                    type="text"
+                                    value={sessionSearchQuery}
+                                    onChange={(e) => setSessionSearchQuery(e.target.value)}
+                                    placeholder="Search sessions..."
+                                    className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                                />
+                                {sessionSearchQuery && (
+                                    <button
+                                        onClick={() => setSessionSearchQuery('')}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                )}
+                            </div>
+                            <div className="flex bg-surface-2/50 p-1 rounded-xl border border-white/[0.06] shrink-0">
+                                <button
+                                    onClick={() => setSessionsViewMode('grid')}
+                                    className={`p-1.5 rounded-lg transition-all ${sessionsViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                    title="Grid View"
+                                >
+                                    <LayoutGrid className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => setSessionsViewMode('list')}
+                                    className={`p-1.5 rounded-lg transition-all ${sessionsViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                    title="List View"
+                                >
+                                    <List className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+
+
+                        {sessions.length === 0 ? (
+                            <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
+                                <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5">
+                                    <Activity className="w-10 h-10 text-violet-500/70" />
+                                </div>
+                                <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No learning sessions</h3>
+                                <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                    You haven't recorded any sessions for this subject yet. Start a session to log your correct and incorrect topics.
+                                </p>
+                                <button
+                                    onClick={() => setShowSessionModal(true)}
+                                    className="bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 hover:border-violet-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
+                                >
+                                    <PlusCircle className="w-4 h-4" />
+                                    <span>Record First Session</span>
+                                </button>
+                            </div>
+                        ) : (
+                            <div className={`grid gap-5 ${sessionsViewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
                                 {(() => {
-                                    const filtered = notes.filter(n =>
-                                        n.title?.toLowerCase().includes(noteSearchQuery.toLowerCase()) ||
-                                        n.content?.toLowerCase().includes(noteSearchQuery.toLowerCase())
+                                    const filtered = sessions.filter(s =>
+                                        (s.title || s.name || '')?.toLowerCase().includes(sessionSearchQuery.toLowerCase()) ||
+                                        s.notes?.toLowerCase().includes(sessionSearchQuery.toLowerCase())
                                     );
 
-                                    if (filtered.length === 0 && notes.length > 0) {
+                                    if (filtered.length === 0 && sessions.length > 0) {
                                         return (
-                                            <div className="col-span-full py-12 flex flex-col items-center justify-center text-center bg-white/[0.02] rounded-2xl border border-white/[0.05] border-dashed">
+                                            <div className="col-span-full py-12 flex flex-col items-center justify-center text-center glass-panel rounded-2xl border-dashed border-white/10">
                                                 <Search className="w-8 h-8 text-slate-600 mb-3" />
-                                                <p className="text-slate-400 font-medium">No notes match your search</p>
-                                                <button onClick={() => setNoteSearchQuery('')} className="mt-2 text-indigo-400 text-sm hover:underline">Clear search</button>
+                                                <p className="text-slate-400 font-medium">No sessions match your search</p>
+                                                <button onClick={() => setSessionSearchQuery('')} className="mt-2 text-indigo-400 text-sm hover:underline">Clear search</button>
                                             </div>
                                         );
                                     }
 
-                                    return filtered.map((note) => (
-                                        <div
-                                            key={note.id}
-                                            id={`note-${note.id}`}
-                                            className={`glass-panel rounded-xl border transition-all flex group relative overflow-hidden ${notesViewMode === 'list' ? 'items-center py-3 pr-5 pl-1' : 'flex-col p-5'} ${isSelectionMode ? (selectedItems.has(note.id) ? 'border-indigo-400 bg-indigo-500/10 cursor-pointer shadow-[0_0_15px_rgba(99,102,241,0.2)]' : 'border-white/[0.06] hover:border-white/[0.1] cursor-pointer') : 'border-white/[0.06] hover:border-emerald-500/30 hover:bg-white/[0.02] cursor-pointer'}`}
-                                            onClick={() => {
-                                                if (isSelectionMode) {
-                                                    const next = new Set(selectedItems);
-                                                    if (next.has(note.id)) next.delete(note.id);
-                                                    else next.add(note.id);
-                                                    setSelectedItems(next);
-                                                } else {
-                                                    setViewingNote(note);
-                                                    if (note.source_image_id) {
-                                                        handleFetchNoteImage(note.id);
-                                                    }
-                                                }
-                                            }}
-                                        >
-                                            {isSelectionMode && (
-                                                <div className="absolute top-3 right-3 z-30">
-                                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(note.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-500 bg-surface-3/50'}`}>
-                                                        {selectedItems.has(note.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {/* List mode progress line/indicator */}
-                                            {notesViewMode === 'list' && (
-                                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500/40" />
-                                            )}
+                                    return filtered.map((s) => (
+                                        <SessionCard
+                                            key={s.id}
+                                            session={s}
+                                            subjectId={id}
+                                            viewMode={sessionsViewMode}
+                                            onDelete={(session) => setConfirmDeleteSession({ open: true, session })}
+                                            onEdit={(session) => setEditingSession(session)}
+                                        />
 
-                                            {/* Optional background glow */}
-                                            {notesViewMode === 'grid' && (
-                                                <div className="absolute -right-10 -top-10 w-24 h-24 bg-emerald-500/10 blur-3xl rounded-full"></div>
-                                            )}
-
-                                            <div className={`flex flex-1 min-w-0 ${notesViewMode === 'list' ? 'items-center px-4 gap-6' : 'flex-col'}`}>
-                                                {/* Title Section */}
-                                                <div className={`flex items-start gap-3 relative z-10 ${notesViewMode === 'list' ? 'w-1/3 shrink-0' : 'mb-4'}`}>
-                                                    <div className={`rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0 ${notesViewMode === 'list' ? 'p-1.5' : 'p-2.5'}`}>
-                                                        <FileText className={`${notesViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <h4 className={`font-heading font-bold text-white tracking-tight break-words truncate group-hover:text-emerald-400 transition-colors ${notesViewMode === 'list' ? 'text-[14px]' : 'text-[15px]'}`}>
-                                                            {note.title}
-                                                        </h4>
-                                                        <div className="flex items-center gap-2 mt-1">
-                                                            <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap">
-                                                                {new Date(note.created_at).toLocaleDateString(undefined, {
-                                                                    day: 'numeric',
-                                                                    month: 'short',
-                                                                    year: notesViewMode === 'grid' ? 'numeric' : undefined
-                                                                })}
-                                                            </span>
-                                                            {notesViewMode === 'list' && note.question_id && (
-                                                                <>
-                                                                    <div className="w-1 h-1 rounded-full bg-slate-700" />
-                                                                    <span className="text-[10px] text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">Question Link</span>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Content Section */}
-                                                {notesViewMode === 'grid' ? (
-                                                    <div className="text-sm text-slate-300 line-clamp-5 leading-relaxed mb-4 relative z-10 overflow-hidden">
-                                                        <div className="prose prose-sm prose-invert max-w-none prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mt-0 prose-p:mb-2 prose-headings:font-bold prose-headings:text-white prose-headings:m-0 prose-headings:mb-1.5 prose-h1:text-[15px] prose-h2:text-[14px] prose-h3:text-[13px] prose-a:text-indigo-400 prose-code:text-emerald-300 prose-code:bg-emerald-500/10 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
-                                                            <ReactMarkdown
-                                                                remarkPlugins={[remarkGfm, remarkMath]}
-                                                                rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
-                                                            >
-                                                                {preprocessMarkdown(note.content || '')}
-                                                            </ReactMarkdown>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex-1 min-w-0 relative z-10 hidden md:block">
-                                                        <p className="text-[12px] text-slate-400 truncate opacity-70 group-hover:opacity-100 transition-opacity">
-                                                            {note.content?.substring(0, 200).replace(/[#*`\n]/g, ' ')}...
-                                                        </p>
-                                                    </div>
-                                                )}
-
-                                                {/* Source Image Link Section */}
-                                                {note.source_image_id && (
-                                                    <div className={`relative z-10 shrink-0 ${notesViewMode === 'list' ? 'mb-0' : 'mb-6'}`}>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleFetchNoteImage(note.id);
-                                                                setViewingNote(note);
-                                                            }}
-                                                            disabled={fetchingImageId === `note-${note.id}`}
-                                                            className={`flex items-center gap-2 rounded-xl font-bold bg-white/[0.04] text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all border border-white/[0.08] disabled:opacity-50 cursor-pointer ${notesViewMode === 'list' ? 'p-2' : 'px-4 py-2 text-[12px]'}`}
-                                                            title="View Source Image"
-                                                        >
-                                                            {fetchingImageId === `note-${note.id}` ? (
-                                                                <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
-                                                            ) : (
-                                                                <ImageIcon className={`${notesViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
-                                                            )}
-                                                            {notesViewMode === 'grid' && <span>Source Image</span>}
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Actions Section */}
-                                            <div className={`flex items-center relative z-10 shrink-0 ${notesViewMode === 'list' ? 'py-0 border-l border-white/[0.06] pl-5 ml-2 gap-4' : 'pt-3 border-t border-white/[0.06] mt-auto justify-between'}`}>
-                                                {notesViewMode === 'grid' && (
-                                                    <div className="flex items-center gap-3">
-                                                        {note.question_id && (
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    navigateToQuestion(note.question_id);
-                                                                }}
-                                                                className="flex items-center gap-1 hover:text-indigo-400 transition-colors cursor-pointer text-[12px]"
-                                                                title="Go to Source Question"
-                                                            >
-                                                                <LinkIcon className="w-3.5 h-3.5" />
-                                                                <span>Source</span>
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                )}
-
-                                                <div className={`flex items-center gap-1 ${notesViewMode === 'list' ? 'flex-col sm:flex-row' : 'opacity-0 group-hover:opacity-100 transition-all'}`}>
-                                                    {notesViewMode === 'list' && note.question_id && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                navigateToQuestion(note.question_id);
-                                                            }}
-                                                            className="p-1.5 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-md transition-all cursor-pointer"
-                                                            title="Go to Source Question"
-                                                        >
-                                                            <LinkIcon className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setEditingNote(note);
-                                                        }}
-                                                        className="p-1.5 text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-md transition-all cursor-pointer"
-                                                        title="Edit Note"
-                                                    >
-                                                        <Pencil className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setConfirmDeleteNote({ open: true, note });
-                                                        }}
-                                                        className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-all cursor-pointer"
-                                                        title="Delete Note"
-                                                    >
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
                                     ));
                                 })()}
                             </div>
                         )}
                     </div>
-                </div>
-            )}
+                )
+            }
 
-            {activeTab === 'revision' && (() => {
-                const renderSession = (session) => {
-                    const isExpanded = activeRevisionSessionId === session.id;
-                    const totalTopics = session.topics?.length || 0;
-                    const doneCount = session.topics?.filter(t => t.status === 'completed').length || 0;
-                    const progressPct = totalTopics > 0 ? Math.round((doneCount / totalTopics) * 100) : 0;
+            {
+                activeTab === 'questions' && (
+                    <div className="fade-in">
+                        {/* Header for Questions */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                            <div className="flex items-center gap-2">
+                                <ListChecks className="w-6 h-6 text-indigo-400" />
+                                <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Question Bank</h3>
+                            </div>
+                            <div className="relative group min-w-[300px]">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Search by content or topic tags..."
+                                    className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                                />
+                                {searchQuery && (
+                                    <button
+                                        onClick={() => setSearchQuery('')}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
 
-                    return (
-                        <div key={session.id} className="bg-surface-2/30 rounded-2xl border border-white/[0.05] overflow-hidden mb-4">
-                            {/* Session Header */}
-                            <div
-                                className={`p-4 flex items-center justify-between cursor-pointer transition-colors hover:bg-white/[0.02] ${isExpanded ? 'border-b border-white/[0.05] bg-white/[0.02]' : ''}`}
-                                onClick={() => setActiveRevisionSessionId(isExpanded ? null : session.id)}
-                            >
-                                <div className="flex-1 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                    <div className="flex flex-col gap-1.5">
-                                        <div className="flex items-center gap-3">
-                                            <h4 className="text-base font-bold text-white tracking-tight">{session.name}</h4>
-                                            <span className="text-[10px] text-slate-500 font-medium tracking-wide">
-                                                {new Date(session.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
-                                            </span>
+                        <div className="grid grid-cols-1 gap-6 items-start">
+                            {/* Form moved to Modal */}
+
+                            {/* Questions List (Full Width) */}
+                            <div className="w-full">
+                                {questions.length === 0 ? (
+                                    <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
+                                        <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 rotate-3">
+                                            <ListChecks className="w-10 h-10 text-indigo-500/70" />
                                         </div>
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-[150px] h-1.5 bg-surface-3 rounded-full overflow-hidden">
-                                                <div
-                                                    className={`h-full rounded-full transition-all duration-700 ${progressPct === 100 ? 'bg-emerald-500' : 'bg-gradient-to-r from-violet-600 to-violet-400'}`}
-                                                    style={{ width: `${progressPct}%` }}
-                                                />
+                                        <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">Your question bank is empty</h3>
+                                        <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                            Start adding questions from your books or notes. AI will automatically format them for better readability.
+                                        </p>
+                                        <button
+                                            onClick={() => setShowQuestionModal(true)}
+                                            className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
+                                        >
+                                            <PlusCircle className="w-4 h-4" />
+                                            <span>Add Your First Question</span>
+                                        </button>
+                                    </div>
+                                ) : groupedQuestions.length === 0 ? (
+                                    <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
+                                        <div className="w-16 h-16 rounded-2xl bg-surface-2 flex items-center justify-center mb-4 border border-white/5">
+                                            <Search className="w-8 h-8 text-slate-600" />
+                                        </div>
+                                        <h4 className="text-lg font-bold text-white mb-1">No matching questions</h4>
+                                        <p className="text-slate-500 text-sm">Try adjusting your search query or tags</p>
+                                        <button
+                                            onClick={() => setSearchQuery('')}
+                                            className="mt-6 text-indigo-400 hover:text-indigo-300 text-sm font-semibold"
+                                        >
+                                            Clear Search
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 gap-7">
+                                        {groupedQuestions.map((group) => {
+                                            const isExpanded = expandedGroups[group.rootId];
+                                            const rootQ = group.questions[0] || group.parent;
+                                            if (!rootQ) return null;
+
+                                            if (!group.isGroup) {
+                                                const q = rootQ;
+                                                const existingAINote = notes.find(n => n.question_id === q.id && n.title?.startsWith('AI Note'));
+                                                return (
+                                                    <div
+                                                        key={q.id}
+                                                        id={`question-${q.id}`}
+                                                        className={`question-card group relative transition-all ${isSelectionMode ? (selectedItems.has(q.id) ? 'ring-2 ring-indigo-500 cursor-pointer bg-indigo-500/5' : 'cursor-pointer hover:bg-white/[0.02]') : ''}`}
+                                                        onClick={() => {
+                                                            if (isSelectionMode) {
+                                                                const next = new Set(selectedItems);
+                                                                if (next.has(q.id)) next.delete(q.id);
+                                                                else next.add(q.id);
+                                                                setSelectedItems(next);
+                                                            }
+                                                        }}
+                                                    >
+                                                        {isSelectionMode && (
+                                                            <div className="absolute top-4 right-4 z-20">
+                                                                <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(q.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-500 bg-surface-3/50'}`}>
+                                                                    {selectedItems.has(q.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        {/* Card Header — question number + metadata */}
+                                                        <div className="flex items-center gap-3 mb-4 pb-3 border-b border-white/[0.06]">
+                                                            <span className="text-[15px] font-heading font-bold text-primary tracking-tight">
+                                                                Q
+                                                            </span>
+                                                            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-surface-3/80 text-slate-300 rounded-md text-[12px] font-semibold border border-white/5">
+                                                                {q.type === 'image' ? <ImageIcon className="w-4 h-4 text-indigo-400" /> : <FileText className="w-4 h-4 text-emerald-400" />}
+                                                                {q.type === 'image' ? 'Image' : 'Text'}
+                                                            </span>
+                                                            <span className="text-[12px] text-slate-500 ml-auto font-medium">
+                                                                {new Date(q.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                            </span>
+
+                                                            <div className="flex items-center gap-1 ml-2">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setEditingQuestion(q);
+                                                                        setShowEditQuestionModal(true);
+                                                                    }}
+                                                                    className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer"
+                                                                    title="Edit Question"
+                                                                >
+                                                                    <Pencil className="w-[18px] h-[18px]" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setSelectedQuestionIdForNote(q.id);
+                                                                        setShowNoteModal(true);
+                                                                    }}
+                                                                    className="p-2 text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-all cursor-pointer"
+                                                                    title="Manual Note"
+                                                                >
+                                                                    <FileText className="w-[18px] h-[18px]" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleGenerateAINote(q.id)}
+                                                                    disabled={generatingAINoteId === q.id}
+                                                                    className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer disabled:opacity-50"
+                                                                    title={existingAINote ? "View AI Note" : "AI Note"}
+                                                                >
+                                                                    {generatingAINoteId === q.id ? (
+                                                                        <div className="w-[18px] h-[18px] border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+                                                                    ) : existingAINote ? (
+                                                                        <BookOpen className="w-[18px] h-[18px]" />
+                                                                    ) : (
+                                                                        <Wand2 className="w-[18px] h-[18px]" />
+                                                                    )}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => setConfirmDeleteQuestion({ open: true, questionId: q.id })}
+                                                                    className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all cursor-pointer"
+                                                                    title="Delete Question"
+                                                                >
+                                                                    <Trash2 className="w-[18px] h-[18px]" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Card Body — question content */}
+                                                        <div className="prose prose-invert prose-lg max-w-none text-slate-200 text-[15px] leading-[1.7]">
+                                                            {q.formatted_content && q.formatted_content.root ? (
+                                                                <RichTextRenderer content={q.formatted_content} />
+                                                            ) : (
+                                                                <ReactMarkdown
+                                                                    remarkPlugins={[remarkGfm, remarkMath]}
+                                                                    rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                                                >
+                                                                    {preprocessMarkdown(q.content)}
+                                                                </ReactMarkdown>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Tags display */}
+                                                        {(() => {
+                                                            let qTags = [];
+                                                            try {
+                                                                qTags = typeof q.tags === 'string' ? JSON.parse(q.tags) : (q.tags || []);
+                                                            } catch {
+                                                                qTags = [];
+                                                            }
+                                                            if (!qTags || qTags.length === 0) return null;
+                                                            return (
+                                                                <div className="mt-4 flex flex-wrap gap-2">
+                                                                    {qTags.map((tag, idx) => (
+                                                                        <span key={idx} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                                            <Hash className="w-2.5 h-2.5" />
+                                                                            {tag}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            );
+                                                        })()}
+
+                                                        {q.type === 'image' && (
+                                                            <div className="mt-5">
+                                                                {fetchedImages[q.id] || fetchedImages[q.source_image_id] ? (
+                                                                    <div className="rounded-xl overflow-hidden border border-white/10 inline-block bg-black/40 group/img relative">
+                                                                        <img
+                                                                            src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
+                                                                            alt="Original Question"
+                                                                            className="max-h-80 object-contain transition-all group-hover/img:opacity-50"
+                                                                        />
+                                                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
+                                                                            <span className="bg-black/60 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/10">
+                                                                                Original Attachment
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <button
+                                                                        onClick={() => handleFetchImage(q.id)}
+                                                                        disabled={fetchingImageId === q.id}
+                                                                        className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-surface-3/80 text-slate-300 hover:text-white hover:bg-surface-3 transition-all border border-white/5 shadow-sm disabled:opacity-50 cursor-pointer"
+                                                                    >
+                                                                        {fetchingImageId === q.id ? (
+                                                                            <div className="w-3.5 h-3.5 border border-white/30 border-t-white rounded-full animate-spin" />
+                                                                        ) : (
+                                                                            <ImageIcon className="w-4 h-4 text-indigo-400" />
+                                                                        )}
+                                                                        <span>
+                                                                            {fetchingImageId === q.id ? 'Loading...' : 'Show Source Image'}
+                                                                        </span>
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+
+                                                    </div>
+                                                );
+                                            }
+
+                                            return (
+                                                <div key={group.rootId} className="flex flex-col gap-3">
+                                                    {/* Group Header */}
+                                                    <div
+                                                        onClick={() => toggleGroup(group.rootId)}
+                                                        className="flex items-center justify-between p-4 rounded-xl bg-surface-2 border border-white/[0.06] cursor-pointer hover:bg-surface-3 transition-colors group/header"
+                                                    >
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+                                                                {rootQ.type === 'image' ? <ImageIcon className="w-5 h-5 text-indigo-400" /> : <FileText className="w-5 h-5 text-emerald-400" />}
+                                                            </div>
+                                                            <div>
+                                                                <div className="flex items-center gap-3">
+                                                                    <h4 className="text-[15px] font-heading font-bold text-white tracking-tight">
+                                                                        {rootQ.type === 'image' ? 'Image' : 'Text'} Collection
+                                                                    </h4>
+                                                                    <span className="px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                                                                        {group.questions.length} Items
+                                                                    </span>
+                                                                </div>
+                                                                <p className="text-[12px] text-slate-500 mt-0.5">
+                                                                    Uploaded {new Date(group.newestAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`p-2 rounded-lg bg-white/[0.03] text-slate-500 group-hover/header:text-white transition-all ${isExpanded ? 'rotate-180' : ''}`}>
+                                                                <ChevronDown className="w-4 h-4" />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Group Content */}
+                                                    {isExpanded && (
+                                                        <div className="flex flex-col gap-5 pl-8 border-l-2 border-white/[0.06] mt-2 mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                            {group.questions.map((q, qidx) => {
+                                                                const existingAINote = notes.find(n => n.question_id === q.id && n.title?.startsWith('AI Note'));
+                                                                return (
+                                                                    <div
+                                                                        key={q.id}
+                                                                        id={`question-${q.id}`}
+                                                                        className={`question-card group relative transition-all ${isSelectionMode ? (selectedItems.has(q.id) ? 'ring-2 ring-indigo-500 cursor-pointer bg-indigo-500/5' : 'cursor-pointer hover:bg-white/[0.02]') : ''}`}
+                                                                        onClick={() => {
+                                                                            if (isSelectionMode) {
+                                                                                const next = new Set(selectedItems);
+                                                                                if (next.has(q.id)) next.delete(q.id);
+                                                                                else next.add(q.id);
+                                                                                setSelectedItems(next);
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        {isSelectionMode && (
+                                                                            <div className="absolute top-4 right-4 z-20">
+                                                                                <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(q.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-500 bg-surface-3/50'}`}>
+                                                                                    {selectedItems.has(q.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                        {/* Card Header — question number + metadata */}
+                                                                        <div className="flex items-center gap-3 mb-4 pb-3 border-b border-white/[0.06]">
+                                                                            <span className="text-[15px] font-heading font-bold text-primary tracking-tight">
+                                                                                #{qidx + 1}
+                                                                            </span>
+                                                                            <span className="text-[12px] text-slate-500 ml-auto font-medium">
+                                                                                {new Date(q.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                                            </span>
+
+                                                                            <div className="flex items-center gap-1 ml-2">
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        setEditingQuestion(q);
+                                                                                        setShowEditQuestionModal(true);
+                                                                                    }}
+                                                                                    className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer"
+                                                                                    title="Edit Question"
+                                                                                >
+                                                                                    <Pencil className="w-[18px] h-[18px]" />
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        setSelectedQuestionIdForNote(q.id);
+                                                                                        setShowNoteModal(true);
+                                                                                    }}
+                                                                                    className="p-2 text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-all cursor-pointer"
+                                                                                    title="Manual Note"
+                                                                                >
+                                                                                    <FileText className="w-[18px] h-[18px]" />
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => handleGenerateAINote(q.id)}
+                                                                                    disabled={generatingAINoteId === q.id}
+                                                                                    className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer disabled:opacity-50"
+                                                                                    title={existingAINote ? "View AI Note" : "AI Note"}
+                                                                                >
+                                                                                    {generatingAINoteId === q.id ? (
+                                                                                        <div className="w-[18px] h-[18px] border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+                                                                                    ) : existingAINote ? (
+                                                                                        <BookOpen className="w-[18px] h-[18px]" />
+                                                                                    ) : (
+                                                                                        <Wand2 className="w-[18px] h-[18px]" />
+                                                                                    )}
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => setConfirmDeleteQuestion({ open: true, questionId: q.id })}
+                                                                                    className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all cursor-pointer"
+                                                                                    title="Delete Question"
+                                                                                >
+                                                                                    <Trash2 className="w-[18px] h-[18px]" />
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Card Body — question content */}
+                                                                        <div className="prose prose-invert prose-lg max-w-none text-slate-200 text-[15px] leading-[1.7]">
+                                                                            {q.formatted_content && q.formatted_content.root ? (
+                                                                                <RichTextRenderer content={q.formatted_content} />
+                                                                            ) : (
+                                                                                <ReactMarkdown
+                                                                                    remarkPlugins={[remarkGfm, remarkMath]}
+                                                                                    rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                                                                >
+                                                                                    {preprocessMarkdown(q.content)}
+                                                                                </ReactMarkdown>
+                                                                            )}
+                                                                        </div>
+
+                                                                        {/* Tags display */}
+                                                                        {(() => {
+                                                                            let qTags = [];
+                                                                            try {
+                                                                                qTags = typeof q.tags === 'string' ? JSON.parse(q.tags) : (q.tags || []);
+                                                                            } catch {
+                                                                                qTags = [];
+                                                                            }
+                                                                            if (!qTags || qTags.length === 0) return null;
+                                                                            return (
+                                                                                <div className="mt-4 flex flex-wrap gap-2">
+                                                                                    {qTags.map((tag, idx) => (
+                                                                                        <span key={idx} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                                                            <Hash className="w-2.5 h-2.5" />
+                                                                                            {tag}
+                                                                                        </span>
+                                                                                    ))}
+                                                                                </div>
+                                                                            );
+                                                                        })()}
+
+                                                                        {q.type === 'image' && qidx === 0 && (
+                                                                            <div className="mt-5">
+                                                                                {fetchedImages[q.id] || fetchedImages[q.source_image_id] ? (
+                                                                                    <div className="rounded-xl overflow-hidden border border-white/10 inline-block bg-black/40 group/img relative">
+                                                                                        <img
+                                                                                            src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
+                                                                                            alt="Original Question"
+                                                                                            className="max-h-80 object-contain transition-all group-hover/img:opacity-50"
+                                                                                        />
+                                                                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
+                                                                                            <span className="bg-black/60 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/10">
+                                                                                                Source Image
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <button
+                                                                                        onClick={() => handleFetchImage(q.id)}
+                                                                                        disabled={fetchingImageId === q.id}
+                                                                                        className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-surface-3/80 text-slate-300 hover:text-white hover:bg-surface-3 transition-all border border-white/5 shadow-sm disabled:opacity-50 cursor-pointer"
+                                                                                    >
+                                                                                        {fetchingImageId === q.id ? (
+                                                                                            <div className="w-3.5 h-3.5 border border-white/30 border-t-white rounded-full animate-spin" />
+                                                                                        ) : (
+                                                                                            <ImageIcon className="w-4 h-4 text-indigo-400" />
+                                                                                        )}
+                                                                                        <span>
+                                                                                            {fetchingImageId === q.id ? 'Loading...' : 'Show Shared Source Image'}
+                                                                                        </span>
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
+
+
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            {
+                activeTab === 'notes' && (
+                    <div className="fade-in">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                            <div className="flex items-center gap-2">
+                                <FileText className="w-6 h-6 text-indigo-400" />
+                                <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Notes</h3>
+                            </div>
+                            <div className="relative group min-w-[300px]">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                                <input
+                                    type="text"
+                                    value={noteSearchQuery}
+                                    onChange={(e) => setNoteSearchQuery(e.target.value)}
+                                    placeholder="Search notes..."
+                                    className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                                />
+                                {noteSearchQuery && (
+                                    <button
+                                        onClick={() => setNoteSearchQuery('')}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                )}
+                            </div>
+                            <div className="flex items-center justify-end gap-3 min-w-[124px]">
+                                {allNoteTags.length > 0 && (
+                                    <div className="hidden md:block">
+                                        <select
+                                            value={selectedNoteTag}
+                                            onChange={(e) => setSelectedNoteTag(e.target.value)}
+                                            className="bg-surface-2/50 border border-white/[0.08] text-slate-200 rounded-xl px-4 py-2 text-[13px] focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all appearance-none cursor-pointer pr-10 hover:border-white/[0.15]"
+                                            style={{
+                                                backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(148, 163, 184, 1)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                                                backgroundRepeat: 'no-repeat',
+                                                backgroundPosition: 'right 0.75rem center',
+                                                backgroundSize: '1em'
+                                            }}
+                                        >
+                                            <option value="">All Tags</option>
+                                            {allNoteTags.map(tag => (
+                                                <option key={tag} value={tag}>{tag}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+                                <div className="flex bg-surface-2/50 p-1 rounded-xl border border-white/[0.06] shrink-0">
+                                    <button
+                                        onClick={() => setNotesViewMode('grid')}
+                                        className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                        title="Grid View"
+                                    >
+                                        <LayoutGrid className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => setNotesViewMode('list')}
+                                        className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                        title="List View"
+                                    >
+                                        <List className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+
+                        <div className="w-full">
+                            {notes.length === 0 ? (
+                                <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
+                                    <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 -rotate-3">
+                                        <FileText className="w-10 h-10 text-emerald-500/70" />
+                                    </div>
+                                    <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No notes yet</h3>
+                                    <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                        Add your first note to start building your knowledge base.
+                                    </p>
+                                    <button
+                                        onClick={() => {
+                                            setSelectedQuestionIdForNote(null);
+                                            setShowNoteModal(true);
+                                        }}
+                                        className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
+                                    >
+                                        <PlusCircle className="w-4 h-4" />
+                                        <span>Add Your First Note</span>
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className={`grid gap-5 ${notesViewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
+                                    {(() => {
+                                        const filtered = getFilteredNotes();
+
+                                        if (filtered.length === 0 && notes.length > 0) {
+                                            return (
+                                                <div className="col-span-full py-12 flex flex-col items-center justify-center text-center glass-panel rounded-2xl border-dashed border-white/10">
+                                                    <Search className="w-8 h-8 text-slate-600 mb-3" />
+                                                    <p className="text-slate-400 font-medium">No notes match your search</p>
+                                                    <button onClick={() => setNoteSearchQuery('')} className="mt-2 text-indigo-400 text-sm hover:underline">Clear search</button>
+                                                </div>
+                                            );
+                                        }
+
+                                        return filtered.map((note) => (
+                                            <div
+                                                key={note.id}
+                                                id={`note-${note.id}`}
+                                                className={`glass-panel rounded-xl border transition-all flex group relative overflow-hidden ${notesViewMode === 'list' ? 'items-center py-3 pr-5 pl-1' : 'flex-col p-5'} ${isSelectionMode ? (selectedItems.has(note.id) ? 'border-indigo-400 bg-indigo-500/10 cursor-pointer shadow-[0_0_15px_rgba(99,102,241,0.2)]' : 'border-white/[0.06] hover:border-white/[0.1] cursor-pointer') : 'border-white/[0.06] hover:border-emerald-500/30 hover:bg-white/[0.02] cursor-pointer'}`}
+                                                onClick={() => {
+                                                    if (isSelectionMode) {
+                                                        const next = new Set(selectedItems);
+                                                        if (next.has(note.id)) next.delete(note.id);
+                                                        else next.add(note.id);
+                                                        setSelectedItems(next);
+                                                    } else {
+                                                        setViewingNote(note);
+                                                        if (note.source_image_id) {
+                                                            handleFetchNoteImage(note.id);
+                                                        }
+                                                    }
+                                                }}
+                                            >
+                                                {isSelectionMode && (
+                                                    <div className="absolute top-3 right-3 z-30">
+                                                        <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(note.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-500 bg-surface-3/50'}`}>
+                                                            {selectedItems.has(note.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {/* List mode progress line/indicator */}
+                                                {notesViewMode === 'list' && (
+                                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500/40" />
+                                                )}
+
+                                                {/* Optional background glow */}
+                                                {notesViewMode === 'grid' && (
+                                                    <div className="absolute -right-10 -top-10 w-24 h-24 bg-emerald-500/10 blur-3xl rounded-full"></div>
+                                                )}
+
+                                                <div className={`flex flex-1 min-w-0 ${notesViewMode === 'list' ? 'items-center px-4 gap-6' : 'flex-col'}`}>
+                                                    {/* Title Section */}
+                                                    <div className={`flex items-start gap-3 relative z-10 ${notesViewMode === 'list' ? 'w-1/3 shrink-0' : 'mb-4'}`}>
+                                                        <div className={`rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0 ${notesViewMode === 'list' ? 'p-1.5' : 'p-2.5'}`}>
+                                                            <FileText className={`${notesViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <h4 className={`font-heading font-bold text-white tracking-tight break-words truncate group-hover:text-emerald-400 transition-colors ${notesViewMode === 'list' ? 'text-[14px]' : 'text-[15px]'}`}>
+                                                                {note.title}
+                                                            </h4>
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap">
+                                                                    {new Date(note.created_at).toLocaleDateString(undefined, {
+                                                                        day: 'numeric',
+                                                                        month: 'short',
+                                                                        year: notesViewMode === 'grid' ? 'numeric' : undefined
+                                                                    })}
+                                                                </span>
+                                                                {notesViewMode === 'list' && note.question_id && (
+                                                                    <>
+                                                                        <div className="w-1 h-1 rounded-full bg-slate-700" />
+                                                                        <span className="text-[10px] text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">Question Link</span>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                            {notesViewMode === 'list' && (() => {
+                                                                let nTags = [];
+                                                                try {
+                                                                    nTags = typeof note.tags === 'string' ? JSON.parse(note.tags) : (note.tags || []);
+                                                                } catch {
+                                                                    nTags = [];
+                                                                }
+                                                                if (!nTags || nTags.length === 0) return null;
+                                                                return (
+                                                                    <div className="flex flex-wrap gap-1.5 mt-1">
+                                                                        {nTags.map((tag, idx) => (
+                                                                            <span key={idx} className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider">
+                                                                                {tag}
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Content Section */}
+                                                    {notesViewMode === 'grid' ? (
+                                                        <div className="text-sm text-slate-300 leading-relaxed mb-4 relative z-10 overflow-hidden max-h-[140px] pointer-events-none [mask-image:linear-gradient(to_bottom,black_60%,transparent)]">
+                                                            <div className="prose prose-sm prose-invert max-w-none prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mt-0 prose-p:mb-2 prose-headings:font-bold prose-headings:text-white prose-headings:m-0 prose-headings:mb-1.5 prose-h1:text-[15px] prose-h2:text-[14px] prose-h3:text-[13px] prose-a:text-indigo-400 prose-code:text-slate-300 prose-code:bg-white/[0.06] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
+                                                                <ReactMarkdown
+                                                                    remarkPlugins={[remarkGfm, remarkMath]}
+                                                                    rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                                                >
+                                                                    {preprocessMarkdown(note.content || '')}
+                                                                </ReactMarkdown>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex-1 min-w-0 relative z-10 hidden md:block">
+                                                            <p className="text-[12px] text-slate-400 truncate opacity-70 group-hover:opacity-100 transition-opacity">
+                                                                {note.content?.substring(0, 200).replace(/[#*`\n]/g, ' ')}...
+                                                            </p>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Source Image Link Section */}
+                                                    {note.source_image_id && (
+                                                        <div className={`relative z-10 shrink-0 ${notesViewMode === 'list' ? 'mb-0' : 'mb-6'}`}>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleFetchNoteImage(note.id);
+                                                                    setViewingNote(note);
+                                                                }}
+                                                                disabled={fetchingImageId === `note-${note.id}`}
+                                                                className={`flex items-center gap-2 rounded-xl font-bold bg-white/[0.04] text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all border border-white/[0.08] disabled:opacity-50 cursor-pointer ${notesViewMode === 'list' ? 'p-2' : 'px-4 py-2 text-[12px]'}`}
+                                                                title="View Source Image"
+                                                            >
+                                                                {fetchingImageId === `note-${note.id}` ? (
+                                                                    <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
+                                                                ) : (
+                                                                    <ImageIcon className={`${notesViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
+                                                                )}
+                                                                {notesViewMode === 'grid' && <span>Source Image</span>}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Actions Section */}
+                                                <div className={`flex items-center relative z-10 ${notesViewMode === 'list' ? 'shrink-0 py-0 border-l border-white/[0.06] pl-5 ml-2 gap-4' : 'w-full pt-3 border-t border-white/[0.06] mt-auto justify-between'}`}>
+                                                    {notesViewMode === 'grid' && (
+                                                        <div className="flex items-center gap-3 overflow-hidden flex-1 mr-2">
+                                                            {note.question_id && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        navigateToQuestion(note.question_id);
+                                                                    }}
+                                                                    className="flex items-center gap-1 hover:text-indigo-400 transition-colors cursor-pointer text-[12px] shrink-0"
+                                                                    title="Go to Source Question"
+                                                                >
+                                                                    <LinkIcon className="w-3.5 h-3.5" />
+                                                                    <span>Source</span>
+                                                                </button>
+                                                            )}
+                                                            {(() => {
+                                                                let nTags = [];
+                                                                try {
+                                                                    nTags = typeof note.tags === 'string' ? JSON.parse(note.tags) : (note.tags || []);
+                                                                } catch {
+                                                                    nTags = [];
+                                                                }
+                                                                if (!nTags || nTags.length === 0) return null;
+                                                                return (
+                                                                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pr-2 w-full" style={{ maskImage: 'linear-gradient(to right, black 80%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to right, black 80%, transparent 100%)' }}>
+                                                                        {nTags.map((tag, idx) => (
+                                                                            <span key={idx} className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider whitespace-nowrap">
+                                                                                {tag}
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    )}
+
+                                                    <div className={`flex items-center gap-1 shrink-0 ${notesViewMode === 'list' ? 'flex-col sm:flex-row' : 'opacity-0 group-hover:opacity-100 transition-all'}`}>
+                                                        {notesViewMode === 'list' && note.question_id && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    navigateToQuestion(note.question_id);
+                                                                }}
+                                                                className="p-1.5 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-md transition-all cursor-pointer"
+                                                                title="Go to Source Question"
+                                                            >
+                                                                <LinkIcon className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setEditingNote(note);
+                                                            }}
+                                                            className="p-1.5 text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-md transition-all cursor-pointer"
+                                                            title="Edit Note"
+                                                        >
+                                                            <Pencil className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setConfirmDeleteNote({ open: true, note });
+                                                            }}
+                                                            className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-all cursor-pointer"
+                                                            title="Delete Note"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <span className="text-[11px] font-semibold text-slate-400">
-                                                {progressPct}%
-                                            </span>
+                                        ));
+                                    })()}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )
+            }
+
+            {
+                activeTab === 'revision' && (() => {
+                    const renderSession = (session) => {
+                        const isExpanded = activeRevisionSessionId === session.id;
+                        const totalTopics = session.topics?.length || 0;
+                        const doneCount = session.topics?.filter(t => t.status === 'completed').length || 0;
+                        const progressPct = totalTopics > 0 ? Math.round((doneCount / totalTopics) * 100) : 0;
+
+                        return (
+                            <div key={session.id} className="glass-panel rounded-2xl border border-white/[0.06] overflow-hidden mb-4">
+                                {/* Session Header */}
+                                <div
+                                    className={`p-4 flex items-center justify-between cursor-pointer transition-colors hover:bg-white/[0.02] ${isExpanded ? 'border-b border-white/[0.05] bg-white/[0.02]' : ''}`}
+                                    onClick={() => setActiveRevisionSessionId(isExpanded ? null : session.id)}
+                                >
+                                    <div className="flex-1 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                        <div className="flex flex-col gap-1.5">
+                                            <div className="flex items-center gap-3">
+                                                <h4 className="text-base font-bold text-white tracking-tight">{session.name}</h4>
+                                                <span className="text-[10px] text-slate-500 font-medium tracking-wide">
+                                                    {new Date(session.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-[150px] h-1.5 bg-surface-3 rounded-full overflow-hidden">
+                                                    <div
+                                                        className={`h-full rounded-full transition-all duration-700 ${progressPct === 100 ? 'bg-emerald-500' : 'bg-gradient-to-r from-violet-600 to-violet-400'}`}
+                                                        style={{ width: `${progressPct}%` }}
+                                                    />
+                                                </div>
+                                                <span className="text-[11px] font-semibold text-slate-400">
+                                                    {progressPct}%
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-4 mr-4">
+                                            <div className="flex items-center gap-2 bg-surface-2/80 px-3 py-1.5 rounded-lg border border-white/[0.05]">
+                                                <div className="flex flex-col text-right">
+                                                    <span className="text-xs font-bold text-white leading-tight">
+                                                        <span className={doneCount === totalTopics ? 'text-emerald-400' : 'text-violet-400'}>{doneCount}</span>
+                                                        <span className="text-slate-500 mx-1">/</span>
+                                                        <span>{totalTopics}</span>
+                                                    </span>
+                                                    <span className="text-[9px] text-slate-500 uppercase tracking-wider font-bold">Topics Done</span>
+                                                </div>
+                                                <div className="w-1 h-8 rounded-full bg-white/[0.05]" />
+                                                {doneCount > 0 && doneCount === totalTopics ? (
+                                                    <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                                                        <CheckCircle className="w-4 h-4" />
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-8 h-8 rounded-full bg-surface-3 flex items-center justify-center text-slate-400 relative">
+                                                        <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 36 36">
+                                                            <path className="text-white/5" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
+                                                            <path className="text-violet-500" strokeDasharray={`${progressPct}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
+                                                        </svg>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-
-                                    <div className="flex items-center gap-4 mr-4">
-                                        <div className="flex items-center gap-2 bg-surface-2/80 px-3 py-1.5 rounded-lg border border-white/[0.05]">
-                                            <div className="flex flex-col text-right">
-                                                <span className="text-xs font-bold text-white leading-tight">
-                                                    <span className={doneCount === totalTopics ? 'text-emerald-400' : 'text-violet-400'}>{doneCount}</span>
-                                                    <span className="text-slate-500 mx-1">/</span>
-                                                    <span>{totalTopics}</span>
-                                                </span>
-                                                <span className="text-[9px] text-slate-500 uppercase tracking-wider font-bold">Topics Done</span>
-                                            </div>
-                                            <div className="w-1 h-8 rounded-full bg-white/[0.05]" />
-                                            {doneCount > 0 && doneCount === totalTopics ? (
-                                                <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-                                                    <CheckCircle className="w-4 h-4" />
-                                                </div>
-                                            ) : (
-                                                <div className="w-8 h-8 rounded-full bg-surface-3 flex items-center justify-center text-slate-400 relative">
-                                                    <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 36 36">
-                                                        <path className="text-white/5" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
-                                                        <path className="text-violet-500" strokeDasharray={`${progressPct}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
-                                                    </svg>
-                                                </div>
-                                            )}
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setEditingRevisionSession(session);
+                                            }}
+                                            className="p-2 rounded-lg text-slate-500 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                                            title="Edit Session"
+                                        >
+                                            <Pencil className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setConfirmDeleteRevisionSession({ open: true, sessionId: session.id });
+                                            }}
+                                            className="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                            title="Delete Session"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                        <div className={`p-2 rounded-lg text-slate-500 transition-transform ${isExpanded ? 'rotate-180 text-white' : ''}`}>
+                                            <ChevronDown className="w-5 h-5" />
                                         </div>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setEditingRevisionSession(session);
-                                        }}
-                                        className="p-2 rounded-lg text-slate-500 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
-                                        title="Edit Session"
-                                    >
-                                        <Pencil className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setConfirmDeleteRevisionSession({ open: true, sessionId: session.id });
-                                        }}
-                                        className="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                                        title="Delete Session"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                    <div className={`p-2 rounded-lg text-slate-500 transition-transform ${isExpanded ? 'rotate-180 text-white' : ''}`}>
-                                        <ChevronDown className="w-5 h-5" />
+
+                                {/* Session Content (Topics) */}
+                                {isExpanded && (
+                                    <div className="p-4 bg-surface-1/50">
+                                        <div className="flex flex-col gap-2">
+                                            {session.topics?.length === 0 ? (
+                                                <p className="text-sm text-slate-500 italic py-2">No topics in this session.</p>
+                                            ) : (() => {
+                                                // Render topics
+                                                const allTopics = session.topics;
+                                                const allIds = new Set(allTopics.map(t => t.topicId));
+                                                const childrenOf = (parentId) => allTopics.filter(t => t.parentId === parentId);
+                                                // A topic is a "root" to display if it has no parent, OR its parent wasn't added to the session.
+                                                const allRoots = allTopics.filter(t => !t.parentId || !allIds.has(t.parentId));
+
+                                                const renderTopicRow = (item) => {
+                                                    const isDone = item.status === 'completed';
+                                                    const isToggling = togglingTopicId === item.topicId;
+                                                    const children = childrenOf(item.topicId);
+                                                    const hasChildren = children.length > 0;
+                                                    const isGrpExpanded = expandedRevisionGroups[`${session.id}_${item.topicId}`] !== false;
+
+                                                    if (hasChildren) {
+                                                        const childDone = children.filter(c => c.status === 'completed').length;
+                                                        return (
+                                                            <div key={item.topicId} className="flex flex-col">
+                                                                <div
+                                                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all cursor-pointer group
+                                                                    ${isDone ? 'bg-emerald-500/[0.06] border-emerald-500/20' : 'bg-surface-2/50 border-white/[0.06]'}
+                                                                    hover:border-white/[0.12]`}
+                                                                    onClick={() => setExpandedRevisionGroups(prev => ({ ...prev, [`${session.id}_${item.topicId}`]: !isGrpExpanded }))}
+                                                                >
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleRevisionToggle(session.id, item.topicId, item.status); }}
+                                                                        disabled={isToggling}
+                                                                        className={`shrink-0 w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer
+                                                                        ${isDone ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-600 hover:border-emerald-500/60 bg-transparent'}
+                                                                        ${isToggling ? 'opacity-50' : ''}`}
+                                                                    >
+                                                                        {isToggling
+                                                                            ? <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
+                                                                            : isDone && <CheckCircle className="w-3.5 h-3.5" />
+                                                                        }
+                                                                    </button>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <span className={`font-semibold text-[14px] ${isDone ? 'text-white' : 'text-slate-200'}`}>
+                                                                            {item.topicName}
+                                                                        </span>
+                                                                        <span className="ml-2 text-[11px] text-slate-500">{childDone}/{children.length} done</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2 shrink-0">
+                                                                        <div className={`p-1 rounded text-slate-500 transition-transform ${isGrpExpanded ? 'rotate-180' : ''}`}>
+                                                                            <ChevronDown className="w-4 h-4" />
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                {isGrpExpanded && (
+                                                                    <div className="ml-6 border-l-2 border-white/[0.06] pl-3 flex flex-col gap-1.5 mt-1.5 mb-1">
+                                                                        {children.map(child => renderTopicRow(child))}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    return (
+                                                        <div
+                                                            key={item.topicId}
+                                                            className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all group
+                                                            ${isDone ? 'bg-emerald-500/[0.06] border-emerald-500/20' : 'bg-surface-2/40 border-white/[0.05] hover:border-white/[0.1]'}`}
+                                                        >
+                                                            <button
+                                                                onClick={() => handleRevisionToggle(session.id, item.topicId, item.status)}
+                                                                disabled={isToggling}
+                                                                className={`shrink-0 w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer
+                                                                ${isDone ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-600 hover:border-emerald-500/60 bg-transparent'}
+                                                                ${isToggling ? 'opacity-50' : ''}`}
+                                                            >
+                                                                {isToggling
+                                                                    ? <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
+                                                                    : isDone && <CheckCircle className="w-3.5 h-3.5" />
+                                                                }
+                                                            </button>
+                                                            <span className={`flex-1 text-[13px] font-medium transition-colors ${isDone ? 'text-slate-400 line-through decoration-slate-600' : 'text-slate-200'}`}>
+                                                                {item.topicName}
+                                                            </span>
+                                                            <div className="flex items-center gap-2 shrink-0 ml-auto">
+                                                                {item.completedAt && (
+                                                                    <span className="text-[10px] text-slate-600 font-medium hidden md:block">
+                                                                        {new Date(item.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                };
+
+                                                return allRoots.map(item => renderTopicRow(item));
+                                            })()}
+                                        </div>
                                     </div>
+                                )}
+                            </div>
+                        );
+                    };
+
+                    return (
+                        <div className="fade-in">
+                            {/* Header */}
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                                <div className="flex items-center gap-2">
+                                    <RefreshCw className="w-6 h-6 text-indigo-400" />
+                                    <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Revision Tracker</h3>
                                 </div>
                             </div>
 
-                            {/* Session Content (Topics) */}
-                            {isExpanded && (
-                                <div className="p-4 bg-surface-1/50">
-                                    <div className="flex flex-col gap-2">
-                                        {session.topics?.length === 0 ? (
-                                            <p className="text-sm text-slate-500 italic py-2">No topics in this session.</p>
-                                        ) : (() => {
-                                            // Render topics
-                                            const allTopics = session.topics;
-                                            const allIds = new Set(allTopics.map(t => t.topicId));
-                                            const childrenOf = (parentId) => allTopics.filter(t => t.parentId === parentId);
-                                            // A topic is a "root" to display if it has no parent, OR its parent wasn't added to the session.
-                                            const allRoots = allTopics.filter(t => !t.parentId || !allIds.has(t.parentId));
-
-                                            const renderTopicRow = (item) => {
-                                                const isDone = item.status === 'completed';
-                                                const isToggling = togglingTopicId === item.topicId;
-                                                const children = childrenOf(item.topicId);
-                                                const hasChildren = children.length > 0;
-                                                const isGrpExpanded = expandedRevisionGroups[`${session.id}_${item.topicId}`] !== false;
-
-                                                if (hasChildren) {
-                                                    const childDone = children.filter(c => c.status === 'completed').length;
-                                                    return (
-                                                        <div key={item.topicId} className="flex flex-col">
-                                                            <div
-                                                                className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all cursor-pointer group
-                                                                    ${isDone ? 'bg-emerald-500/[0.06] border-emerald-500/20' : 'bg-surface-2/50 border-white/[0.06]'}
-                                                                    hover:border-white/[0.12]`}
-                                                                onClick={() => setExpandedRevisionGroups(prev => ({ ...prev, [`${session.id}_${item.topicId}`]: !isGrpExpanded }))}
-                                                            >
-                                                                <button
-                                                                    onClick={(e) => { e.stopPropagation(); handleRevisionToggle(session.id, item.topicId, item.status); }}
-                                                                    disabled={isToggling}
-                                                                    className={`shrink-0 w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer
-                                                                        ${isDone ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-600 hover:border-emerald-500/60 bg-transparent'}
-                                                                        ${isToggling ? 'opacity-50' : ''}`}
-                                                                >
-                                                                    {isToggling
-                                                                        ? <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
-                                                                        : isDone && <CheckCircle className="w-3.5 h-3.5" />
-                                                                    }
-                                                                </button>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <span className={`font-semibold text-[14px] ${isDone ? 'text-white' : 'text-slate-200'}`}>
-                                                                        {item.topicName}
-                                                                    </span>
-                                                                    <span className="ml-2 text-[11px] text-slate-500">{childDone}/{children.length} done</span>
-                                                                </div>
-                                                                <div className="flex items-center gap-2 shrink-0">
-                                                                    <div className={`p-1 rounded text-slate-500 transition-transform ${isGrpExpanded ? 'rotate-180' : ''}`}>
-                                                                        <ChevronDown className="w-4 h-4" />
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            {isGrpExpanded && (
-                                                                <div className="ml-6 border-l-2 border-white/[0.06] pl-3 flex flex-col gap-1.5 mt-1.5 mb-1">
-                                                                    {children.map(child => renderTopicRow(child))}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                }
-
-                                                return (
-                                                    <div
-                                                        key={item.topicId}
-                                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all group
-                                                            ${isDone ? 'bg-emerald-500/[0.06] border-emerald-500/20' : 'bg-surface-2/40 border-white/[0.05] hover:border-white/[0.1]'}`}
-                                                    >
-                                                        <button
-                                                            onClick={() => handleRevisionToggle(session.id, item.topicId, item.status)}
-                                                            disabled={isToggling}
-                                                            className={`shrink-0 w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer
-                                                                ${isDone ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-600 hover:border-emerald-500/60 bg-transparent'}
-                                                                ${isToggling ? 'opacity-50' : ''}`}
-                                                        >
-                                                            {isToggling
-                                                                ? <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
-                                                                : isDone && <CheckCircle className="w-3.5 h-3.5" />
-                                                            }
-                                                        </button>
-                                                        <span className={`flex-1 text-[13px] font-medium transition-colors ${isDone ? 'text-slate-400 line-through decoration-slate-600' : 'text-slate-200'}`}>
-                                                            {item.topicName}
-                                                        </span>
-                                                        <div className="flex items-center gap-2 shrink-0 ml-auto">
-                                                            {item.completedAt && (
-                                                                <span className="text-[10px] text-slate-600 font-medium hidden md:block">
-                                                                    {new Date(item.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            };
-
-                                            return allRoots.map(item => renderTopicRow(item));
-                                        })()}
+                            {revisionSessions.length === 0 ? (
+                                <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
+                                    <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5">
+                                        <RefreshCw className="w-10 h-10 text-violet-500/70" />
                                     </div>
+                                    <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No revision sessions</h3>
+                                    <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                        Create a targeted session of specific topics from the syllabus to start your revision.
+                                    </p>
+                                    <button
+                                        onClick={() => setShowCreateRevisionSession(true)}
+                                        className="bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 hover:border-violet-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
+                                    >
+                                        <PlusCircle className="w-4 h-4" />
+                                        <span>Create Revision Session</span>
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col gap-2">
+                                    {revisionSessions.map(renderSession)}
                                 </div>
                             )}
                         </div>
                     );
-                };
+                })()
+            }
 
-                return (
-                    <div className="fade-in">
-                        {/* Header */}
+            {
+                activeTab === 'images' && (
+                    <div className="fade-in pb-12 px-1">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
-                            <div className="flex items-center gap-3">
-                                <RefreshCw className="w-6 h-6 text-indigo-400" />
-                                <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Revision Tracker</h3>
+                            <div className="flex items-center gap-2">
+                                <ImageIcon className="w-6 h-6 text-indigo-400" />
+                                <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Image Gallery</h3>
+                            </div>
+                            <div className="relative group min-w-[300px]">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                                <input
+                                    type="text"
+                                    value={imageSearchQuery}
+                                    onChange={(e) => setImageSearchQuery(e.target.value)}
+                                    placeholder="Search by date..."
+                                    className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                                />
+                                {imageSearchQuery && (
+                                    <button
+                                        onClick={() => setImageSearchQuery('')}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                )}
                             </div>
                         </div>
 
-                        {revisionSessions.length === 0 ? (
-                            <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center max-w-2xl mx-auto mt-8">
-                                <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5">
-                                    <RefreshCw className="w-10 h-10 text-violet-500/60" />
+                        {images.length === 0 ? (
+                            <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
+                                <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 rotate-3">
+                                    <ImageIcon className="w-10 h-10 text-indigo-500/70" />
                                 </div>
-                                <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No revision sessions</h3>
-                                <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-6">
-                                    Create a targeted session of specific topics from the syllabus to start your revision.
+                                <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No images yet</h3>
+                                <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                    Upload diagrams, textbook snippets, or handwritten notes. They'll be saved here for easy reference and AI analysis.
                                 </p>
                                 <button
-                                    onClick={() => setShowCreateRevisionSession(true)}
-                                    className="bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 hover:border-violet-500/40 flex items-center gap-2 text-[13px] font-semibold px-6 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
+                                    onClick={() => setShowImageModal(true)}
+                                    className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
                                 >
-                                    <PlusCircle className="w-4 h-4" strokeWidth={2} />
-                                    <span>Create Revision Session</span>
+                                    <PlusCircle className="w-4 h-4" />
+                                    <span>Upload Your First Image</span>
                                 </button>
                             </div>
                         ) : (
-                            <div className="flex flex-col gap-2">
-                                {revisionSessions.map(renderSession)}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
+                                {images
+                                    .filter(img =>
+                                        new Date(img.created_at).toLocaleDateString().includes(imageSearchQuery)
+                                    )
+                                    .map((img, index, arr) => {
+                                        const isLast = index === arr.length - 1;
+                                        return (
+                                            <div
+                                                key={img.id}
+                                                ref={isLast ? lastImageElementRef : null}
+                                                className="group relative aspect-square rounded-2xl overflow-hidden bg-surface-2 border border-white/[0.06] hover:border-indigo-500/50 transition-all cursor-pointer shadow-lg hover:shadow-indigo-500/20 active:scale-[0.98]"
+                                            >
+                                                {/* Source Indicator Button */}
+                                                {(img.linked_question_id || img.linked_note_id) && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (img.linked_question_id) {
+                                                                navigateToQuestion(img.linked_question_id);
+                                                            } else if (img.linked_note_id) {
+                                                                const note = notes.find(n => n.id === img.linked_note_id);
+                                                                if (note) {
+                                                                    setViewingNote(note);
+                                                                    if (note.source_image_id) handleFetchNoteImage(note.id);
+                                                                }
+                                                            }
+                                                        }}
+                                                        className="absolute top-3 right-3 p-2 bg-black/60 backdrop-blur-md rounded-xl text-indigo-400 border border-white/[0.08] opacity-0 group-hover:opacity-100 transition-all shadow-2xl z-20 hover:scale-110 active:scale-95 hover:bg-indigo-500/20"
+                                                        title="View Linked Content"
+                                                    >
+                                                        <LinkIcon className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+
+                                                <img
+                                                    src={img.data}
+                                                    alt="Subject material"
+                                                    className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
+                                                    loading="lazy"
+                                                />
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-4">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <p className="text-[11px] font-bold text-white/70 flex items-center gap-1.5">
+                                                            <Activity className="w-3 h-3 text-indigo-400" />
+                                                            {new Date(img.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                        </p>
+                                                        {img.linked_question_id && <span className="text-[9px] font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">Question</span>}
+                                                        {img.linked_note_id && <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">Note</span>}
+                                                    </div>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const fakeNote = {
+                                                                id: `img-${img.id}`,
+                                                                title: 'Source Image',
+                                                                content: 'Original captured material.',
+                                                                source_image_id: img.id,
+                                                                created_at: img.created_at
+                                                            };
+                                                            setFetchedImages(prev => ({ ...prev, [`note-img-${img.id}`]: img.data }));
+                                                            setViewingNote(fakeNote);
+                                                        }}
+                                                        className="w-full py-2 bg-white text-black text-[12px] font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 transition-colors shadow-lg active:scale-95"
+                                                    >
+                                                        <Maximize2 className="w-3.5 h-3.5" />
+                                                        View Full
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                            </div>
+                        )}
+
+                        {loadingMoreImages && (
+                            <div className="flex justify-center mt-8 mb-4">
+                                <div className="w-6 h-6 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
                             </div>
                         )}
                     </div>
-                );
-            })()}
-
-            {activeTab === 'images' && (
-                <div className="fade-in pb-12 px-1">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
-                        <div className="flex items-center gap-3">
-                            <ImageIcon className="w-5 h-5 text-indigo-400" />
-                            <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Image Gallery</h3>
-                        </div>
-                        <div className="relative group min-w-[300px]">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
-                            <input
-                                type="text"
-                                value={imageSearchQuery}
-                                onChange={(e) => setImageSearchQuery(e.target.value)}
-                                placeholder="Search by date..."
-                                className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
-                            />
-                            {imageSearchQuery && (
-                                <button
-                                    onClick={() => setImageSearchQuery('')}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
-                                >
-                                    <X className="w-4 h-4" />
-                                </button>
-                            )}
-                        </div>
-                    </div>
-
-                    {images.length === 0 ? (
-                        <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center max-w-2xl mx-auto mt-8">
-                            <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 rotate-3">
-                                <ImageIcon className="w-10 h-10 text-slate-500" />
-                            </div>
-                            <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No images yet</h3>
-                            <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
-                                Upload diagrams, textbook snippets, or handwritten notes. They'll be saved here for easy reference and AI analysis.
-                            </p>
-                            <button
-                                onClick={() => setShowImageModal(true)}
-                                className="btn-primary flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer"
-                            >
-                                <PlusCircle className="w-4 h-4" />
-                                <span>Upload Your First Image</span>
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
-                            {images
-                                .filter(img =>
-                                    new Date(img.created_at).toLocaleDateString().includes(imageSearchQuery)
-                                )
-                                .map((img, index, arr) => {
-                                    const isLast = index === arr.length - 1;
-                                    return (
-                                        <div
-                                            key={img.id}
-                                            ref={isLast ? lastImageElementRef : null}
-                                            className="group relative aspect-square rounded-2xl overflow-hidden bg-surface-2 border border-white/[0.06] hover:border-indigo-500/50 transition-all cursor-pointer shadow-lg hover:shadow-indigo-500/20 active:scale-[0.98]"
-                                        >
-                                            {/* Source Indicator Button */}
-                                            {(img.linked_question_id || img.linked_note_id) && (
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        if (img.linked_question_id) {
-                                                            navigateToQuestion(img.linked_question_id);
-                                                        } else if (img.linked_note_id) {
-                                                            const note = notes.find(n => n.id === img.linked_note_id);
-                                                            if (note) {
-                                                                setViewingNote(note);
-                                                                if (note.source_image_id) handleFetchNoteImage(note.id);
-                                                            }
-                                                        }
-                                                    }}
-                                                    className="absolute top-3 right-3 p-2 bg-black/60 backdrop-blur-md rounded-xl text-indigo-400 border border-white/[0.08] opacity-0 group-hover:opacity-100 transition-all shadow-2xl z-20 hover:scale-110 active:scale-95 hover:bg-indigo-500/20"
-                                                    title="View Linked Content"
-                                                >
-                                                    <LinkIcon className="w-3.5 h-3.5" />
-                                                </button>
-                                            )}
-
-                                            <img
-                                                src={img.data}
-                                                alt="Subject material"
-                                                className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
-                                                loading="lazy"
-                                            />
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-4">
-                                                <div className="flex items-center justify-between mb-2">
-                                                    <p className="text-[11px] font-bold text-white/70 flex items-center gap-1.5">
-                                                        <Activity className="w-3 h-3 text-indigo-400" />
-                                                        {new Date(img.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                                    </p>
-                                                    {img.linked_question_id && <span className="text-[9px] font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">Question</span>}
-                                                    {img.linked_note_id && <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">Note</span>}
-                                                </div>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        const fakeNote = {
-                                                            id: `img-${img.id}`,
-                                                            title: 'Source Image',
-                                                            content: 'Original captured material.',
-                                                            source_image_id: img.id,
-                                                            created_at: img.created_at
-                                                        };
-                                                        setFetchedImages(prev => ({ ...prev, [`note-img-${img.id}`]: img.data }));
-                                                        setViewingNote(fakeNote);
-                                                    }}
-                                                    className="w-full py-2 bg-white text-black text-[12px] font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 transition-colors shadow-lg active:scale-95"
-                                                >
-                                                    <Maximize2 className="w-3.5 h-3.5" />
-                                                    View Full
-                                                </button>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                        </div>
-                    )}
-
-                    {loadingMoreImages && (
-                        <div className="flex justify-center mt-8 mb-4">
-                            <div className="w-6 h-6 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
-                        </div>
-                    )}
-                </div>
-            )}
+                )
+            }
 
             <CreateRevisionSessionModal
                 isOpen={showCreateRevisionSession}
@@ -3018,7 +3497,7 @@ const SubjectDetail = () => {
                 confirmText="Delete Session"
                 danger
             />
-        </div>
+        </div >
     );
 };
 

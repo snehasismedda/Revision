@@ -5,6 +5,7 @@ const router = express.Router({ mergeParams: true });
 
 // Mounted at /api/subjects/:subjectId/notes
 router.get('/', noteController.getNotes);
+router.get('/tags', noteController.getNoteTags);
 router.get('/:noteId/image', noteController.getNoteImage);
 router.post('/', noteController.createNote);
 router.put('/:noteId', noteController.updateNote);

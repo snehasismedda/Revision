@@ -10,10 +10,11 @@ export const getOverview = async (req, res) => {
         const totalCorrect = parseInt(overview?.total_correct || 0);
         const availableQuestions = parseInt(overview?.available_questions || 0);
         const totalSessions = parseInt(overview?.total_sessions || 0);
+        const totalNotes = parseInt(overview?.total_notes || 0);
 
         const accuracy = totalQuestions > 0
             ? Math.round((totalCorrect / totalQuestions) * 100 * 10) / 10
-            : 0;
+            : null;
 
         res.status(200).json({
             overview: {
@@ -23,6 +24,7 @@ export const getOverview = async (req, res) => {
                 totalIncorrect: totalQuestions - totalCorrect,
                 accuracy,
                 totalSessions,
+                totalNotes,
                 topicsCovered: parseInt(overview?.topics_covered || 0),
                 totalTopics: parseInt(overview?.total_topics || 0),
                 totalRevisionSessions: parseInt(overview?.total_revision_sessions || 0),

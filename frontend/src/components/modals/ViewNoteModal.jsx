@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, FileText, Link2 as LinkIcon, Pencil, ChevronLeft, ChevronRight, List, PanelLeftClose, PanelLeftOpen, Plus, ArrowLeft, Wand2, Check, XCircle, Loader2 } from 'lucide-react';
+import { X, FileText, Link2 as LinkIcon, Pencil, ChevronLeft, ChevronRight, List, PanelLeftClose, PanelLeftOpen, Plus, ArrowLeft, Wand2, Check, XCircle, Loader2, Maximize2, Minimize2, Sun, Moon } from 'lucide-react';
 
 import ModalPortal from '../ModalPortal.jsx';
 import ReactMarkdown from 'react-markdown';
@@ -33,12 +33,12 @@ const preprocessMarkdown = (text) => {
 /* ================================================================
    TOC Sidebar Styles (inline to keep it self-contained)
    ================================================================ */
-const sidebarStyles = {
+const getSidebarStyles = (isLightMode) => ({
     container: {
         width: '260px',
         minWidth: '260px',
-        borderRight: '1px solid rgba(255,255,255,0.06)',
-        background: 'linear-gradient(180deg, rgba(18,18,26,0.95) 0%, rgba(14,14,22,0.98) 100%)',
+        borderRight: isLightMode ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)',
+        background: isLightMode ? '#f8fafc' : 'linear-gradient(180deg, rgba(18,18,26,0.95) 0%, rgba(14,14,22,0.98) 100%)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
@@ -52,7 +52,7 @@ const sidebarStyles = {
     },
     header: {
         padding: '16px 18px 12px',
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
+        borderBottom: isLightMode ? '1px solid rgba(0,0,0,0.06)' : '1px solid rgba(255,255,255,0.05)',
         display: 'flex',
         alignItems: 'center',
         gap: '10px',
@@ -67,7 +67,7 @@ const sidebarStyles = {
         fontWeight: 700,
         textTransform: 'uppercase',
         letterSpacing: '0.08em',
-        color: 'rgba(255,255,255,0.4)',
+        color: isLightMode ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.4)',
         fontFamily: "'Outfit', sans-serif",
     },
     list: {
@@ -87,10 +87,10 @@ const sidebarStyles = {
         color: isActive
             ? '#a78bfa'
             : level === 1
-                ? 'rgba(255,255,255,0.7)'
+                ? (isLightMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.7)')
                 : level === 2
-                    ? 'rgba(255,255,255,0.5)'
-                    : 'rgba(255,255,255,0.4)',
+                    ? (isLightMode ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.5)')
+                    : (isLightMode ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.4)'),
         lineHeight: '1.5',
         borderLeft: isActive ? '2px solid #8b5cf6' : '2px solid transparent',
         background: isActive ? 'rgba(139,92,246,0.06)' : 'transparent',
@@ -99,8 +99,8 @@ const sidebarStyles = {
         fontFamily: "'Inter', sans-serif",
     }),
     itemHover: {
-        background: 'rgba(255,255,255,0.03)',
-        color: 'rgba(255,255,255,0.85)',
+        background: isLightMode ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.03)',
+        color: isLightMode ? 'rgba(0,0,0,0.95)' : 'rgba(255,255,255,0.85)',
     },
     dot: (level, isActive) => ({
         width: '5px',
@@ -111,25 +111,26 @@ const sidebarStyles = {
         background: isActive
             ? '#8b5cf6'
             : level === 1
-                ? 'rgba(255,255,255,0.25)'
-                : 'rgba(255,255,255,0.12)',
+                ? (isLightMode ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.25)')
+                : (isLightMode ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.12)'),
         transition: 'background 0.2s ease',
     }),
     emptyState: {
         padding: '24px 18px',
         textAlign: 'center',
-        color: 'rgba(255,255,255,0.25)',
+        color: isLightMode ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.25)',
         fontSize: '12px',
         fontStyle: 'italic',
     },
-};
+});
 
 /** TOC Sidebar Item */
-const TocItem = ({ heading, isActive, onClick }) => {
+const TocItem = ({ heading, isActive, onClick, isLightMode }) => {
     const [hovered, setHovered] = useState(false);
+    const styles = getSidebarStyles(isLightMode);
     const style = {
-        ...sidebarStyles.item(heading.level, isActive),
-        ...(hovered && !isActive ? sidebarStyles.itemHover : {}),
+        ...styles.item(heading.level, isActive),
+        ...(hovered && !isActive ? styles.itemHover : {}),
     };
 
     return (
@@ -139,10 +140,10 @@ const TocItem = ({ heading, isActive, onClick }) => {
             onMouseLeave={() => setHovered(false)}
             style={style}
             title={heading.text}
-            className="w-full text-left border-none bg-transparent"
+            className="w-full text-left border-none bg-transparent block"
         >
-            <span style={sidebarStyles.dot(heading.level, isActive)} />
-            <span className="truncate">{heading.text}</span>
+            <span style={styles.dot(heading.level, isActive)} className="inline-block align-top mr-2" />
+            <span className="inline-block max-w-[calc(100%-15px)] break-words">{heading.text}</span>
         </button>
     );
 };
@@ -265,6 +266,8 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
 
 
     const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isLightMode, setIsLightMode] = useState(false);
     const [activeHeadingId, setActiveHeadingId] = useState(null);
     const [headings, setHeadings] = useState([]);
     const contentRef = useRef(null);
@@ -577,35 +580,61 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
 
     return (
         <ModalPortal>
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 bg-black/60 backdrop-blur-sm fade-in" onClick={onClose}>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-6 bg-black/60 backdrop-blur-sm fade-in" onClick={onClose}>
                 <div
-                    className="w-full h-[90vh] md:h-auto md:max-h-[85vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-white/[0.08]"
-                    style={{ background: '#12121a', maxWidth: hasHeadings ? '72rem' : '56rem', transition: 'max-width 0.3s ease' }}
+                    className={`w-full flex flex-col ${isFullscreen ? 'h-screen md:max-h-screen rounded-none border-none' : 'h-[90vh] md:h-auto md:max-h-[85vh] rounded-2xl shadow-2xl border'} overflow-hidden`}
+                    style={{
+                        background: isLightMode ? '#ffffff' : '#12121a',
+                        borderColor: isLightMode ? '#e2e8f0' : 'rgba(255,255,255,0.08)',
+                        maxWidth: isFullscreen ? 'none' : (hasHeadings ? '72rem' : '56rem'),
+                        transition: 'max-width 0.3s ease, border-radius 0.3s ease'
+                    }}
                     onClick={e => e.stopPropagation()}
                 >
                     {/* Header */}
-                    <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06] shrink-0 bg-surface-2/30 backdrop-blur-md">
-                        <div className="flex items-center gap-4">
+                    <div className={`flex items-center justify-between px-5 py-3.5 border-b shrink-0 ${isLightMode ? 'bg-[#f8fafc] border-slate-200 text-slate-900' : 'bg-surface-2/30 border-white/[0.06] text-white'} backdrop-blur-md`}>
+                        <div className="flex items-center gap-3">
+                            {(onPrev || onNext) && (
+                                <div className={`hidden md:flex items-center mr-1 rounded-lg border overflow-hidden ${isLightMode ? 'border-slate-300 bg-white' : 'border-white/[0.1] bg-white/[0.02]'}`}>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onPrev?.(); }}
+                                        disabled={!onPrev}
+                                        className={`p-1.5 transition-all ${!onPrev ? 'opacity-30 cursor-not-allowed' : isLightMode ? 'hover:bg-slate-100 cursor-pointer' : 'hover:bg-white/[0.1] cursor-pointer'}`}
+                                        title="Previous Note"
+                                    >
+                                        <ChevronLeft className="w-4 h-4" />
+                                    </button>
+                                    <div className={`w-[1px] h-4 ${isLightMode ? 'bg-slate-300' : 'bg-white/[0.1]'}`} />
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onNext?.(); }}
+                                        disabled={!onNext}
+                                        className={`p-1.5 transition-all ${!onNext ? 'opacity-30 cursor-not-allowed' : isLightMode ? 'hover:bg-slate-100 cursor-pointer' : 'hover:bg-white/[0.1] cursor-pointer'}`}
+                                        title="Next Note"
+                                    >
+                                        <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            )}
                             {/* Back to parent note button */}
                             {parentNoteTitle && (
                                 <button
                                     onClick={onClose}
-                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold text-amber-400 hover:bg-amber-500/10 hover:text-amber-300 transition-all border border-amber-500/20 hover:border-amber-500/30 cursor-pointer mr-1"
+                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold text-amber-500 hover:bg-amber-500/10 transition-all border border-amber-500/20 hover:border-amber-500/40 cursor-pointer"
                                     title={`Back to "${parentNoteTitle}"`}
                                 >
                                     <ArrowLeft className="w-3.5 h-3.5" />
-                                    <span className="max-w-[120px] truncate">Back</span>
+                                    <span className="max-w-[120px] truncate hidden sm:inline">Back</span>
                                 </button>
                             )}
-                            <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
-                                <FileText className="w-5 h-5" />
+                            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)]">
+                                <FileText className="w-4 h-4" />
                             </div>
                             <div>
-                                <h3 className="text-[18px] font-heading font-bold text-white tracking-tight leading-snug">
+                                <h3 className={`text-[16px] font-heading font-bold ${isLightMode ? 'text-slate-900' : 'text-white'} tracking-tight leading-snug`}>
                                     {note.title}
                                 </h3>
-                                <div className="flex items-center gap-3 mt-1.5 opacity-80">
-                                    <span className="text-[12px] font-medium text-slate-400">
+                                <div className="flex items-center gap-2 mt-0.5 opacity-80">
+                                    <span className={`text-[11px] font-medium ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
                                         {new Date(note.created_at).toLocaleDateString(undefined, {
                                             day: 'numeric',
                                             month: 'short',
@@ -615,48 +644,72 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                 </div>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            {/* Toggle sidebar button — shown if headings or linked notes exist */}
-                            {(hasHeadings || hasLinkedNotes) && (
+                        {/* Control Panel Group */}
+                        <div className="flex items-center">
+                            <div className={`flex items-center gap-1 p-1 rounded-xl ${isLightMode ? 'bg-slate-100/80 border border-slate-200/60' : 'bg-white/[0.03] border border-white/[0.05]'}`}>
+                                {(hasHeadings || hasLinkedNotes) && (
+                                    <button
+                                        onClick={() => setSidebarOpen(prev => !prev)}
+                                        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all ${isLightMode ? 'bg-white shadow-sm text-purple-600 hover:bg-purple-50' : 'bg-purple-500/20 text-purple-400 shadow-[0_0_12px_rgba(168,85,247,0.3)] hover:bg-purple-500/30'}`}
+                                        title={sidebarOpen ? 'Hide Sidebar' : 'Show Sidebar'}
+                                    >
+                                        {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+                                    </button>
+                                )}
+                                {note.question_id && onNavigateToQuestion && (
+                                    <button
+                                        onClick={() => {
+                                            onClose();
+                                            onNavigateToQuestion(note.question_id);
+                                        }}
+                                        className={`hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-all ${isLightMode ? 'bg-white shadow-sm text-indigo-600 hover:bg-indigo-50' : 'bg-indigo-500/20 text-indigo-400 shadow-[0_0_12px_rgba(99,102,241,0.3)] hover:bg-indigo-500/30'}`}
+                                        title={note.is_note_link ? 'View Note' : 'View Question'}
+                                    >
+                                        <LinkIcon className="w-4 h-4" />
+                                    </button>
+                                )}
+                                {onEdit && (
+                                    <button
+                                        onClick={() => {
+                                            onClose();
+                                            onEdit(note);
+                                        }}
+                                        className={`hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-all ${isLightMode ? 'bg-white shadow-sm text-emerald-600 hover:bg-emerald-50' : 'bg-emerald-500/20 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.3)] hover:bg-emerald-500/30'}`}
+                                        title="Edit Note"
+                                    >
+                                        <Pencil className="w-4 h-4" />
+                                    </button>
+                                )}
+
+                                {((hasHeadings || hasLinkedNotes) || (note.question_id && onNavigateToQuestion) || onEdit) && (
+                                    <div className={`w-[1px] h-4 mx-0.5 ${isLightMode ? 'bg-slate-300' : 'bg-white/[0.1]'}`} />
+                                )}
+
                                 <button
-                                    onClick={() => setSidebarOpen(prev => !prev)}
-                                    className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-semibold text-purple-400 hover:bg-purple-500/10 hover:text-purple-300 transition-all border border-transparent hover:border-purple-500/20 cursor-pointer"
-                                    title={sidebarOpen ? 'Hide Sidebar' : 'Show Sidebar'}
+                                    onClick={() => setIsLightMode(!isLightMode)}
+                                    className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all ${isLightMode ? 'bg-white shadow-sm text-amber-500 hover:bg-amber-50' : 'bg-amber-500/20 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.3)] hover:bg-amber-500/30'}`}
+                                    title={isLightMode ? "Switch to Dark Mode" : "Switch to Light Mode"}
                                 >
-                                    {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
-                                    <span className="hidden lg:inline">{sidebarOpen ? 'Hide' : 'Show'}</span>
+                                    {isLightMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
                                 </button>
-                            )}
-                            {note.question_id && onNavigateToQuestion && (
                                 <button
-                                    onClick={() => {
-                                        onClose();
-                                        onNavigateToQuestion(note.question_id);
-                                    }}
-                                    className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-semibold text-indigo-400 hover:bg-indigo-500/10 hover:text-indigo-300 transition-all border border-transparent hover:border-indigo-500/20 cursor-pointer"
+                                    onClick={() => setIsFullscreen(!isFullscreen)}
+                                    className={`hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-all ${isLightMode ? 'bg-white shadow-sm text-blue-600 hover:bg-blue-50' : 'bg-blue-500/20 text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.3)] hover:bg-blue-500/30'}`}
+                                    title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
                                 >
-                                    <LinkIcon className="w-4 h-4" />
-                                    <span>{note.is_note_link ? 'View Note' : 'View Question'}</span>
+                                    {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                                 </button>
-                            )}
-                            {onEdit && (
+
+                                <div className={`w-[1px] h-4 mx-0.5 ${isLightMode ? 'bg-slate-300' : 'bg-white/[0.1]'}`} />
+
                                 <button
-                                    onClick={() => {
-                                        onClose();
-                                        onEdit(note);
-                                    }}
-                                    className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-semibold text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 transition-all border border-transparent hover:border-emerald-500/20"
+                                    onClick={onClose}
+                                    className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all ${isLightMode ? 'text-slate-500 hover:bg-red-50 hover:text-red-500' : 'text-slate-400 hover:bg-red-500/20 hover:text-red-400'}`}
+                                    title="Close"
                                 >
-                                    <Pencil className="w-4 h-4" />
-                                    <span>Edit</span>
+                                    <X className="w-4 h-4" />
                                 </button>
-                            )}
-                            <button
-                                onClick={onClose}
-                                className="p-2.5 text-slate-400 hover:text-white hover:bg-white/[0.08] rounded-xl transition-all cursor-pointer"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
+                            </div>
                         </div>
                     </div>
 
@@ -667,22 +720,23 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                         {(hasHeadings || hasLinkedNotes) && (
                             <div
                                 className="hidden md:flex flex-col"
-                                style={sidebarOpen ? sidebarStyles.container : { ...sidebarStyles.container, ...sidebarStyles.containerCollapsed }}
+                                style={sidebarOpen ? getSidebarStyles(isLightMode).container : { ...getSidebarStyles(isLightMode).container, ...getSidebarStyles(isLightMode).containerCollapsed }}
                             >
                                 {/* TOC headings */}
                                 {hasHeadings && (
                                     <>
-                                        <div style={sidebarStyles.header}>
-                                            <List size={14} style={sidebarStyles.headerIcon} />
-                                            <span style={sidebarStyles.headerTitle}>On This Page</span>
+                                        <div style={getSidebarStyles(isLightMode).header}>
+                                            <List size={14} style={getSidebarStyles(isLightMode).headerIcon} />
+                                            <span style={getSidebarStyles(isLightMode).headerTitle}>On This Page</span>
                                         </div>
-                                        <div style={sidebarStyles.list} className="custom-scrollbar">
+                                        <div style={getSidebarStyles(isLightMode).list} className="custom-scrollbar">
                                             {headings.map((h) => (
                                                 <TocItem
                                                     key={h.id}
                                                     heading={h}
                                                     isActive={activeHeadingId === h.id}
                                                     onClick={() => scrollToHeading(h.id)}
+                                                    isLightMode={isLightMode}
                                                 />
                                             ))}
                                         </div>
@@ -692,15 +746,15 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                 {/* Linked Notes — always accessible in sidebar */}
                                 {hasLinkedNotes && (
                                     <div style={{
-                                        borderTop: hasHeadings ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                                        borderTop: hasHeadings ? `1px solid ${isLightMode ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)'}` : 'none',
                                         flexShrink: 0,
                                     }}>
                                         <div style={{
-                                            ...sidebarStyles.header,
+                                            ...getSidebarStyles(isLightMode).header,
                                             paddingBottom: '10px',
                                         }}>
                                             <LinkIcon size={13} style={{ color: '#a78bfa', opacity: 0.8 }} />
-                                            <span style={sidebarStyles.headerTitle}>Linked Notes</span>
+                                            <span style={getSidebarStyles(isLightMode).headerTitle}>Linked Notes</span>
                                             <span style={{
                                                 marginLeft: 'auto',
                                                 fontSize: '10px',
@@ -718,17 +772,17 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                                     onClick={() => onOpenChildNote && onOpenChildNote(child)}
                                                     className="w-full text-left flex items-center gap-2 px-3 py-2 mb-1 rounded-lg text-[12px] font-medium transition-all cursor-pointer group"
                                                     style={{
-                                                        color: 'rgba(167,139,250,0.75)',
+                                                        color: isLightMode ? 'rgba(124,58,237,0.85)' : 'rgba(167,139,250,0.75)',
                                                         background: 'transparent',
                                                         border: '1px solid transparent',
                                                     }}
                                                     onMouseEnter={e => {
-                                                        e.currentTarget.style.color = '#a78bfa';
-                                                        e.currentTarget.style.background = 'rgba(139,92,246,0.08)';
+                                                        e.currentTarget.style.color = isLightMode ? '#6d28d9' : '#a78bfa';
+                                                        e.currentTarget.style.background = isLightMode ? 'rgba(139,92,246,0.1)' : 'rgba(139,92,246,0.08)';
                                                         e.currentTarget.style.borderColor = 'rgba(139,92,246,0.2)';
                                                     }}
                                                     onMouseLeave={e => {
-                                                        e.currentTarget.style.color = 'rgba(167,139,250,0.75)';
+                                                        e.currentTarget.style.color = isLightMode ? 'rgba(124,58,237,0.85)' : 'rgba(167,139,250,0.75)';
                                                         e.currentTarget.style.background = 'transparent';
                                                         e.currentTarget.style.borderColor = 'transparent';
                                                     }}
@@ -749,7 +803,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                         <div
                             ref={contentRef}
                             className="px-6 py-6 md:px-8 md:py-8 overflow-y-auto custom-scrollbar flex-1 relative"
-                            style={{ background: '#12121a' }}
+                            style={{ background: isLightMode ? '#ffffff' : '#12121a' }}
                         >
                             {/* Text Selection Toolbar */}
                             {selectionTooltip && !editMode && (
@@ -766,17 +820,16 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                     <div
                                         className="flex items-center gap-0.5 px-1.5 py-1 rounded-lg border"
                                         style={{
-                                            background: 'rgba(15, 15, 25, 0.95)',
-                                            borderColor: 'rgba(255,255,255,0.1)',
+                                            background: isLightMode ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 15, 25, 0.95)',
+                                            borderColor: isLightMode ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)',
                                             backdropFilter: 'blur(20px)',
-                                            boxShadow: '0 4px 24px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)',
+                                            boxShadow: isLightMode ? '0 4px 24px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)' : '0 4px 24px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)',
                                         }}
                                     >
                                         {onAddToNote && (
                                             <button
                                                 onClick={handleAddToNote}
-                                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold cursor-pointer transition-all hover:bg-white/[0.08]"
-                                                style={{ color: 'rgba(255,255,255,0.85)' }}
+                                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold cursor-pointer transition-all ${isLightMode ? 'hover:bg-black/[0.05] text-slate-700' : 'hover:bg-white/[0.08] text-[rgba(255,255,255,0.85)]'}`}
                                                 title="Create a new note from selection"
                                             >
                                                 <Plus className="w-3 h-3 text-emerald-400" />
@@ -785,11 +838,10 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                         )}
                                         {onUpdateNoteContent && (
                                             <>
-                                                <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.08)' }} />
+                                                <div style={{ width: '1px', height: '16px', background: isLightMode ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.08)' }} />
                                                 <button
                                                     onClick={handleStartEdit}
-                                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold cursor-pointer transition-all hover:bg-white/[0.08]"
-                                                    style={{ color: 'rgba(255,255,255,0.85)' }}
+                                                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold cursor-pointer transition-all ${isLightMode ? 'hover:bg-black/[0.05] text-slate-700' : 'hover:bg-white/[0.08] text-[rgba(255,255,255,0.85)]'}`}
                                                     title="Edit this selection"
                                                 >
                                                     <Pencil className="w-3 h-3 text-blue-400" />
@@ -799,11 +851,10 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                         )}
                                         {onAIEditSection && (
                                             <>
-                                                <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.08)' }} />
+                                                <div style={{ width: '1px', height: '16px', background: isLightMode ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.08)' }} />
                                                 <button
                                                     onClick={handleStartAIEdit}
-                                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold cursor-pointer transition-all hover:bg-white/[0.08]"
-                                                    style={{ color: 'rgba(255,255,255,0.85)' }}
+                                                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold cursor-pointer transition-all ${isLightMode ? 'hover:bg-black/[0.05] text-slate-700' : 'hover:bg-white/[0.08] text-[rgba(255,255,255,0.85)]'}`}
                                                     title="Edit with AI"
                                                 >
                                                     <Wand2 className="w-3 h-3 text-violet-400" />
@@ -812,7 +863,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                             </>
                                         )}
                                     </div>
-                                    <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid rgba(15, 15, 25, 0.95)', margin: '0 auto' }} />
+                                    <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: isLightMode ? '5px solid rgba(255, 255, 255, 0.95)' : '5px solid rgba(15, 15, 25, 0.95)', margin: '0 auto' }} />
                                     <style>{`@keyframes tooltipIn { from { opacity: 0; transform: translate(-50%, -90%); } to { opacity: 1; transform: translate(-50%, -100%); } }`}</style>
                                 </div>
                             )}
@@ -932,9 +983,9 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
 
                             {/* Source Image Display */}
                             {(isFetchingImage || sourceImage) && (
-                                <div className="mb-10 rounded-2xl overflow-hidden border border-white/[0.08] bg-black/40 shadow-2xl relative group">
+                                <div className={`mb-10 rounded-2xl overflow-hidden ${isLightMode ? 'border-none bg-slate-100' : 'border border-white/[0.08] bg-black/40'} shadow-2xl relative group`}>
                                     {isFetchingImage ? (
-                                        <div className="aspect-video flex flex-col items-center justify-center gap-4 bg-surface-2/30">
+                                        <div className={`aspect-video flex flex-col items-center justify-center gap-4 ${isLightMode ? 'bg-slate-50' : 'bg-surface-2/30'}`}>
                                             <div className="w-10 h-10 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
                                             <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-widest animate-pulse">Loading Source Image...</span>
                                         </div>
@@ -959,7 +1010,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                 </div>
                             )}
 
-                            <div className="prose prose-invert prose-lg max-w-none prose-headings:font-heading prose-headings:font-bold prose-h1:text-[22px] prose-h2:text-[19px] prose-h3:text-[17px] prose-headings:mt-6 prose-headings:mb-3 prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mb-3 prose-a:text-indigo-400 hover:prose-a:text-indigo-300 prose-strong:text-white prose-code:text-slate-300 prose-code:before:content-none prose-code:after:content-none prose-pre:bg-surface-2 prose-pre:border prose-pre:border-white/[0.08] prose-ul:my-3 prose-ol:my-3 prose-li:my-1">
+                            <div className={`prose prose-lg max-w-none prose-headings:font-heading prose-headings:font-bold prose-h1:text-[22px] prose-h2:text-[19px] prose-h3:text-[17px] prose-headings:mt-6 prose-headings:mb-3 prose-p:leading-relaxed prose-p:mb-3 prose-ul:my-3 prose-ol:my-3 prose-li:my-1 prose-pre:border prose-code:before:content-none prose-code:after:content-none ${isLightMode ? 'prose-slate text-slate-800 prose-p:text-slate-800 prose-a:text-indigo-600 hover:prose-a:text-indigo-700 prose-strong:text-slate-900 prose-code:text-slate-800 prose-pre:bg-slate-50 prose-pre:border-slate-200' : 'prose-invert prose-p:text-slate-300 prose-a:text-indigo-400 hover:prose-a:text-indigo-300 prose-strong:text-white prose-code:text-slate-300 prose-pre:bg-surface-2 prose-pre:border-white/[0.08]'}`}>
                                 <ReactMarkdown
                                     remarkPlugins={[remarkGfm, remarkMath]}
                                     rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
@@ -987,33 +1038,6 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                         </div>
                     )}
                 </div>
-
-                {/* Navigation Arrows for Gallery/Notes */}
-                {onPrev && (
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onPrev();
-                        }}
-                        className="fixed left-6 md:left-12 top-1/2 -translate-y-1/2 p-3 md:p-4 rounded-full bg-surface-2/60 backdrop-blur-md text-white/50 border border-white/5 hover:bg-surface-2 hover:text-white hover:scale-110 active:scale-95 transition-all shadow-2xl z-[60] group hidden md:flex"
-                        title="Previous"
-                    >
-                        <ChevronLeft className="w-6 h-6 group-active:-translate-x-1 transition-transform" />
-                    </button>
-                )}
-
-                {onNext && (
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onNext();
-                        }}
-                        className="fixed right-6 md:right-12 top-1/2 -translate-y-1/2 p-3 md:p-4 rounded-full bg-surface-2/60 backdrop-blur-md text-white/50 border border-white/5 hover:bg-surface-2 hover:text-white hover:scale-110 active:scale-95 transition-all shadow-2xl z-[60] group hidden md:flex"
-                        title="Next"
-                    >
-                        <ChevronRight className="w-6 h-6 group-active:translate-x-1 transition-transform" />
-                    </button>
-                )}
             </div>
         </ModalPortal>
     );

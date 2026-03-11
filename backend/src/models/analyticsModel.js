@@ -39,6 +39,12 @@ export const getSubjectOverview = async (data) => {
         .count('* as count')
         .first();
 
+    const notes = await db('revision.notes')
+        .where('subject_id', data.subjectId)
+        .where('is_deleted', false)
+        .count('* as count')
+        .first();
+
     return {
         total_questions: attempts?.total_questions || 0,
         total_correct: attempts?.total_correct || 0,
@@ -47,6 +53,7 @@ export const getSubjectOverview = async (data) => {
         available_questions: qs?.count || 0,
         total_sessions: sess?.count || 0,
         total_revision_sessions: revSess?.count || 0,
+        total_notes: notes?.count || 0,
     };
 };
 

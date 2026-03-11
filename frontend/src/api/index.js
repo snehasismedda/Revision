@@ -119,6 +119,7 @@ export const questionsApi = {
 // Notes
 export const notesApi = {
     list: (subjectId) => request(`/subjects/${subjectId}/notes`),
+    getTags: (subjectId) => request(`/subjects/${subjectId}/notes/tags`),
     create: (subjectId, body) => request(`/subjects/${subjectId}/notes`, { method: 'POST', body }),
     update: (subjectId, noteId, body) => request(`/subjects/${subjectId}/notes/${noteId}`, { method: 'PUT', body }),
     delete: (subjectId, noteId) => request(`/subjects/${subjectId}/notes/${noteId}`, { method: 'DELETE' }),

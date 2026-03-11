@@ -12,14 +12,15 @@ export const getNotesByQuestion = async (questionId) => {
         .orderBy('created_at', 'desc');
 };
 
-export const createNote = async (subjectId, questionId, title, content, sourceImageId, parentNoteId) => {
+export const createNote = async (subjectId, questionId, title, content, sourceImageId, parentNoteId, tags = []) => {
     const [note] = await db('revision.notes').insert({
         subject_id: subjectId,
         question_id: questionId || null,
         source_image_id: sourceImageId || null,
         parent_note_id: parentNoteId || null,
         title,
-        content
+        content,
+        tags: JSON.stringify(tags || [])
     }).returning('*');
     return note;
 };
@@ -31,15 +32,36 @@ export const deleteNote = async (noteId, subjectId) => {
 };
 
 export const updateNote = async (noteId, subjectId, data) => {
+    const updateData = {
+        title: data.title,
+        content: data.content,
+        updated_at: db.fn.now()
+    };
+
+    if (data.tags !== undefined) {
+        updateData.tags = JSON.stringify(data.tags || []);
+    }
+
     const [updated] = await db('revision.notes')
         .where({ id: noteId, subject_id: subjectId })
-        .update({
-            title: data.title,
-            content: data.content,
-            updated_at: db.fn.now()
-        })
+        .update(updateData)
         .returning('*');
     return updated;
+};
+
+export const getUniqueTagsBySubject = async (subjectId) => {
+    const notes = await db('revision.notes')
+        .where({ subject_id: subjectId, is_deleted: false })
+        .select('tags');
+    
+    const tagSet = new Set();
+    notes.forEach(note => {
+        const noteTags = note.tags || [];
+        if (Array.isArray(noteTags)) {
+            noteTags.forEach(tag => tagSet.add(tag));
+        }
+    });
+    return Array.from(tagSet).sort();
 };
 
 export const softDeleteNotesBySubject = async (data) => {

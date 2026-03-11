@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import PerformanceBadge from './PerformanceBadge.jsx';
-import { BookMarked, BrainCircuit, Activity, ArrowRight, Trash2, Edit2 } from 'lucide-react';
+import { BookMarked, BrainCircuit, Activity, ArrowRight, Trash2, Edit2, FileText } from 'lucide-react';
 
 const SubjectCard = ({ subject, stats, variant, onEdit, onDelete }) => {
     const navigate = useNavigate();
@@ -40,9 +40,9 @@ const SubjectCard = ({ subject, stats, variant, onEdit, onDelete }) => {
                         <p className="text-[11px] text-slate-500 line-clamp-1 leading-relaxed mt-1 ml-[30px]">{subject.description}</p>
                     )}
                 </div>
-                {accuracy != null && (
+                {(accuracy != null || totalQ > 0) && (
                     <div className="shrink-0 transform group-hover:scale-105 transition-transform duration-300 origin-top-right">
-                        <PerformanceBadge accuracy={accuracy} />
+                        <PerformanceBadge accuracy={totalQ > 0 ? (accuracy ?? 0) : null} />
                     </div>
                 )}
             </div>
@@ -85,6 +85,11 @@ const SubjectCard = ({ subject, stats, variant, onEdit, onDelete }) => {
                     <div className="flex items-center gap-1.5">
                         <BrainCircuit className="w-3 h-3 text-slate-400" strokeWidth={2} />
                         <span>{stats?.availableQuestions ?? (stats?.totalQuestions ?? 0)} Qs</span>
+                    </div>
+                    <div className="h-2.5 w-px bg-white/10" />
+                    <div className="flex items-center gap-1.5">
+                        <FileText className="w-3 h-3 text-slate-400" strokeWidth={2} />
+                        <span>{stats?.totalNotes ?? 0} notes</span>
                     </div>
                 </div>
 

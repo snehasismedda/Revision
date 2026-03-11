@@ -43,11 +43,7 @@ const SessionCard = ({ subjectId, session, onDelete, onEdit, viewMode = 'grid' }
 
     return (
         <div
-            className={`group relative overflow-hidden rounded-xl transition-all hover:-translate-y-0.5 cursor-pointer ${isList ? 'flex items-center gap-4 py-2 pr-5 pl-1' : 'flex flex-col'}`}
-            style={{
-                background: 'rgba(22, 22, 34, 0.6)',
-                border: '1px solid rgba(255,255,255,0.06)',
-            }}
+            className={`glass-panel group relative overflow-hidden rounded-xl border border-white/[0.06] transition-all hover:-translate-y-0.5 cursor-pointer ${isList ? 'flex items-center gap-4 py-2 pr-5 pl-1' : 'flex flex-col'}`}
             onClick={() => navigate(`/subjects/${subjectId}/sessions/${session.id}`)}
         >
             {/* Hover glow */}

@@ -31,7 +31,7 @@ export const getNotes = async (req, res, next) => {
 export const createNote = async (req, res, next) => {
     try {
         const { subjectId } = req.params;
-        const { questionId, title, content, sourceImageId: existingSourceImageId, sourceImageContent, parentNoteId } = req.body;
+        const { questionId, title, content, sourceImageId: existingSourceImageId, sourceImageContent, parentNoteId, tags } = req.body;
 
         let finalContent = content;
         let finalTitle = title;
@@ -77,7 +77,7 @@ export const createNote = async (req, res, next) => {
             return res.status(400).json({ error: 'Title and content are required' });
         }
 
-        const note = await noteModel.createNote(subjectId, questionId, finalTitle, finalContent, sourceImageId, parentNoteId);
+        const note = await noteModel.createNote(subjectId, questionId, finalTitle, finalContent, sourceImageId, parentNoteId, tags);
         res.status(201).json({ note });
     } catch (error) {
         next(error);
@@ -97,18 +97,28 @@ export const deleteNote = async (req, res, next) => {
 export const updateNote = async (req, res, next) => {
     try {
         const { subjectId, noteId } = req.params;
-        const { title, content } = req.body;
+        const { title, content, tags } = req.body;
 
         if (!title || !content) {
             return res.status(400).json({ error: 'Title and content are required' });
         }
 
-        const note = await noteModel.updateNote(noteId, subjectId, { title, content });
+        const note = await noteModel.updateNote(noteId, subjectId, { title, content, tags });
         if (!note) {
             return res.status(404).json({ error: 'Note not found' });
         }
 
         res.json({ note });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getNoteTags = async (req, res, next) => {
+    try {
+        const { subjectId } = req.params;
+        const tags = await noteModel.getUniqueTagsBySubject(subjectId);
+        res.json({ tags });
     } catch (error) {
         next(error);
     }
