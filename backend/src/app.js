@@ -17,6 +17,7 @@ import imageRoute from './routes/imageRoute.js';
 import testSeriesRoute from './routes/testSeriesRoute.js';
 import testRoute from './routes/testRoute.js';
 import revisionTrackerRoute from './routes/revisionTrackerRoute.js';
+import solutionRoute from './routes/solutionRoute.js';
 
 const app = express();
 
@@ -43,6 +44,7 @@ app.use('/api/images', imageRoute);
 app.use('/api/test-series', testSeriesRoute);
 app.use('/api/test-series/:seriesId/tests', testRoute);
 app.use('/api/subjects/:subjectId/revision-tracker', revisionTrackerRoute);
+app.use('/api/subjects/:subjectId/solutions', solutionRoute);
 
 // --- Health Check ---
 app.get('/health', (req, res) => res.json({ status: 'ok' }));

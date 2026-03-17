@@ -108,15 +108,26 @@ export const findAllDescendants = async (topicId) => {
     return result.rows || [];
 };
 
-export const softDeleteTopic = async (data) => {
-    // Soft delete the topic and all its descendants
-    const descendants = await findAllDescendants(data.id);
-    const idsToDelete = [data.id, ...descendants.map(d => d.id)];
+export const softDeleteTopics = async (ids) => {
+    const idList = Array.isArray(ids) ? ids : [ids];
+    if (idList.length === 0) return;
+
+    let allIdsToDelete = [...idList];
+    
+    // For each topic ID, find all its descendants
+    for (const id of idList) {
+        const descendants = await findAllDescendants(id);
+        allIdsToDelete = [...allIdsToDelete, ...descendants.map(d => d.id)];
+    }
+
+    // De-duplicate IDs
+    const uniqueIds = [...new Set(allIdsToDelete)];
 
     return db('revision.topics')
-        .whereIn('id', idsToDelete)
+        .whereIn('id', uniqueIds)
         .update({ is_deleted: true, deleted_at: new Date() });
 };
+
 
 export const softDeleteTopicsBySubject = async (data) => {
     return db('revision.topics')

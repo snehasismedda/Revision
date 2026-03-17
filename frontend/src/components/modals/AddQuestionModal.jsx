@@ -1,42 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { questionsApi } from '../../api/index.js';
 import toast from 'react-hot-toast';
-import { X, PlusCircle, Wand2, FileText, Image as ImageIcon, Trash2, Save, Scissors, Check, RotateCw, ZoomIn, ZoomOut, Camera, RefreshCcw, FlipHorizontal, ChevronDown } from 'lucide-react';
+import { X, PlusCircle, Wand2, FileText, Image as ImageIcon, Trash2, Save, Scissors, Check, RotateCw, ZoomIn, ZoomOut, Camera, RefreshCcw, FlipHorizontal, ChevronDown, Hash, CheckCircle2, Circle, Search } from 'lucide-react';
 import ModalPortal from '../ModalPortal.jsx';
-import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
-import 'react-image-crop/dist/ReactCrop.css';
-import getCroppedImg from '../../utils/cropImage.js';
+import ImageCropper from '../common/ImageCropper.jsx';
 
-// Custom styles for react-image-crop handles
-const cropStyles = `
-.ReactCrop__drag-handle {
-    width: 12px !important;
-    height: 12px !important;
-    background-color: #8b5cf6 !important;
-    border: 2px solid white !important;
-    border-radius: 50% !important;
-}
-.ReactCrop__crop-selection {
-    border: 2px solid #8b5cf6 !important;
-    box-shadow: 0 0 0 9999em rgba(0, 0, 0, 0.7) !important;
-}
-`;
 
-const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
+const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics }) => {
     const [newQuestionType, setNewQuestionType] = useState('text');
     const [newQuestionText, setNewQuestionText] = useState('');
     const [newQuestionImage, setNewQuestionImage] = useState('');
+    const [tags, setTags] = useState([]);
+    const [topicSearchQuery, setTopicSearchQuery] = useState('');
     const [addingQuestion, setAddingQuestion] = useState(false);
     const [analyzeWithAI, setAnalyzeWithAI] = useState(true);
 
     // Cropping State
     const [imageToCrop, setImageToCrop] = useState(null);
-    const [crop, setCrop] = useState();
-    const [zoom, setZoom] = useState(1);
-    const [rotation, setRotation] = useState(0);
-    const [completedCrop, setCompletedCrop] = useState(null);
     const [isCropping, setIsCropping] = useState(false);
-    const imgRef = useRef(null);
 
     // Camera State
     const [cameras, setCameras] = useState([]);
@@ -131,6 +112,30 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
         setIsCropping(true);
     };
 
+    // Flatten topics for easier selection
+    const flattenTopics = (nodes, result = [], path = '') => {
+        nodes.forEach(node => {
+            const currentPath = path ? `${path} > ${node.name}` : node.name;
+            result.push({ id: node.id, name: node.name, path: currentPath, depth: path ? path.split('>').length : 0 });
+            if (node.children) flattenTopics(node.children, result, currentPath);
+        });
+        return result;
+    };
+
+    const flatTopics = flattenTopics(topics || []);
+
+    const filteredTopics = flatTopics.filter(topic =>
+        topic.name.toLowerCase().includes(topicSearchQuery.toLowerCase())
+    );
+
+    const toggleTag = (topicName) => {
+        setTags(prev =>
+            prev.includes(topicName)
+                ? prev.filter(t => t !== topicName)
+                : [...prev, topicName]
+        );
+    };
+
     useEffect(() => {
         if (isOpen) {
             const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -150,69 +155,32 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
         return () => stopCamera();
     }, []);
 
-    function onImageLoad(e) {
-        const { width, height } = e.currentTarget;
-        const initialCrop = centerCrop(
-            makeAspectCrop(
-                {
-                    unit: '%',
-                    width: 70,
-                },
-                undefined, // Unrestricted aspect ratio
-                width,
-                height
-            ),
-            width,
-            height
-        );
-        setCrop(initialCrop);
-    }
-
-    const handleApplyCrop = async () => {
-        try {
-            if (!completedCrop || !imgRef.current) return;
-
-            // Calculate exact pixel crop coordinates based on displayed image size and actual native resolution
-            const scaleX = imgRef.current.naturalWidth / imgRef.current.width;
-            const scaleY = imgRef.current.naturalHeight / imgRef.current.height;
-
-            const pixelCrop = {
-                x: completedCrop.x * scaleX,
-                y: completedCrop.y * scaleY,
-                width: completedCrop.width * scaleX,
-                height: completedCrop.height * scaleY,
-            };
-
-            const croppedImage = await getCroppedImg(imageToCrop, pixelCrop, rotation);
-            setNewQuestionImage(croppedImage);
-            setNewQuestionType('image'); // Switch to image tab to preview the result
-            setIsCropping(false);
-            setImageToCrop(null);
-            setRotation(0);
-            setZoom(1);
-            setCompletedCrop(null);
-            toast.success('Image cropped successfully');
-        } catch (e) {
-            console.error(e);
-            toast.error('Failed to crop image');
-        }
+    const handleApplyCrop = (croppedImage) => {
+        setNewQuestionImage(croppedImage);
+        setNewQuestionType('image'); // Switch to image tab to preview the result
+        setIsCropping(false);
+        setImageToCrop(null);
+        toast.success('Image cropped successfully');
     };
 
     const handleAddQuestion = async (e) => {
         e.preventDefault();
         const content = newQuestionType === 'text' ? newQuestionText.trim() : newQuestionImage;
-        if (!content) return toast.error('Please provide question content');
+        if (newQuestionType === 'image' && !content) return toast.error('Please provide an image');
+        // Removed: if (!content) return toast.error('Please provide question content');
 
         setAddingQuestion(true);
         try {
             const { questions } = await questionsApi.create(subjectId, {
                 content,
                 type: newQuestionType,
-                skipAI: !analyzeWithAI
+                skipAI: !analyzeWithAI,
+                tags: tags
             });
             onQuestionAdded(questions);
             setNewQuestionText('');
             setNewQuestionImage('');
+            setTags([]);
             onClose();
             const count = questions.length;
             toast.success(analyzeWithAI
@@ -228,6 +196,12 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
 
     const handleModalClose = () => {
         stopCamera();
+        setNewQuestionText('');
+        setNewQuestionImage('');
+        setTags([]);
+        setTopicSearchQuery('');
+        setIsCropping(false);
+        setImageToCrop(null);
         onClose();
     };
 
@@ -530,6 +504,59 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
                                     )}
                                 </div>
                             )}
+
+                            <div>
+                                <div className="flex items-center justify-between mb-2.5">
+                                    <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] flex items-center gap-2 text-slate-400">
+                                        <Hash className="w-3 h-3" /> Topic Tags
+                                    </label>
+                                    <div className="relative w-48">
+                                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
+                                        <input
+                                            type="text"
+                                            value={topicSearchQuery}
+                                            onChange={(e) => setTopicSearchQuery(e.target.value)}
+                                            placeholder="Search topics..."
+                                            className="w-full bg-surface-3/50 border border-white/5 rounded-lg py-1 pl-8 pr-3 text-[11px] text-slate-300 outline-none focus:border-primary/40 transition-all placeholder:text-slate-600"
+                                        />
+                                        {topicSearchQuery && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setTopicSearchQuery('')}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                            >
+                                                <X className="w-2.5 h-2.5" />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-41 overflow-y-auto p-2 rounded-xl bg-surface-2/30 border border-white/[0.04]">
+                                    {filteredTopics.map(topic => {
+                                        const isSelected = tags.includes(topic.name);
+                                        return (
+                                            <button
+                                                key={topic.id}
+                                                type="button"
+                                                onClick={() => toggleTag(topic.name)}
+                                                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[12px] font-medium transition-all border cursor-pointer
+                                                    ${isSelected
+                                                        ? 'bg-primary/10 border-primary/30 text-primary shadow-[0_2px_8px_rgba(139,92,246,0.1)]'
+                                                        : 'bg-white/5 border-transparent text-slate-500 hover:bg-white/10 hover:text-slate-300'
+                                                    }`}
+                                            >
+                                                {isSelected ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Circle className="w-3.5 h-3.5 opacity-40" />}
+                                                {topic.depth > 0 && <span className="text-[10px] opacity-30 shrink-0">↳</span>}
+                                                <span className="truncate" title={topic.path}>{topic.name}</span>
+                                            </button>
+                                        );
+                                    })}
+                                    {filteredTopics.length === 0 && (
+                                        <div className="col-span-full py-4 text-center text-[12px] text-slate-500 italic">
+                                            {topicSearchQuery ? 'No topics found matching your search' : 'No topics available. Add topics to regular syllabus first.'}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </form>
                     </div>
 
@@ -567,7 +594,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
                             <button
                                 form="add-question-form"
                                 type="submit"
-                                disabled={addingQuestion || (newQuestionType === 'text' ? !newQuestionText.trim() : !newQuestionImage)}
+                                disabled={addingQuestion || (newQuestionType === 'image' && !newQuestionImage)}
                                 className="btn-primary text-[13px] font-semibold px-6 py-3 rounded-xl disabled:opacity-50 transition-all cursor-pointer shadow-lg flex items-center gap-2 group min-w-[140px] justify-center active:scale-[0.98] hover:shadow-[0_6px_24px_rgba(139,92,246,0.4)]"
                             >
                                 {addingQuestion ? (
@@ -589,121 +616,16 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded }) => {
 
             {/* Cropper UI Overlay */}
             {isCropping && (
-                <div className="fixed inset-0 z-[60] flex flex-col bg-[#0f0f1a]">
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-surface-1 shrink-0">
-                        <style>{cropStyles}</style>
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
-                                <Scissors className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <h3 className="text-white font-semibold">Free-form Crop</h3>
-                                <p className="text-slate-400 text-xs">Select and rotate the question area</p>
-                            </div>
-                        </div>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => {
-                                    setIsCropping(false);
-                                    if (!newQuestionImage) setImageToCrop(null);
-                                }}
-                                className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white transition-all border border-white/5 bg-white/5 active:scale-95"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleApplyCrop}
-                                className="px-6 py-2 rounded-lg text-sm font-semibold bg-primary text-white shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all flex items-center gap-2 active:scale-95"
-                            >
-                                <Check className="w-4 h-4" /> Apply Crop
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="relative flex-1 bg-[#05050a] overflow-auto flex items-center justify-center p-4 md:p-8">
-                        <div className="transition-transform duration-200 ease-out flex items-center justify-center min-w-max min-h-max" style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}>
-                            <div className="relative inline-block" style={{ transform: `rotate(${rotation}deg)`, transition: 'transform 0.2s ease-out' }}>
-                                <ReactCrop
-                                    crop={crop}
-                                    onChange={(c) => setCrop(c)}
-                                    onComplete={(c) => setCompletedCrop(c)}
-                                    minHeight={20}
-                                    minWidth={20}
-                                >
-                                    <img
-                                        ref={imgRef}
-                                        alt="Crop me"
-                                        src={imageToCrop}
-                                        onLoad={onImageLoad}
-                                        style={{ maxHeight: '65vh', maxWidth: '100%', display: 'block' }}
-                                    />
-                                </ReactCrop>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="px-6 py-6 border-t border-white/10 bg-surface-1 shrink-0">
-                        <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-                            {/* Zoom Control */}
-                            <div className="flex flex-col">
-                                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-3 text-center md:text-left">Zoom Control</label>
-                                <div className="flex items-center gap-4">
-                                    <button
-                                        onClick={() => setZoom(z => Math.max(1, z - 0.2))}
-                                        className="p-2.5 rounded-lg bg-surface-2 text-slate-400 hover:text-white border border-white/5 transition-all"
-                                    >
-                                        <ZoomOut className="w-5 h-5" />
-                                    </button>
-                                    <input
-                                        type="range"
-                                        value={zoom}
-                                        min={1}
-                                        max={3}
-                                        step={0.1}
-                                        onChange={(e) => setZoom(parseFloat(e.target.value))}
-                                        className="flex-1 h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer accent-primary"
-                                    />
-                                    <button
-                                        onClick={() => setZoom(z => Math.min(3, z + 0.2))}
-                                        className="p-2.5 rounded-lg bg-surface-2 text-slate-400 hover:text-white border border-white/5 transition-all"
-                                    >
-                                        <ZoomIn className="w-5 h-5" />
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Rotate Control */}
-                            <div className="flex flex-col">
-                                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-3 text-center md:text-left">Rotate ({rotation}°)</label>
-                                <div className="flex items-center gap-4">
-                                    <button
-                                        onClick={() => setRotation(r => (r - 90) % 360)}
-                                        className="p-2.5 rounded-lg bg-surface-2 text-slate-400 hover:text-white border border-white/5 transition-all"
-                                        title="Rotate Left"
-                                    >
-                                        <RotateCw className="w-5 h-5 -scale-x-100" />
-                                    </button>
-                                    <input
-                                        type="range"
-                                        value={rotation}
-                                        min={0}
-                                        max={360}
-                                        step={1}
-                                        onChange={(e) => setRotation(parseInt(e.target.value))}
-                                        className="flex-1 h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer accent-indigo-400"
-                                    />
-                                    <button
-                                        onClick={() => setRotation(r => (r + 90) % 360)}
-                                        className="p-2.5 rounded-lg bg-surface-2 text-slate-400 hover:text-white border border-white/5 transition-all"
-                                        title="Rotate Right"
-                                    >
-                                        <RotateCw className="w-5 h-5" />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <ImageCropper
+                    image={imageToCrop}
+                    onCropComplete={handleApplyCrop}
+                    onCancel={() => {
+                        setIsCropping(false);
+                        if (!newQuestionImage) setImageToCrop(null);
+                    }}
+                    title="Crop Question"
+                    subtitle="Select the question area from your image"
+                />
             )}
         </ModalPortal>
     );

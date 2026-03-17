@@ -96,14 +96,22 @@ export const updateSession = async (req, res) => {
 
 export const deleteSession = async (req, res) => {
     try {
-        const session = await sessionModel.findSessionById({ id: req.params.id });
-        if (!session) return res.status(404).json({ error: 'Session not found' });
+        const { id } = req.params;
+        const { sessionIds } = req.body;
 
-        await sessionModel.softDeleteSession({ id: req.params.id });
-        await deletionService.deleteSessionCascade(req.params.id);
+        const ids = sessionIds && Array.isArray(sessionIds) ? sessionIds : [id];
 
-        res.status(200).json({ message: 'Session deleted successfully' });
+        if (ids.length === 0 || !ids[0]) {
+            return res.status(400).json({ error: 'No session IDs provided' });
+        }
+
+        await sessionModel.softDeleteSessions(ids);
+        await deletionService.deleteSessionsCascade(ids);
+
+
+        res.status(200).json({ message: 'Sessions deleted successfully', deletedCount: ids.length });
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete session' });
     }
 };
+

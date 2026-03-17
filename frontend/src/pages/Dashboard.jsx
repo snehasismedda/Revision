@@ -477,13 +477,23 @@ const Dashboard = () => {
 
 
 
-            {/* All subjects */}
             <div className="fade-in stagger-4 pb-12">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
-                        <BookOpen className="w-5 h-5 text-primary" />
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
+                            <BookOpen className="w-5 h-5 text-primary" />
+                        </div>
+                        <h2 className="text-xl font-heading font-bold text-white tracking-tight">Active Subjects</h2>
                     </div>
-                    <h2 className="text-xl font-heading font-bold text-white tracking-tight">Active Subjects</h2>
+                    {subjects.length > 6 && (
+                        <button
+                            onClick={() => navigate('/subjects')}
+                            className="flex items-center gap-2 text-primary hover:text-primary/80 text-sm font-semibold transition-colors cursor-pointer group/see-all"
+                        >
+                            <span>See All</span>
+                            <ArrowRight className="w-4 h-4 group-hover/see-all:translate-x-0.5 transition-transform" />
+                        </button>
+                    )}
                 </div>
                 {loading ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -511,7 +521,7 @@ const Dashboard = () => {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                        {subjects.map((s) => (
+                        {subjects.slice(0, 6).map((s) => (
                             <SubjectCard
                                 key={s.id}
                                 subject={s}
@@ -527,13 +537,23 @@ const Dashboard = () => {
                 )}
             </div>
 
-            {/* Active Test Series */}
             <div className="fade-in stagger-5 pb-12">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2 rounded-lg bg-pink-500/10 border border-pink-500/20">
-                        <Target className="w-5 h-5 text-pink-500" />
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-pink-500/10 border border-pink-500/20">
+                            <Target className="w-5 h-5 text-pink-500" />
+                        </div>
+                        <h2 className="text-xl font-heading font-bold text-white tracking-tight">Active Test Series</h2>
                     </div>
-                    <h2 className="text-xl font-heading font-bold text-white tracking-tight">Active Test Series</h2>
+                    {testSeries.length > 6 && (
+                        <button
+                            onClick={() => navigate('/tests')}
+                            className="flex items-center gap-2 text-pink-500 hover:text-pink-400 text-sm font-semibold transition-colors cursor-pointer group/see-all"
+                        >
+                            <span>See All</span>
+                            <ArrowRight className="w-4 h-4 group-hover/see-all:translate-x-0.5 transition-transform" />
+                        </button>
+                    )}
                 </div>
                 {loading ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -560,7 +580,7 @@ const Dashboard = () => {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                        {testSeries.map((ts) => (
+                        {testSeries.slice(0, 6).map((ts) => (
                             <div key={ts.id}
                                 onClick={() => navigate(`/tests/${ts.id}`)}
                                 className="glass-card glass p-5 cursor-pointer group flex flex-col justify-between transition-all hover:border-pink-500/30 min-h-[160px]"

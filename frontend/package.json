@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "serve:network": "vite build && vite preview --host",
+    "serve:watch": "vite build --watch & vite preview --host"
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.19",

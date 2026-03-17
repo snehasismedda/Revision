@@ -92,11 +92,15 @@ export const updateSession = async (data) => {
     return updated;
 };
 
-export const softDeleteSession = async (data) => {
+export const softDeleteSessions = async (ids) => {
+    const idList = Array.isArray(ids) ? ids : [ids];
+    if (idList.length === 0) return;
+
     return db('revision.sessions')
-        .where('id', data.id)
+        .whereIn('id', idList)
         .update({ is_deleted: true, deleted_at: new Date() });
 };
+
 
 export const softDeleteSessionsBySubject = async (data) => {
     return db('revision.sessions')

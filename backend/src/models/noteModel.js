@@ -25,11 +25,16 @@ export const createNote = async (subjectId, questionId, title, content, sourceIm
     return note;
 };
 
-export const deleteNote = async (noteId, subjectId) => {
+export const softDeleteNotes = async (ids, subjectId) => {
+    const idList = Array.isArray(ids) ? ids : [ids];
+    if (idList.length === 0) return;
+
     return await db('revision.notes')
-        .where({ id: noteId, subject_id: subjectId })
+        .whereIn('id', idList)
+        .where('subject_id', subjectId)
         .update({ is_deleted: true, deleted_at: db.fn.now() });
 };
+
 
 export const updateNote = async (noteId, subjectId, data) => {
     const updateData = {
@@ -76,18 +81,8 @@ export const softDeleteNotesByQuestion = async (data) => {
         .update({ is_deleted: true, deleted_at: db.fn.now() });
 };
 
-export const softDeleteNotesByTopic = async (data) => {
-    // Soft-delete notes by joining with the questions table to filter by topic_id
-    const questionIds = await db('revision.questions')
-        .where('topic_id', data.topicId)
-        .select('id');
-
-    const ids = questionIds.map(q => q.id);
-
-    if (ids.length > 0) {
-        return await db('revision.notes')
-            .whereIn('question_id', ids)
-            .update({ is_deleted: true, deleted_at: db.fn.now() });
-    }
-    return 0;
+export const getNoteById = async (id, subjectId) => {
+    return await db('revision.notes')
+        .where({ id, subject_id: subjectId, is_deleted: false })
+        .first();
 };

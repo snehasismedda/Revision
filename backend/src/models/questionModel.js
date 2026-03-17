@@ -9,7 +9,7 @@ export const createQuestions = async (data) => {
 export const getQuestionsBySubject = async (subjectId) => {
     return await db('revision.questions')
         .select(
-            'id', 'subject_id', 'topic_id', 'type', 'formatted_content',
+            'id', 'subject_id', 'type', 'formatted_content',
             'source_image_id', 'parent_id', 'created_at', 'updated_at', 'tags',
             db.raw("CASE WHEN type = 'text' OR content IS NOT NULL THEN content ELSE NULL END as content")
         )
@@ -54,17 +54,16 @@ export const updateQuestion = async (id, subjectId, updateData) => {
     return updated;
 };
 
-export const deleteQuestion = async (id, subjectId) => {
-    await db('revision.questions')
-        .where({ id, subject_id: subjectId })
+export const softDeleteQuestions = async (ids, subjectId) => {
+    const idList = Array.isArray(ids) ? ids : [ids];
+    if (idList.length === 0) return;
+
+    return await db('revision.questions')
+        .whereIn('id', idList)
+        .where('subject_id', subjectId)
         .update({ is_deleted: true, deleted_at: db.fn.now() });
 };
 
-export const softDeleteQuestionsByTopic = async (data) => {
-    return await db('revision.questions')
-        .where('topic_id', data.topicId)
-        .update({ is_deleted: true, deleted_at: db.fn.now() });
-};
 
 export const softDeleteQuestionsBySubject = async (data) => {
     return await db('revision.questions')

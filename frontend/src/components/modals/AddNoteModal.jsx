@@ -3,9 +3,7 @@ import { notesApi, aiApi } from '../../api/index.js';
 import toast from 'react-hot-toast';
 import { X, PlusCircle, Trash2, Save, FileText, Image as ImageIcon, Camera, RefreshCcw, FlipHorizontal, ChevronDown, Scissors, Check, RotateCw, ZoomIn, ZoomOut, Wand2, Sparkles, Info } from 'lucide-react';
 import ModalPortal from '../ModalPortal.jsx';
-import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
-import 'react-image-crop/dist/ReactCrop.css';
-import getCroppedImg from '../../utils/cropImage.js';
+import ImageCropper from '../common/ImageCropper.jsx';
 
 const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, initialTitle, initialContent, parentNoteId }) => {
     const [mainType, setMainType] = useState('text'); // 'text' or 'image'
@@ -22,12 +20,7 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
 
     // Cropping State
     const [imageToCrop, setImageToCrop] = useState(null);
-    const [crop, setCrop] = useState();
-    const [zoom, setZoom] = useState(1);
-    const [rotation, setRotation] = useState(0);
-    const [completedCrop, setCompletedCrop] = useState(null);
     const [isCropping, setIsCropping] = useState(false);
-    const imgRef = useRef(null);
 
     // Camera State
     const [cameras, setCameras] = useState([]);
@@ -169,58 +162,12 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
 
     // ─── Image Cropping Handlers ───────────────────────────
 
-    function onImageLoad(e) {
-        const { width, height } = e.currentTarget;
-        const initialCrop = centerCrop(
-            makeAspectCrop(
-                { unit: '%', width: 90 },
-                width / height,
-                width,
-                height
-            ),
-            width,
-            height
-        );
-        setCrop(initialCrop);
-
-        setCompletedCrop({
-            unit: 'px',
-            x: (initialCrop.x / 100) * width,
-            y: (initialCrop.y / 100) * height,
-            width: (initialCrop.width / 100) * width,
-            height: (initialCrop.height / 100) * height,
-        });
-    }
-
-    const handleApplyCrop = async () => {
-        try {
-            if (!completedCrop || !imgRef.current) return;
-
-            const scaleX = imgRef.current.naturalWidth / imgRef.current.width;
-            const scaleY = imgRef.current.naturalHeight / imgRef.current.height;
-
-            const pixelCrop = {
-                x: Math.round(completedCrop.x * scaleX),
-                y: Math.round(completedCrop.y * scaleY),
-                width: Math.round(completedCrop.width * scaleX),
-                height: Math.round(completedCrop.height * scaleY),
-            };
-
-            const croppedImage = await getCroppedImg(imageToCrop, pixelCrop, rotation);
-            setNoteImage(croppedImage);
-            setMainType('image');
-            setIsCropping(false);
-            setImageToCrop(null);
-            setRotation(0);
-            setZoom(1);
-            setCompletedCrop(null);
-            toast.success('Image cropped successfully');
-
-            // Image is now set, user can manually trigger AI tools in the UI
-        } catch (e) {
-            console.error(e);
-            toast.error('Failed to crop image');
-        }
+    const handleApplyCrop = (croppedImage) => {
+        setNoteImage(croppedImage);
+        setMainType('image');
+        setIsCropping(false);
+        setImageToCrop(null);
+        toast.success('Image cropped successfully');
     };
 
     const handleAnalyzeImage = async (image) => {
@@ -297,7 +244,6 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
         setNoteImage('');
         setMainType('text');
         setImageMethod('upload');
-        setCompletedCrop(null);
         setIsCropping(false);
         setImageToCrop(null);
         onClose();
@@ -329,7 +275,7 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
                         </button>
                     </div>
 
-                    {!isCropping ? (
+                    {!isCropping && (
                         <>
                             {/* Main Tabs */}
                             <div className="px-7 pt-5 shrink-0">
@@ -677,71 +623,21 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
                                 </div>
                             </div>
                         </>
-                    ) : (
-                        /* Cropper UI */
-                        <div className="flex flex-col flex-1 overflow-hidden">
-                            <div className="flex-1 overflow-auto p-6 bg-black/40 flex items-center justify-center">
-                                <ReactCrop
-                                    crop={crop}
-                                    onChange={c => setCrop(c)}
-                                    onComplete={c => setCompletedCrop(c)}
-                                >
-                                    <img
-                                        ref={imgRef}
-                                        alt="Crop me"
-                                        src={imageToCrop}
-                                        onLoad={onImageLoad}
-                                        style={{ maxHeight: '60vh', maxWidth: '100%', display: 'block' }}
-                                    />
-                                </ReactCrop>
-                            </div>
-                            <div className="p-6 bg-surface-2 border-t border-white/[0.06] flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                    <button
-                                        onClick={() => setRotation(r => (r - 90) % 360)}
-                                        className="p-2.5 rounded-lg bg-surface-3 text-slate-400 hover:text-white border border-white/5 transition-all"
-                                    >
-                                        <RotateCw className="w-5 h-5 -scale-x-100" />
-                                    </button>
-                                    <button
-                                        onClick={() => setRotation(r => (r + 90) % 360)}
-                                        className="p-2.5 rounded-lg bg-surface-3 text-slate-400 hover:text-white border border-white/5 transition-all"
-                                    >
-                                        <RotateCw className="w-5 h-5" />
-                                    </button>
-                                </div>
-                                <div className="flex gap-3">
-                                    <button
-                                        onClick={() => setIsCropping(false)}
-                                        className="px-6 py-2.5 rounded-xl text-[13px] font-semibold text-slate-400 hover:text-white transition-all"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={handleApplyCrop}
-                                        className="bg-emerald-500 text-white px-8 py-2.5 rounded-xl text-[13px] font-bold shadow-lg flex items-center gap-2"
-                                    >
-                                        <Check className="w-4 h-4" /> Apply Crop
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                    )}
+                    {isCropping && (
+                        <ImageCropper
+                            image={imageToCrop}
+                            onCropComplete={handleApplyCrop}
+                            onCancel={() => {
+                                setIsCropping(false);
+                                if (!noteImage) setImageToCrop(null);
+                            }}
+                            title="Crop Note Image"
+                            subtitle="Select the area you want to save as a note"
+                        />
                     )}
                 </div>
             </div>
-            <style>{`
-                .ReactCrop__drag-handle {
-                    width: 12px !important;
-                    height: 12px !important;
-                    background-color: #10b981 !important;
-                    border: 2px solid white !important;
-                    border-radius: 50% !important;
-                }
-                .ReactCrop__crop-selection {
-                    border: 2px solid #10b981 !important;
-                    box-shadow: 0 0 0 9999em rgba(0, 0, 0, 0.7) !important;
-                }
-            `}</style>
         </ModalPortal>
     );
 };

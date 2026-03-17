@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { questionsApi } from '../../api/index.js';
 import toast from 'react-hot-toast';
-import { X, Save, FileText, Hash, CheckCircle2, Circle } from 'lucide-react';
+import { X, Save, FileText, Hash, CheckCircle2, Circle, Search } from 'lucide-react';
 import ModalPortal from '../ModalPortal.jsx';
 
 const EditQuestionModal = ({ isOpen, onClose, subjectId, question, topics, onQuestionUpdated }) => {
     const [content, setContent] = useState('');
     const [tags, setTags] = useState([]);
+    const [topicSearchQuery, setTopicSearchQuery] = useState('');
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
@@ -34,6 +35,10 @@ const EditQuestionModal = ({ isOpen, onClose, subjectId, question, topics, onQue
 
     const flatTopics = flattenTopics(topics || []);
 
+    const filteredTopics = flatTopics.filter(topic =>
+        topic.name.toLowerCase().includes(topicSearchQuery.toLowerCase())
+    );
+
     const toggleTag = (topicName) => {
         setTags(prev =>
             prev.includes(topicName)
@@ -44,7 +49,7 @@ const EditQuestionModal = ({ isOpen, onClose, subjectId, question, topics, onQue
 
     const handleUpdate = async (e) => {
         e.preventDefault();
-        if (!content.trim()) return toast.error('Content cannot be empty');
+        // Removed: if (!content.trim()) return toast.error('Content cannot be empty');
 
         setSaving(true);
         try {
@@ -109,11 +114,32 @@ const EditQuestionModal = ({ isOpen, onClose, subjectId, question, topics, onQue
                             </div>
 
                             <div>
-                                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-2.5 flex items-center gap-2 text-slate-400">
-                                    <Hash className="w-3 h-3" /> Topic Tags
-                                </label>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-2 rounded-xl bg-surface-2/30 border border-white/[0.04]">
-                                    {flatTopics.map(topic => {
+                                <div className="flex items-center justify-between mb-2.5">
+                                    <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] flex items-center gap-2 text-slate-400">
+                                        <Hash className="w-3 h-3" /> Topic Tags
+                                    </label>
+                                    <div className="relative w-48">
+                                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
+                                        <input
+                                            type="text"
+                                            value={topicSearchQuery}
+                                            onChange={(e) => setTopicSearchQuery(e.target.value)}
+                                            placeholder="Search topics..."
+                                            className="w-full bg-surface-3/50 border border-white/5 rounded-lg py-1 pl-8 pr-3 text-[11px] text-slate-300 outline-none focus:border-indigo-400/40 transition-all placeholder:text-slate-600"
+                                        />
+                                        {topicSearchQuery && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setTopicSearchQuery('')}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                            >
+                                                <X className="w-2.5 h-2.5" />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-41 overflow-y-auto p-2 rounded-xl bg-surface-2/30 border border-white/[0.04]">
+                                    {filteredTopics.map(topic => {
                                         const isSelected = tags.includes(topic.name);
                                         return (
                                             <button
@@ -132,9 +158,9 @@ const EditQuestionModal = ({ isOpen, onClose, subjectId, question, topics, onQue
                                             </button>
                                         );
                                     })}
-                                    {flatTopics.length === 0 && (
+                                    {filteredTopics.length === 0 && (
                                         <div className="col-span-full py-4 text-center text-[12px] text-slate-500 italic">
-                                            No topics available. Add topics to regular syllabus first.
+                                            {topicSearchQuery ? 'No topics found matching your search' : 'No topics available. Add topics to regular syllabus first.'}
                                         </div>
                                     )}
                                 </div>
@@ -155,7 +181,7 @@ const EditQuestionModal = ({ isOpen, onClose, subjectId, question, topics, onQue
                             <button
                                 form="edit-question-form"
                                 type="submit"
-                                disabled={saving || (question.type === 'text' && !content.trim())}
+                                disabled={saving}
                                 className="bg-indigo-600 text-white text-[13px] font-semibold px-6 py-3 rounded-xl disabled:opacity-50 transition-all cursor-pointer shadow-lg shadow-indigo-500/20 flex items-center gap-2 group min-w-[140px] justify-center active:scale-[0.98] hover:bg-indigo-500"
                             >
                                 {saving ? (

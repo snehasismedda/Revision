@@ -35,7 +35,7 @@ export function rotateSize(width, height, rotation) {
  * @param {number} rotation - optional rotation parameter
  * @param {Object} flip - optional flip parameter
  */
-export default async function getCroppedImg(
+export async function getCroppedImg(
     imageSrc,
     pixelCrop,
     rotation = 0,
@@ -89,11 +89,32 @@ export default async function getCroppedImg(
 
     // As Base64 string
     return canvas.toDataURL('image/jpeg');
+}
 
-    // As a blob
-    // return new Promise((resolve, reject) => {
-    //   canvas.toBlob((file) => {
-    //     resolve(URL.createObjectURL(file))
-    //   }, 'image/jpeg')
-    // })
+/**
+ * Returns a new image source that is rotated by the given amount.
+ */
+export async function getRotatedImage(imageSrc, rotation = 0) {
+    const image = await createImage(imageSrc)
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+
+    if (!ctx) return null
+
+    const rotRad = getRadianAngle(rotation)
+    const { width: bBoxWidth, height: bBoxHeight } = rotateSize(
+        image.width,
+        image.height,
+        rotation
+    )
+
+    canvas.width = bBoxWidth
+    canvas.height = bBoxHeight
+
+    ctx.translate(bBoxWidth / 2, bBoxHeight / 2)
+    ctx.rotate(rotRad)
+    ctx.translate(-image.width / 2, -image.height / 2)
+    ctx.drawImage(image, 0, 0)
+
+    return canvas.toDataURL('image/jpeg')
 }

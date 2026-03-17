@@ -43,13 +43,14 @@ export const getQuestionImage = async (req, res, next) => {
 export const createQuestion = async (req, res, next) => {
     try {
         const { subjectId } = req.params;
-        const { topicId, content, type, skipAI } = req.body;
+        const { content, type, skipAI, tags: manualTags } = req.body;
 
         if (!content) {
             return res.status(400).json({ error: 'Content is required' });
         }
 
         const typeValue = type === 'image' ? 'image' : 'text';
+        const finalManualTags = Array.isArray(manualTags) ? manualTags : [];
 
         // Check for Skip AI
         if (skipAI) {
@@ -61,25 +62,18 @@ export const createQuestion = async (req, res, next) => {
 
             const [question] = await questionModel.createQuestions({
                 subject_id: subjectId,
-                topic_id: topicId,
-                content: typeValue === 'text' ? content : 'Captured Question',
+                content: typeValue === 'text' ? content : '',
                 type: typeValue,
                 source_image_id: sourceImageId,
-                tags: JSON.stringify([])
+                tags: JSON.stringify(finalManualTags)
             });
             return res.status(201).json({ questions: [question] });
         }
 
-        const subjectTopics = await topicModel.findTopicsBySubject({ subjectId });
-
-        const allParentIds = new Set(subjectTopics.map(t => t.parent_id).filter(id => id !== null));
-        const leafTopics = subjectTopics.filter(t => !allParentIds.has(t.id));
-        const topicNames = leafTopics.map(t => t.name);
-
         const parsedQuestions = await parseQuestionToRichText({
             content,
             type: typeValue,
-            topics: topicNames
+            topics: [] // No topics filter needed
         });
 
         const { questions } = parsedQuestions;
@@ -91,33 +85,39 @@ export const createQuestion = async (req, res, next) => {
         }
 
         if (questions.length === 1) {
+            // Merge manual tags with AI tags, avoiding duplicates
+            const aiTags = questions[0].tags || [];
+            const mergedTags = [...new Set([...finalManualTags, ...aiTags])];
+
             const question = await questionModel.createQuestions({
                 subject_id: subjectId,
-                topic_id: topicId,
                 content: questions[0].question,
                 type: typeValue,
                 formatted_content: parsedQuestions,
                 source_image_id: sourceImageId,
-                tags: JSON.stringify(questions[0].tags)
+                tags: JSON.stringify(mergedTags)
             });
             return res.status(201).json({ questions: question });
         } else {
             const parentQuestion = await questionModel.createQuestions({
                 subject_id: subjectId,
-                topic_id: topicId,
                 type: typeValue,
                 formatted_content: parsedQuestions,
+                tags: JSON.stringify(finalManualTags) // Parent gets manual tags
             });
 
-            const childQuestions = await questionModel.createQuestions(questions.map(q => ({
-                subject_id: subjectId,
-                topic_id: topicId,
-                content: q.question,
-                type: typeValue,
-                parent_id: parentQuestion[0].id,
-                tags: JSON.stringify(q.tags),
-                source_image_id: sourceImageId,
-            })));
+            const childQuestions = await questionModel.createQuestions(questions.map(q => {
+                const aiTags = q.tags || [];
+                const mergedTags = [...new Set([...finalManualTags, ...aiTags])];
+                return {
+                    subject_id: subjectId,
+                    content: q.question,
+                    type: typeValue,
+                    parent_id: parentQuestion[0].id,
+                    tags: JSON.stringify(mergedTags),
+                    source_image_id: sourceImageId,
+                };
+            }));
             return res.status(201).json({ questions: childQuestions });
         }
     } catch (error) {
@@ -128,21 +128,30 @@ export const createQuestion = async (req, res, next) => {
 export const deleteQuestion = async (req, res, next) => {
     try {
         const { subjectId, questionId } = req.params;
-        await questionModel.deleteQuestion(questionId, subjectId);
-        await deletionService.deleteQuestionCascade(questionId);
-        res.json({ message: 'Question deleted successfully' });
+        const { questionIds } = req.body;
+
+        const ids = questionIds && Array.isArray(questionIds) ? questionIds : [questionId];
+
+        if (ids.length === 0 || !ids[0]) {
+            return res.status(400).json({ error: 'No question IDs provided' });
+        }
+
+        await questionModel.softDeleteQuestions(ids, subjectId);
+        await deletionService.deleteQuestionsCascade(ids, subjectId);
+        
+        res.json({ message: 'Questions deleted successfully', deletedCount: ids.length });
     } catch (error) {
         next(error);
     }
 };
 
+
 export const updateQuestion = async (req, res, next) => {
     try {
         const { subjectId, questionId } = req.params;
-        const { topicId, content, type, tags } = req.body;
+        const { content, type, tags } = req.body;
 
         const updateData = {};
-        if (topicId !== undefined) updateData.topic_id = topicId;
         if (content !== undefined) {
             updateData.content = content;
             updateData.formatted_content = null;

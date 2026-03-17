@@ -140,6 +140,15 @@ export const revisionApi = {
     analytics: (subjectId) => request(`/subjects/${subjectId}/revision-tracker/analytics`),
 };
 
+// Solutions
+export const solutionsApi = {
+    list: (subjectId) => request(`/subjects/${subjectId}/solutions`),
+    create: (subjectId, body) => request(`/subjects/${subjectId}/solutions`, { method: 'POST', body }),
+    update: (subjectId, solutionId, body) => request(`/subjects/${subjectId}/solutions/${solutionId}`, { method: 'PUT', body }),
+    delete: (subjectId, solutionId) => request(`/subjects/${subjectId}/solutions/${solutionId}`, { method: 'DELETE' }),
+    getImage: (subjectId, solutionId) => request(`/subjects/${subjectId}/solutions/${solutionId}/image`),
+};
+
 // Images
 export const imagesApi = {
     list: (limit, offset) => {

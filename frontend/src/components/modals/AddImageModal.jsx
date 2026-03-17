@@ -3,24 +3,7 @@ import { imagesApi, subjectsApi, aiApi } from '../../api/index.js';
 import toast from 'react-hot-toast';
 import { X, PlusCircle, Wand2, FileText, Image as ImageIcon, Trash2, Save, Scissors, Check, RotateCw, ZoomIn, ZoomOut, Camera, RefreshCcw, FlipHorizontal, ChevronDown, Sparkles } from 'lucide-react';
 import ModalPortal from '../ModalPortal.jsx';
-import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
-import 'react-image-crop/dist/ReactCrop.css';
-import getCroppedImg from '../../utils/cropImage.js';
-
-// Custom styles for react-image-crop handles
-const cropStyles = `
-.ReactCrop__drag-handle {
-    width: 12px !important;
-    height: 12px !important;
-    background-color: #8b5cf6 !important;
-    border: 2px solid white !important;
-    border-radius: 50% !important;
-}
-.ReactCrop__crop-selection {
-    border: 2px solid #8b5cf6 !important;
-    box-shadow: 0 0 0 9999em rgba(0, 0, 0, 0.7) !important;
-}
-`;
+import ImageCropper from '../common/ImageCropper.jsx';
 
 const AddImageModal = ({ isOpen, onClose, onImageSaved }) => {
     const [saveType, setSaveType] = useState('question'); // 'question' or 'note'
@@ -37,12 +20,7 @@ const AddImageModal = ({ isOpen, onClose, onImageSaved }) => {
 
     // Cropping State
     const [imageToCrop, setImageToCrop] = useState(null);
-    const [crop, setCrop] = useState();
-    const [zoom, setZoom] = useState(1);
-    const [rotation, setRotation] = useState(0);
-    const [completedCrop, setCompletedCrop] = useState(null);
     const [isCropping, setIsCropping] = useState(false);
-    const imgRef = useRef(null);
 
     // Camera State
     const [cameras, setCameras] = useState([]);
@@ -168,51 +146,12 @@ const AddImageModal = ({ isOpen, onClose, onImageSaved }) => {
         setIsCropping(true);
     };
 
-    function onImageLoad(e) {
-        const { width, height } = e.currentTarget;
-        const initialCrop = centerCrop(
-            makeAspectCrop(
-                {
-                    unit: '%',
-                    width: 70,
-                },
-                undefined, // Unrestricted aspect ratio
-                width,
-                height
-            ),
-            width,
-            height
-        );
-        setCrop(initialCrop);
-    }
-
-    const handleApplyCrop = async () => {
-        try {
-            if (!completedCrop || !imgRef.current) return;
-
-            const scaleX = imgRef.current.naturalWidth / imgRef.current.width;
-            const scaleY = imgRef.current.naturalHeight / imgRef.current.height;
-
-            const pixelCrop = {
-                x: completedCrop.x * scaleX,
-                y: completedCrop.y * scaleY,
-                width: completedCrop.width * scaleX,
-                height: completedCrop.height * scaleY,
-            };
-
-            const croppedImage = await getCroppedImg(imageToCrop, pixelCrop, rotation);
-            setNewImage(croppedImage);
-            setUploadType('image');
-            setIsCropping(false);
-            setImageToCrop(null);
-            setRotation(0);
-            setZoom(1);
-            setCompletedCrop(null);
-            toast.success('Image cropped successfully');
-        } catch (e) {
-            console.error(e);
-            toast.error('Failed to crop image');
-        }
+    const handleApplyCrop = (croppedImage) => {
+        setNewImage(croppedImage);
+        setUploadType('image');
+        setIsCropping(false);
+        setImageToCrop(null);
+        toast.success('Image cropped successfully');
     };
 
     const handleEnhance = async () => {
@@ -265,6 +204,11 @@ const AddImageModal = ({ isOpen, onClose, onImageSaved }) => {
 
     const handleModalClose = () => {
         stopCamera();
+        setNewImage('');
+        setTitle('');
+        setContent('');
+        setIsCropping(false);
+        setImageToCrop(null);
         onClose();
     };
 
@@ -638,71 +582,16 @@ const AddImageModal = ({ isOpen, onClose, onImageSaved }) => {
 
             {/* Cropper UI Overlay */}
             {isCropping && (
-                <div className="fixed inset-0 z-[60] flex flex-col bg-[#0f0f1a]">
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-surface-1 shrink-0">
-                        <style>{cropStyles}</style>
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
-                                <Scissors className="w-5 h-5" />
-                            </div>
-                            <h3 className="text-white font-semibold">Crop Image</h3>
-                        </div>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => {
-                                    setIsCropping(false);
-                                    if (!newImage) setImageToCrop(null);
-                                }}
-                                className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white transition-all border border-white/5 bg-white/5 active:scale-95"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleApplyCrop}
-                                className="px-6 py-2 rounded-lg text-sm font-semibold bg-primary text-white shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all flex items-center gap-2 active:scale-95"
-                            >
-                                <Check className="w-4 h-4" /> Apply
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="relative flex-1 bg-[#05050a] overflow-auto flex items-center justify-center p-4">
-                        <div className="transition-transform duration-200 ease-out min-w-max min-h-max" style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}>
-                            <div className="relative inline-block" style={{ transform: `rotate(${rotation}deg)`, transition: 'transform 0.2s ease-out' }}>
-                                <ReactCrop
-                                    crop={crop}
-                                    onChange={(c) => setCrop(c)}
-                                    onComplete={(c) => setCompletedCrop(c)}
-                                    minHeight={20}
-                                    minWidth={20}
-                                >
-                                    <img ref={imgRef} alt="Crop me" src={imageToCrop} onLoad={onImageLoad} style={{ maxHeight: '65vh', maxWidth: '100%', display: 'block' }} />
-                                </ReactCrop>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="px-6 py-6 border-t border-white/10 bg-surface-1 shrink-0">
-                        <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-                            <div className="flex flex-col">
-                                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-3">Zoom</label>
-                                <div className="flex items-center gap-4">
-                                    <ZoomOut className="w-4 h-4 text-slate-500" />
-                                    <input type="range" value={zoom} min={1} max={3} step={0.1} onChange={(e) => setZoom(parseFloat(e.target.value))} className="flex-1 h-1 bg-white/10 rounded-full appearance-none accent-primary" />
-                                    <ZoomIn className="w-4 h-4 text-slate-500" />
-                                </div>
-                            </div>
-                            <div className="flex flex-col">
-                                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-3">Rotate ({rotation}°)</label>
-                                <div className="flex items-center gap-4">
-                                    <button onClick={() => setRotation(r => (r - 90) % 360)} className="p-2 rounded-lg bg-surface-2 text-slate-400 hover:text-white border border-white/5 active:scale-90"><RotateCw className="w-4 h-4 -scale-x-100" /></button>
-                                    <input type="range" value={rotation} min={0} max={360} step={1} onChange={(e) => setRotation(parseInt(e.target.value))} className="flex-1 h-1 bg-white/10 rounded-full appearance-none accent-indigo-400" />
-                                    <button onClick={() => setRotation(r => (r + 90) % 360)} className="p-2 rounded-lg bg-surface-2 text-slate-400 hover:text-white border border-white/5 active:scale-90"><RotateCw className="w-4 h-4" /></button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <ImageCropper
+                    image={imageToCrop}
+                    onCropComplete={handleApplyCrop}
+                    onCancel={() => {
+                        setIsCropping(false);
+                        if (!newImage) setImageToCrop(null);
+                    }}
+                    title="Crop Research Item"
+                    subtitle="Select the area you want to save"
+                />
             )}
         </ModalPortal>
     );

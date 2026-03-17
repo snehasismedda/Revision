@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { subjectsApi, topicsApi, sessionsApi, questionsApi, notesApi, imagesApi, aiApi, revisionApi } from '../api/index.js';
+import { subjectsApi, topicsApi, sessionsApi, questionsApi, notesApi, imagesApi, aiApi, revisionApi, solutionsApi } from '../api/index.js';
 import TopicTree from '../components/TopicTree.jsx';
 import SessionCard from '../components/SessionCard.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
@@ -25,6 +26,9 @@ import EditNoteModal from '../components/modals/EditNoteModal.jsx';
 import AddImageModal from '../components/modals/AddImageModal.jsx';
 import CreateRevisionSessionModal from '../components/modals/CreateRevisionSessionModal.jsx';
 import EditRevisionSessionModal from '../components/modals/EditRevisionSessionModal.jsx';
+import AddSolutionModal from '../components/modals/AddSolutionModal.jsx';
+import ViewSolutionModal from '../components/modals/ViewSolutionModal.jsx';
+import EditSolutionModal from '../components/modals/EditSolutionModal.jsx';
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -69,6 +73,7 @@ const SubjectDetail = () => {
     const [questions, setQuestions] = useState([]);
     const [notes, setNotes] = useState([]);
     const [images, setImages] = useState([]);
+    const [solutions, setSolutions] = useState([]);
     const [loading, setLoading] = useState(true);
 
     // Pagination for images
@@ -81,9 +86,12 @@ const SubjectDetail = () => {
     const [showQuestionModal, setShowQuestionModal] = useState(false);
     const [showNoteModal, setShowNoteModal] = useState(false);
     const [showImageModal, setShowImageModal] = useState(false);
+    const [showSolutionModal, setShowSolutionModal] = useState(false);
     const [viewingNote, setViewingNote] = useState(null);
+    const [viewingSolution, setViewingSolution] = useState(null);
     const [editingNote, setEditingNote] = useState(null);
     const [selectedQuestionIdForNote, setSelectedQuestionIdForNote] = useState(null);
+    const [selectedQuestionIdForSolution, setSelectedQuestionIdForSolution] = useState(null);
     const [noteStack, setNoteStack] = useState([]); // Stack for parent note navigation
     const [addToNoteData, setAddToNoteData] = useState(null); // { selectedText, parentNoteId }
 
@@ -94,11 +102,14 @@ const SubjectDetail = () => {
     const [confirmDeleteNote, setConfirmDeleteNote] = useState({ open: false, note: null });
     const [editingSession, setEditingSession] = useState(null);
     const [editingQuestion, setEditingQuestion] = useState(null);
+    const [editingSolution, setEditingSolution] = useState(null);
     const [showEditQuestionModal, setShowEditQuestionModal] = useState(false);
+    const [showEditSolutionModal, setShowEditSolutionModal] = useState(false);
     const [fetchingImageId, setFetchingImageId] = useState(null);
     const [fetchedImages, setFetchedImages] = useState({});
     const [searchQuery, setSearchQuery] = useState('');
     const [noteSearchQuery, setNoteSearchQuery] = useState('');
+    const [solutionSearchQuery, setSolutionSearchQuery] = useState('');
     const [selectedNoteTag, setSelectedNoteTag] = useState('');
     const [sessionSearchQuery, setSessionSearchQuery] = useState('');
     const [imageSearchQuery, setImageSearchQuery] = useState('');
@@ -106,6 +117,7 @@ const SubjectDetail = () => {
     const [treeKey, setTreeKey] = useState(0);
     const [sessionsViewMode, setSessionsViewMode] = useState('grid'); // 'grid' or 'list'
     const [notesViewMode, setNotesViewMode] = useState('grid'); // 'grid' or 'list'
+    const [solutionsViewMode, setSolutionsViewMode] = useState('grid');
 
     // Revision tracker state
     const [revisionSessions, setRevisionSessions] = useState([]);
@@ -136,19 +148,38 @@ const SubjectDetail = () => {
         setSelectedItems(new Set());
     }, [activeTab]);
 
-    const getFilteredNotes = () => {
+    const filteredNotes = useMemo(() => {
         const query = (noteSearchQuery || '').toLowerCase();
-        return notes.filter(n => {
-            const matchesSearch = n.title?.toLowerCase().includes(query) || n.content?.toLowerCase().includes(query);
-            let nTags = n.tags || [];
-            if (typeof nTags === 'string') {
-                try { nTags = JSON.parse(nTags); } catch { nTags = []; }
+        return notes.map(n => {
+            let parsedTags = n.tags || [];
+            if (typeof parsedTags === 'string') {
+                try { parsedTags = JSON.parse(parsedTags); } catch { parsedTags = []; }
             }
-            if (!Array.isArray(nTags)) nTags = [];
-            const matchesTag = selectedNoteTag ? nTags.includes(selectedNoteTag) : true;
+            if (!Array.isArray(parsedTags)) parsedTags = [];
+            return { ...n, parsedTags };
+        }).filter(n => {
+            const matchesSearch = n.title?.toLowerCase().includes(query) || n.content?.toLowerCase().includes(query);
+            const matchesTag = selectedNoteTag ? n.parsedTags.includes(selectedNoteTag) : true;
             return matchesSearch && matchesTag;
         });
-    };
+    }, [notes, noteSearchQuery, selectedNoteTag]);
+
+    const filteredSessions = useMemo(() => {
+        const query = (sessionSearchQuery || '').toLowerCase();
+        return sessions.filter(s =>
+            (s.title || s.name || '')?.toLowerCase().includes(query) ||
+            s.notes?.toLowerCase().includes(query)
+        );
+    }, [sessions, sessionSearchQuery]);
+
+    const filteredSolutions = useMemo(() => {
+        if (!solutionSearchQuery.trim()) return solutions;
+        const q = solutionSearchQuery.toLowerCase();
+        return solutions.filter(s =>
+            s.title?.toLowerCase().includes(q) ||
+            s.content?.toLowerCase().includes(q)
+        );
+    }, [solutions, solutionSearchQuery]);
 
     const handleSelectAll = () => {
         if (activeTab === 'questions') {
@@ -161,7 +192,7 @@ const SubjectDetail = () => {
                 setSelectedItems(new Set(visibleQuestions.map(q => q.id)));
             }
         } else if (activeTab === 'notes') {
-            const visibleNotes = getFilteredNotes();
+            const visibleNotes = filteredNotes;
 
             if (selectedItems.size === visibleNotes.length && visibleNotes.length > 0) {
                 setSelectedItems(new Set());
@@ -1143,6 +1174,9 @@ const SubjectDetail = () => {
             if (entries[0].isIntersecting && hasMoreImages) {
                 setImagePage(prevPage => prevPage + 1);
             }
+        }, {
+            rootMargin: '400px', // Load more images when 400px from bottom
+            threshold: 0
         });
         if (node) imageObserver.current.observe(node);
     }, [loading, loadingMoreImages, hasMoreImages]);
@@ -1150,12 +1184,13 @@ const SubjectDetail = () => {
     useEffect(() => {
         const load = async () => {
             try {
-                const [subRes, topRes, sesRes, qsRes, notesRes, imgRes, revRes] = await Promise.all([
+                const [subRes, topRes, sesRes, qsRes, notesRes, solutionsRes, imgRes, revRes] = await Promise.all([
                     subjectsApi.get(id),
                     topicsApi.list(id),
                     sessionsApi.list(id),
                     questionsApi.list(id),
                     notesApi.list(id),
+                    solutionsApi.list(id),
                     imagesApi.listBySubject(id, IMAGE_LIMIT, 0),
                     revisionApi.listSessions(id).catch(() => ({ sessions: [] })),
                 ]);
@@ -1164,6 +1199,7 @@ const SubjectDetail = () => {
                 setSessions(sesRes.sessions);
                 setQuestions(qsRes.questions || []);
                 setNotes(notesRes.notes || []);
+                setSolutions(solutionsRes.solutions || []);
                 setRevisionSessions(revRes.sessions || []);
 
                 const initialImages = imgRes.images || [];
@@ -1229,6 +1265,10 @@ const SubjectDetail = () => {
     const handleNoteUpdated = (updatedNote) => {
         setNotes((prev) => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
         if (viewingNote?.id === updatedNote.id) setViewingNote(updatedNote);
+    };
+
+    const handleSolutionAdded = (newSolution) => {
+        setSolutions((prev) => [newSolution, ...prev]);
     };
 
     const handleRevisionToggle = async (sessionId, topicId, currentStatus) => {
@@ -1380,18 +1420,67 @@ const SubjectDetail = () => {
         }
     };
 
+    const handleHideImage = (questionId) => {
+        const question = questions.find(q => q.id === questionId);
+        const sourceId = question?.source_image_id || questionId;
+        setFetchedImages(prev => {
+            const next = { ...prev };
+            delete next[questionId];
+            delete next[sourceId];
+            return next;
+        });
+    };
+
     const handleFetchNoteImage = async (noteId) => {
-        if (fetchedImages[`note - ${noteId} `]) return;
+        if (fetchedImages[`note-${noteId}`]) return;
         try {
-            setFetchingImageId(`note - ${noteId} `);
+            setFetchingImageId(`note-${noteId}`);
             const res = await notesApi.getImage(id, noteId);
             if (res.content) {
-                setFetchedImages((prev) => ({ ...prev, [`note - ${noteId} `]: res.content }));
+                setFetchedImages((prev) => ({ ...prev, [`note-${noteId}`]: res.content }));
             }
         } catch {
             toast.error('Failed to load note image');
         } finally {
             setFetchingImageId(null);
+        }
+    };
+
+    const handleFetchSolutionImage = async (solutionId) => {
+        if (fetchedImages[`solution-${solutionId}`]) return;
+        try {
+            setFetchingImageId(`solution-${solutionId}`);
+            const res = await solutionsApi.getImage(id, solutionId);
+            if (res.content) {
+                setFetchedImages((prev) => ({ ...prev, [`solution-${solutionId}`]: res.content }));
+            }
+        } catch {
+            toast.error('Failed to load solution image');
+        } finally {
+            setFetchingImageId(null);
+        }
+    };
+
+    const handleOpenEditSolution = (solution) => {
+        setEditingSolution(solution);
+        setShowEditSolutionModal(true);
+    };
+
+    const handleEditSolutionUpdated = (updated) => {
+        setSolutions(prev => prev.map(s => s.id === updated.id ? updated : s));
+        
+        // Clear old image cache for this solution so it reloads if viewing/next time
+        setFetchedImages(prev => {
+            const next = { ...prev };
+            delete next[`solution-${updated.id}`];
+            return next;
+        });
+
+        if (viewingSolution && viewingSolution.id === updated.id) {
+            setViewingSolution(updated);
+            if (updated.source_image_id) {
+                handleFetchSolutionImage(updated.id);
+            }
         }
     };
     const handlePrevImage = () => {
@@ -1433,7 +1522,7 @@ const SubjectDetail = () => {
     const handlePrevNote = () => {
         if (!viewingNote || viewingNote.id?.toString().startsWith('img-')) return;
 
-        const filtered = getFilteredNotes();
+        const filtered = filteredNotes;
 
         const idx = filtered.findIndex(n => n.id === viewingNote.id);
         if (idx > 0) {
@@ -1448,7 +1537,7 @@ const SubjectDetail = () => {
     const handleNextNote = () => {
         if (!viewingNote || viewingNote.id?.toString().startsWith('img-')) return;
 
-        const filtered = getFilteredNotes();
+        const filtered = filteredNotes;
 
         const idx = filtered.findIndex(n => n.id === viewingNote.id);
         if (idx < filtered.length - 1) {
@@ -1476,15 +1565,23 @@ const SubjectDetail = () => {
     };
 
     const handleDeleteNote = async () => {
-        const note = confirmDeleteNote.note;
-        if (!note) return;
-        const loadingToast = toast.loading('Deleting note...');
+        const item = confirmDeleteNote.note;
+        if (!item) return;
+        const isSolution = item.isSolution;
+        const api = isSolution ? solutionsApi : notesApi;
+        const typeLabel = isSolution ? 'solution' : 'note';
+
+        const loadingToast = toast.loading(`Deleting ${typeLabel}...`);
         try {
-            await notesApi.delete(id, note.id);
-            setNotes((prev) => prev.filter((n) => n.id !== note.id));
-            toast.success('Note deleted', { id: loadingToast });
+            await api.delete(id, item.id);
+            if (isSolution) {
+                setSolutions((prev) => prev.filter((s) => s.id !== item.id));
+            } else {
+                setNotes((prev) => prev.filter((n) => n.id !== item.id));
+            }
+            toast.success(`${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} deleted`, { id: loadingToast });
         } catch {
-            toast.error('Failed to delete note', { id: loadingToast });
+            toast.error(`Failed to delete ${typeLabel}`, { id: loadingToast });
         } finally {
             setConfirmDeleteNote({ open: false, note: null });
         }
@@ -1493,7 +1590,7 @@ const SubjectDetail = () => {
     const navigateToQuestion = (questionId) => {
         setActiveTab('questions');
         setTimeout(() => {
-            let el = document.getElementById(`question - ${questionId} `);
+            let el = document.getElementById(`question-${questionId}`);
             if (!el) {
                 // If the element is hidden inside a collapsed group, expand it
                 const group = groupedQuestions.find(g => g.questions.some(q => q.id === questionId));
@@ -1503,13 +1600,18 @@ const SubjectDetail = () => {
             }
 
             setTimeout(() => {
-                el = document.getElementById(`question - ${questionId} `);
+                el = document.getElementById(`question-${questionId}`);
                 if (el) {
                     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    // Optional styling ping
-                    el.style.transition = 'box-shadow 0.3s ease';
-                    el.style.boxShadow = '0 0 0 2px rgba(139, 92, 246, 0.5)';
-                    setTimeout(() => el.style.boxShadow = 'none', 2000);
+                    // Premium highlight effect
+                    el.style.transition = 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+                    el.style.ring = '4px';
+                    el.style.ringColor = 'rgb(139, 92, 246)'; // indigo-500
+                    el.classList.add('ring-2', 'ring-indigo-500', 'ring-offset-4', 'ring-offset-slate-900', 'scale-[1.01]', 'z-50');
+                    
+                    setTimeout(() => {
+                        el.classList.remove('ring-2', 'ring-indigo-500', 'ring-offset-4', 'ring-offset-slate-900', 'scale-[1.01]', 'z-50');
+                    }, 2500);
                 }
             }, 100);
         }, 100);
@@ -1521,12 +1623,16 @@ const SubjectDetail = () => {
         if (existingNote) {
             setActiveTab('notes');
             setTimeout(() => {
-                const el = document.getElementById(`note - ${existingNote.id} `);
+                const el = document.getElementById(`note-${existingNote.id}`);
                 if (el) {
                     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    el.style.transition = 'box-shadow 0.3s ease';
-                    el.style.boxShadow = '0 0 0 2px rgba(139, 92, 246, 0.5)';
-                    setTimeout(() => el.style.boxShadow = 'none', 2000);
+                    // Premium highlight effect
+                    el.style.transition = 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+                    el.classList.add('ring-2', 'ring-emerald-500', 'ring-offset-4', 'ring-offset-slate-900', 'scale-[1.01]', 'z-50');
+                    
+                    setTimeout(() => {
+                        el.classList.remove('ring-2', 'ring-emerald-500', 'ring-offset-4', 'ring-offset-slate-900', 'scale-[1.01]', 'z-50');
+                    }, 2500);
                 }
             }, 100);
             return;
@@ -1547,46 +1653,40 @@ const SubjectDetail = () => {
 
     // Group questions by source
     const groupedQuestions = React.useMemo(() => {
-        const filtered = !searchQuery.trim() ? questions : questions.filter(q => {
-            const query = searchQuery.toLowerCase().trim();
-            let qTags = [];
-            try {
-                qTags = typeof q.tags === 'string' ? JSON.parse(q.tags) : (q.tags || []);
-            } catch {
-                qTags = [];
+        const query = searchQuery.toLowerCase().trim();
+        const filtered = !query ? questions : questions.filter(q => {
+            let qTags = q.tags || [];
+            if (typeof qTags === 'string') {
+                try { qTags = JSON.parse(qTags); } catch { qTags = []; }
             }
+            if (!Array.isArray(qTags)) qTags = [];
+
             return qTags.some(tag => tag.toLowerCase().includes(query)) ||
                 q.content?.toLowerCase().includes(query);
         });
 
         const groups = {};
-        // First pass: identify all potential roots and initialize groups
         filtered.forEach(q => {
             const rootId = q.parent_id || q.source_image_id || q.id;
-            if (!groups[rootId]) {
-                groups[rootId] = [];
+            if (!groups[rootId]) groups[rootId] = [];
+
+            // Pre-parse tags here so we don't do it in the render loop
+            let parsedTags = q.tags || [];
+            if (typeof parsedTags === 'string') {
+                try { parsedTags = JSON.parse(parsedTags); } catch { parsedTags = []; }
             }
+            if (!Array.isArray(parsedTags)) parsedTags = [];
+
+            groups[rootId].push({ ...q, parsedTags });
         });
 
-        // Second pass: assign questions to groups
-        filtered.forEach(q => {
-            const rootId = q.parent_id || q.source_image_id || q.id;
-            groups[rootId].push(q);
-        });
-
-        // Sort questions within groups by created_at ascending
         Object.keys(groups).forEach(rootId => {
             groups[rootId].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
         });
 
-        // Convert to array of groups and sort by newest question in each group
         return Object.entries(groups).map(([rootId, qs]) => {
             const parent = qs.find(q => q.content === null);
             const actionableQs = qs.filter(q => q.content !== null);
-
-            // A group exists if:
-            // 1. More than 1 actionable question share a source ID
-            // 2. OR a logical parent exists that extracted multiple questions
             const isGroup = actionableQs.length > 1 || (parent && parent.formatted_content?.questions?.length > 1);
 
             return {
@@ -1599,13 +1699,13 @@ const SubjectDetail = () => {
         }).sort((a, b) => b.newestAt - a.newestAt);
     }, [questions, searchQuery]);
 
-    const allNoteTags = Array.from(new Set(notes.flatMap(n => {
-        let t = n.tags || [];
-        if (typeof t === 'string') {
-            try { t = JSON.parse(t); } catch { t = []; }
+    const allNoteTags = useMemo(() => Array.from(new Set(notes.flatMap(n => {
+        let t = Array.isArray(n.tags) ? n.tags : (n.parsedTags || []);
+        if (t.length === 0 && typeof n.tags === 'string') {
+            try { t = JSON.parse(n.tags); } catch { t = []; }
         }
         return Array.isArray(t) ? t : [];
-    }))).sort();
+    }))).sort(), [notes]);
 
     if (loading) {
         return (
@@ -1675,10 +1775,11 @@ const SubjectDetail = () => {
             {/* Confirm Delete Note */}
             <ConfirmDialog
                 isOpen={confirmDeleteNote.open}
-                title="Delete Note"
-                message={`Are you sure you want to delete "${confirmDeleteNote.note?.title}" ? This action cannot be undone.`}
+                title={confirmDeleteNote.note?.isSolution ? "Delete Solution" : "Delete Note"}
+                message={`Are you sure you want to delete "${confirmDeleteNote.note?.title}"? This action cannot be undone.`}
                 onConfirm={handleDeleteNote}
                 onCancel={() => setConfirmDeleteNote({ open: false, note: null })}
+                danger
             />
 
             <ConfirmDialog
@@ -1705,6 +1806,7 @@ const SubjectDetail = () => {
                 onClose={() => setShowQuestionModal(false)}
                 subjectId={id}
                 onQuestionAdded={handleQuestionAdded}
+                topics={topics}
             />
 
             <AddImageModal
@@ -1899,7 +2001,7 @@ const SubjectDetail = () => {
                     {/* Segmented Tabs */}
                     < div className="flex gap-1 p-1 bg-surface-2/50 backdrop-blur-md rounded-xl border border-white/[0.06] w-fit" >
                         {
-                            ['topics', 'sessions', 'questions', 'notes', 'revision', 'images'].map((tab) => {
+                            ['topics', 'sessions', 'questions', 'notes', 'solutions', 'revision', 'images'].map((tab) => {
                                 let count;
                                 switch (tab) {
                                     case 'topics':
@@ -1913,6 +2015,9 @@ const SubjectDetail = () => {
                                         break;
                                     case 'notes':
                                         count = notes.length;
+                                        break;
+                                    case 'solutions':
+                                        count = solutions.length;
                                         break;
                                     case 'images':
                                         count = images.length;
@@ -2077,7 +2182,7 @@ const SubjectDetail = () => {
                                                 onClick={handleSelectAll}
                                                 className="text-[12px] font-medium text-slate-300 hover:text-white px-3 py-1.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
                                             >
-                                                {selectedItems.size > 0 && selectedItems.size === getFilteredNotes().length ? 'Clear' : 'All'}
+                                                {selectedItems.size > 0 && selectedItems.size === filteredNotes.length ? 'Clear' : 'All'}
                                             </button>
 
                                             <div className="w-px h-5 bg-white/[0.08] mx-1"></div>
@@ -2341,12 +2446,7 @@ const SubjectDetail = () => {
                         ) : (
                             <div className={`grid gap-5 ${sessionsViewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
                                 {(() => {
-                                    const filtered = sessions.filter(s =>
-                                        (s.title || s.name || '')?.toLowerCase().includes(sessionSearchQuery.toLowerCase()) ||
-                                        s.notes?.toLowerCase().includes(sessionSearchQuery.toLowerCase())
-                                    );
-
-                                    if (filtered.length === 0 && sessions.length > 0) {
+                                    if (filteredSessions.length === 0 && sessions.length > 0) {
                                         return (
                                             <div className="col-span-full py-12 flex flex-col items-center justify-center text-center glass-panel rounded-2xl border-dashed border-white/10">
                                                 <Search className="w-8 h-8 text-slate-600 mb-3" />
@@ -2356,7 +2456,7 @@ const SubjectDetail = () => {
                                         );
                                     }
 
-                                    return filtered.map((s) => (
+                                    return filteredSessions.map((s) => (
                                         <SessionCard
                                             key={s.id}
                                             session={s}
@@ -2505,6 +2605,24 @@ const SubjectDetail = () => {
                                                                     <FileText className="w-[18px] h-[18px]" />
                                                                 </button>
                                                                 <button
+                                                                    onClick={() => {
+                                                                        const existingRes = solutions.find(s => s.question_id === q.id);
+                                                                        if (existingRes) {
+                                                                            setViewingSolution(existingRes);
+                                                                            if (existingRes.source_image_id) {
+                                                                                handleFetchSolutionImage(existingRes.id);
+                                                                            }
+                                                                        } else {
+                                                                            setSelectedQuestionIdForSolution(q.id);
+                                                                            setShowSolutionModal(true);
+                                                                        }
+                                                                    }}
+                                                                    className={`p-2 rounded-lg transition-all cursor-pointer ${solutions.some(s => s.question_id === q.id) ? 'text-blue-400 bg-blue-400/10' : 'text-slate-500 hover:text-blue-400 hover:bg-blue-400/10'}`}
+                                                                    title={solutions.some(s => s.question_id === q.id) ? "View Solution" : "Add Solution"}
+                                                                >
+                                                                    <ListChecks className="w-[18px] h-[18px]" />
+                                                                </button>
+                                                                <button
                                                                     onClick={() => handleGenerateAINote(q.id)}
                                                                     disabled={generatingAINoteId === q.id}
                                                                     className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer disabled:opacity-50"
@@ -2543,40 +2661,40 @@ const SubjectDetail = () => {
                                                         </div>
 
                                                         {/* Tags display */}
-                                                        {(() => {
-                                                            let qTags = [];
-                                                            try {
-                                                                qTags = typeof q.tags === 'string' ? JSON.parse(q.tags) : (q.tags || []);
-                                                            } catch {
-                                                                qTags = [];
-                                                            }
-                                                            if (!qTags || qTags.length === 0) return null;
-                                                            return (
-                                                                <div className="mt-4 flex flex-wrap gap-2">
-                                                                    {qTags.map((tag, idx) => (
-                                                                        <span key={idx} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                                                            <Hash className="w-2.5 h-2.5" />
-                                                                            {tag}
-                                                                        </span>
-                                                                    ))}
-                                                                </div>
-                                                            );
-                                                        })()}
+                                                        {q.parsedTags && q.parsedTags.length > 0 && (
+                                                            <div className="mt-4 flex flex-wrap gap-2">
+                                                                {q.parsedTags.map((tag, idx) => (
+                                                                    <span key={idx} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                                        <Hash className="w-2.5 h-2.5" />
+                                                                        {tag}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
 
                                                         {q.type === 'image' && (
-                                                            <div className="mt-5">
+                                                            <div className="mt-5 relative group/img-container w-fit">
                                                                 {fetchedImages[q.id] || fetchedImages[q.source_image_id] ? (
-                                                                    <div className="rounded-xl overflow-hidden border border-white/10 inline-block bg-black/40 group/img relative">
-                                                                        <img
-                                                                            src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
-                                                                            alt="Original Question"
-                                                                            className="max-h-80 object-contain transition-all group-hover/img:opacity-50"
-                                                                        />
-                                                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
-                                                                            <span className="bg-black/60 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/10">
-                                                                                Original Attachment
-                                                                            </span>
+                                                                    <div className="relative">
+                                                                        <div className="rounded-xl overflow-hidden border border-white/10 inline-block bg-black/40 group/img relative">
+                                                                            <img
+                                                                                src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
+                                                                                alt="Original Question"
+                                                                                className="max-h-80 object-contain transition-all group-hover/img:opacity-50"
+                                                                            />
+                                                                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
+                                                                                <span className="bg-black/60 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/10">
+                                                                                    Original Attachment
+                                                                                </span>
+                                                                            </div>
                                                                         </div>
+                                                                        <button
+                                                                            onClick={() => handleHideImage(q.id)}
+                                                                            className="absolute -top-2 -right-2 p-1.5 bg-slate-800/90 text-slate-400 hover:text-white rounded-full border border-white/10 shadow-lg opacity-0 group-hover/img-container:opacity-100 transition-all cursor-pointer z-10"
+                                                                            title="Hide Image"
+                                                                        >
+                                                                            <X className="w-3.5 h-3.5" />
+                                                                        </button>
                                                                     </div>
                                                                 ) : (
                                                                     <button
@@ -2680,16 +2798,34 @@ const SubjectDetail = () => {
                                                                                 >
                                                                                     <Pencil className="w-[18px] h-[18px]" />
                                                                                 </button>
-                                                                                <button
-                                                                                    onClick={() => {
-                                                                                        setSelectedQuestionIdForNote(q.id);
-                                                                                        setShowNoteModal(true);
-                                                                                    }}
-                                                                                    className="p-2 text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-all cursor-pointer"
-                                                                                    title="Manual Note"
-                                                                                >
-                                                                                    <FileText className="w-[18px] h-[18px]" />
-                                                                                </button>
+                                                                                 <button
+                                                                                     onClick={() => {
+                                                                                         setSelectedQuestionIdForNote(q.id);
+                                                                                         setShowNoteModal(true);
+                                                                                     }}
+                                                                                     className="p-2 text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-all cursor-pointer"
+                                                                                     title="Manual Note"
+                                                                                 >
+                                                                                     <FileText className="w-[18px] h-[18px]" />
+                                                                                 </button>
+                                                                                 <button
+                                                                                     onClick={() => {
+                                                                                         const existingRes = solutions.find(s => s.question_id === q.id);
+                                                                                         if (existingRes) {
+                                                                                             setViewingSolution(existingRes);
+                                                                                             if (existingRes.source_image_id) {
+                                                                                                 handleFetchSolutionImage(existingRes.id);
+                                                                                             }
+                                                                                         } else {
+                                                                                             setSelectedQuestionIdForSolution(q.id);
+                                                                                             setShowSolutionModal(true);
+                                                                                         }
+                                                                                     }}
+                                                                                     className={`p-2 rounded-lg transition-all cursor-pointer ${solutions.some(s => s.question_id === q.id) ? 'text-blue-400 bg-blue-400/10' : 'text-slate-500 hover:text-blue-400 hover:bg-blue-400/10'}`}
+                                                                                     title={solutions.some(s => s.question_id === q.id) ? "View Solution" : "Add Solution"}
+                                                                                 >
+                                                                                     <ListChecks className="w-[18px] h-[18px]" />
+                                                                                 </button>
                                                                                 <button
                                                                                     onClick={() => handleGenerateAINote(q.id)}
                                                                                     disabled={generatingAINoteId === q.id}
@@ -2729,40 +2865,40 @@ const SubjectDetail = () => {
                                                                         </div>
 
                                                                         {/* Tags display */}
-                                                                        {(() => {
-                                                                            let qTags = [];
-                                                                            try {
-                                                                                qTags = typeof q.tags === 'string' ? JSON.parse(q.tags) : (q.tags || []);
-                                                                            } catch {
-                                                                                qTags = [];
-                                                                            }
-                                                                            if (!qTags || qTags.length === 0) return null;
-                                                                            return (
-                                                                                <div className="mt-4 flex flex-wrap gap-2">
-                                                                                    {qTags.map((tag, idx) => (
-                                                                                        <span key={idx} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                                                                            <Hash className="w-2.5 h-2.5" />
-                                                                                            {tag}
-                                                                                        </span>
-                                                                                    ))}
-                                                                                </div>
-                                                                            );
-                                                                        })()}
+                                                                        {q.parsedTags && q.parsedTags.length > 0 && (
+                                                                            <div className="mt-4 flex flex-wrap gap-2">
+                                                                                {q.parsedTags.map((tag, idx) => (
+                                                                                    <span key={idx} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                                                        <Hash className="w-2.5 h-2.5" />
+                                                                                        {tag}
+                                                                                    </span>
+                                                                                ))}
+                                                                            </div>
+                                                                        )}
 
                                                                         {q.type === 'image' && qidx === 0 && (
-                                                                            <div className="mt-5">
+                                                                            <div className="mt-5 relative group/img-container w-fit">
                                                                                 {fetchedImages[q.id] || fetchedImages[q.source_image_id] ? (
-                                                                                    <div className="rounded-xl overflow-hidden border border-white/10 inline-block bg-black/40 group/img relative">
-                                                                                        <img
-                                                                                            src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
-                                                                                            alt="Original Question"
-                                                                                            className="max-h-80 object-contain transition-all group-hover/img:opacity-50"
-                                                                                        />
-                                                                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
-                                                                                            <span className="bg-black/60 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/10">
-                                                                                                Source Image
-                                                                                            </span>
+                                                                                    <div className="relative">
+                                                                                        <div className="rounded-xl overflow-hidden border border-white/10 inline-block bg-black/40 group/img relative">
+                                                                                            <img
+                                                                                                src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
+                                                                                                alt="Original Question"
+                                                                                                className="max-h-80 object-contain transition-all group-hover/img:opacity-50"
+                                                                                            />
+                                                                                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
+                                                                                                <span className="bg-black/60 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/10">
+                                                                                                    Source Image
+                                                                                                </span>
+                                                                                            </div>
                                                                                         </div>
+                                                                                        <button
+                                                                                            onClick={() => handleHideImage(q.id)}
+                                                                                            className="absolute -top-2 -right-2 p-1.5 bg-slate-800/90 text-slate-400 hover:text-white rounded-full border border-white/10 shadow-lg opacity-0 group-hover/img-container:opacity-100 transition-all cursor-pointer z-10"
+                                                                                            title="Hide Image"
+                                                                                        >
+                                                                                            <X className="w-3.5 h-3.5" />
+                                                                                        </button>
                                                                                     </div>
                                                                                 ) : (
                                                                                     <button
@@ -2891,7 +3027,7 @@ const SubjectDetail = () => {
                             ) : (
                                 <div className={`grid gap-5 ${notesViewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
                                     {(() => {
-                                        const filtered = getFilteredNotes();
+                                        const filtered = filteredNotes;
 
                                         if (filtered.length === 0 && notes.length > 0) {
                                             return (
@@ -2965,12 +3101,7 @@ const SubjectDetail = () => {
                                                                 )}
                                                             </div>
                                                             {notesViewMode === 'list' && (() => {
-                                                                let nTags = [];
-                                                                try {
-                                                                    nTags = typeof note.tags === 'string' ? JSON.parse(note.tags) : (note.tags || []);
-                                                                } catch {
-                                                                    nTags = [];
-                                                                }
+                                                                const nTags = Array.isArray(note.tags) ? note.tags : (note.parsedTags || []);
                                                                 if (!nTags || nTags.length === 0) return null;
                                                                 return (
                                                                     <div className="flex flex-wrap gap-1.5 mt-1">
@@ -3047,12 +3178,7 @@ const SubjectDetail = () => {
                                                                 </button>
                                                             )}
                                                             {(() => {
-                                                                let nTags = [];
-                                                                try {
-                                                                    nTags = typeof note.tags === 'string' ? JSON.parse(note.tags) : (note.tags || []);
-                                                                } catch {
-                                                                    nTags = [];
-                                                                }
+                                                                const nTags = Array.isArray(note.tags) ? note.tags : (note.parsedTags || []);
                                                                 if (!nTags || nTags.length === 0) return null;
                                                                 return (
                                                                     <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pr-2 w-full" style={{ maskImage: 'linear-gradient(to right, black 80%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to right, black 80%, transparent 100%)' }}>
@@ -3105,6 +3231,226 @@ const SubjectDetail = () => {
                                             </div>
                                         ));
                                     })()}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )
+            }
+
+            {
+                activeTab === 'solutions' && (
+                    <div className="fade-in pb-12">
+                        {/* Header & Search */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                            <div className="flex items-center gap-2">
+                                <ListChecks className="w-6 h-6 text-blue-400" />
+                                <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Solutions Library</h3>
+                                <span className="ml-2 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 text-[10px] font-bold border border-blue-500/20 uppercase tracking-widest">{solutions.length}</span>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <div className="relative group min-w-[280px]">
+                                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
+                                    <input
+                                        type="text"
+                                        value={solutionSearchQuery}
+                                        onChange={(e) => setSolutionSearchQuery(e.target.value)}
+                                        placeholder="Search solutions..."
+                                        className="w-full bg-surface-2/50 border border-white/[0.08] rounded-xl py-2.5 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-blue-500/40 focus:bg-surface-2 transition-all"
+                                    />
+                                </div>
+                                <div className="flex bg-surface-2/80 p-1 rounded-xl border border-white/[0.06]">
+                                    <button
+                                        onClick={() => setSolutionsViewMode('grid')}
+                                        className={`p-1.5 rounded-lg transition-all ${solutionsViewMode === 'grid' ? 'bg-blue-500 text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                        title="Grid View"
+                                    >
+                                        <LayoutGrid className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => setSolutionsViewMode('list')}
+                                        className={`p-1.5 rounded-lg transition-all ${solutionsViewMode === 'list' ? 'bg-blue-500 text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                        title="List View"
+                                    >
+                                        <List className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="w-full">
+                            {solutions.length === 0 ? (
+                                <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
+                                    <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 rotate-3">
+                                        <ListChecks className="w-10 h-10 text-blue-500/70" />
+                                    </div>
+                                    <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No solutions yet</h3>
+                                    <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                        Add solutions to questions to keep track of your learning path.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className={`grid gap-5 ${solutionsViewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
+                                    {filteredSolutions.length === 0 ? (
+                                        <div className="col-span-full py-12 flex flex-col items-center justify-center text-center glass-panel rounded-2xl border-dashed border-white/10">
+                                            <Search className="w-8 h-8 text-slate-600 mb-3" />
+                                            <p className="text-slate-400 font-medium">No solutions match your search</p>
+                                            <button onClick={() => setSolutionSearchQuery('')} className="mt-2 text-blue-400 text-sm hover:underline hover:text-blue-300 transition-colors">Clear search</button>
+                                        </div>
+                                    ) : (
+                                        filteredSolutions.map((solution) => (
+                                            <div
+                                                key={solution.id}
+                                                id={`solution-${solution.id}`}
+                                                className={`glass-panel rounded-xl border transition-all flex group relative overflow-hidden ${solutionsViewMode === 'list' ? 'items-center py-3 pr-5 pl-1' : 'flex-col p-5'} border-white/[0.06] hover:border-blue-500/30 hover:bg-white/[0.02] cursor-pointer`}
+                                                onClick={() => {
+                                                    setViewingSolution(solution);
+                                                    if (solution.source_image_id) {
+                                                        handleFetchSolutionImage(solution.id);
+                                                    }
+                                                }}
+                                            >
+                                                {/* List mode progress line/indicator */}
+                                                {solutionsViewMode === 'list' && (
+                                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500/40" />
+                                                )}
+
+                                                {/* Optional background glow */}
+                                                {solutionsViewMode === 'grid' && (
+                                                    <div className="absolute -right-10 -top-10 w-24 h-24 bg-blue-500/10 blur-3xl rounded-full"></div>
+                                                )}
+
+                                                <div className={`flex flex-1 min-w-0 ${solutionsViewMode === 'list' ? 'items-center px-4 gap-6' : 'flex-col'}`}>
+                                                    {/* Title Section */}
+                                                    <div className={`flex items-start gap-3 relative z-10 ${solutionsViewMode === 'list' ? 'w-1/3 shrink-0' : 'mb-4'}`}>
+                                                        <div className={`rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0 ${solutionsViewMode === 'list' ? 'p-1.5' : 'p-2.5'}`}>
+                                                            <ListChecks className={`${solutionsViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <h4 className={`font-heading font-bold text-white tracking-tight break-words truncate group-hover:text-blue-400 transition-colors ${solutionsViewMode === 'list' ? 'text-[14px]' : 'text-[15px]'}`}>
+                                                                {solution.title || 'Solution'}
+                                                            </h4>
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap">
+                                                                    {new Date(solution.created_at).toLocaleDateString(undefined, {
+                                                                        day: 'numeric',
+                                                                        month: 'short',
+                                                                        year: solutionsViewMode === 'grid' ? 'numeric' : undefined
+                                                                    })}
+                                                                </span>
+                                                                {solutionsViewMode === 'list' && solution.question_id && (
+                                                                    <>
+                                                                        <div className="w-1 h-1 rounded-full bg-slate-700" />
+                                                                        <span className="text-[10px] text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">Question Link</span>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Content Section */}
+                                                    {solutionsViewMode === 'grid' ? (
+                                                        <div className="text-sm text-slate-300 leading-relaxed mb-4 relative z-10 overflow-hidden max-h-[140px] pointer-events-none [mask-image:linear-gradient(to_bottom,black_60%,transparent)]">
+                                                            <div className="prose prose-sm prose-invert max-w-none prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mt-0 prose-p:mb-2 prose-headings:font-bold prose-headings:text-white prose-headings:m-0 prose-headings:mb-1.5 prose-h1:text-[15px] prose-h2:text-[14px] prose-h3:text-[13px] prose-a:text-indigo-400 prose-code:text-slate-300 prose-code:bg-white/[0.06] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
+                                                                <ReactMarkdown
+                                                                    remarkPlugins={[remarkGfm, remarkMath]}
+                                                                    rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                                                >
+                                                                    {preprocessMarkdown(solution.content || '')}
+                                                                </ReactMarkdown>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex-1 min-w-0 relative z-10 hidden md:block">
+                                                            <p className="text-[12px] text-slate-400 truncate opacity-70 group-hover:opacity-100 transition-opacity">
+                                                                {solution.content?.substring(0, 200).replace(/[#*`\n]/g, ' ')}...
+                                                            </p>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Source Image Link Section */}
+                                                    {solution.source_image_id && (
+                                                        <div className={`relative z-10 shrink-0 ${solutionsViewMode === 'list' ? 'mb-0' : 'mb-6'}`}>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleFetchSolutionImage(solution.id);
+                                                                    setViewingSolution(solution);
+                                                                }}
+                                                                disabled={fetchingImageId === `solution-${solution.id}`}
+                                                                className={`flex items-center gap-2 rounded-xl font-bold bg-white/[0.04] text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 transition-all border border-white/[0.08] disabled:opacity-50 cursor-pointer ${solutionsViewMode === 'list' ? 'p-2' : 'px-4 py-2 text-[12px]'}`}
+                                                                title="View Source Image"
+                                                            >
+                                                                {fetchingImageId === `solution-${solution.id}` ? (
+                                                                    <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
+                                                                ) : (
+                                                                    <ImageIcon className={`${solutionsViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
+                                                                )}
+                                                                {solutionsViewMode === 'grid' && <span>Source Image</span>}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Actions Section */}
+                                                <div className={`flex items-center relative z-10 ${solutionsViewMode === 'list' ? 'shrink-0 py-0 border-l border-white/[0.06] pl-5 ml-2 gap-4' : 'w-full pt-3 border-t border-white/[0.06] mt-auto justify-between'}`}>
+                                                    {solutionsViewMode === 'grid' && (
+                                                        <div className="flex items-center gap-3 overflow-hidden flex-1 mr-2">
+                                                            {solution.question_id && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        navigateToQuestion(solution.question_id);
+                                                                    }}
+                                                                    className="flex items-center gap-1 hover:text-indigo-400 transition-colors cursor-pointer text-[12px] shrink-0"
+                                                                    title="Go to Source Question"
+                                                                >
+                                                                    <LinkIcon className="w-3.5 h-3.5" />
+                                                                    <span>Source</span>
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    <div className={`flex items-center gap-1 shrink-0 ${solutionsViewMode === 'list' ? 'flex-col sm:flex-row' : 'opacity-0 group-hover:opacity-100 transition-all'}`}>
+                                                        {solutionsViewMode === 'list' && solution.question_id && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    navigateToQuestion(solution.question_id);
+                                                                }}
+                                                                className="p-1.5 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-md transition-all cursor-pointer"
+                                                                title="Go to Source Question"
+                                                            >
+                                                                <LinkIcon className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleOpenEditSolution(solution);
+                                                            }}
+                                                            className="p-1.5 text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-md transition-all cursor-pointer"
+                                                            title="Edit Solution"
+                                                        >
+                                                            <Pencil className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setConfirmDeleteNote({ open: true, note: { ...solution, isSolution: true } });
+                                                            }}
+                                                            className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-md transition-all cursor-pointer"
+                                                            title="Delete Solution"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -3397,9 +3743,12 @@ const SubjectDetail = () => {
                                     .map((img, index, arr) => {
                                         const isLast = index === arr.length - 1;
                                         return (
-                                            <div
+                                            <motion.div
                                                 key={img.id}
                                                 ref={isLast ? lastImageElementRef : null}
+                                                initial={{ opacity: 0, y: 20 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ duration: 0.5, delay: (index % 10) * 0.05 }}
                                                 className="group relative aspect-square rounded-2xl overflow-hidden bg-surface-2 border border-white/[0.06] hover:border-indigo-500/50 transition-all cursor-pointer shadow-lg hover:shadow-indigo-500/20 active:scale-[0.98]"
                                             >
                                                 {/* Source Indicator Button */}
@@ -3458,15 +3807,19 @@ const SubjectDetail = () => {
                                                         View Full
                                                     </button>
                                                 </div>
-                                            </div>
+                                            </motion.div>
                                         );
                                     })}
                             </div>
                         )}
 
                         {loadingMoreImages && (
-                            <div className="flex justify-center mt-8 mb-4">
-                                <div className="w-6 h-6 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5 mt-5">
+                                {[...Array(5)].map((_, i) => (
+                                    <div key={`skeleton-${i}`} className="aspect-square rounded-2xl bg-surface-2/40 border border-white/[0.04] animate-pulse overflow-hidden">
+                                        <div className="w-full h-full bg-indigo-500/5" />
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </div>
@@ -3496,6 +3849,37 @@ const SubjectDetail = () => {
                 onCancel={() => setConfirmDeleteRevisionSession({ open: false, sessionId: null })}
                 confirmText="Delete Session"
                 danger
+            />
+
+            <AddSolutionModal
+                isOpen={showSolutionModal}
+                onClose={() => {
+                    setShowSolutionModal(false);
+                    setSelectedQuestionIdForSolution(null);
+                }}
+                subjectId={id}
+                questionId={selectedQuestionIdForSolution}
+                onSolutionAdded={handleSolutionAdded}
+            />
+
+            <ViewSolutionModal
+                isOpen={!!viewingSolution}
+                onClose={() => setViewingSolution(null)}
+                solution={viewingSolution}
+                sourceImage={viewingSolution ? fetchedImages[`solution-${viewingSolution.id}`] : null}
+                isFetchingImage={fetchingImageId === (viewingSolution ? `solution-${viewingSolution.id}` : null)}
+                onEdit={handleOpenEditSolution}
+            />
+
+            <EditSolutionModal
+                isOpen={showEditSolutionModal}
+                onClose={() => {
+                    setShowEditSolutionModal(false);
+                    setEditingSolution(null);
+                }}
+                subjectId={id}
+                solution={editingSolution}
+                onSolutionUpdated={handleEditSolutionUpdated}
             />
         </div >
     );

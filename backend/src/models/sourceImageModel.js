@@ -12,7 +12,7 @@ export const createSourceImage = async (subjectId, data) => {
 
 export const getSourceImageById = async (id, subjectId) => {
     return await db('revision.source_images')
-        .where({ id, subject_id: subjectId })
+        .where({ id, subject_id: subjectId, is_deleted: false })
         .first();
 };
 
@@ -21,6 +21,7 @@ export const getAllSourceImagesByUser = async (userId, limit, offset) => {
         .join('revision.subjects as s', 'si.subject_id', 's.id')
         .where('s.user_id', userId)
         .where('s.is_deleted', false)
+        .where('si.is_deleted', false)
         .select(
             'si.*',
             's.name as subject_name',
@@ -39,6 +40,7 @@ export const getSourceImagesBySubject = async (subjectId, limit, offset) => {
         .join('revision.subjects as s', 'si.subject_id', 's.id')
         .where('si.subject_id', subjectId)
         .where('s.is_deleted', false)
+        .where('si.is_deleted', false)
         .select(
             'si.*',
             's.name as subject_name',
@@ -52,3 +54,20 @@ export const getSourceImagesBySubject = async (subjectId, limit, offset) => {
 
     return await query;
 };
+
+export const softDeleteSourceImagesBySubject = async (data) => {
+    return await db('revision.source_images')
+        .where('subject_id', data.subjectId)
+        .update({ is_deleted: true, deleted_at: db.fn.now() });
+};
+
+export const softDeleteSourceImage = async (ids, subjectId) => {
+    const idList = Array.isArray(ids) ? ids : [ids];
+    if (idList.length === 0) return;
+
+    return await db('revision.source_images')
+        .whereIn('id', idList)
+        .where('subject_id', subjectId)
+        .update({ is_deleted: true, deleted_at: db.fn.now() });
+};
+

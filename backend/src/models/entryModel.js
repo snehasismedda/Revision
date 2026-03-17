@@ -33,14 +33,22 @@ export const findEntriesBySession = async (data) => {
         ]);
 };
 
-export const softDeleteEntriesBySession = async (data) => {
+export const softDeleteEntriesBySessions = async (sessionIds) => {
+    const idList = Array.isArray(sessionIds) ? sessionIds : [sessionIds];
+    if (idList.length === 0) return;
+
     return db('revision.session_entries')
-        .where('session_id', data.sessionId)
+        .whereIn('session_id', idList)
         .update({ is_deleted: true, deleted_at: new Date() });
 };
 
-export const softDeleteEntriesByTopic = async (data) => {
+
+export const softDeleteEntriesByTopics = async (topicIds) => {
+    const idList = Array.isArray(topicIds) ? topicIds : [topicIds];
+    if (idList.length === 0) return;
+
     return db('revision.session_entries')
-        .where('topic_id', data.topicId)
+        .whereIn('topic_id', idList)
         .update({ is_deleted: true, deleted_at: new Date() });
 };
+

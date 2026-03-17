@@ -74,15 +74,26 @@ export const updateTopic = async (req, res) => {
 
 export const deleteTopic = async (req, res) => {
     try {
+        const { id } = req.params;
+        const { topicIds } = req.body;
+
+        const ids = topicIds && Array.isArray(topicIds) ? topicIds : [id];
+
+        if (ids.length === 0 || !ids[0]) {
+            return res.status(400).json({ error: 'No topic IDs provided' });
+        }
+
         // 1. Cascade cleanup related data while topics are still "active"
-        await deletionService.deleteTopicCascade(req.params.id);
+        await deletionService.deleteTopicsCascade(ids);
 
         // 2. Mark topic (and its descendants) as deleted
-        await topicModel.softDeleteTopic({ id: req.params.id });
+        await topicModel.softDeleteTopics(ids);
 
-        res.status(200).json({ message: 'Topic deleted successfully' });
+
+        res.status(200).json({ message: 'Topics deleted successfully', deletedCount: ids.length });
     } catch (error) {
-        console.error(`[topicController] ❌ Error deleting topic ${req.params.id}:`, error);
-        res.status(500).json({ error: 'Failed to delete topic' });
+        console.error(`[topicController] ❌ Error deleting topics:`, error);
+        res.status(500).json({ error: 'Failed to delete topics' });
     }
 };
+

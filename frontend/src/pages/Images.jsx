@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { imagesApi, subjectsApi } from '../api/index.js';
 import { Image as ImageIcon, PlusCircle, Search, X, Calendar, Activity, Maximize2, Link as LinkIcon, ChevronDown, FileText } from 'lucide-react';
@@ -74,6 +75,9 @@ const Images = () => {
             if (entries[0].isIntersecting && hasMore) {
                 setPage(prevPage => prevPage + 1);
             }
+        }, {
+            rootMargin: '400px', // Pre-load when 400px from viewport
+            threshold: 0
         });
         if (node) observer.current.observe(node);
     }, [loading, loadingMore, hasMore]);
@@ -264,9 +268,12 @@ const Images = () => {
                                     const hasLink = img.linked_question_id || img.linked_note_id;
 
                                     return (
-                                        <div
+                                        <motion.div
                                             key={img.id}
                                             ref={isLastElement ? lastImageElementRef : null}
+                                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                                            transition={{ duration: 0.4, delay: (groupImgs.indexOf(img) % 10) * 0.05 }}
                                             className="group relative aspect-square rounded-xl overflow-hidden bg-surface-2 border border-white/[0.04] hover:border-primary/40 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-primary/5 active:scale-[0.98]"
                                             onClick={() => setSelectedImage(img)}
                                         >
@@ -326,7 +333,7 @@ const Images = () => {
                                                     <Maximize2 className="w-3 h-3 text-white/60" />
                                                 </div>
                                             </div>
-                                        </div>
+                                        </motion.div>
                                     );
                                 })}
                             </div>
@@ -342,9 +349,12 @@ const Images = () => {
             />
 
             {loadingMore && (
-                <div className="flex flex-col items-center justify-center mt-20 mb-10 gap-3">
-                    <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
-                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Loading more...</span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 mt-12 pb-10">
+                    {[...Array(5)].map((_, i) => (
+                        <div key={`skeleton-${i}`} className="aspect-square rounded-xl bg-surface-2/40 border border-white/[0.04] animate-pulse overflow-hidden">
+                            <div className="w-full h-full bg-primary/5" />
+                        </div>
+                    ))}
                 </div>
             )}
 

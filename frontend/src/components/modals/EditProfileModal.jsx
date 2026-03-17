@@ -1,26 +1,10 @@
 import React, { useState, useRef } from 'react';
 import { X, User, Mail, Lock, CheckCircle2, Camera, Upload } from 'lucide-react';
-import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
-import 'react-image-crop/dist/ReactCrop.css';
+import ImageCropper from '../common/ImageCropper.jsx';
 import ModalPortal from '../ModalPortal.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import toast from 'react-hot-toast';
 
-function centerAspectCrop(mediaWidth, mediaHeight, aspect) {
-    return centerCrop(
-        makeAspectCrop(
-            {
-                unit: '%',
-                width: 90,
-            },
-            aspect,
-            mediaWidth,
-            mediaHeight
-        ),
-        mediaWidth,
-        mediaHeight
-    );
-}
 
 const EditProfileModal = ({ isOpen, onClose }) => {
     const { user, updateProfile } = useAuth();
@@ -31,13 +15,11 @@ const EditProfileModal = ({ isOpen, onClose }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Image Cropper states
+    // Image Cropper states
     const [imgSrc, setImgSrc] = useState('');
-    const [crop, setCrop] = useState();
-    const [completedCrop, setCompletedCrop] = useState(null);
     const [isCropping, setIsCropping] = useState(false);
     const [profileImgData, setProfileImgData] = useState(user?.profile_picture || null);
 
-    const imgRef = useRef(null);
     const fileInputRef = useRef(null);
 
     if (!isOpen) return null;
@@ -51,46 +33,10 @@ const EditProfileModal = ({ isOpen, onClose }) => {
         }
     };
 
-    const onImageLoad = (e) => {
-        const { width, height } = e.currentTarget;
-        setCrop(centerAspectCrop(width, height, 1));
-    };
-
-    const applyCrop = () => {
-        const image = imgRef.current;
-        if (!image || !completedCrop) return;
-
-        const canvas = document.createElement('canvas');
-        const scaleX = image.naturalWidth / image.width;
-        const scaleY = image.naturalHeight / image.height;
-        canvas.width = completedCrop.width;
-        canvas.height = completedCrop.height;
-        const ctx = canvas.getContext('2d');
-
-        if (!ctx) return;
-
-        ctx.drawImage(
-            image,
-            completedCrop.x * scaleX,
-            completedCrop.y * scaleY,
-            completedCrop.width * scaleX,
-            completedCrop.height * scaleY,
-            0,
-            0,
-            completedCrop.width,
-            completedCrop.height
-        );
-
-        const base64Image = canvas.toDataURL('image/jpeg', 0.9);
-        setProfileImgData(base64Image);
+    const applyCrop = (croppedImage) => {
+        setProfileImgData(croppedImage);
         setIsCropping(false);
         setImgSrc('');
-    };
-
-    const cancelCrop = () => {
-        setIsCropping(false);
-        setImgSrc('');
-        if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     const handleRemoveImage = () => {
@@ -161,45 +107,22 @@ const EditProfileModal = ({ isOpen, onClose }) => {
                     </div>
 
                     {/* Body */}
-                    {isCropping ? (
-                        <div className="px-7 py-6 flex flex-col items-center">
-                            <h4 className="text-sm font-semibold text-slate-300 mb-4 self-start">Crop Profile Picture</h4>
-                            <div className="w-full bg-black/40 border border-white/10 rounded-xl flex items-center justify-center overflow-hidden" style={{ maxHeight: '60vh' }}>
-                                <ReactCrop
-                                    crop={crop}
-                                    onChange={(_, percentCrop) => setCrop(percentCrop)}
-                                    onComplete={(c) => setCompletedCrop(c)}
-                                    aspect={1}
-                                    circularCrop
-                                    style={{ maxHeight: '100%', maxWidth: '100%' }}
-                                >
-                                    <img
-                                        ref={imgRef}
-                                        alt="Crop me"
-                                        src={imgSrc}
-                                        onLoad={onImageLoad}
-                                        style={{ maxHeight: '55vh', maxWidth: '100%', objectFit: 'contain' }}
-                                    />
-                                </ReactCrop>
-                            </div>
-                            <div className="flex gap-3 mt-6 w-full">
-                                <button
-                                    type="button"
-                                    onClick={cancelCrop}
-                                    className="flex-1 px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white bg-surface-2 hover:bg-surface-3 border border-white/[0.08] rounded-lg transition-all cursor-pointer"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={applyCrop}
-                                    className="flex-1 btn-primary px-4 py-2 font-semibold text-xs rounded-lg cursor-pointer"
-                                >
-                                    Apply Crop
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
+                    {isCropping && (
+                        <ImageCropper
+                            image={imgSrc}
+                            onCropComplete={applyCrop}
+                            onCancel={() => {
+                                setIsCropping(false);
+                                setImgSrc('');
+                                if (fileInputRef.current) fileInputRef.current.value = '';
+                            }}
+                            title="Crop Profile Photo"
+                            subtitle="Position and zoom your photo"
+                            aspect={1}
+                            circularCrop={true}
+                        />
+                    )}
+                    {!isCropping && (
                         <form id="edit-profile-form" onSubmit={handleSubmit} className="px-7 py-6 space-y-6">
 
                             {/* Avatar Editor Section */}

@@ -2,6 +2,7 @@ import * as noteModel from '../models/noteModel.js';
 import * as questionModel from '../models/questionModel.js';
 import * as sourceImageModel from '../models/sourceImageModel.js';
 import { generateNoteFromQuestion } from '../services/ai_service/response/noteGenerator.js';
+import * as deletionService from '../services/deletionService.js';
 
 export const getNoteImage = async (req, res, next) => {
     try {
@@ -87,12 +88,24 @@ export const createNote = async (req, res, next) => {
 export const deleteNote = async (req, res, next) => {
     try {
         const { subjectId, noteId } = req.params;
-        await noteModel.deleteNote(noteId, subjectId);
-        res.json({ message: 'Note deleted successfully' });
+        const { noteIds } = req.body;
+        
+        const ids = noteIds && Array.isArray(noteIds) ? noteIds : [noteId];
+        
+        if (ids.length === 0 || !ids[0]) {
+            return res.status(400).json({ error: 'No note IDs provided' });
+        }
+
+        await noteModel.softDeleteNotes(ids, subjectId);
+        await deletionService.deleteNotesCascade(ids, subjectId);
+
+
+        res.json({ message: 'Notes deleted successfully', deletedCount: ids.length });
     } catch (error) {
         next(error);
     }
 };
+
 
 export const updateNote = async (req, res, next) => {
     try {
