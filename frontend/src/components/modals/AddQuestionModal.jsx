@@ -209,7 +209,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
 
     return (
         <ModalPortal>
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm fade-in" onClick={onClose}>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop fade-in" onClick={onClose}>
                 <div
                     className="w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
                     style={{ background: 'rgba(22, 22, 34, 0.95)', border: '1px solid rgba(255,255,255,0.08)' }}
@@ -314,7 +314,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                                             <div className="w-full relative min-h-[200px] flex items-center justify-center">
                                                 <img src={newQuestionImage} alt="Preview" className="max-h-[300px] object-contain rounded-lg shadow-lg relative z-0" />
                                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center pointer-events-none">
-                                                    <span className="text-white font-medium bg-black/60 px-4 py-2 rounded-full backdrop-blur-sm text-[13px]">Click or Drag to change</span>
+                                                    <span className="text-white font-medium bg-black/60 px-4 py-2 rounded-full text-[13px]">Click or Drag to change</span>
                                                 </div>
                                             </div>
                                         ) : (
@@ -423,7 +423,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                                                                     setSelectedCameraId(nextId);
                                                                     startCamera(nextId);
                                                                 }}
-                                                                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center backdrop-blur-md border border-white/10 transition-all active:scale-90"
+                                                                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center border border-white/10 transition-all active:scale-90"
                                                                 title="Switch Camera"
                                                             >
                                                                 <FlipHorizontal className="w-5 h-5" />
@@ -446,7 +446,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                                                         <button
                                                             type="button"
                                                             onClick={() => startCamera(selectedCameraId)}
-                                                            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center backdrop-blur-md border border-white/10 transition-all active:scale-90"
+                                                            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center border border-white/10 transition-all active:scale-90"
                                                             title="Refresh Stream"
                                                         >
                                                             <RefreshCcw className="w-4 h-4" />
@@ -455,7 +455,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                                                 </div>
 
                                                 {/* Corner Decoration */}
-                                                <div className="absolute top-4 left-4 flex items-center gap-2 px-2 py-1 bg-black/40 rounded-md backdrop-blur-sm border border-white/10">
+                                                <div className="absolute top-4 left-4 flex items-center gap-2 px-2 py-1 bg-black/40 rounded-md border border-white/10">
                                                     <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
                                                     <span className="text-[10px] font-bold text-white uppercase tracking-wider">Live</span>
                                                 </div>

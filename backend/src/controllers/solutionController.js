@@ -1,6 +1,7 @@
 import * as solutionModel from '../models/solutionModel.js';
 import * as sourceImageModel from '../models/sourceImageModel.js';
 import * as deletionService from '../services/deletionService.js';
+import * as subjectModel from '../models/subjectModel.js';
 
 export const getSolutionImage = async (req, res, next) => {
     try {
@@ -43,6 +44,7 @@ export const createSolution = async (req, res, next) => {
 
         // Title and content are now non-mandatory
         const solution = await solutionModel.createSolution(subjectId, questionId, finalTitle || '', finalContent || '', sourceImageId);
+        await subjectModel.touchSubject(subjectId);
         res.status(201).json({ solution });
     } catch (error) {
         next(error);
@@ -90,6 +92,7 @@ export const updateSolution = async (req, res, next) => {
             return res.status(404).json({ error: 'Solution not found' });
         }
 
+        await subjectModel.touchSubject(subjectId);
         res.json({ solution });
     } catch (error) {
         next(error);

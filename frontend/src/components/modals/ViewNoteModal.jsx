@@ -202,7 +202,7 @@ const TableEditPanel = ({ editOriginalText, editText, setEditText, editPosition,
                 top: `${editPosition.y + 8}px`,
                 transform: 'translateX(-50%)',
                 background: 'rgba(20, 20, 35, 0.98)',
-                backdropFilter: 'blur(20px)',
+                
                 boxShadow: '0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)',
             }}
         >
@@ -580,19 +580,22 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
 
     return (
         <ModalPortal>
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-6 bg-black/60 backdrop-blur-sm fade-in" onClick={onClose}>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-6 modal-backdrop fade-in" onClick={onClose}>
                 <div
                     className={`w-full flex flex-col ${isFullscreen ? 'h-screen md:max-h-screen rounded-none border-none' : 'h-[90vh] md:h-auto md:max-h-[85vh] rounded-2xl shadow-2xl border'} overflow-hidden`}
                     style={{
                         background: isLightMode ? '#ffffff' : '#12121a',
                         borderColor: isLightMode ? '#e2e8f0' : 'rgba(255,255,255,0.08)',
                         maxWidth: isFullscreen ? 'none' : (hasHeadings ? '72rem' : '56rem'),
-                        transition: 'max-width 0.3s ease, border-radius 0.3s ease'
+                        transition: 'max-width 0.3s ease, border-radius 0.3s ease',
+                        contain: 'layout paint style',
+                        isolation: 'isolate',
+                        willChange: 'auto',
                     }}
                     onClick={e => e.stopPropagation()}
                 >
                     {/* Header */}
-                    <div className={`flex items-center justify-between px-5 py-3.5 border-b shrink-0 ${isLightMode ? 'bg-[#f8fafc] border-slate-200 text-slate-900' : 'bg-surface-2/30 border-white/[0.06] text-white'} backdrop-blur-md`}>
+                    <div className={`flex items-center justify-between px-5 py-3.5 border-b shrink-0 ${isLightMode ? 'bg-[#f8fafc] border-slate-200 text-slate-900' : 'bg-surface-2/80 border-white/[0.06] text-white'}`}>
                         <div className="flex items-center gap-3">
                             {(onPrev || onNext) && (
                                 <div className={`hidden md:flex items-center mr-1 rounded-lg border overflow-hidden ${isLightMode ? 'border-slate-300 bg-white' : 'border-white/[0.1] bg-white/[0.02]'}`}>
@@ -650,7 +653,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                 {(hasHeadings || hasLinkedNotes) && (
                                     <button
                                         onClick={() => setSidebarOpen(prev => !prev)}
-                                        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all ${isLightMode ? 'bg-white shadow-sm text-purple-600 hover:bg-purple-50' : 'bg-purple-500/20 text-purple-400 shadow-[0_0_12px_rgba(168,85,247,0.3)] hover:bg-purple-500/30'}`}
+                                        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${isLightMode ? 'bg-white shadow-sm text-purple-600 hover:bg-purple-50' : 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30'}`}
                                         title={sidebarOpen ? 'Hide Sidebar' : 'Show Sidebar'}
                                     >
                                         {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
@@ -662,7 +665,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                             onClose();
                                             onNavigateToQuestion(note.question_id);
                                         }}
-                                        className={`hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-all ${isLightMode ? 'bg-white shadow-sm text-indigo-600 hover:bg-indigo-50' : 'bg-indigo-500/20 text-indigo-400 shadow-[0_0_12px_rgba(99,102,241,0.3)] hover:bg-indigo-500/30'}`}
+                                        className={`hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${isLightMode ? 'bg-white shadow-sm text-indigo-600 hover:bg-indigo-50' : 'bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30'}`}
                                         title={note.is_note_link ? 'View Note' : 'View Question'}
                                     >
                                         <LinkIcon className="w-4 h-4" />
@@ -674,7 +677,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                             onClose();
                                             onEdit(note);
                                         }}
-                                        className={`hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-all ${isLightMode ? 'bg-white shadow-sm text-emerald-600 hover:bg-emerald-50' : 'bg-emerald-500/20 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.3)] hover:bg-emerald-500/30'}`}
+                                        className={`hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${isLightMode ? 'bg-white shadow-sm text-emerald-600 hover:bg-emerald-50' : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'}`}
                                         title="Edit Note"
                                     >
                                         <Pencil className="w-4 h-4" />
@@ -687,14 +690,14 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
 
                                 <button
                                     onClick={() => setIsLightMode(!isLightMode)}
-                                    className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all ${isLightMode ? 'bg-white shadow-sm text-amber-500 hover:bg-amber-50' : 'bg-amber-500/20 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.3)] hover:bg-amber-500/30'}`}
+                                    className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${isLightMode ? 'bg-white shadow-sm text-amber-500 hover:bg-amber-50' : 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30'}`}
                                     title={isLightMode ? "Switch to Dark Mode" : "Switch to Light Mode"}
                                 >
                                     {isLightMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
                                 </button>
                                 <button
                                     onClick={() => setIsFullscreen(!isFullscreen)}
-                                    className={`hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-all ${isLightMode ? 'bg-white shadow-sm text-blue-600 hover:bg-blue-50' : 'bg-blue-500/20 text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.3)] hover:bg-blue-500/30'}`}
+                                    className={`hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${isLightMode ? 'bg-white shadow-sm text-blue-600 hover:bg-blue-50' : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'}`}
                                     title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
                                 >
                                     {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -822,7 +825,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                         style={{
                                             background: isLightMode ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 15, 25, 0.95)',
                                             borderColor: isLightMode ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)',
-                                            backdropFilter: 'blur(20px)',
+                                            
                                             boxShadow: isLightMode ? '0 4px 24px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)' : '0 4px 24px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)',
                                         }}
                                     >
@@ -889,7 +892,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                         top: `${editPosition.y + 8}px`,
                                         transform: 'translateX(-50%)',
                                         background: 'rgba(20, 20, 35, 0.98)',
-                                        backdropFilter: 'blur(20px)',
+                                        
                                         boxShadow: '0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)',
                                     }}
                                 >
@@ -936,7 +939,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                         top: `${editPosition.y + 8}px`,
                                         transform: 'translateX(-50%)',
                                         background: 'rgba(20, 20, 35, 0.98)',
-                                        backdropFilter: 'blur(20px)',
+                                        
                                         boxShadow: '0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)',
                                     }}
                                 >
@@ -1024,7 +1027,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
 
                     {/* Mobile Footer for Source Link */}
                     {note.question_id && onNavigateToQuestion && (
-                        <div className="md:hidden px-6 py-4 border-t border-white/[0.06] shrink-0 bg-surface-2/30 backdrop-blur-md">
+                        <div className="md:hidden px-6 py-4 border-t border-white/[0.06] shrink-0 bg-surface-2/80">
                             <button
                                 onClick={() => {
                                     onClose();

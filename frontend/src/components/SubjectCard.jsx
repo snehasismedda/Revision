@@ -79,7 +79,7 @@ const SubjectCard = ({ subject, stats, variant, onEdit, onDelete }) => {
                 <div className="flex items-center gap-3 text-[10px] font-medium text-slate-500">
                     <div className="flex items-center gap-1.5">
                         <Activity className="w-3 h-3 text-slate-400" strokeWidth={2} />
-                        <span>{stats?.totalSessions ?? 0} sessions</span>
+                        <span>{(stats?.totalSessions ?? 0) + (stats?.totalRevisionSessions ?? 0)} sessions</span>
                     </div>
                     <div className="h-2.5 w-px bg-white/10" />
                     <div className="flex items-center gap-1.5">

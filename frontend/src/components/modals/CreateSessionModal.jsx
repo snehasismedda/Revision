@@ -39,7 +39,7 @@ const CreateSessionModal = ({ isOpen, onClose, subjectId, onSessionCreated }) =>
 
     return (
         <ModalPortal>
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm fade-in" onClick={onClose}>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop fade-in" onClick={onClose}>
                 <div
                     className="w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col"
                     style={{ background: 'rgba(22, 22, 34, 0.95)', border: '1px solid rgba(255,255,255,0.08)' }}

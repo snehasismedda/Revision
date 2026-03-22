@@ -319,7 +319,7 @@ const Dashboard = () => {
                                         </div>
                                     )}
                                     <div className="absolute top-4 right-4 opacity-0 group-hover/editor:opacity-100 transition-opacity pointer-events-none">
-                                        <div className="text-[9px] px-2 py-1 rounded bg-black/40 border border-white/10 text-slate-500 uppercase tracking-widest font-black backdrop-blur-md">
+                                        <div className="text-[9px] px-2 py-1 rounded bg-black/40 border border-white/10 text-slate-500 uppercase tracking-widest font-black">
                                             {isEditingInsight ? 'MASTER EDITOR' : 'SECURE VIEW'}
                                         </div>
                                     </div>

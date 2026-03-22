@@ -216,7 +216,7 @@ const AddImageModal = ({ isOpen, onClose, onImageSaved }) => {
 
     return (
         <ModalPortal>
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm fade-in" onClick={handleModalClose}>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop fade-in" onClick={handleModalClose}>
                 <div
                     className="w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
                     style={{ background: 'rgba(22, 22, 34, 0.95)', border: '1px solid rgba(255,255,255,0.08)' }}
@@ -344,7 +344,7 @@ const AddImageModal = ({ isOpen, onClose, onImageSaved }) => {
                                             <div className="w-full relative min-h-[200px] flex items-center justify-center">
                                                 <img src={newImage} alt="Preview" className="max-h-[300px] object-contain rounded-lg shadow-lg relative z-0" />
                                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center pointer-events-none">
-                                                    <span className="text-white font-medium bg-black/60 px-4 py-2 rounded-full backdrop-blur-sm text-[13px]">Click or Drag to change</span>
+                                                    <span className="text-white font-medium bg-black/60 px-4 py-2 rounded-full text-[13px]">Click or Drag to change</span>
                                                 </div>
                                             </div>
                                         ) : (
@@ -433,7 +433,7 @@ const AddImageModal = ({ isOpen, onClose, onImageSaved }) => {
                                                         <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg border-4 border-slate-200" />
                                                     </button>
                                                 </div>
-                                                <div className="absolute top-4 left-4 flex items-center gap-2 px-2 py-1 bg-black/40 rounded-md backdrop-blur-sm border border-white/10">
+                                                <div className="absolute top-4 left-4 flex items-center gap-2 px-2 py-1 bg-black/40 rounded-md border border-white/10">
                                                     <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
                                                     <span className="text-[10px] font-bold text-white uppercase tracking-wider">Live</span>
                                                 </div>

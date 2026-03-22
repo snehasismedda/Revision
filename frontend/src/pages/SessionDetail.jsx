@@ -43,7 +43,7 @@ const RED = '#ef4444';
 const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
     return (
-        <div className="glass p-3 border border-white/10 rounded-lg shadow-xl backdrop-blur-xl text-sm">
+        <div className="glass p-3 border border-white/10 rounded-lg shadow-xl  text-sm">
             <p className="text-slate-300 font-heading font-semibold mb-1.5">{label}</p>
             {payload.map((p) => (
                 <div key={p.name} className="flex items-center gap-2">
@@ -321,7 +321,7 @@ const SessionDetail = () => {
                                     content={({ active, payload, label }) => {
                                         if (active && payload && payload.length) {
                                             return (
-                                                <div className="glass p-3 border border-indigo-500/20 rounded-xl shadow-2xl backdrop-blur-2xl text-sm ring-1 ring-white/10">
+                                                <div className="glass p-3 border border-indigo-500/20 rounded-xl shadow-2xl  text-sm ring-1 ring-white/10">
                                                     <p className="text-white font-heading font-bold mb-1.5">{label}</p>
                                                     <div className="flex items-center gap-2">
                                                         <div className="w-2 h-2 rounded-full bg-indigo-400" />

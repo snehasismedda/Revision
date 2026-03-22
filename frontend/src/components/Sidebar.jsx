@@ -47,17 +47,17 @@ const Sidebar = () => {
 
     return (
         <aside
-            className={`flex-shrink-0 flex flex-col backdrop-blur-3xl h-[100dvh] sticky top-0 transition-all duration-500 ease-in-out group/sidebar z-[50]
+            className={`flex-shrink-0 flex flex-col h-[100dvh] sticky top-0 transition-all duration-500 ease-in-out group/sidebar z-[50]
             ${isCollapsed ? 'w-[80px]' : 'w-[260px]'}`}
             style={{
-                background: 'linear-gradient(180deg, rgba(15, 15, 20, 0.98) 0%, rgba(10, 10, 15, 0.99) 100%)',
+                background: 'linear-gradient(180deg, rgba(13, 13, 18, 1) 0%, rgba(9, 9, 14, 1) 100%)',
                 borderRight: '1px solid rgba(255,255,255,0.04)',
             }}
         >
-            {/* Atmospheric Background Layers - Contained */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-40">
-                <div className="absolute top-[-10%] left-[-20%] w-[120%] h-[40%] bg-primary/5 blur-[120px] rounded-full animate-drift" />
-                <div className="absolute bottom-[-10%] right-[-20%] w-[100%] h-[40%] bg-indigo-500/5 blur-[100px] rounded-full animate-drift" style={{ animationDelay: '-5s' }} />
+            {/* Atmospheric Background Layers - static, no expensive blur/animation */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
+                <div className="absolute top-0 left-0 w-full h-[40%] bg-gradient-to-b from-primary/[0.04] to-transparent" />
+                <div className="absolute bottom-0 right-0 w-full h-[40%] bg-gradient-to-t from-indigo-500/[0.03] to-transparent" />
             </div>
 
             {/* Toggle Button */}
@@ -126,7 +126,7 @@ const Sidebar = () => {
                                             <motion.div
                                                 initial={{ opacity: 0 }}
                                                 animate={{ opacity: 1 }}
-                                                className="absolute inset-0 bg-primary/15 border border-primary/20 backdrop-blur-md shadow-[0_8px_32px_-8px_rgba(139,92,246,0.3)] rounded-xl z-0"
+                                                className="absolute inset-0 bg-primary/15 border border-primary/20 rounded-xl z-0"
                                             />
                                         )}
 

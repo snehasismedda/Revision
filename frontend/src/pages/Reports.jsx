@@ -45,7 +45,7 @@ const RED = '#ef4444';
 const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
     return (
-        <div className="glass p-3 border border-white/10 rounded-lg shadow-xl backdrop-blur-xl text-sm">
+        <div className="glass p-3 border border-white/10 rounded-lg shadow-xl  text-sm">
             <p className="text-slate-200 font-heading font-bold mb-2 pb-2 border-b border-white/5">{label}</p>
             <div className="space-y-2">
                 {payload.map((p) => (
@@ -215,7 +215,7 @@ const Reports = () => {
                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Questions</span>
                             </div>
                             <p className="text-3xl font-heading font-bold text-white">{overview.totalQuestions}</p>
-                            <p className="text-xs text-slate-500 mt-1">{overview.totalSessions || '—'} sessions</p>
+                            <p className="text-xs text-slate-500 mt-1">{(overview.totalSessions || 0) + (overview.totalRevisionSessions || 0)} sessions</p>
                         </div>
 
                         {/* Correct */}
@@ -634,7 +634,7 @@ const Reports = () => {
                                         content={({ active, payload, label }) => {
                                             if (active && payload && payload.length) {
                                                 return (
-                                                    <div className="glass p-3 border border-white/10 rounded-lg shadow-xl backdrop-blur-xl text-sm">
+                                                    <div className="glass p-3 border border-white/10 rounded-lg shadow-xl  text-sm">
                                                         <p className="text-white font-bold mb-1">{label}</p>
                                                         <p className="text-emerald-400">Questions: {payload[0].value}</p>
                                                     </div>

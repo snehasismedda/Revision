@@ -290,7 +290,7 @@ const TestSeriesInsightsModal = ({ isOpen, onClose, analytics }) => {
 
     return (
         <ModalPortal>
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm fade-in" onClick={onClose}>
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 fade-in" onClick={onClose}>
                 <div
                     className="w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col"
                     style={{ background: 'rgba(22, 22, 34, 0.95)', border: '1px solid rgba(255,255,255,0.08)' }}

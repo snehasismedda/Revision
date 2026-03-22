@@ -34,6 +34,8 @@ export const getSubject = async (req, res) => {
             userId: req.user.id,
         });
         if (!subject) return res.status(404).json({ error: 'Subject not found' });
+        
+        await subjectModel.touchSubject(req.params.id);
         res.status(200).json({ subject });
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch subject' });

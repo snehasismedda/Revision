@@ -2,6 +2,7 @@ import * as questionModel from '../models/questionModel.js';
 import * as topicModel from '../models/topicModel.js';
 import * as sourceImageModel from '../models/sourceImageModel.js';
 import * as deletionService from '../services/deletionService.js';
+import * as subjectModel from '../models/subjectModel.js';
 import { parseQuestionToRichText } from '../services/ai_service/response/questionParser.js';
 
 export const getQuestions = async (req, res, next) => {
@@ -67,6 +68,7 @@ export const createQuestion = async (req, res, next) => {
                 source_image_id: sourceImageId,
                 tags: JSON.stringify(finalManualTags)
             });
+            await subjectModel.touchSubject(subjectId);
             return res.status(201).json({ questions: [question] });
         }
 
@@ -97,6 +99,7 @@ export const createQuestion = async (req, res, next) => {
                 source_image_id: sourceImageId,
                 tags: JSON.stringify(mergedTags)
             });
+            await subjectModel.touchSubject(subjectId);
             return res.status(201).json({ questions: question });
         } else {
             const parentQuestion = await questionModel.createQuestions({
@@ -118,6 +121,7 @@ export const createQuestion = async (req, res, next) => {
                     source_image_id: sourceImageId,
                 };
             }));
+            await subjectModel.touchSubject(subjectId);
             return res.status(201).json({ questions: childQuestions });
         }
     } catch (error) {
@@ -160,6 +164,7 @@ export const updateQuestion = async (req, res, next) => {
         if (tags !== undefined) updateData.tags = JSON.stringify(tags);
 
         const question = await questionModel.updateQuestion(questionId, subjectId, updateData);
+        await subjectModel.touchSubject(subjectId);
         res.json({ question });
     } catch (error) {
         next(error);

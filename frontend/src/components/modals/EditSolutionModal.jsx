@@ -183,7 +183,7 @@ const EditSolutionModal = ({ isOpen, onClose, subjectId, solution, onSolutionUpd
 
     return (
         <ModalPortal>
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm fade-in" onClick={handleModalClose}>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop fade-in" onClick={handleModalClose}>
                 <div
                     className="w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
                     style={{ background: 'rgba(22, 22, 34, 0.95)', border: '1px solid rgba(255,255,255,0.08)' }}
@@ -259,7 +259,7 @@ const EditSolutionModal = ({ isOpen, onClose, subjectId, solution, onSolutionUpd
                                                 {solutionImage ? (
                                                      <div className="relative group">
                                                          <img src={solutionImage} alt="Preview" className="max-h-[300px] object-contain rounded-lg shadow-lg" />
-                                                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm rounded-lg">
+                                                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
                                                              <p className="text-white text-xs font-bold">Click or drag to replace image</p>
                                                          </div>
                                                      </div>

@@ -147,7 +147,7 @@ const ImageCropper = ({
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex flex-col bg-surface-1/95 backdrop-blur-2xl animate-in fade-in duration-300 overflow-hidden">
+        <div className="fixed inset-0 z-[100] flex flex-col bg-[#08080d] animate-in fade-in duration-200 overflow-hidden">
             <style>{cropStyles}</style>
 
             {/* Header */}
@@ -219,7 +219,7 @@ const ImageCropper = ({
             </div>
 
             {/* Controls Bar */}
-            <div className="px-7 py-6 border-t border-white/[0.06] bg-surface-2/80 backdrop-blur-md shrink-0">
+            <div className="px-7 py-6 border-t border-white/[0.06] bg-surface-2 shrink-0">
                 <div className="max-w-6xl mx-auto flex flex-wrap gap-x-12 gap-y-6 items-center justify-center">
 
                     {/* Zoom Group */}

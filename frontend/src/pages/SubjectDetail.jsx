@@ -249,7 +249,7 @@ const SubjectDetail = () => {
             // ── Cover / document title ──
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(20);
-            const titleText = subject?.name || 'Syllabus';
+            const titleText = sanitizeForPDF(subject?.name || 'Syllabus');
             doc.text(titleText, margin, y);
             y += 10;
 
@@ -298,7 +298,7 @@ const SubjectDetail = () => {
                     y = margin;
                 }
 
-                doc.text(prefix + topic.name, indent, y);
+                doc.text(sanitizeForPDF(prefix + topic.name), indent, y);
                 y += 6;
 
                 if (topic.children && topic.children.length > 0) {
@@ -333,7 +333,7 @@ const SubjectDetail = () => {
                 doc.setFontSize(8);
                 doc.setTextColor(150, 150, 170);
                 doc.text(
-                    `${subject?.name || 'Syllabus'}  ·  Page ${p} of ${totalPages}`,
+                    `${sanitizeForPDF(subject?.name || 'Syllabus')}  ·  Page ${p} of ${totalPages}`,
                     pageWidth / 2,
                     pageHeight - 8,
                     { align: 'center' }
@@ -341,7 +341,8 @@ const SubjectDetail = () => {
                 doc.setTextColor(0, 0, 0);
             }
 
-            const fileName = `${subject?.name || 'Subject'}_Syllabus.pdf`.replace(/\s+/g, '_');
+            const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+            const fileName = `${subject?.name || 'Subject'}_Syllabus_${timestamp}.pdf`.replace(/\s+/g, '_');
             doc.save(fileName);
 
             toast.success('Syllabus PDF generated successfully!', { id: loadingToast, duration: 4000 });
@@ -362,24 +363,25 @@ const SubjectDetail = () => {
     const stripLatexMath = (str) => {
         if (!str) return '';
         return str
-            .replace(/\$\$[\s\S]*?\$\$/g, '[Math]')
-            .replace(/\$[^$\n]+\$/g, '[Math]')
-            .replace(/\\\[[\s\S]*?\\\]/g, '[Math]')
-            .replace(/\\\([\s\S]*?\\\)/g, '[Math]')
+            // Remove delimiters but keep content for simple math/currency
+            .replace(/\$\$([\s\S]*?)\$\$/g, '$1')
+            .replace(/\$([^$\n]+)\$/g, '$1')
+            .replace(/\\\[([\s\S]*?)\\\]/g, '$1')
+            .replace(/\\\(([\s\S]*?)\\\)/g, '$1')
             .replace(/\\rightarrow/g, '->')
             .replace(/\\leftarrow/g, '<-')
             .replace(/\\leftrightarrow/g, '<->')
             .replace(/\\neq/g, '!=')
             .replace(/\\leq/g, '<=')
             .replace(/\\geq/g, '>=')
-            .replace(/\\land/g, 'AND')
-            .replace(/\\lor/g, 'OR')
-            .replace(/\\neg/g, 'NOT')
-            .replace(/\\exists/g, 'EXISTS')
-            .replace(/\\forall/g, 'FORALL')
-            .replace(/\\in\b/g, 'in')
-            .replace(/\\notin/g, 'not in')
-            .replace(/\\subset/g, 'subset of')
+            .replace(/\\land/g, '∧')
+            .replace(/\\lor/g, '∨')
+            .replace(/\\neg/g, '¬')
+            .replace(/\\exists/g, '∃')
+            .replace(/\\forall/g, '∀')
+            .replace(/\\in\b/g, '∈')
+            .replace(/\\notin/g, '∉')
+            .replace(/\\subset/g, '⊂')
             .replace(/\\infty/g, '∞')
             .replace(/\\alpha/g, 'α')
             .replace(/\\beta/g, 'β')
@@ -460,14 +462,21 @@ const SubjectDetail = () => {
     // Convert complex unicode (like boxes, arrows) to standard ASCII for jsPDF (WinAnsi fallback)
     const sanitizeForPDF = (text) => {
         if (!text) return '';
-        // Unidecode universally handles standard unicode blocks
-        let sanitized = unidecode(text);
 
-        // Minor clean up for specific known cases where unidecode falls short on certain typography
+        // Manually replace specific symbols that `unidecode` fails to map correctly (returns '[?]')
+        let processed = text
+            .replace(/[\u20B9\u20A8\u20B4]/g, '!!RUPEE!!')
+            .replace(/\u2212/g, '!!MINUS!!'); // Mathematical minus
+
+        // Unidecode natively handles quotes, ellipses, en/em dashes, multiply/divide, etc.
+        let sanitized = unidecode(processed);
+
+        // Replace marker back with ASCII-safe Rupee representation
+        // Also map Math Minus to an en-dash (\u2013). WinAnsi perfectly supports en-dashes,
+        // and it visually preserves the longer minus sign without unidecode crushing it to a tiny hyphen.
         return sanitized
-            .replace(/[“”]/g, '"')
-            .replace(/[‘’]/g, "'")
-            .replace(/…/g, '...');
+            .replace(/!!RUPEE!!/g, 'Rs. ')
+            .replace(/!!MINUS!!/g, '\u2013');
     };
 
     // Use marked.lexer() to parse markdown into a block token array,
@@ -775,7 +784,7 @@ const SubjectDetail = () => {
             // ── Cover / document title ──
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(20);
-            const titleText = subject?.name || 'Export';
+            const titleText = sanitizeForPDF(subject?.name || 'Export');
             doc.text(titleText, margin, y);
             y += 10;
 
@@ -809,7 +818,7 @@ const SubjectDetail = () => {
 
                 const itemType = activeTab === 'notes' ? 'Note' : 'Question';
                 const itemTitle = activeTab === 'notes' && item.title
-                    ? `${itemType} ${i + 1}: ${item.title}`
+                    ? sanitizeForPDF(`${itemType} ${i + 1}: ${item.title}`)
                     : `${itemType} ${i + 1}`;
 
                 // ── Source image (if any) ──
@@ -910,7 +919,7 @@ const SubjectDetail = () => {
                 doc.setFontSize(8);
                 doc.setTextColor(150, 150, 170);
                 doc.text(
-                    `${subject?.name || 'Export'}  ·  ${tabLabel}  ·  Page ${p} of ${totalPages}`,
+                    `${sanitizeForPDF(subject?.name || 'Export')}  ·  ${tabLabel}  ·  Page ${p} of ${totalPages}`,
                     pageWidth / 2,
                     pageHeight - 8,
                     { align: 'center' }
@@ -918,7 +927,8 @@ const SubjectDetail = () => {
                 doc.setTextColor(0, 0, 0);
             }
 
-            const fileName = `${subject?.name || 'Export'}_${activeTab}.pdf`.replace(/\s+/g, '_');
+            const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+            const fileName = `${subject?.name || 'Export'}_${activeTab}_${timestamp}.pdf`.replace(/\s+/g, '_');
             doc.save(fileName);
 
             setIsSelectionMode(false);
@@ -953,7 +963,7 @@ const SubjectDetail = () => {
 
             const docChildren = [
                 new Paragraph({
-                    text: `${subject?.name || 'Export'} - ${tabLabel} Export`,
+                    text: `${sanitizeForPDF(subject?.name || 'Export')} - ${tabLabel} Export`,
                     heading: HeadingLevel.HEADING_1,
                 }),
                 new Paragraph({
@@ -969,7 +979,7 @@ const SubjectDetail = () => {
                 const item = items[i];
                 const itemType = activeTab === 'notes' ? 'Note' : 'Question';
                 const itemTitle = activeTab === 'notes' && item.title
-                    ? `${itemType} ${i + 1}: ${item.title}`
+                    ? sanitizeForPDF(`${itemType} ${i + 1}: ${item.title}`)
                     : `${itemType} ${i + 1}`;
 
                 docChildren.push(
@@ -1131,7 +1141,8 @@ const SubjectDetail = () => {
             });
 
             const blob = await Packer.toBlob(doc);
-            const fileName = `${subject?.name || 'Export'}_${activeTab}.docx`.replace(/\s+/g, '_');
+            const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+            const fileName = `${subject?.name || 'Export'}_${activeTab}_${timestamp}.docx`.replace(/\s+/g, '_');
             saveAs(blob, fileName);
 
             setIsSelectionMode(false);
@@ -1468,7 +1479,7 @@ const SubjectDetail = () => {
 
     const handleEditSolutionUpdated = (updated) => {
         setSolutions(prev => prev.map(s => s.id === updated.id ? updated : s));
-        
+
         // Clear old image cache for this solution so it reloads if viewing/next time
         setFetchedImages(prev => {
             const next = { ...prev };
@@ -1608,7 +1619,7 @@ const SubjectDetail = () => {
                     el.style.ring = '4px';
                     el.style.ringColor = 'rgb(139, 92, 246)'; // indigo-500
                     el.classList.add('ring-2', 'ring-indigo-500', 'ring-offset-4', 'ring-offset-slate-900', 'scale-[1.01]', 'z-50');
-                    
+
                     setTimeout(() => {
                         el.classList.remove('ring-2', 'ring-indigo-500', 'ring-offset-4', 'ring-offset-slate-900', 'scale-[1.01]', 'z-50');
                     }, 2500);
@@ -1629,7 +1640,7 @@ const SubjectDetail = () => {
                     // Premium highlight effect
                     el.style.transition = 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
                     el.classList.add('ring-2', 'ring-emerald-500', 'ring-offset-4', 'ring-offset-slate-900', 'scale-[1.01]', 'z-50');
-                    
+
                     setTimeout(() => {
                         el.classList.remove('ring-2', 'ring-emerald-500', 'ring-offset-4', 'ring-offset-slate-900', 'scale-[1.01]', 'z-50');
                     }, 2500);
@@ -1999,7 +2010,7 @@ const SubjectDetail = () => {
                 {/* Controls (Sub-Nav + Action) — single row, vertically aligned */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-50">
                     {/* Segmented Tabs */}
-                    < div className="flex gap-1 p-1 bg-surface-2/50 backdrop-blur-md rounded-xl border border-white/[0.06] w-fit" >
+                    < div className="flex gap-1 p-1 bg-surface-2/50 rounded-xl border border-white/[0.06] w-fit" >
                         {
                             ['topics', 'sessions', 'questions', 'notes', 'solutions', 'revision', 'images'].map((tab) => {
                                 let count;
@@ -2068,7 +2079,7 @@ const SubjectDetail = () => {
                             activeTab === 'questions' && (
                                 <>
                                     {isSelectionMode ? (
-                                        <div className="flex items-center h-[44px] bg-[#121214]/60 backdrop-blur-2xl border border-white/[0.04] rounded-full px-1.5 shadow-[0_8px_30px_rgb(0,0,0,0.4)] transition-all animate-in fade-in zoom-in-95 duration-300">
+                                        <div className="flex items-center h-[44px] bg-[#121214]/60 border border-white/[0.04] rounded-full px-1.5 shadow-[0_8px_30px_rgb(0,0,0,0.4)] transition-all animate-in fade-in zoom-in-95 duration-300">
                                             <div className="flex items-center pl-3 pr-2">
                                                 <div className="w-5 h-5 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center text-[11px] font-bold mr-2">
                                                     {selectedItems.size}
@@ -2099,7 +2110,7 @@ const SubjectDetail = () => {
 
                                                 {/* Export Dropdown */}
                                                 {showExportMenu && selectedItems.size > 0 && (
-                                                    <div className="absolute top-full right-0 mt-2 w-48 bg-[#121214]/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 z-50">
+                                                    <div className="absolute top-full right-0 mt-2 w-48 bg-[#121214]/90 border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 z-50">
                                                         <div className="p-1 space-y-0.5">
                                                             <button
                                                                 onClick={() => { handleDownloadSelected(); setShowExportMenu(false); }}
@@ -2168,7 +2179,7 @@ const SubjectDetail = () => {
                             activeTab === 'notes' && (
                                 <>
                                     {isSelectionMode ? (
-                                        <div className="flex items-center h-[44px] bg-[#121214]/60 backdrop-blur-2xl border border-white/[0.04] rounded-full px-1.5 shadow-[0_8px_30px_rgb(0,0,0,0.4)] transition-all animate-in fade-in zoom-in-95 duration-300">
+                                        <div className="flex items-center h-[44px] bg-[#121214]/60 border border-white/[0.04] rounded-full px-1.5 shadow-[0_8px_30px_rgb(0,0,0,0.4)] transition-all animate-in fade-in zoom-in-95 duration-300">
                                             <div className="flex items-center pl-3 pr-2">
                                                 <div className="w-5 h-5 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center text-[11px] font-bold mr-2">
                                                     {selectedItems.size}
@@ -2199,7 +2210,7 @@ const SubjectDetail = () => {
 
                                                 {/* Export Dropdown */}
                                                 {showExportMenu && selectedItems.size > 0 && (
-                                                    <div className="absolute top-full right-0 mt-2 w-48 bg-[#121214]/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 z-50">
+                                                    <div className="absolute top-full right-0 mt-2 w-48 bg-[#121214]/90 border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 z-50">
                                                         <div className="p-1 space-y-0.5">
                                                             <button
                                                                 onClick={() => { handleDownloadSelected(); setShowExportMenu(false); }}
@@ -2798,34 +2809,34 @@ const SubjectDetail = () => {
                                                                                 >
                                                                                     <Pencil className="w-[18px] h-[18px]" />
                                                                                 </button>
-                                                                                 <button
-                                                                                     onClick={() => {
-                                                                                         setSelectedQuestionIdForNote(q.id);
-                                                                                         setShowNoteModal(true);
-                                                                                     }}
-                                                                                     className="p-2 text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-all cursor-pointer"
-                                                                                     title="Manual Note"
-                                                                                 >
-                                                                                     <FileText className="w-[18px] h-[18px]" />
-                                                                                 </button>
-                                                                                 <button
-                                                                                     onClick={() => {
-                                                                                         const existingRes = solutions.find(s => s.question_id === q.id);
-                                                                                         if (existingRes) {
-                                                                                             setViewingSolution(existingRes);
-                                                                                             if (existingRes.source_image_id) {
-                                                                                                 handleFetchSolutionImage(existingRes.id);
-                                                                                             }
-                                                                                         } else {
-                                                                                             setSelectedQuestionIdForSolution(q.id);
-                                                                                             setShowSolutionModal(true);
-                                                                                         }
-                                                                                     }}
-                                                                                     className={`p-2 rounded-lg transition-all cursor-pointer ${solutions.some(s => s.question_id === q.id) ? 'text-blue-400 bg-blue-400/10' : 'text-slate-500 hover:text-blue-400 hover:bg-blue-400/10'}`}
-                                                                                     title={solutions.some(s => s.question_id === q.id) ? "View Solution" : "Add Solution"}
-                                                                                 >
-                                                                                     <ListChecks className="w-[18px] h-[18px]" />
-                                                                                 </button>
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        setSelectedQuestionIdForNote(q.id);
+                                                                                        setShowNoteModal(true);
+                                                                                    }}
+                                                                                    className="p-2 text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-all cursor-pointer"
+                                                                                    title="Manual Note"
+                                                                                >
+                                                                                    <FileText className="w-[18px] h-[18px]" />
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        const existingRes = solutions.find(s => s.question_id === q.id);
+                                                                                        if (existingRes) {
+                                                                                            setViewingSolution(existingRes);
+                                                                                            if (existingRes.source_image_id) {
+                                                                                                handleFetchSolutionImage(existingRes.id);
+                                                                                            }
+                                                                                        } else {
+                                                                                            setSelectedQuestionIdForSolution(q.id);
+                                                                                            setShowSolutionModal(true);
+                                                                                        }
+                                                                                    }}
+                                                                                    className={`p-2 rounded-lg transition-all cursor-pointer ${solutions.some(s => s.question_id === q.id) ? 'text-blue-400 bg-blue-400/10' : 'text-slate-500 hover:text-blue-400 hover:bg-blue-400/10'}`}
+                                                                                    title={solutions.some(s => s.question_id === q.id) ? "View Solution" : "Add Solution"}
+                                                                                >
+                                                                                    <ListChecks className="w-[18px] h-[18px]" />
+                                                                                </button>
                                                                                 <button
                                                                                     onClick={() => handleGenerateAINote(q.id)}
                                                                                     disabled={generatingAINoteId === q.id}
@@ -3766,7 +3777,7 @@ const SubjectDetail = () => {
                                                                 }
                                                             }
                                                         }}
-                                                        className="absolute top-3 right-3 p-2 bg-black/60 backdrop-blur-md rounded-xl text-indigo-400 border border-white/[0.08] opacity-0 group-hover:opacity-100 transition-all shadow-2xl z-20 hover:scale-110 active:scale-95 hover:bg-indigo-500/20"
+                                                        className="absolute top-3 right-3 p-2 bg-black/60 rounded-xl text-indigo-400 border border-white/[0.08] opacity-0 group-hover:opacity-100 transition-all shadow-2xl z-20 hover:scale-110 active:scale-95 hover:bg-indigo-500/20"
                                                         title="View Linked Content"
                                                     >
                                                         <LinkIcon className="w-3.5 h-3.5" />

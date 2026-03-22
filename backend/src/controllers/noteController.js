@@ -3,6 +3,7 @@ import * as questionModel from '../models/questionModel.js';
 import * as sourceImageModel from '../models/sourceImageModel.js';
 import { generateNoteFromQuestion } from '../services/ai_service/response/noteGenerator.js';
 import * as deletionService from '../services/deletionService.js';
+import * as subjectModel from '../models/subjectModel.js';
 
 export const getNoteImage = async (req, res, next) => {
     try {
@@ -79,6 +80,9 @@ export const createNote = async (req, res, next) => {
         }
 
         const note = await noteModel.createNote(subjectId, questionId, finalTitle, finalContent, sourceImageId, parentNoteId, tags);
+
+        await subjectModel.touchSubject(subjectId);
+
         res.status(201).json({ note });
     } catch (error) {
         next(error);
@@ -89,9 +93,9 @@ export const deleteNote = async (req, res, next) => {
     try {
         const { subjectId, noteId } = req.params;
         const { noteIds } = req.body;
-        
+
         const ids = noteIds && Array.isArray(noteIds) ? noteIds : [noteId];
-        
+
         if (ids.length === 0 || !ids[0]) {
             return res.status(400).json({ error: 'No note IDs provided' });
         }
@@ -121,6 +125,7 @@ export const updateNote = async (req, res, next) => {
             return res.status(404).json({ error: 'Note not found' });
         }
 
+        await subjectModel.touchSubject(subjectId);
         res.json({ note });
     } catch (error) {
         next(error);

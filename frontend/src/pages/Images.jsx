@@ -288,12 +288,12 @@ const Images = () => {
                                             {hasLink && (
                                                 <div className="absolute top-2 left-2 flex gap-1 z-20">
                                                     {img.linked_question_id && (
-                                                        <div className="p-1.5 rounded-lg bg-indigo-500/80 backdrop-blur-md text-white border border-white/10 shadow-lg" title="Linked to Question">
+                                                        <div className="p-1.5 rounded-lg bg-indigo-500/80 text-white border border-white/10 shadow-lg" title="Linked to Question">
                                                             <Activity className="w-3 h-3" />
                                                         </div>
                                                     )}
                                                     {img.linked_note_id && (
-                                                        <div className="p-1.5 rounded-lg bg-emerald-500/80 backdrop-blur-md text-white border border-white/10 shadow-lg" title="Linked to Note">
+                                                        <div className="p-1.5 rounded-lg bg-emerald-500/80 text-white border border-white/10 shadow-lg" title="Linked to Note">
                                                             <FileText className="w-3 h-3" />
                                                         </div>
                                                     )}
@@ -319,7 +319,7 @@ const Images = () => {
                                                                 const contentId = img.linked_question_id || img.linked_note_id;
                                                                 navigate(`/subjects/${img.subject_id}?tab=${tab}&id=${contentId}`);
                                                             }}
-                                                            className="p-1.5 bg-primary/20 hover:bg-primary text-white backdrop-blur-md rounded-lg border border-primary/30 transition-all cursor-pointer"
+                                                            className="p-1.5 bg-primary/20 hover:bg-primary text-white rounded-lg border border-primary/30 transition-all cursor-pointer"
                                                             title={img.linked_question_id ? "View Question" : "View Note"}
                                                         >
                                                             <LinkIcon className="w-3 h-3" />

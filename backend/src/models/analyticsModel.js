@@ -22,9 +22,19 @@ export const getSubjectOverview = async (data) => {
         .count('* as count')
         .first();
 
-    const sess = await db('revision.sessions')
-        .where('subject_id', data.subjectId)
-        .where('is_deleted', false)
+    const sess = await db('revision.sessions as s')
+        .where('s.is_deleted', false)
+        .where(function () {
+            this.where('s.subject_id', data.subjectId)
+                .orWhereExists(function () {
+                    this.select('*')
+                        .from('revision.session_entries as se')
+                        .join('revision.topics as t', 'se.topic_id', 't.id')
+                        .whereRaw('se.session_id = s.id')
+                        .where('t.subject_id', data.subjectId)
+                        .where('se.is_deleted', false);
+                });
+        })
         .count('* as count')
         .first();
 

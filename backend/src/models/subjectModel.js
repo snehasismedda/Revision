@@ -17,9 +17,15 @@ export const findSubjectsByUser = async (data) => {
         .where('user_id', data.userId)
         .where('is_deleted', false)
         .select([
-            'id', 'name', 'description', 'tags', 'created_at',
+            'id', 'name', 'description', 'tags', 'created_at', 'updated_at',
         ])
-        .orderBy('created_at', 'desc');
+        .orderBy('updated_at', 'desc');
+};
+
+export const touchSubject = async (id) => {
+    return db('revision.subjects')
+        .where('id', id)
+        .update({ updated_at: new Date() });
 };
 
 export const findSubjectById = async (data) => {

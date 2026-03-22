@@ -73,7 +73,7 @@ const ViewSolutionModal = ({ isOpen, onClose, solution, sourceImage, isFetchingI
 
     return (
         <ModalPortal>
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-6 bg-black/60 backdrop-blur-sm fade-in" onClick={onClose}>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-6 modal-backdrop fade-in" onClick={onClose}>
                 <div
                     className={`w-full flex flex-col ${isFullscreen ? 'h-screen md:max-h-screen rounded-none border-none' : 'h-[90vh] md:h-auto md:max-h-[85vh] rounded-2xl shadow-2xl border'} overflow-hidden transition-all duration-300`}
                     style={{
@@ -84,7 +84,7 @@ const ViewSolutionModal = ({ isOpen, onClose, solution, sourceImage, isFetchingI
                     onClick={e => e.stopPropagation()}
                 >
                     {/* Header */}
-                    <div className={`flex items-center justify-between px-5 py-3.5 border-b shrink-0 ${isLightMode ? 'bg-[#f8fafc] border-slate-200 text-slate-900' : 'bg-surface-2/30 border-white/[0.06] text-white'} backdrop-blur-md`}>
+                    <div className={`flex items-center justify-between px-5 py-3.5 border-b shrink-0 ${isLightMode ? 'bg-[#f8fafc] border-slate-200 text-slate-900' : 'bg-surface-2/80 border-white/[0.06] text-white'}`}>
                         <div className="flex items-center gap-3">
                             <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500 border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.1)]">
                                 <FileText className="w-4 h-4" />
@@ -137,8 +137,8 @@ const ViewSolutionModal = ({ isOpen, onClose, solution, sourceImage, isFetchingI
                              {sourceImage && (
                                 <div className="mb-10 group relative rounded-2xl overflow-hidden border border-white/[0.08] shadow-2xl transition-all hover:scale-[1.01]">
                                     <img src={sourceImage} alt="Solution Original" className="w-full h-auto rounded-xl select-none" />
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
-                                        <button onClick={handleOpenOriginal} className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 backdrop-blur-md transition-all">
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                        <button onClick={handleOpenOriginal} className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all">
                                             <Maximize2 className="w-4 h-4" /> View Original
                                         </button>
                                     </div>

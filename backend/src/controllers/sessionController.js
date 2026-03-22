@@ -44,6 +44,9 @@ export const createSession = async (req, res) => {
             notes,
             sessionDate,
         });
+
+        await subjectModel.touchSubject(req.params.subjectId);
+
         res.status(201).json({ session });
     } catch (error) {
         res.status(500).json({ error: 'Failed to create session' });
@@ -88,6 +91,8 @@ export const updateSession = async (req, res) => {
             sessionDate,
         });
         if (!updated) return res.status(404).json({ error: 'Session not found' });
+        
+        await subjectModel.touchSubject(updated.subject_id);
         res.status(200).json({ session: updated });
     } catch (error) {
         res.status(500).json({ error: 'Failed to update session' });
