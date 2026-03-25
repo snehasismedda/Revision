@@ -1,26 +1,61 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Target, ArrowLeft, Plus, Calendar, Activity, TrendingUp, TrendingDown, BookOpen, Trash2, Edit2, ChevronRight, X, Brain, CheckCircle2, BarChart3, Notebook } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { Target, ArrowLeft, Plus, Calendar, Activity, TrendingUp, TrendingDown, BookOpen, Trash2, Edit2, ChevronRight, ChevronDown, X, Brain, CheckCircle2, BarChart3, Notebook, BarChart2 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 
 import * as testSeriesApi from '../api/testSeriesApi';
 import * as testsApi from '../api/testsApi';
-import { analyticsApi } from '../api';
+import { useTestSeries } from '../context/TestSeriesContext.jsx';
+import { useTopics } from '../context/TopicContext.jsx';
 import CreateTestModal from '../components/modals/CreateTestModal';
 import toast from 'react-hot-toast';
 
-
+import {
+    AreaChart, Area, BarChart, Bar, LineChart, Line,
+    XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine,
+    ResponsiveContainer, Cell, Legend
+} from 'recharts';
 
 import ModalPortal from '../components/ModalPortal.jsx';
+
+// ── colour helpers ────────────────────────────────────────────────────────────
+const accColor = (v) => v >= 75 ? '#34d399' : v >= 50 ? '#fbbf24' : '#f87171';
+const accPill = (v) => v >= 75
+    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+    : v >= 50 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+        : 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+
+const ChartTip = ({ active, payload, label }) => {
+    if (!active || !payload?.length) return null;
+    return (
+        <div className="bg-[#13132a]/95 border border-white/10 rounded-xl p-3 shadow-2xl text-[13px] min-w-[140px]">
+            <p className="text-slate-500 mb-1.5 text-[11px] font-medium uppercase tracking-wider">{payload[0]?.payload?.date || label}</p>
+            {payload.map((p, i) => (
+                <div key={i} className="flex items-center justify-between gap-4 py-0.5">
+                    <span className="text-slate-400 font-medium">{p.name}:</span>
+                    <span style={{ color: p.color }} className="font-bold">
+                        {p.value}{p.name.includes('Acc') || p.name === 'Accuracy' || p.name === 'Target' ? '%' : ''}
+                    </span>
+                </div>
+            ))}
+        </div>
+    );
+};
+
 
 const TestSeriesDetail = () => {
     const { seriesId } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
 
-    const [series, setSeries] = useState(null);
-    const [tests, setTests] = useState([]);
-    const [analytics, setAnalytics] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const { seriesDetails, detailLoading, loadSeriesDetail, updateTestsInSeries } = useTestSeries();
+    const { loadTopics } = useTopics();
+    
+    // Derived from global state
+    const cached = seriesDetails[seriesId];
+    const series = cached?.series || null;
+    const tests = cached?.tests || [];
+    const loading = detailLoading[seriesId] && !series;
 
     const [isCreateTestModalOpen, setIsCreateTestModalOpen] = useState(false);
     const [isInsightsOpen, setIsInsightsOpen] = useState(false);
@@ -31,29 +66,20 @@ const TestSeriesDetail = () => {
 
 
 
-    const loadData = async () => {
-        try {
-            setLoading(true);
-            const [detailRes, analyticsRes] = await Promise.all([
-                testSeriesApi.getTestSeriesDetail(seriesId),
-                analyticsApi.testSeries(seriesId).catch(() => null)
-            ]);
-
-            setSeries(detailRes.series);
-            setTests(detailRes.tests || []);
-            setAnalytics(analyticsRes);
-        } catch (error) {
-            console.error('Failed to load test series detail', error);
-            toast.error('Failed to load series details');
-            navigate('/tests');
-        } finally {
-            setLoading(false);
-        }
-    };
+    const loadData = useCallback(async (force = false) => {
+        if (seriesId) await loadSeriesDetail(seriesId, force);
+    }, [seriesId, loadSeriesDetail]);
 
     useEffect(() => {
-        if (seriesId) loadData();
-    }, [seriesId]);
+        loadData();
+    }, [loadData]);
+
+    // Pre-load topics for all subjects in this series
+    useEffect(() => {
+        if (series?.subjects) {
+            series.subjects.forEach(sub => loadTopics(sub.id));
+        }
+    }, [series?.subjects, loadTopics]);
 
     const handleDeleteTest = async (e, testId) => {
         e.stopPropagation();
@@ -66,7 +92,8 @@ const TestSeriesDetail = () => {
         try {
             await testsApi.deleteTest(seriesId, testToDelete);
             toast.success('Test deleted');
-            loadData();
+            // Refresh details in context
+            loadData(true);
         } catch (error) {
             toast.error('Failed to delete test');
         } finally {
@@ -123,7 +150,7 @@ const TestSeriesDetail = () => {
             </div>
 
             {/* Header Content matching SubjectDetail approach */}
-            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-6">
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-4">
                 <div>
                     <h1 className="text-[22px] md:text-[24px] font-heading font-semibold text-white tracking-tight leading-tight mb-1.5">
                         {series.name}
@@ -135,7 +162,7 @@ const TestSeriesDetail = () => {
 
                 <div className="flex items-center gap-3">
                     <button
-                        onClick={() => setIsInsightsOpen(true)}
+                        onClick={() => navigate(`/tests/${seriesId}/insights`)}
                         className="flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all cursor-pointer border border-white/[0.08] bg-surface-3/50 text-slate-300 hover:text-white hover:bg-surface-3 hover:border-white/[0.12] group"
                     >
                         <BarChart3 className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" strokeWidth={2} />
@@ -153,9 +180,9 @@ const TestSeriesDetail = () => {
             </div>
 
             {/* Divider and section Heading */}
-            <div className="h-px bg-gradient-to-r from-white/[0.08] via-white/[0.06] to-transparent mb-8" />
+            <div className="h-px bg-gradient-to-r from-white/[0.08] via-white/[0.06] to-transparent mb-4" />
 
-            <div className="flex items-center gap-2.5 mb-8">
+            <div className="flex items-center gap-2.5 mb-4">
                 <div className="p-1.5 rounded-lg bg-pink-500/10 border border-pink-500/20">
                     <Notebook className="w-4 h-4 text-pink-400" />
                 </div>
@@ -257,17 +284,13 @@ const TestSeriesDetail = () => {
             <CreateTestModal
                 isOpen={isCreateTestModalOpen}
                 onClose={handleModalClose}
-                onSuccess={loadData}
+                onSuccess={() => loadData(true)}
                 seriesId={seriesId}
                 seriesSubjects={series.subjects || []}
                 initialData={editingTest}
             />
 
-            <TestSeriesInsightsModal
-                isOpen={isInsightsOpen}
-                onClose={() => setIsInsightsOpen(false)}
-                analytics={analytics}
-            />
+
 
             <ConfirmDialog
                 isOpen={isConfirmDeleteOpen}
@@ -284,97 +307,6 @@ const TestSeriesDetail = () => {
     );
 };
 
-
-const TestSeriesInsightsModal = ({ isOpen, onClose, analytics }) => {
-    if (!isOpen) return null;
-
-    return (
-        <ModalPortal>
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 fade-in" onClick={onClose}>
-                <div
-                    className="w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-                    style={{ background: 'rgba(22, 22, 34, 0.95)', border: '1px solid rgba(255,255,255,0.08)' }}
-                    onClick={e => e.stopPropagation()}
-                >
-                    {/* Header */}
-                    <div className="flex items-center justify-between px-7 py-5 border-b border-white/[0.06] shrink-0">
-                        <div className="flex items-center gap-4">
-                            <div className="p-2 rounded-lg bg-pink-500/10 text-pink-400">
-                                <BarChart3 className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-heading font-semibold text-white leading-tight">Series Insights</h3>
-                                <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mt-0.5">Performance Analysis</p>
-                            </div>
-                        </div>
-                        <button
-                            onClick={onClose}
-                            className="p-2 text-slate-500 hover:text-white hover:bg-white/[0.06] rounded-lg transition-all cursor-pointer"
-                        >
-                            <X className="w-5 h-5" />
-                        </button>
-                    </div>
-
-                    {/* Body */}
-                    <div className="px-7 py-6 space-y-8 overflow-y-auto max-h-[70vh] custom-scrollbar">
-                        {analytics ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                                <div className="bg-white/[0.02] border border-white/5 p-5 rounded-2xl relative overflow-hidden group hover:border-pink-500/20 transition-all">
-                                    <Activity className="absolute -right-3 -top-3 w-16 h-16 text-pink-500/5 group-hover:text-pink-500/10 transition-colors" />
-                                    <h3 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.2em] mb-1.5">Total Tests</h3>
-                                    <p className="text-3xl font-heading font-bold text-white tracking-tight">{analytics.overview?.total_tests || 0}</p>
-                                </div>
-
-                                <div className="bg-white/[0.02] border border-white/5 p-5 rounded-2xl relative overflow-hidden group hover:border-emerald-500/20 transition-all">
-                                    <TrendingUp className="absolute -right-3 -top-3 w-16 h-16 text-emerald-500/5 group-hover:text-emerald-500/10 transition-colors" />
-                                    <h4 className="text-[10px] font-extrabold text-emerald-500/80 uppercase tracking-[0.2em] mb-1.5">Strongest</h4>
-                                    <p className="text-[15px] font-heading font-bold text-white tracking-tight truncate mb-1">{analytics.strongest?.subject_name || 'N/A'}</p>
-                                    <p className="text-[11px] font-bold text-slate-500">{analytics.strongest ? `${analytics.strongest.overall_accuracy}% Accuracy` : '—'}</p>
-                                </div>
-
-                                <div className="bg-white/[0.02] border border-white/5 p-5 rounded-2xl relative overflow-hidden group hover:border-rose-500/20 transition-all">
-                                    <TrendingDown className="absolute -right-3 -top-3 w-16 h-16 text-rose-500/5 group-hover:text-rose-500/10 transition-colors" />
-                                    <h4 className="text-[10px] font-extrabold text-rose-500/80 uppercase tracking-[0.2em] mb-1.5">Weakest</h4>
-                                    <p className="text-[15px] font-heading font-bold text-white tracking-tight truncate mb-1">{analytics.weakest?.subject_name || 'N/A'}</p>
-                                    <p className="text-[11px] font-bold text-slate-500">{analytics.weakest ? `${analytics.weakest.overall_accuracy}% Accuracy` : '—'}</p>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="py-16 text-center bg-white/[0.02] rounded-3xl border border-dashed border-white/10">
-                                <Activity className="w-12 h-12 text-slate-700 mx-auto mb-4 opacity-50" />
-                                <p className="text-slate-400 text-sm font-medium">No analytics data available for this series yet.</p>
-                            </div>
-                        )}
-
-                        {analytics?.strongest && (
-                            <div className="p-5 rounded-2xl bg-emerald-500/[0.03] border border-emerald-500/15 flex items-start gap-4 transition-all hover:bg-emerald-500/[0.05]">
-                                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0 border border-emerald-500/20">
-                                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-[14px] font-bold text-emerald-400">Great progress in {analytics.strongest.subject_name}!</p>
-                                    <p className="text-[13px] text-slate-400 leading-relaxed max-w-lg">
-                                        You've maintained exceptional performance in this subject. To improve further, balance your effort by targeting {analytics.weakest?.subject_name || 'weaker areas'} in your next session.
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Footer */}
-                    <div className="px-7 py-5 border-t border-white/[0.06] flex shrink-0">
-                        <button
-                            onClick={onClose}
-                            className="w-full py-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-white text-[13px] font-bold transition-all border border-white/10 uppercase tracking-widest cursor-pointer shadow-md active:scale-95"
-                        >
-                            Got it
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </ModalPortal>
-    );
-};
 
 export default TestSeriesDetail;
 

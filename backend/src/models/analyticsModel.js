@@ -1,91 +1,152 @@
 import db from '../knex/db.js';
 
-export const getSubjectOverview = async (data) => {
+export const getSubjectsOverview = async (subjectIds) => {
+    if (!subjectIds || subjectIds.length === 0) return {};
+
+    // 1. Attempts stats
     const attempts = await db('revision.session_entries as se')
         .join('revision.sessions as s', 'se.session_id', 's.id')
         .join('revision.topics as t', 'se.topic_id', 't.id')
-        .where('t.subject_id', data.subjectId)
+        .whereIn('t.subject_id', subjectIds)
         .where('s.is_deleted', false)
         .where('se.is_deleted', false)
         .where('t.is_deleted', false)
+        .groupBy('t.subject_id')
         .select(
+            't.subject_id',
             db.raw('COUNT(*) as total_questions'),
             db.raw('SUM(CASE WHEN se.is_correct THEN 1 ELSE 0 END) as total_correct'),
             db.raw('COUNT(DISTINCT se.topic_id) as topics_covered'),
-        )
-        .first();
+        );
 
-
+    // 2. Question counts
     const qs = await db('revision.questions')
-        .where('subject_id', data.subjectId)
+        .whereIn('subject_id', subjectIds)
         .where('is_deleted', false)
-        .count('* as count')
-        .first();
+        .groupBy('subject_id')
+        .select('subject_id', db.raw('COUNT(*) as count'));
 
-    const sess = await db('revision.sessions as s')
-        .where('s.is_deleted', false)
-        .where(function () {
-            this.where('s.subject_id', data.subjectId)
-                .orWhereExists(function () {
-                    this.select('*')
-                        .from('revision.session_entries as se')
-                        .join('revision.topics as t', 'se.topic_id', 't.id')
-                        .whereRaw('se.session_id = s.id')
-                        .where('t.subject_id', data.subjectId)
-                        .where('se.is_deleted', false);
-                });
-        })
-        .count('* as count')
-        .first();
-
+    // 3. Question counts (continued)
+    // 4. Revision session counts
     const revSess = await db('revision.revision_sessions')
-        .where('subject_id', data.subjectId)
-        .count('* as count')
-        .first();
+        .whereIn('subject_id', subjectIds)
+        .groupBy('subject_id')
+        .select('subject_id', db.raw('COUNT(*) as count'));
 
+    // 5. Topic counts
     const tpc = await db('revision.topics')
-        .where('subject_id', data.subjectId)
+        .whereIn('subject_id', subjectIds)
         .where('is_deleted', false)
-        .count('* as count')
-        .first();
+        .groupBy('subject_id')
+        .select('subject_id', db.raw('COUNT(*) as count'));
 
+    // 6. Note counts
     const notes = await db('revision.notes')
-        .where('subject_id', data.subjectId)
+        .whereIn('subject_id', subjectIds)
         .where('is_deleted', false)
-        .count('* as count')
-        .first();
+        .groupBy('subject_id')
+        .select('subject_id', db.raw('COUNT(*) as count'));
 
-    return {
-        total_questions: attempts?.total_questions || 0,
-        total_correct: attempts?.total_correct || 0,
-        topics_covered: attempts?.topics_covered || 0,
-        total_topics: tpc?.count || 0,
-        available_questions: qs?.count || 0,
-        total_sessions: sess?.count || 0,
-        total_revision_sessions: revSess?.count || 0,
-        total_notes: notes?.count || 0,
-    };
+    // 7. Solution counts
+    const solutions = await db('revision.solutions')
+        .whereIn('subject_id', subjectIds)
+        .where('is_deleted', false)
+        .groupBy('subject_id')
+        .select('subject_id', db.raw('COUNT(*) as count'));
+
+    // 8. Image counts
+    const images = await db('revision.source_images')
+        .whereIn('subject_id', subjectIds)
+        .where('is_deleted', false)
+        .groupBy('subject_id')
+        .select('subject_id', db.raw('COUNT(*) as count'));
+
+    // Map all results back
+    const result = {};
+    for (const id of subjectIds) {
+        const att = attempts.find(a => a.subject_id == id);
+        const q = qs.find(a => a.subject_id == id);
+        const rs = revSess.find(a => a.subject_id == id);
+        const t = tpc.find(a => a.subject_id == id);
+        const n = notes.find(a => a.subject_id == id);
+        const sl = solutions.find(a => a.subject_id == id);
+        const img = images.find(a => a.subject_id == id);
+
+        // Session count remains specific due to OR/EXISTS logic which is tricky to batch perfectly with GROUP BY
+        const accurateSessCount = await db('revision.sessions as s')
+            .where('s.is_deleted', false)
+            .where(function () {
+                this.where('s.subject_id', id)
+                    .orWhereExists(function () {
+                        this.select('*')
+                            .from('revision.session_entries as se')
+                            .join('revision.topics as t', 'se.topic_id', 't.id')
+                            .whereRaw('se.session_id = s.id')
+                            .where('t.subject_id', id)
+                            .where('se.is_deleted', false)
+                            .where('t.is_deleted', false);
+                    });
+            })
+            .count('* as count')
+            .first();
+
+        result[id] = {
+            total_questions: parseInt(att?.total_questions || 0),
+            total_correct: parseInt(att?.total_correct || 0),
+            topics_covered: parseInt(att?.topics_covered || 0),
+            total_topics: parseInt(tpc.find(a => a.subject_id == id)?.count || 0), // Use tpc specifically
+            available_questions: parseInt(q?.count || 0),
+            total_sessions: parseInt(accurateSessCount?.count || 0),
+            total_revision_sessions: parseInt(rs?.count || 0),
+            total_notes: parseInt(n?.count || 0),
+            total_solutions: parseInt(sl?.count || 0),
+            total_images: parseInt(img?.count || 0),
+        };
+    }
+
+
+    return result;
 };
 
+
+
+export const getSubjectOverview = async (data) => {
+    const res = await getSubjectsOverview([data.subjectId]);
+    return res[data.subjectId] || {};
+};
+
+
 export const getTopicPerformance = async (data) => {
-    return db('revision.session_entries as se')
+    // We want ALL topics for this subject, paired with entry stats if any
+    const topics = await db('revision.topics')
+        .where('subject_id', data.subjectId)
+        .where('is_deleted', false)
+        .select('id as topic_id', 'name as topic_name', 'parent_id')
+        .orderBy('name', 'asc');
+
+    const stats = await db('revision.session_entries as se')
         .join('revision.sessions as s', 'se.session_id', 's.id')
         .join('revision.topics as t', 'se.topic_id', 't.id')
         .where('t.subject_id', data.subjectId)
         .where('s.is_deleted', false)
         .where('se.is_deleted', false)
-        .where('t.is_deleted', false)
-
-        .groupBy('t.id', 't.name', 't.parent_id')
+        .groupBy('t.id')
         .select(
             't.id as topic_id',
-            't.name as topic_name',
-            't.parent_id',
             db.raw('COUNT(*) as total'),
             db.raw('SUM(CASE WHEN se.is_correct THEN 1 ELSE 0 END) as correct'),
             db.raw('ROUND(100.0 * SUM(CASE WHEN se.is_correct THEN 1 ELSE 0 END) / COUNT(*), 1) as accuracy'),
-        )
-        .orderBy('accuracy', 'asc');
+        );
+
+    return topics.map(t => {
+        const s = stats.find(st => st.topic_id === t.topic_id);
+        return {
+            ...t,
+            total: parseInt(s?.total || 0),
+            correct: parseInt(s?.correct || 0),
+            accuracy: parseFloat(s?.accuracy || 0),
+        };
+    });
 };
 
 export const getSessionTrends = async (data) => {
@@ -203,7 +264,13 @@ export const getTestSeriesOverview = async (seriesId) => {
         .count('* as count')
         .first();
 
+    const series = await db('revision.test_series')
+        .where('id', seriesId)
+        .select('name')
+        .first();
+
     return {
+        series_name: series?.name || 'Unknown Series',
         total_tests: parseInt(testCount?.count || 0),
         total_subjects: parseInt(subjectCount?.count || 0)
     };
@@ -449,4 +516,93 @@ export const getTestAnalytics = async (testId) => {
     };
 };
 
+export const getTestSeriesDetailedStats = async (seriesId) => {
+    // 1. Fetch all test results for tests in this series, ordered by test date or result creation
+    const results = await db('revision.test_results as tr')
+        .join('revision.tests as t', 'tr.test_id', 't.id')
+        .where('t.test_series_id', seriesId)
+        .where('tr.is_deleted', false)
+        .where('t.is_deleted', false)
+        .orderBy('t.test_date', 'asc') // Order by the date of the test
+        .orderBy('tr.created_at', 'asc') // Then by attempt time
+        .select('tr.*', 't.name as test_name', 't.test_date');
 
+    if (!results || results.length === 0) {
+        return {
+            seriesTrend: [],
+            subjectTrend: {},
+            stats: { avgAccuracy: 0, bestAccuracy: 0, worstAccuracy: 0, totalAttempts: 0 }
+        };
+    }
+
+    const fetchSubjectPerformance = async (sessionIds) => {
+        if (!sessionIds || sessionIds.length === 0) return [];
+        return db('revision.session_entries as se')
+            .join('revision.sessions as s', 'se.session_id', 's.id')
+            .join('revision.topics as t', 'se.topic_id', 't.id')
+            .join('revision.subjects as sub', 't.subject_id', 'sub.id')
+            .whereIn('s.id', sessionIds)
+            .where('se.is_deleted', false)
+            .groupBy('sub.id', 'sub.name')
+            .select(
+                'sub.id as subject_id',
+                'sub.name as subject_name',
+                db.raw('ROUND(100.0 * SUM(CASE WHEN se.is_correct THEN 1 ELSE 0 END) / COUNT(*), 1) as accuracy')
+            );
+    };
+
+    const seriesTrend = [];
+    const subjectTrend = {};
+    const accuracies = [];
+
+    for (const result of results) {
+        let sessionIds = result.session_ids;
+        if (typeof sessionIds === 'string') {
+            try { sessionIds = JSON.parse(sessionIds); } catch (e) { }
+        }
+        sessionIds = Array.isArray(sessionIds) ? sessionIds : [];
+
+        const acc = (result.total_score && Number(result.total_score) > 0)
+            ? Math.round(100.0 * Number(result.my_score) / Number(result.total_score) * 10) / 10
+            : 0;
+
+        accuracies.push(acc);
+        const testIndex = seriesTrend.length;
+        
+        seriesTrend.push({
+            test_id: result.test_id,
+            test_name: result.test_name,
+            test_date: result.test_date,
+            accuracy: acc,
+            score: Number(result.my_score),
+            max_score: Number(result.total_score)
+        });
+
+        const subjectPerf = await fetchSubjectPerformance(sessionIds);
+        subjectPerf.forEach(sp => {
+            if (!subjectTrend[sp.subject_name]) subjectTrend[sp.subject_name] = [];
+            
+            subjectTrend[sp.subject_name].push({
+                testIndex: testIndex,
+                test_name: result.test_name,
+                accuracy: Number(sp.accuracy)
+            });
+        });
+    }
+
+    const n_acc = accuracies.length;
+    const avgAccuracy = n_acc > 0 ? Math.round(accuracies.reduce((a, b) => a + b, 0) / n_acc * 10) / 10 : 0;
+    const bestAccuracy = n_acc > 0 ? Math.max(...accuracies) : 0;
+    const worstAccuracy = n_acc > 0 ? Math.min(...accuracies) : 0;
+
+    return {
+        seriesTrend,
+        subjectTrend,
+        stats: {
+            avgAccuracy,
+            bestAccuracy,
+            worstAccuracy,
+            totalAttempts: n_acc
+        }
+    };
+};

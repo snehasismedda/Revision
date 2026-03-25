@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { imagesApi, subjectsApi } from '../api/index.js';
+import { imagesApi } from '../api/index.js';
+import { useSubjects } from '../context/SubjectContext.jsx';
 import { Image as ImageIcon, PlusCircle, Search, X, Calendar, Activity, Maximize2, Link as LinkIcon, ChevronDown, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AddImageModal from '../components/modals/AddImageModal.jsx';
@@ -17,7 +18,7 @@ const Images = () => {
     const LIMIT = 20;
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedSubjectId, setSelectedSubjectId] = useState('all');
-    const [subjects, setSubjects] = useState([]);
+    const { subjects, loadSubjects } = useSubjects();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
 
@@ -28,16 +29,7 @@ const Images = () => {
 
     useEffect(() => {
         loadSubjects();
-    }, []);
-
-    const loadSubjects = async () => {
-        try {
-            const res = await subjectsApi.list();
-            setSubjects(res.subjects || []);
-        } catch (error) {
-            console.error('Failed to load subjects:', error);
-        }
-    };
+    }, [loadSubjects]);
 
     const loadImages = async (isFirstLoad) => {
         if (isFirstLoad) setLoading(true);

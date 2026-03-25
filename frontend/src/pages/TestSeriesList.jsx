@@ -9,10 +9,11 @@ import * as testSeriesApi from '../api/testSeriesApi';
 import CreateTestSeriesModal from '../components/modals/CreateTestSeriesModal';
 import toast from 'react-hot-toast';
 
+import { useTestSeries } from '../context/TestSeriesContext.jsx';
+
 const TestSeriesList = () => {
     const navigate = useNavigate();
-    const [series, setSeries] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const { testSeries: series, loading, loadTestSeries: loadSeries, deleteSeries } = useTestSeries();
     const [searchQuery, setSearchQuery] = useState('');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingSeries, setEditingSeries] = useState(null);
@@ -21,37 +22,22 @@ const TestSeriesList = () => {
 
 
 
-    const loadSeries = async () => {
-        try {
-            setLoading(true);
-            const data = await testSeriesApi.getTestSeries();
-            setSeries(data.testSeries || []);
-        } catch (error) {
-            console.error('Failed to load test series', error);
-            toast.error('Failed to load test series');
-        } finally {
-            setLoading(false);
-        }
-    };
-
     useEffect(() => {
         loadSeries();
-    }, []);
+    }, [loadSeries]);
 
-    const handleDelete = async (e, id) => {
+    const handleDelete = async (e, s) => {
         e.stopPropagation();
-        setSeriesToDelete(id);
+        setSeriesToDelete(s);
         setIsConfirmDeleteOpen(true);
     };
 
     const confirmDelete = async () => {
         if (!seriesToDelete) return;
         try {
-            await testSeriesApi.deleteTestSeries(seriesToDelete);
-            toast.success('Test series deleted');
-            loadSeries();
+            await deleteSeries(seriesToDelete.id, seriesToDelete.name);
         } catch (error) {
-            toast.error('Failed to delete test series');
+            // Error handled in context
         } finally {
             setIsConfirmDeleteOpen(false);
             setSeriesToDelete(null);
@@ -129,7 +115,7 @@ const TestSeriesList = () => {
                     {filteredSeries.map(s => (
                         <div
                             key={s.id}
-                            onClick={() => navigate(`/tests/${s.id}`)}
+                            onClick={() => navigate(`/tests/${s.id}`, { state: { series: s } })}
                             className="glass-card glass p-5 cursor-pointer group flex flex-col justify-between transition-all hover:border-pink-500/30 min-h-[160px]"
                         >
                             {/* Top: Icon + Title + Actions */}
@@ -156,7 +142,7 @@ const TestSeriesList = () => {
                                         <Edit2 className="w-3.5 h-3.5" />
                                     </button>
                                     <button
-                                        onClick={(e) => handleDelete(e, s.id)}
+                                        onClick={(e) => handleDelete(e, s)}
                                         className="p-1 text-slate-500 hover:text-red-400 transition-colors"
                                         title="Delete Series"
                                     >

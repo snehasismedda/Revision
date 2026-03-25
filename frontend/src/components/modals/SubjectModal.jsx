@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { X, LibraryBig, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ModalPortal from '../ModalPortal.jsx';
+import { useSubjects } from '../../context/SubjectContext.jsx';
 
 const SubjectModal = ({ isOpen, onClose, editingSubject, onSubjectSaved, existingTags = [] }) => {
     const [form, setForm] = useState({ name: '', description: '', tags: [] });
@@ -11,6 +12,7 @@ const SubjectModal = ({ isOpen, onClose, editingSubject, onSubjectSaved, existin
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const navigate = useNavigate();
+    const { addSubject, updateSubject } = useSubjects();
 
     useEffect(() => {
         if (editingSubject) {
@@ -29,7 +31,6 @@ const SubjectModal = ({ isOpen, onClose, editingSubject, onSubjectSaved, existin
         e.preventDefault();
         setError('');
         setSaving(true);
-        const loadingToast = toast.loading(editingSubject ? 'Updating subject...' : 'Creating subject...');
 
         // Auto-add any leftover tagInput
         const finalTags = [...form.tags];
@@ -40,29 +41,26 @@ const SubjectModal = ({ isOpen, onClose, editingSubject, onSubjectSaved, existin
 
         try {
             if (editingSubject) {
-                const { subject } = await subjectsApi.update(editingSubject.id, {
+                const subject = await updateSubject(editingSubject.id, {
                     name: form.name,
                     description: form.description,
                     tags: finalTags
                 });
                 onSubjectSaved(subject, true);
-                toast.success('Subject updated successfully!', { id: loadingToast });
                 onClose();
             } else {
-                const { subject } = await subjectsApi.create({
+                const subject = await addSubject({
                     name: form.name,
                     description: form.description,
                     tags: finalTags
                 });
 
                 onSubjectSaved(subject, false);
-                toast.success('Subject created successfully!', { id: loadingToast });
                 onClose();
                 navigate(`/subjects/${subject.id}`);
             }
         } catch (err) {
-            setError(err.message);
-            toast.error(err.message || (editingSubject ? 'Failed to update subject' : 'Failed to create subject'), { id: loadingToast });
+            setError(err.message || 'Operation failed');
         } finally {
             setSaving(false);
         }

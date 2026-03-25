@@ -13,8 +13,9 @@ import {
     ChevronDown,
 } from "lucide-react";
 import * as testsApi from "../api/testsApi";
-import * as testSeriesApi from "../api/testSeriesApi";
-import { topicsApi } from "../api";
+import { useSubjects } from "../context/SubjectContext.jsx";
+import { useTopics } from "../context/TopicContext.jsx";
+import { useTestSeries } from "../context/TestSeriesContext.jsx";
 import toast from "react-hot-toast";
 
 /* Flatten nested topics helper */
@@ -126,12 +127,16 @@ const TopicMultiSelect = ({ options, value = [], onChange }) => {
 const TestDetail = () => {
     const { seriesId, testId } = useParams();
     const navigate = useNavigate();
+    const { refreshStats } = useSubjects();
+    const { topicsBySubject, loadTopics } = useTopics();
+    const { seriesDetails, loadSeriesDetail } = useTestSeries();
 
-    const [series, setSeries] = useState(null);
+    const cachedSeries = seriesDetails[seriesId];
+    const cachedTest = cachedSeries?.tests?.find(t => t.id === testId);
+
     const [testData, setTestData] = useState(null);
     const [loading, setLoading] = useState(true);
-
-    const [topicsBySubject, setTopicsBySubject] = useState({});
+    const [saving, setSaving] = useState(false);
 
     // Result form state
     const [myScore, setMyScore] = useState("");
@@ -141,35 +146,33 @@ const TestDetail = () => {
     // Array of { id, subject_id, topic_ids: [], is_correct }
     const [questions, setQuestions] = useState([]);
 
-    const [saving, setSaving] = useState(false);
-
-    const loadData = async () => {
+    const loadData = async (forceInit = false) => {
         try {
             setLoading(true);
-            const [seriesRes, testRes] = await Promise.all([
-                testSeriesApi.getTestSeriesDetail(seriesId),
-                testsApi.getTestDetail(seriesId, testId),
-            ]);
-
-            setSeries(seriesRes.series);
-            setTestData(testRes.test);
-
-            // DO NOT prepopulate form, keep it clean for new attempt.
-            // testRes.test.results holds historic data.
-
-            // Load topics for all subjects in the test
-            const topicsMap = {};
-            if (testRes.test.subjects) {
-                for (const sub of testRes.test.subjects) {
-                    try {
-                        const topRes = await topicsApi.list(sub.id);
-                        topicsMap[sub.id] = flattenTopics(topRes.topics || []);
-                    } catch (e) {
-                        console.error("Failed fetching topics for subject", sub.id);
-                    }
-                }
+            
+            // If we don't have the series info in context, load it first
+            let currentSeries = cachedSeries;
+            if (!currentSeries || forceInit) {
+                const res = await loadSeriesDetail(seriesId);
+                currentSeries = { series: res.series, tests: res.tests || [] };
             }
-            setTopicsBySubject(topicsMap);
+
+            const currentTest = currentSeries.tests?.find(t => t.id === testId);
+            if (!currentTest) throw new Error("Test not found in series");
+
+            // Fetch ONLY results (test data)
+            const resultsRes = await testsApi.getTestResults(seriesId, testId);
+            
+            setTestData({
+                ...currentTest,
+                series_name: currentSeries.series.name,
+                results: resultsRes.results || []
+            });
+
+            // Pre-load topics for subjects in this series
+            if (currentTest.subjects) {
+                currentTest.subjects.forEach(sub => loadTopics(sub.id));
+            }
         } catch (error) {
             console.error("Failed to load test detail", error);
             toast.error("Failed to load test info");
@@ -179,9 +182,17 @@ const TestDetail = () => {
         }
     };
 
+    // Initialize from context if available, then fetch results
     useEffect(() => {
+        if (cachedTest && cachedSeries) {
+            setTestData({
+                ...cachedTest,
+                series_name: cachedSeries.series.name,
+                results: testData?.results || [] // Preserve results if already loaded
+            });
+        }
         loadData();
-    }, [testId]);
+    }, [testId, cachedTest, cachedSeries?.series?.name]);
 
     const handleAddQuestion = () => {
         const defaultSubjectId = testData?.subjects?.[0]?.id || "";
@@ -259,11 +270,15 @@ const TestDetail = () => {
             );
 
             toast.success("Attempt logged successfully!", { id: loadingToast });
-            // Reset form instead of navigating away immediately, so they see it added below
+            
+            // Clean up form
             setMyScore("");
             setTotalQs("");
             setQuestions([]);
-            loadData(); // Reload to fetch newest history
+            
+            // Refresh global analytics and local test results
+            refreshStats(testData.subjects.map(s => s.id));
+            loadData(); 
         } catch (error) {
             toast.error("Failed to save results", { id: loadingToast });
         } finally {
@@ -271,7 +286,7 @@ const TestDetail = () => {
         }
     };
 
-    if (loading || !testData || !series) {
+    if (!testData && (loading || !cachedTest)) {
         return (
             <div className="flex-1 flex items-center justify-center h-[100dvh]">
                 <div className="w-8 h-8 rounded-full border-2 border-pink-500 border-t-transparent animate-spin"></div>
@@ -284,7 +299,7 @@ const TestDetail = () => {
             {/* Back Button Row */}
             <div className="flex items-center gap-3 mb-4">
                 <button
-                    onClick={() => navigate(`/tests/${seriesId}`)}
+                    onClick={() => navigate(-1)}
                     className="flex items-center gap-2 text-[13px] font-semibold text-slate-400 hover:text-white transition-all hover:bg-white/[0.06] px-3 py-1.5 rounded-lg border border-white/[0.06] hover:border-white/[0.1] transition-all cursor-pointer"
                 >
                     <ArrowLeft className="w-4 h-4" />
@@ -302,7 +317,7 @@ const TestDetail = () => {
                         <Calendar className="w-4 h-4 text-emerald-500/80" />
                         <span>{testData?.test_date ? new Date(testData.test_date).toLocaleDateString() : 'No date'}</span>
                         <span className="mx-2 opacity-20">•</span>
-                        <span className="text-slate-500/80 font-medium">{series?.name}</span>
+                        <span className="text-slate-500/80 font-medium">{testData?.series_name}</span>
                     </div>
                 </div>
             </div>
@@ -412,7 +427,6 @@ const TestDetail = () => {
                             </div>
                         ) : (
                             questions.map((q, index) => {
-                                const availableTopics = topicsBySubject[q.subject_id] || [];
                                 return (
                                     <div
                                         key={q.id}
@@ -421,7 +435,6 @@ const TestDetail = () => {
                                         <span className="text-xs font-bold text-slate-500 w-6">
                                             Q{index + 1}
                                         </span>
-
                                         <select
                                             value={q.subject_id}
                                             onChange={(e) =>
@@ -442,9 +455,8 @@ const TestDetail = () => {
                                                 </option>
                                             ))}
                                         </select>
-
                                         <TopicMultiSelect
-                                            options={availableTopics}
+                                            options={flattenTopics(topicsBySubject[q.subject_id] || [])}
                                             value={q.topic_ids}
                                             onChange={(newVal) =>
                                                 handleUpdateQuestion(q.id, "topic_ids", newVal)

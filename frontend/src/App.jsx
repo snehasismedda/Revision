@@ -1,5 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth, AuthProvider } from './context/AuthContext.jsx';
+import { SubjectProvider } from './context/SubjectContext.jsx';
+import { TestSeriesProvider } from './context/TestSeriesContext.jsx';
+import { TopicProvider } from './context/TopicContext.jsx';
 import Layout from './components/Layout.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
@@ -15,6 +18,7 @@ import TestSeriesList from './pages/TestSeriesList.jsx';
 import TestSeriesDetail from './pages/TestSeriesDetail.jsx';
 import TestDetail from './pages/TestDetail.jsx';
 import TestAnalytics from './pages/TestAnalytics.jsx';
+import TestSeriesInsights from './pages/TestSeriesInsights.jsx';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -51,6 +55,7 @@ const AppRoutes = () => (
       <Route path="tests/:seriesId" element={<TestSeriesDetail />} />
       <Route path="tests/:seriesId/test/:testId" element={<TestDetail />} />
       <Route path="tests/:seriesId/test/:testId/analytics" element={<TestAnalytics />} />
+      <Route path="tests/:seriesId/insights" element={<TestSeriesInsights />} />
       <Route path="images" element={<Images />} />
     </Route>
 
@@ -64,22 +69,28 @@ import { Toaster } from 'react-hot-toast';
 const App = () => (
   <BrowserRouter>
     <AuthProvider>
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: '#1a1a2e',
-            color: '#fff',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: '12px',
-            fontSize: '14px',
-            padding: '12px 16px',
-            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-          },
-        }}
-      />
-      <AppRoutes />
+      <SubjectProvider>
+        <TestSeriesProvider>
+          <TopicProvider>
+            <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 4000,
+            style: {
+              background: '#1a1a2e',
+              color: '#fff',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: '12px',
+              fontSize: '14px',
+              padding: '12px 16px',
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+            },
+          }}
+        />
+            <AppRoutes />
+          </TopicProvider>
+        </TestSeriesProvider>
+      </SubjectProvider>
     </AuthProvider>
   </BrowserRouter>
 );

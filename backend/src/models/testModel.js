@@ -57,8 +57,10 @@ export const findTestsBySeries = async (seriesId) => {
 };
 
 export const findTestById = async (id, seriesId) => {
-    const test = await db('revision.tests')
-        .where({ id, test_series_id: seriesId, is_deleted: false })
+    const test = await db('revision.tests as t')
+        .join('revision.test_series as ts', 't.test_series_id', 'ts.id')
+        .where({ 't.id': id, 't.test_series_id': seriesId, 't.is_deleted': false })
+        .select('t.*', 'ts.name as series_name')
         .first();
 
     if (!test) return null;
@@ -76,29 +78,7 @@ export const findTestById = async (id, seriesId) => {
         .orderBy('tr.created_at', 'desc')
         .select('*');
 
-    let savedQuestions = [];
-    if (results.length > 0 && results[0].session_ids) {
-        let sids = results[0].session_ids;
-        if (typeof sids === 'string') {
-            try { sids = JSON.parse(sids); } catch (e) { }
-        }
-        if (Array.isArray(sids) && sids.length > 0) {
-            const entries = await db('revision.session_entries as se')
-                .join('revision.sessions as s', 'se.session_id', 's.id')
-                .whereIn('s.id', sids)
-                .where('se.is_deleted', false)
-                .select('s.subject_id', 'se.topic_id', 'se.is_correct');
-
-            savedQuestions = entries.map((e, idx) => ({
-                id: `saved-${Date.now()}-${idx}`,
-                subject_id: e.subject_id,
-                topic_ids: [e.topic_id],
-                is_correct: e.is_correct
-            }));
-        }
-    }
-
-    return { ...test, subjects, results, savedQuestions };
+    return { ...test, subjects, results };
 };
 
 export const saveTestResult = async (data) => {

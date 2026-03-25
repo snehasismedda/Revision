@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { sessionsApi, topicsApi, entriesApi } from '../api/index.js';
+import { sessionsApi, entriesApi } from '../api/index.js';
+import { useTopics } from '../context/TopicContext.jsx';
 import toast from 'react-hot-toast';
 import {
     ArrowLeft, CheckCircle2, XCircle, Plus, Trash2, Save,
@@ -22,7 +23,9 @@ const TagTopics = () => {
     const navigate = useNavigate();
 
     const [session, setSession] = useState(null);
-    const [allTopics, setAllTopics] = useState([]);        // flat list of all topics
+    const { topicsBySubject, loadTopics } = useTopics();
+    const allTopics = useMemo(() => flattenTopics(topicsBySubject[subjectId] || []), [topicsBySubject, subjectId]);
+
     const [entries, setEntries] = useState([]);             // { id (local), topicId, topicName, isCorrect }
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -33,28 +36,29 @@ const TagTopics = () => {
     useEffect(() => {
         const load = async () => {
             try {
-                const [sesRes, topRes, entRes] = await Promise.all([
+                // loadTopics from Context handles caching
+                const [sesRes, _, entRes] = await Promise.all([
                     sessionsApi.get(subjectId, sessionId),
-                    topicsApi.list(subjectId),
+                    loadTopics(subjectId),
                     entriesApi.list(sessionId),
                 ]);
                 setSession(sesRes.session);
-                const flat = flattenTopics(topRes.topics);
-                setAllTopics(flat);
 
                 // Build existing entries from the backend
                 const existing = (entRes.entries || []).map((e, idx) => ({
                     localId: `existing-${idx}`,
                     topicId: e.topic_id || e.topicId,
-                    topicName: e.topic_name || e.topicName || flat.find(t => t.id === (e.topic_id || e.topicId))?.name || 'Unknown',
+                    topicName: e.topic_name || e.topicName || (allTopics.find(t => t.id === (e.topic_id || e.topicId))?.name) || 'Unknown',
                     isCorrect: e.is_correct ?? e.isCorrect ?? true,
                 }));
                 setEntries(existing);
 
                 // Expand all root parents by default
-                const sections = {};
-                flat.forEach(t => { if (t.depth === 0) sections[t.id] = true; });
-                setExpandedSections(sections);
+                if (Object.keys(expandedSections).length === 0) {
+                    const sections = {};
+                    allTopics.forEach(t => { if (t.depth === 0) sections[t.id] = true; });
+                    setExpandedSections(sections);
+                }
             } catch {
                 toast.error('Failed to load session data');
                 navigate(`/subjects/${subjectId}`);
@@ -63,8 +67,7 @@ const TagTopics = () => {
             }
         };
         load();
-         
-    }, [subjectId, sessionId, navigate]);
+    }, [subjectId, sessionId, navigate, loadTopics, allTopics]);
 
     /* ── Add an entry for a topic ─────────────────────── */
     const addEntry = (topic, isCorrect = true) => {
@@ -108,7 +111,6 @@ const TagTopics = () => {
             } else {
                 // If no entries, replace with empty (soft-delete all)
                 await entriesApi.update(sessionId, { entries: [{ topicId: allTopics[0]?.id, isCorrect: true }] });
-                // Actually, the backend requires at least 1 entry, so let's just navigate
             }
             toast.success(`${payload.length} entries saved!`, { id: loadingToast });
             navigate(`/subjects/${subjectId}/sessions/${sessionId}`);
@@ -138,7 +140,6 @@ const TagTopics = () => {
                 currentGroup.children.push(t);
             }
         });
-        // If search is active, show flat results
         if (search.trim()) return [{ parent: null, children: filteredTopics }];
         return groups;
     }, [filteredTopics, search]);
@@ -235,7 +236,6 @@ const TagTopics = () => {
                                 const parentCounts = topicEntryCounts[group.parent.id];
                                 return (
                                     <div key={group.parent.id} className="mb-1">
-                                        {/* Parent header */}
                                         <div className="flex items-center gap-1.5 py-2 px-2 rounded-lg hover:bg-white/[0.03] transition-colors">
                                             <button
                                                 onClick={() => setExpandedSections(p => ({ ...p, [group.parent.id]: !isExpanded }))}
@@ -249,10 +249,8 @@ const TagTopics = () => {
                                                     {parentCounts.correct + parentCounts.incorrect}
                                                 </span>
                                             )}
-                                            {/* Root topics are headers, no tagging buttons */}
                                         </div>
 
-                                        {/* Children */}
                                         {isExpanded && group.children.length > 0 && (
                                             <div className="ml-4 border-l border-white/[0.06] pl-2 space-y-0.5">
                                                 {group.children.map(child => {
@@ -293,128 +291,52 @@ const TagTopics = () => {
                                 );
                             }
 
-                            // Flat search results
                             return group.children.map(t => {
                                 const counts = topicEntryCounts[t.id];
                                 return (
                                     <div key={t.id} className="flex items-center gap-1.5 py-2 px-2 rounded-lg hover:bg-white/[0.03] transition-colors group/topic min-w-0">
-                                        {t.depth === 0 && (
-                                            <ChevronDown className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                                        )}
+                                        {t.depth === 0 && <ChevronDown className="w-3.5 h-3.5 text-slate-500 shrink-0" />}
                                         <span
                                             className={`text-sm flex-1 truncate ${t.depth === 0 ? 'font-heading font-semibold text-slate-200' : 'text-slate-400 group-hover/topic:text-slate-100'}`}
                                             style={{ marginLeft: t.depth > 0 ? `${(t.depth - 1) * 16}px` : '0px' }}
                                         >
                                             {t.name}
                                         </span>
-                                        {counts && (
-                                            <span className="text-[10px] font-bold text-slate-600">
-                                                {counts.correct + counts.incorrect}
-                                            </span>
-                                        )}
+                                        {counts && <span className="text-[10px] font-bold text-slate-600"> {counts.correct + counts.incorrect} </span>}
                                         {t.depth > 0 && (
                                             <>
-                                                <button
-                                                    onClick={() => addEntry(t, true)}
-                                                    className="p-1 text-emerald-500/30 hover:text-emerald-400 hover:bg-emerald-500/10 rounded transition-colors cursor-pointer opacity-0 group-hover/topic:opacity-100"
-                                                >
-                                                    <CheckCircle2 className="w-3.5 h-3.5" />
-                                                </button>
-                                                <button
-                                                    onClick={() => addEntry(t, false)}
-                                                    className="p-1 text-red-500/30 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors cursor-pointer opacity-0 group-hover/topic:opacity-100"
-                                                >
-                                                    <XCircle className="w-3.5 h-3.5" />
-                                                </button>
+                                                <button onClick={() => addEntry(t, true)} className="p-1 text-emerald-500/30 hover:text-emerald-400 hover:bg-emerald-500/10 rounded opacity-0 group-hover/topic:opacity-100"> <CheckCircle2 className="w-3.5 h-3.5" /> </button>
+                                                <button onClick={() => addEntry(t, false)} className="p-1 text-red-500/30 hover:text-red-400 hover:bg-red-500/10 rounded opacity-0 group-hover/topic:opacity-100"> <XCircle className="w-3.5 h-3.5" /> </button>
                                             </>
                                         )}
                                     </div>
                                 );
                             });
                         })}
-
-                        {filteredTopics.length === 0 && (
-                            <div className="p-6 text-center">
-                                <p className="text-xs text-slate-500">No topics found</p>
-                            </div>
-                        )}
                     </div>
                 </div>
 
                 {/* ─── RIGHT: Current Entries ──────────────── */}
                 <div className="glass p-6 rounded-xl flex flex-col">
                     <div className="flex items-center gap-2 mb-6">
-                        <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest flex-1">
-                            Tagged Entries ({entries.length})
-                        </h3>
-                        {entries.length > 0 && (
-                            <div className="flex items-center gap-2 text-[10px] font-bold">
-                                <span className="text-emerald-400">{totalCorrect} ✓</span>
-                                <span className="text-red-400">{totalIncorrect} ✗</span>
-                            </div>
-                        )}
+                        <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest flex-1">Tagged Entries ({entries.length})</h3>
                     </div>
 
-                    <div className="flex-1 max-h-[460px] overflow-y-auto space-y-1 pr-1">
+                    <div className="flex-1 max-h-[460px] overflow-y-auto space-y-1">
                         {entries.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-12 text-center">
-                                <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-3 border border-white/5">
-                                    <Plus className="w-5 h-5 text-slate-600" />
-                                </div>
-                                <p className="text-sm text-slate-500 font-medium">No entries yet</p>
-                                <p className="text-xs text-slate-600 mt-1">Click ✓ or ✗ on topics to add entries</p>
-                            </div>
+                            <div className="flex flex-col items-center justify-center py-12 text-center text-slate-500">No entries yet</div>
                         ) : (
                             entries.map((entry, idx) => (
-                                <div
-                                    key={entry.localId}
-                                    className={`flex items-center gap-2 py-2 px-3 rounded-lg border transition-all group/entry ${entry.isCorrect
-                                        ? 'border-emerald-500/10 bg-emerald-500/[0.02] hover:bg-emerald-500/[0.05]'
-                                        : 'border-red-500/10 bg-red-500/[0.02] hover:bg-red-500/[0.05]'
-                                        }`}
-                                >
-                                    <span className="text-[10px] font-bold text-slate-600 w-5 text-center shrink-0">
-                                        {idx + 1}
-                                    </span>
-                                    <span className="text-sm text-slate-300 flex-1 truncate min-w-0">
-                                        {entry.topicName}
-                                    </span>
-
-                                    {/* Toggle correct/incorrect */}
-                                    <button
-                                        onClick={() => toggleEntry(entry.localId)}
-                                        className={`shrink-0 flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${entry.isCorrect
-                                            ? 'text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20'
-                                            : 'text-red-400 bg-red-500/10 hover:bg-red-500/20'
-                                            }`}
-                                        title="Toggle correct/incorrect"
-                                    >
-                                        {entry.isCorrect ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                                        {entry.isCorrect ? 'Correct' : 'Wrong'}
-                                    </button>
-
-                                    {/* Remove entry */}
-                                    <button
-                                        onClick={() => removeEntry(entry.localId)}
-                                        className="shrink-0 p-1 text-slate-600 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors cursor-pointer opacity-0 group-hover/entry:opacity-100"
-                                        title="Remove this entry"
-                                    >
-                                        <Trash2 className="w-3 h-3" />
-                                    </button>
+                                <div key={entry.localId} className={`flex items-center gap-2 py-2 px-3 rounded-lg border transition-all group/entry ${entry.isCorrect ? 'border-emerald-500/10 bg-emerald-500/[0.02]' : 'border-red-500/10 bg-red-500/[0.02]'}`}>
+                                    <span className="text-sm flex-1 truncate text-slate-300">{entry.topicName}</span>
+                                    <button onClick={() => toggleEntry(entry.localId)} className={`px-2 py-1 rounded text-[11px] font-bold ${entry.isCorrect ? 'text-emerald-400 bg-emerald-500/10' : 'text-red-400 bg-red-500/10'}`}> {entry.isCorrect ? '✓' : '✗'} </button>
+                                    <button onClick={() => removeEntry(entry.localId)} className="p-1 text-slate-600 hover:text-red-400 opacity-0 group-hover/entry:opacity-100"> <Trash2 className="w-3 h-3" /> </button>
                                 </div>
                             ))
                         )}
                     </div>
 
-                    {/* Save button */}
-                    <button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="mt-4 btn-primary w-full flex items-center justify-center gap-2 font-semibold py-3 rounded-xl disabled:opacity-50 cursor-pointer"
-                    >
-                        <Save className="w-4 h-4" />
-                        <span>{saving ? 'Saving...' : `Save ${entries.length} Entries`}</span>
-                    </button>
+                    <button onClick={handleSave} disabled={saving} className="mt-4 btn-primary w-full py-3 rounded-xl font-semibold"> {saving ? 'Saving...' : `Save ${entries.length} Entries`} </button>
                 </div>
             </div>
         </div>

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { subjectsApi, analyticsApi, aiApi } from '../api/index.js';
-import { getTestSeries } from '../api/testSeriesApi.js';
+import { aiApi } from '../api/index.js';
+import { useSubjects } from '../context/SubjectContext.jsx';
+import { useTestSeries } from '../context/TestSeriesContext.jsx';
 import SubjectCard from '../components/SubjectCard.jsx';
 import SubjectModal from '../components/modals/SubjectModal.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
@@ -79,9 +80,19 @@ const StatCard = ({ label, value, sub, icon: Icon, colorClass, delayClass, trend
 
 const Dashboard = () => {
     const navigate = useNavigate();
-    const [subjects, setSubjects] = useState([]);
-    const [testSeries, setTestSeries] = useState([]);
-    const [statsMap, setStatsMap] = useState({});
+    const { 
+        subjects, 
+        statsMap, 
+        loadSubjects, 
+        deleteSubject 
+    } = useSubjects(); 
+
+
+    const { 
+        testSeries, 
+        loadTestSeries 
+    } = useTestSeries();
+
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingSubject, setEditingSubject] = useState(null);
@@ -93,54 +104,32 @@ const Dashboard = () => {
     useEffect(() => {
         const load = async () => {
             try {
-                const { subjects: subs } = await subjectsApi.list();
-                setSubjects(subs);
-
-                const entries = await Promise.allSettled(
-                    subs.map(async (s) => {
-                        const data = await analyticsApi.overview(s.id);
-                        return [s.id, data.overview];
-                    }),
-                );
-
-                const map = {};
-                entries.forEach((r) => {
-                    if (r.status === 'fulfilled') {
-                        const [id, stats] = r.value;
-                        map[id] = stats;
-                    }
-                });
-
-                setStatsMap(map);
-
-                const { testSeries: seriesData } = await getTestSeries();
-                setTestSeries(seriesData || []);
-            } catch {
-                // silently fail
+                // Batch fetch subjects and stats
+                await loadSubjects();
+                
+                // Fetch test series centrally
+                await loadTestSeries();
+            } catch (err) {
+                console.error("[Dashboard] Load error:", err);
             } finally {
                 setLoading(false);
             }
         };
         load();
-    }, []);
+    }, [loadSubjects, loadTestSeries]);
 
-    const handleSubjectSaved = (subject, isEditing) => {
-        if (isEditing) {
-            setSubjects((prev) => prev.map((s) => (s.id === subject.id ? subject : s)));
-        } else {
-            setSubjects((prev) => [subject, ...prev]);
-        }
+    const handleSubjectSaved = () => {
+        // Context now handles the updates internally via SubjectModal
+        setShowModal(false);
+        setEditingSubject(null);
     };
 
     const handleDelete = async () => {
         const { id, name } = confirmDelete;
-        const loadingToast = toast.loading(`Deleting ${name}...`);
         try {
-            await subjectsApi.delete(id);
-            setSubjects((prev) => prev.filter((s) => s.id !== id));
-            toast.success(`${name} deleted`, { id: loadingToast });
-        } catch {
-            toast.error('Failed to delete subject', { id: loadingToast });
+            await deleteSubject(id, name);
+        } catch (error) {
+            // Error handled in context
         } finally {
             setConfirmDelete({ open: false, id: null, name: '' });
         }
@@ -225,6 +214,7 @@ const Dashboard = () => {
                     <p className="text-slate-400 text-sm mt-2 leading-relaxed">Your learning performance at a glance.</p>
                 </div>
             </div>
+
             {/* AI Strategic Insights Section — Top Level Analysis
             <div className="mb-10 fade-in stagger-1">
                 <div className="glass-card glass p-8 rounded-[2rem] border-indigo-500/20 bg-indigo-500/[0.03] relative overflow-hidden group shadow-2xl shadow-indigo-900/10">
@@ -582,7 +572,7 @@ const Dashboard = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                         {testSeries.slice(0, 6).map((ts) => (
                             <div key={ts.id}
-                                onClick={() => navigate(`/tests/${ts.id}`)}
+                                onClick={() => navigate(`/tests/${ts.id}`, { state: { series: ts } })}
                                 className="glass-card glass p-5 cursor-pointer group flex flex-col justify-between transition-all hover:border-pink-500/30 min-h-[160px]"
                             >
                                 {/* Top: Icon + Title */}

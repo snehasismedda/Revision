@@ -8,6 +8,10 @@ export const getTestDetail = async (seriesId, testId) => {
     return await request(`/test-series/${seriesId}/tests/${testId}`);
 };
 
+export const getTestResults = async (seriesId, testId) => {
+    return await request(`/test-series/${seriesId}/tests/${testId}/results`);
+};
+
 export const submitTestResult = async (seriesId, testId, subjectId, data) => {
     return await request(`/test-series/${seriesId}/tests/${testId}/subjects/${subjectId}/results`, { method: 'POST', body: data });
 };

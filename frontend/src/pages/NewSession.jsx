@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { sessionsApi, topicsApi, entriesApi } from '../api/index.js';
+import { sessionsApi, entriesApi } from '../api/index.js';
+import { useSubjects } from '../context/SubjectContext.jsx';
+import { useTopics } from '../context/TopicContext.jsx';
 import { ArrowLeft, CheckCircle2, XCircle, ChevronRight, GitCommit } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import toast from 'react-hot-toast';
@@ -17,17 +19,19 @@ const flattenTopics = (nodes, depth = 0) => {
 const NewSession = () => {
     const { subjectId } = useParams();
     const navigate = useNavigate();
+    const { refreshStats } = useSubjects();
     const [step, setStep] = useState(1); // 1=details, 2=topics
     const [form, setForm] = useState({ title: '', notes: '', sessionDate: new Date().toISOString().slice(0, 10) });
-    const [topics, setTopics] = useState([]);
+    const { topicsBySubject, loadTopics } = useTopics();
+    const topics = flattenTopics(topicsBySubject[subjectId] || []);
     const [selected, setSelected] = useState({}); // topicId → { selected, isCorrect }
     const [saving, setSaving] = useState(false);
     const [session, setSession] = useState(null);
     const [showEmptyConfirm, setShowEmptyConfirm] = useState(false);
 
     useEffect(() => {
-        topicsApi.list(subjectId).then(({ topics: t }) => setTopics(flattenTopics(t)));
-    }, [subjectId]);
+        if (subjectId) loadTopics(subjectId);
+    }, [subjectId, loadTopics]);
 
     const handleDetailsSubmit = async (e) => {
         e.preventDefault();
@@ -81,6 +85,7 @@ const NewSession = () => {
                 await entriesApi.create(session.id, { entries });
             }
             toast.success('Session completed!', { id: loadingToast });
+            refreshStats([subjectId]);
             navigate(`/subjects/${subjectId}/sessions/${session.id}`);
         } catch {
             toast.error('Failed to save session results', { id: loadingToast });

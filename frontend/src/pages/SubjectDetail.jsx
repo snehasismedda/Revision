@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { subjectsApi, topicsApi, sessionsApi, questionsApi, notesApi, imagesApi, aiApi, revisionApi, solutionsApi } from '../api/index.js';
+import { useParams, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
+import { sessionsApi, questionsApi, notesApi, imagesApi, aiApi, revisionApi, solutionsApi, analyticsApi } from '../api/index.js';
+import { useTopics } from '../context/TopicContext.jsx';
+import { useSubjects } from '../context/SubjectContext.jsx';
 import TopicTree from '../components/TopicTree.jsx';
 import SessionCard from '../components/SessionCard.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
@@ -66,15 +68,24 @@ const preprocessMarkdown = (text) => {
 const SubjectDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const [searchParams] = useSearchParams();
-    const [subject, setSubject] = useState(null);
-    const [topics, setTopics] = useState([]);
+
+    const { subjects, statsMap, isLoaded: subjectsLoaded, loadSubjects, refreshStats } = useSubjects();
+    const { topicsBySubject, loadTopics, deleteTopic } = useTopics();
+    
+    // Derived from global state
+    const topics = topicsBySubject[id] || [];
+    const subject = subjects.find(s => s.id === id);
+    const overview = statsMap[id];
+    const loading = !subjectsLoaded || !subject || !overview;
     const [sessions, setSessions] = useState([]);
     const [questions, setQuestions] = useState([]);
     const [notes, setNotes] = useState([]);
     const [images, setImages] = useState([]);
     const [solutions, setSolutions] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [loadedTabs, setLoadedTabs] = useState(new Set());
+    const [tabLoading, setTabLoading] = useState(false);
 
     // Pagination for images
     const [imagePage, setImagePage] = useState(0);
@@ -1158,7 +1169,6 @@ const SubjectDetail = () => {
         }
     };
 
-    // Load more images effect
     useEffect(() => {
         if (imagePage === 0) return; // handled by initial load
         const loadMore = async () => {
@@ -1177,6 +1187,64 @@ const SubjectDetail = () => {
         loadMore();
     }, [id, imagePage]);
 
+    const fetchTabData = async (tab) => {
+        if (loadedTabs.has(tab) || !id) return;
+        setTabLoading(true);
+        try {
+            switch (tab) {
+                case 'topics':
+                    await loadTopics(id);
+                    break;
+                case 'sessions':
+                    const sesRes = await sessionsApi.list(id);
+                    setSessions(sesRes.sessions);
+                    break;
+                case 'questions':
+                    const qsRes = await questionsApi.list(id);
+                    setQuestions(qsRes.questions || []);
+                    break;
+                case 'notes':
+                    const notesRes = await notesApi.list(id);
+                    setNotes(notesRes.notes || []);
+                    break;
+                case 'solutions':
+                    const solutionsRes = await solutionsApi.list(id);
+                    setSolutions(solutionsRes.solutions || []);
+                    break;
+                case 'revision':
+                    const revRes = await revisionApi.listSessions(id).catch(() => ({ sessions: [] }));
+                    setRevisionSessions(revRes.sessions || []);
+                    break;
+                case 'images':
+                    // We only load page 0 initially when the tab is clicked
+                    const imgRes = await imagesApi.listBySubject(id, IMAGE_LIMIT, 0);
+                    const initialImages = imgRes.images || [];
+                    setImages(initialImages);
+                    setHasMoreImages(initialImages.length === IMAGE_LIMIT);
+                    setImagePage(0);
+                    break;
+                default:
+                    break;
+            }
+            setLoadedTabs(prev => new Set(prev).add(tab));
+        } catch (error) {
+            console.error(`Failed to load ${tab}:`, error);
+            toast.error(`Failed to load ${tab} data`);
+        } finally {
+            setTabLoading(false);
+        }
+    };
+
+    // Trigger data fetch when tab changes
+    useEffect(() => {
+        if (!loading && id) {
+            fetchTabData(activeTab);
+        }
+    }, [activeTab, id, loading]);
+
+    // Update tab-related counts in overview when items are added/deleted manually, but only if that tab has been loaded
+    // Removed redundant stats refresh effect as it's handled in loadBaseData
+
     const imageObserver = React.useRef();
     const lastImageElementRef = React.useCallback(node => {
         if (loading || loadingMoreImages) return;
@@ -1186,44 +1254,42 @@ const SubjectDetail = () => {
                 setImagePage(prevPage => prevPage + 1);
             }
         }, {
-            rootMargin: '400px', // Load more images when 400px from bottom
+            rootMargin: '400px',
             threshold: 0
         });
         if (node) imageObserver.current.observe(node);
     }, [loading, loadingMoreImages, hasMoreImages]);
 
     useEffect(() => {
-        const load = async () => {
+        const loadBaseData = async () => {
+            if (!id) return;
+            
             try {
-                const [subRes, topRes, sesRes, qsRes, notesRes, solutionsRes, imgRes, revRes] = await Promise.all([
-                    subjectsApi.get(id),
-                    topicsApi.list(id),
-                    sessionsApi.list(id),
-                    questionsApi.list(id),
-                    notesApi.list(id),
-                    solutionsApi.list(id),
-                    imagesApi.listBySubject(id, IMAGE_LIMIT, 0),
-                    revisionApi.listSessions(id).catch(() => ({ sessions: [] })),
-                ]);
-                setSubject(subRes.subject);
-                setTopics(topRes.topics);
-                setSessions(sesRes.sessions);
-                setQuestions(qsRes.questions || []);
-                setNotes(notesRes.notes || []);
-                setSolutions(solutionsRes.solutions || []);
-                setRevisionSessions(revRes.sessions || []);
+                // 1. Ensure subjects are loaded
+                if (!subjectsLoaded) {
+                    await loadSubjects();
+                }
 
-                const initialImages = imgRes.images || [];
-                setImages(initialImages);
-                setHasMoreImages(initialImages.length === IMAGE_LIMIT);
-            } catch {
-                navigate('/subjects');
+                // 2. Ensure specific subject analytics are available
+                // We rely on the global context to have fetched these during loadSubjects
+                // but if for some reason they are missing, we could fetch here.
+                // However, the user explicitly wants to avoid this call.
+                if (!statsMap[id] && subjectsLoaded) {
+                    await refreshStats([id]);
+                }
+            } catch (error) {
+                console.error("Failed to load subject base data:", error);
+                // If it really fails, we might want to navigate away, 
+                // but let's just stop loading for now.
             } finally {
-                setLoading(false);
+                // Derived state handles loading
             }
         };
-        load();
-    }, [id, navigate]);
+        
+        loadBaseData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id, subjectsLoaded]); // Only rerun if ID changes or we need to trigger initial load
+
 
     // Handle deep linking from query params
     useEffect(() => {
@@ -1252,30 +1318,35 @@ const SubjectDetail = () => {
         }
     }, [loading, searchParams, notes]);
 
-    const handleTopicDeleted = (topicId) => {
-        const removeFromTree = (nodes) =>
-            nodes
-                .filter((n) => n.id !== topicId)
-                .map((n) => ({ ...n, children: removeFromTree(n.children || []) }));
-        setTopics((prev) => removeFromTree(prev));
+    const handleTopicDeleted = async (topicId) => {
+        try {
+            await deleteTopic(id, topicId);
+            refreshStats([id]);
+        } catch (error) {
+            // Error handled in context
+        }
     };
 
     const handleQuestionAdded = (newQuestions) => {
         // newQuestions is always an array (may contain 1 or more)
         setQuestions((prev) => [...newQuestions, ...prev]);
+        refreshStats([id]);
     };
 
     const handleQuestionUpdated = (updatedQ) => {
         setQuestions(prev => prev.map(q => q.id === updatedQ.id ? { ...q, ...updatedQ } : q));
+        refreshStats([id]);
     };
 
     const handleNoteAdded = (newNote) => {
         setNotes((prev) => [newNote, ...prev]);
+        refreshStats([id]);
     };
 
     const handleNoteUpdated = (updatedNote) => {
         setNotes((prev) => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
         if (viewingNote?.id === updatedNote.id) setViewingNote(updatedNote);
+        refreshStats([id]);
     };
 
     const handleSolutionAdded = (newSolution) => {
@@ -1299,6 +1370,7 @@ const SubjectDetail = () => {
 
         try {
             const updated = await revisionApi.toggleStatus(id, sessionId, topicId, newStatus);
+            refreshStats([id]);
             setRevisionSessions(prev => prev.map(session => {
                 if (session.id !== sessionId) return session;
                 return {
@@ -1355,6 +1427,7 @@ const SubjectDetail = () => {
             setRevisionSessions(prev => prev.filter(s => s.id !== sessionId));
             setConfirmDeleteRevisionSession({ open: false, sessionId: null });
             toast.success('Revision session deleted');
+            refreshStats([id]);
         } catch {
             toast.error('Failed to delete session');
         }
@@ -1377,10 +1450,12 @@ const SubjectDetail = () => {
             setHasMoreImages(newImages.length === IMAGE_LIMIT);
         };
         refreshImages();
+        refreshStats([id]);
     };
 
     const handleSessionCreated = (newSession) => {
         setSessions((prev) => [newSession, ...prev]);
+        refreshStats([id]);
         navigate(`/subjects/${id}/sessions/${newSession.id}`);
     };
 
@@ -1393,6 +1468,7 @@ const SubjectDetail = () => {
             await sessionsApi.delete(id, session.id);
             setSessions((prev) => prev.filter((s) => s.id !== session.id));
             toast.success(`Session deleted`, { id: loadingToast });
+            refreshStats([id]);
         } catch {
             toast.error('Failed to delete session', { id: loadingToast });
         }
@@ -1568,6 +1644,7 @@ const SubjectDetail = () => {
             await questionsApi.delete(id, questionId);
             setQuestions((prev) => prev.filter((q) => q.id !== questionId));
             toast.success('Question deleted', { id: loadingToast });
+            refreshStats([id]);
         } catch {
             toast.error('Failed to delete', { id: loadingToast });
         } finally {
@@ -1591,6 +1668,7 @@ const SubjectDetail = () => {
                 setNotes((prev) => prev.filter((n) => n.id !== item.id));
             }
             toast.success(`${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} deleted`, { id: loadingToast });
+            refreshStats([id]);
         } catch {
             toast.error(`Failed to delete ${typeLabel}`, { id: loadingToast });
         } finally {
@@ -1655,6 +1733,7 @@ const SubjectDetail = () => {
             const res = await notesApi.create(id, { questionId });
             setNotes((prev) => [res.note, ...prev]);
             toast.success('AI Note generated!', { id: loadingToast });
+            refreshStats([id]);
         } catch (error) {
             toast.error(error.message || 'Failed to generate AI note', { id: loadingToast });
         } finally {
@@ -1763,6 +1842,19 @@ const SubjectDetail = () => {
         );
     }
 
+    if (!subject) {
+        return (
+            <div className="max-w-6xl mx-auto flex flex-col items-center justify-center py-20 text-center">
+                <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6">
+                    <X className="w-10 h-10 text-rose-500/70" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">Subject not found</h2>
+                <p className="text-slate-400 mb-8">The subject you're looking for doesn't exist or you don't have access.</p>
+                <Link to="/subjects" className="btn-primary px-8 py-3 rounded-xl">Back to Subjects</Link>
+            </div>
+        );
+    }
+
     return (
         <div className="fade-in max-w-6xl mx-auto">
             {/* Confirm Delete Session */}
@@ -1808,7 +1900,6 @@ const SubjectDetail = () => {
                 isOpen={showTopicModal}
                 onClose={() => setShowTopicModal(false)}
                 subjectId={id}
-                onTopicsUpdated={setTopics}
                 topics={topics}
             />
 
@@ -1984,73 +2075,68 @@ const SubjectDetail = () => {
             </div>
 
             {/* Subject Header (Identity) */}
-            <div className="flex flex-col gap-6 mb-6">
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                    <div>
-                        <h1 className="text-[22px] md:text-[24px] font-heading font-semibold text-white tracking-tight leading-tight mb-1.5">
+            <div className="relative mb-4 mt-4">
+                <div className="absolute -inset-x-6 -inset-y-4 bg-gradient-to-b from-indigo-500/5 via-primary/2 to-transparent blur-2xl rounded-[3rem] -z-10 opacity-60" />
+
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+                    <div className="flex-1">
+                        <h1 className="text-[28px] md:text-[32px] font-heading font-extrabold text-white tracking-tight leading-tight mb-2 selection:bg-primary/30">
                             {subject?.name}
                         </h1>
                         {subject?.description && (
-                            <p className="text-slate-500 text-[14px] max-w-2xl leading-[1.6]">{subject.description}</p>
+                            <p className="text-slate-400/80 text-[14.5px] max-w-2xl leading-relaxed font-medium">
+                                {subject.description}
+                            </p>
                         )}
                     </div>
                     <Link
                         to={`/subjects/${id}/reports`}
-                        className="flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all cursor-pointer border border-white/[0.08] bg-surface-3/50 text-slate-300 hover:text-white hover:bg-surface-3 hover:border-white/[0.12] group"
+                        className="flex items-center gap-2.5 text-[13px] font-bold px-5 py-3 rounded-xl transition-all cursor-pointer border border-indigo-500/20 bg-indigo-500/10 text-indigo-400 hover:text-white hover:bg-indigo-500/20 hover:border-indigo-500/40 hover:shadow-[0_0_20px_rgba(99,102,241,0.2)] group shrink-0"
                     >
-                        <BarChart3 className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform" strokeWidth={2} />
-                        <span className="hidden sm:inline">View Analytics</span>
+                        <BarChart3 className="w-4.5 h-4.5 text-indigo-400 group-hover:scale-110 transition-transform" strokeWidth={2.5} />
+                        <span className="hidden sm:inline tracking-wide font-bold">Analytics</span>
                         <span className="sm:hidden">Analytics</span>
-                    </Link >
-                </div >
+                    </Link>
+                </div>
+            </div>
 
-                {/* Gradient separator */}
-                < div className="h-px bg-gradient-to-r from-white/[0.08] via-white/[0.06] to-transparent" />
+            {/* Subtle Decorative Line */}
+            <div className="relative h-px w-full mb-4">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent blur-[1px]" />
+            </div>
 
-                {/* Controls (Sub-Nav + Action) — single row, vertically aligned */}
+            {/* Controls (Sub-Nav + Action) — Glass background wrapper */}
+            <div className="relative p-2 rounded-2xl bg-surface-2/40 border border-white/[0.04] backdrop-blur-md mb-8 ring-1 ring-white/[0.02]">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-50">
                     {/* Segmented Tabs */}
-                    < div className="flex gap-1 p-1 bg-surface-2/50 rounded-xl border border-white/[0.06] w-fit" >
+                    <div className="flex gap-1 p-1 bg-black/20 rounded-xl border border-white/[0.06] overflow-x-auto no-scrollbar max-w-full" >
                         {
                             ['topics', 'sessions', 'questions', 'notes', 'solutions', 'revision', 'images'].map((tab) => {
                                 let count;
                                 switch (tab) {
-                                    case 'topics':
-                                        count = topics.length;
-                                        break;
-                                    case 'sessions':
-                                        count = sessions.length;
-                                        break;
-                                    case 'questions':
-                                        count = questions.length;
-                                        break;
-                                    case 'notes':
-                                        count = notes.length;
-                                        break;
-                                    case 'solutions':
-                                        count = solutions.length;
-                                        break;
-                                    case 'images':
-                                        count = images.length;
-                                        break;
-                                    case 'revision':
-                                        count = revisionSessions.length;
-                                        break;
+                                case 'topics': count = overview?.totalTopics ?? topics.length; break;
+                                case 'sessions': count = overview?.totalSessions ?? sessions.length; break;
+                                case 'questions': count = overview?.availableQuestions ?? questions.length; break;
+                                case 'notes': count = overview?.totalNotes ?? notes.length; break;
+                                case 'solutions': count = overview?.totalSolutions ?? solutions.length; break;
+                                case 'images': count = overview?.totalImages ?? images.length; break;
+                                case 'revision': count = overview?.totalRevisionSessions ?? revisionSessions.length; break;
                                 }
                                 return (
                                     <button
                                         key={tab}
                                         onClick={() => setActiveTab(tab)}
-                                        className={`flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-[13px] font-semibold capitalize transition-all duration-200 cursor-pointer
-                                        ${activeTab === tab
-                                                ? 'bg-primary text-white shadow-[0_2px_12px_rgba(139,92,246,0.35)]'
-                                                : 'text-slate-500 hover:text-slate-200 hover:bg-white/[0.05]'
+                                        className={`flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-[13px] font-bold capitalize transition-all duration-300 cursor-pointer whitespace-nowrap
+                                            ${activeTab === tab
+                                                ? 'bg-primary text-white shadow-[0_4px_16px_rgba(139,92,246,0.4)] scale-[1.02]'
+                                                : 'text-slate-500 hover:text-slate-200 hover:bg-white/[0.04]'
                                             }`}
                                     >
                                         {tab}
 
-                                        <span className={`min-w-5 h-5 px-1 flex items-center justify-center rounded-full text-[10px] font-bold leading-none
-                                        ${activeTab === tab
+                                        <span className={`min-w-5 h-5 px-1.5 flex items-center justify-center rounded-full text-[10px] font-black leading-none
+                                            ${activeTab === tab
                                                 ? 'bg-white/20 text-white'
                                                 : 'bg-white/[0.06] text-slate-500'
                                             }`}
@@ -2315,10 +2401,21 @@ const SubjectDetail = () => {
             </div >
 
             {/* Main Content Area */}
-            {
-                activeTab === 'topics' && (
+            {tabLoading && !loadedTabs.has(activeTab) ? (
+                <div className="fade-in space-y-6">
+                    <div className="h-12 w-full bg-white/[0.04] rounded-xl animate-pulse" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {[...Array(3)].map((_, i) => (
+                            <div key={i} className="h-48 bg-white/[0.04] rounded-2xl animate-pulse" />
+                        ))}
+                    </div>
+                </div>
+            ) : (
+                <>
+
+                {activeTab === 'topics' && (
                     <div className="fade-in">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
                             <div className="flex items-center gap-2">
                                 <BookOpen className="w-6 h-6 text-indigo-400" />
                                 <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Syllabus</h3>
@@ -2327,7 +2424,7 @@ const SubjectDetail = () => {
                                 <button
                                     onClick={handleDownloadSyllabus}
                                     disabled={isDownloadingSyllabus}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 border border-emerald-500/20 transition-all cursor-pointer uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 border border-emerald-500/20 transition-all cursor-pointer uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
                                     title="Download Syllabus as PDF"
                                 >
                                     {isDownloadingSyllabus ? (
@@ -2342,7 +2439,7 @@ const SubjectDetail = () => {
                                         setTopicsDefaultExpanded(true);
                                         setTreeKey(prev => prev + 1);
                                     }}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-400 hover:text-primary hover:bg-primary/10 border border-white/5 transition-all cursor-pointer uppercase tracking-wider"
+                                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-400 hover:text-primary hover:bg-primary/10 border border-white/5 transition-all cursor-pointer uppercase tracking-wider"
                                     title="Expand all"
                                 >
                                     <Maximize2 className="w-3.5 h-3.5" />
@@ -2353,7 +2450,7 @@ const SubjectDetail = () => {
                                         setTopicsDefaultExpanded(false);
                                         setTreeKey(prev => prev + 1);
                                     }}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white hover:bg-white/10 border border-white/5 transition-all cursor-pointer uppercase tracking-wider"
+                                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white hover:bg-white/10 border border-white/5 transition-all cursor-pointer uppercase tracking-wider"
                                     title="Collapse all"
                                 >
                                     <Minimize2 className="w-3.5 h-3.5" />
@@ -2383,56 +2480,54 @@ const SubjectDetail = () => {
                                 key={treeKey}
                                 topics={topics}
                                 subjectId={id}
-                                onTopicDeleted={handleTopicDeleted}
-                                onTopicsChanged={setTopics}
                                 defaultExpanded={topicsDefaultExpanded}
                             />
                         )}
                     </div>
-                )
-            }
+                )}
 
-            {
-                activeTab === 'sessions' && (
+            {activeTab === 'sessions' && (
                     <div className="fade-in">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
                             <div className="flex items-center gap-2">
                                 <Activity className="w-6 h-6 text-indigo-400" />
                                 <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Study Sessions</h3>
                             </div>
-                            <div className="relative group min-w-[300px]">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
-                                <input
-                                    type="text"
-                                    value={sessionSearchQuery}
-                                    onChange={(e) => setSessionSearchQuery(e.target.value)}
-                                    placeholder="Search sessions..."
-                                    className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
-                                />
-                                {sessionSearchQuery && (
+                            <div className="flex items-center gap-3">
+                                <div className="relative group flex-1 sm:min-w-[280px]">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                                    <input
+                                        type="text"
+                                        value={sessionSearchQuery}
+                                        onChange={(e) => setSessionSearchQuery(e.target.value)}
+                                        placeholder="Search sessions..."
+                                        className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                                    />
+                                    {sessionSearchQuery && (
+                                        <button
+                                            onClick={() => setSessionSearchQuery('')}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex bg-surface-2/50 p-1 rounded-xl border border-white/[0.06] shrink-0">
                                     <button
-                                        onClick={() => setSessionSearchQuery('')}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                        onClick={() => setSessionsViewMode('grid')}
+                                        className={`p-1.5 rounded-lg transition-all ${sessionsViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                        title="Grid View"
                                     >
-                                        <X className="w-4 h-4" />
+                                        <LayoutGrid className="w-4 h-4" />
                                     </button>
-                                )}
-                            </div>
-                            <div className="flex bg-surface-2/50 p-1 rounded-xl border border-white/[0.06] shrink-0">
-                                <button
-                                    onClick={() => setSessionsViewMode('grid')}
-                                    className={`p-1.5 rounded-lg transition-all ${sessionsViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
-                                    title="Grid View"
-                                >
-                                    <LayoutGrid className="w-4 h-4" />
-                                </button>
-                                <button
-                                    onClick={() => setSessionsViewMode('list')}
-                                    className={`p-1.5 rounded-lg transition-all ${sessionsViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
-                                    title="List View"
-                                >
-                                    <List className="w-4 h-4" />
-                                </button>
+                                    <button
+                                        onClick={() => setSessionsViewMode('list')}
+                                        className={`p-1.5 rounded-lg transition-all ${sessionsViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                        title="List View"
+                                    >
+                                        <List className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -2482,26 +2577,24 @@ const SubjectDetail = () => {
                             </div>
                         )}
                     </div>
-                )
-            }
+                )}
 
-            {
-                activeTab === 'questions' && (
+            {activeTab === 'questions' && (
                     <div className="fade-in">
                         {/* Header for Questions */}
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
                             <div className="flex items-center gap-2">
                                 <ListChecks className="w-6 h-6 text-indigo-400" />
                                 <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Question Bank</h3>
                             </div>
-                            <div className="relative group min-w-[300px]">
+                            <div className="relative group w-full sm:min-w-[300px] sm:w-auto">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
                                 <input
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search by content or topic tags..."
-                                    className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                                    placeholder="Search content or tags..."
+                                    className="w-full sm:w-[300px] bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
                                 />
                                 {searchQuery && (
                                     <button
@@ -2944,71 +3037,71 @@ const SubjectDetail = () => {
                             </div>
                         </div>
                     </div>
-                )
-            }
+                )}
 
-            {
-                activeTab === 'notes' && (
+            {activeTab === 'notes' && (
                     <div className="fade-in">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
                             <div className="flex items-center gap-2">
                                 <FileText className="w-6 h-6 text-indigo-400" />
                                 <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Notes</h3>
                             </div>
-                            <div className="relative group min-w-[300px]">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
-                                <input
-                                    type="text"
-                                    value={noteSearchQuery}
-                                    onChange={(e) => setNoteSearchQuery(e.target.value)}
-                                    placeholder="Search notes..."
-                                    className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
-                                />
-                                {noteSearchQuery && (
-                                    <button
-                                        onClick={() => setNoteSearchQuery('')}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                )}
-                            </div>
-                            <div className="flex items-center justify-end gap-3 min-w-[124px]">
-                                {allNoteTags.length > 0 && (
-                                    <div className="hidden md:block">
-                                        <select
-                                            value={selectedNoteTag}
-                                            onChange={(e) => setSelectedNoteTag(e.target.value)}
-                                            className="bg-surface-2/50 border border-white/[0.08] text-slate-200 rounded-xl px-4 py-2 text-[13px] focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all appearance-none cursor-pointer pr-10 hover:border-white/[0.15]"
-                                            style={{
-                                                backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(148, 163, 184, 1)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                                                backgroundRepeat: 'no-repeat',
-                                                backgroundPosition: 'right 0.75rem center',
-                                                backgroundSize: '1em'
-                                            }}
+                            <div className="flex flex-col sm:flex-row sm:items-center items-stretch gap-3 w-full sm:w-auto">
+                                <div className="relative group flex-1 sm:min-w-[280px]">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                                    <input
+                                        type="text"
+                                        value={noteSearchQuery}
+                                        onChange={(e) => setNoteSearchQuery(e.target.value)}
+                                        placeholder="Search notes..."
+                                        className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                                    />
+                                    {noteSearchQuery && (
+                                        <button
+                                            onClick={() => setNoteSearchQuery('')}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
                                         >
-                                            <option value="">All Tags</option>
-                                            {allNoteTags.map(tag => (
-                                                <option key={tag} value={tag}>{tag}</option>
-                                            ))}
-                                        </select>
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {allNoteTags.length > 0 && (
+                                        <div className="flex-1">
+                                            <select
+                                                value={selectedNoteTag}
+                                                onChange={(e) => setSelectedNoteTag(e.target.value)}
+                                                className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-200 rounded-xl px-4 py-2 text-[13px] focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all appearance-none cursor-pointer pr-10 hover:border-white/[0.15]"
+                                                style={{
+                                                    backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(148, 163, 184, 1)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                                                    backgroundRepeat: 'no-repeat',
+                                                    backgroundPosition: 'right 0.75rem center',
+                                                    backgroundSize: '1em'
+                                                }}
+                                            >
+                                                <option value="">All Tags</option>
+                                                {allNoteTags.map(tag => (
+                                                    <option key={tag} value={tag}>{tag}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+                                    <div className="flex bg-surface-2/50 p-1 rounded-xl border border-white/[0.06] shrink-0">
+                                        <button
+                                            onClick={() => setNotesViewMode('grid')}
+                                            className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                            title="Grid View"
+                                        >
+                                            <LayoutGrid className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => setNotesViewMode('list')}
+                                            className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                            title="List View"
+                                        >
+                                            <List className="w-4 h-4" />
+                                        </button>
                                     </div>
-                                )}
-                                <div className="flex bg-surface-2/50 p-1 rounded-xl border border-white/[0.06] shrink-0">
-                                    <button
-                                        onClick={() => setNotesViewMode('grid')}
-                                        className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
-                                        title="Grid View"
-                                    >
-                                        <LayoutGrid className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        onClick={() => setNotesViewMode('list')}
-                                        className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
-                                        title="List View"
-                                    >
-                                        <List className="w-4 h-4" />
-                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -3246,14 +3339,12 @@ const SubjectDetail = () => {
                             )}
                         </div>
                     </div>
-                )
-            }
+                )}
 
-            {
-                activeTab === 'solutions' && (
+            {activeTab === 'solutions' && (
                     <div className="fade-in pb-12">
                         {/* Header & Search */}
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
                             <div className="flex items-center gap-2">
                                 <ListChecks className="w-6 h-6 text-blue-400" />
                                 <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Solutions Library</h3>
@@ -3261,7 +3352,7 @@ const SubjectDetail = () => {
                             </div>
 
                             <div className="flex items-center gap-3">
-                                <div className="relative group min-w-[280px]">
+                                <div className="relative group flex-1 sm:min-w-[280px]">
                                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
                                     <input
                                         type="text"
@@ -3271,7 +3362,7 @@ const SubjectDetail = () => {
                                         className="w-full bg-surface-2/50 border border-white/[0.08] rounded-xl py-2.5 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-blue-500/40 focus:bg-surface-2 transition-all"
                                     />
                                 </div>
-                                <div className="flex bg-surface-2/80 p-1 rounded-xl border border-white/[0.06]">
+                                <div className="flex bg-surface-2/80 p-1 rounded-xl border border-white/[0.06] shrink-0">
                                     <button
                                         onClick={() => setSolutionsViewMode('grid')}
                                         className={`p-1.5 rounded-lg transition-all ${solutionsViewMode === 'grid' ? 'bg-blue-500 text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
@@ -3466,11 +3557,9 @@ const SubjectDetail = () => {
                             )}
                         </div>
                     </div>
-                )
-            }
+                )}
 
-            {
-                activeTab === 'revision' && (() => {
+            {activeTab === 'revision' && (() => {
                     const renderSession = (session) => {
                         const isExpanded = activeRevisionSessionId === session.id;
                         const totalTopics = session.topics?.length || 0;
@@ -3697,11 +3786,9 @@ const SubjectDetail = () => {
                             )}
                         </div>
                     );
-                })()
-            }
+                })()}
 
-            {
-                activeTab === 'images' && (
+            {activeTab === 'images' && (
                     <div className="fade-in pb-12 px-1">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
                             <div className="flex items-center gap-2">
@@ -3836,6 +3923,8 @@ const SubjectDetail = () => {
                     </div>
                 )
             }
+                </>
+            )}
 
             <CreateRevisionSessionModal
                 isOpen={showCreateRevisionSession}

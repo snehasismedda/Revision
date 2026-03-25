@@ -48,6 +48,17 @@ export const getTestSeriesDetail = async (req, res) => {
     }
 };
 
+export const getTestsBySeries = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const tests = await testModel.findTestsBySeries(id);
+        res.status(200).json({ tests });
+    } catch (error) {
+        console.error('[getTestsBySeries]', error);
+        res.status(500).json({ error: 'Failed to fetch tests' });
+    }
+};
+
 export const deleteTestSeries = async (req, res) => {
     try {
         const { id } = req.params;

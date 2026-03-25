@@ -48,7 +48,13 @@ export const findTestSeriesByUser = async (userId) => {
         .whereIn('test_series_id', seriesIds)
         .where('is_deleted', false)
         .groupBy('test_series_id')
-        .select('test_series_id', db.raw('count(*) as count'));
+        .select('test_series_id')
+        .count('id as count');
+
+    const testCountMap = testCounts.reduce((acc, curr) => {
+        acc[curr.test_series_id] = parseInt(curr.count);
+        return acc;
+    }, {});
 
     // 4. Map everything together
     const subjectsBySeries = subjects.reduce((acc, curr) => {
@@ -57,15 +63,10 @@ export const findTestSeriesByUser = async (userId) => {
         return acc;
     }, {});
 
-    const countsBySeries = testCounts.reduce((acc, curr) => {
-        acc[curr.test_series_id] = parseInt(curr.count);
-        return acc;
-    }, {});
-
     return series.map(s => ({
         ...s,
         subjects: subjectsBySeries[s.id] || [],
-        testCount: countsBySeries[s.id] || 0
+        testCount: testCountMap[s.id] || 0
     }));
 };
 

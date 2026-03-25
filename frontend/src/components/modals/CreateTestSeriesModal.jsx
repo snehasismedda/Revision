@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { X, Check, Plus } from 'lucide-react';
 import * as testSeriesApi from '../../api/testSeriesApi.js';
-import { subjectsApi } from '../../api';
+import { useSubjects } from '../../context/SubjectContext.jsx';
+import { useTestSeries } from '../../context/TestSeriesContext.jsx';
 import toast from 'react-hot-toast';
 import ModalPortal from '../ModalPortal.jsx';
 
 const CreateTestSeriesModal = ({ isOpen, onClose, onSuccess, initialData = null }) => {
+    const { addSeries, updateSeries } = useTestSeries();
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
-    const [availableSubjects, setAvailableSubjects] = useState([]);
+    const { subjects: availableSubjects, isLoaded, loadSubjects } = useSubjects();
     const [selectedSubjects, setSelectedSubjects] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -16,7 +18,7 @@ const CreateTestSeriesModal = ({ isOpen, onClose, onSuccess, initialData = null 
 
     useEffect(() => {
         if (isOpen) {
-            loadSubjects();
+            if (!isLoaded) loadSubjects();
             if (initialData) {
                 setName(initialData.name || '');
                 setDescription(initialData.description || '');
@@ -27,16 +29,8 @@ const CreateTestSeriesModal = ({ isOpen, onClose, onSuccess, initialData = null 
                 setSelectedSubjects([]);
             }
         }
-    }, [isOpen, initialData]);
+    }, [isOpen, initialData, isLoaded, loadSubjects]);
 
-    const loadSubjects = async () => {
-        try {
-            const data = await subjectsApi.list();
-            setAvailableSubjects(data.subjects || []);
-        } catch (error) {
-            toast.error('Failed to load available subjects');
-        }
-    };
 
     const toggleSubject = (subjectId) => {
         setSelectedSubjects(prev =>
@@ -59,16 +53,15 @@ const CreateTestSeriesModal = ({ isOpen, onClose, onSuccess, initialData = null 
             };
 
             if (isEdit) {
-                await testSeriesApi.updateTestSeries(initialData.id, payload);
-                toast.success('Test series updated');
+                await updateSeries(initialData.id, payload);
             } else {
-                await testSeriesApi.createTestSeries(payload);
-                toast.success('Test series created');
+                await addSeries(payload);
             }
+            
             onSuccess();
             onClose();
         } catch (error) {
-            toast.error(isEdit ? 'Failed to update test series' : 'Failed to create test series');
+            // Errors handled in context
         } finally {
             setIsSubmitting(false);
         }

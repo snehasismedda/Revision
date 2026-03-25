@@ -75,6 +75,7 @@ const TestAnalytics = () => {
     const [negFactor, setNegFactor] = useState(0);
     const [showNegSim, setShowNegSim] = useState(false);
     const [trendType, setTrendType] = useState('accuracy'); // 'accuracy' or 'score'
+    const [filterTopicSubject, setFilterTopicSubject] = useState('All');
 
 
     useEffect(() => {
@@ -154,16 +155,12 @@ const TestAnalytics = () => {
     const impPositive = stats.improvement > 0;
     const impNeutral = stats.improvement === 0;
 
-    // ── Group most asked topics by subject ──────────────────────────────────
+    // ── Group topics by subject ─────────────────────────────────────────────
     const topicsBySub = {};
     (global.topicPerformance || []).forEach(t => {
         const subName = t.subject_name || 'Other';
         if (!topicsBySub[subName]) topicsBySub[subName] = [];
         topicsBySub[subName].push(t);
-    });
-    // Sort each group by frequency
-    Object.keys(topicsBySub).forEach(sub => {
-        topicsBySub[sub].sort((a, b) => Number(b.total_questions) - Number(a.total_questions));
     });
 
     const subjectBarData = (global.subjectPerformance || [])
@@ -183,7 +180,7 @@ const TestAnalytics = () => {
             {/* Back Button Row */}
             <div className="flex items-center gap-3 mb-4">
                 <button
-                    onClick={() => navigate(`/tests/${seriesId}`)}
+                    onClick={() => navigate(-1)}
                     className="flex items-center gap-2 text-[13px] font-semibold text-slate-400 hover:text-white transition-all hover:bg-white/[0.06] px-3 py-1.5 rounded-lg border border-white/[0.06] hover:border-white/[0.1] transition-all cursor-pointer"
                 >
                     <ArrowLeft className="w-4 h-4" />
@@ -508,39 +505,56 @@ const TestAnalytics = () => {
                 {/* ── Most Asked Topics (Subject Wise) ─────────────────── */}
                 {Object.keys(topicsBySub).length > 0 && (
                     <div className="glass rounded-3xl border border-white/8 p-6 shadow-xl">
-                        <div className="flex items-center gap-2 mb-6">
-                            <Flame className="w-5 h-5 text-amber-500" />
-                            <h2 className="text-base font-heading font-semibold text-white">Most Asked Topics</h2>
-                            <span className="text-xs text-slate-500 ml-1">subject-wise frequency focus</span>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+                            <div className="flex items-center gap-2">
+                                <Flame className="w-5 h-5 text-amber-500" />
+                                <h2 className="text-base font-heading font-semibold text-white">Most Asked Topics</h2>
+                                <span className="text-xs text-slate-500 ml-1">subject-wise frequency focus</span>
+                            </div>
+
+                            <div className="relative group self-start sm:self-center">
+                                <select
+                                    className="bg-white/5 border border-white/10 text-slate-300 text-[11px] font-bold uppercase tracking-wider rounded-xl pl-4 pr-10 py-2 outline-none focus:border-pink-500/50 appearance-none cursor-pointer hover:bg-white/[0.08] transition-all min-w-[160px]"
+                                    value={filterTopicSubject}
+                                    onChange={e => setFilterTopicSubject(e.target.value)}
+                                >
+                                    <option value="All" className="bg-[#161622]">ALL SUBJECTS</option>
+                                    {Object.keys(topicsBySub).sort().map(sub => (
+                                        <option key={sub} value={sub} className="bg-[#161622]">{sub.toUpperCase()}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none group-hover:text-slate-300 transition-colors" />
+                            </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {Object.entries(topicsBySub).map(([sub, topics]) => (
-                                <div key={sub} className="flex flex-col gap-3">
-                                    <div className="flex items-center gap-2 pb-2 border-b border-white/[0.04]">
-                                        <BookOpen className="w-3.5 h-3.5 text-pink-400" />
-                                        <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">{sub}</span>
-                                    </div>
-                                    <div className="space-y-2.5">
-                                        {topics.slice(0, 5).map((t, idx) => (
-                                            <div key={idx} className="group flex flex-col gap-1">
-                                                <div className="flex justify-between items-center text-[13px]">
-                                                    <span className="text-slate-200 truncate pr-2">{t.topic_name}</span>
-                                                    <span className="text-[11px] font-bold text-pink-400 whitespace-nowrap">{t.total_questions} times</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="flex-1 bg-white/[0.03] rounded-full h-1.5 overflow-hidden">
-                                                        <div
-                                                            className="h-full bg-gradient-to-r from-pink-500 to-violet-500 rounded-full transition-all duration-300 group-hover:from-pink-400 group-hover:to-violet-400"
-                                                            style={{ width: `${Math.min(100, (Number(t.total_questions) / Number(topics[0].total_questions)) * 100)}%` }}
-                                                        />
+                        <div className={`grid grid-cols-1 ${filterTopicSubject === 'All' ? 'md:grid-cols-2 lg:grid-cols-3' : 'md:grid-cols-1'} gap-6`}>
+                            {Object.entries(topicsBySub)
+                                .filter(([sub]) => filterTopicSubject === 'All' || sub === filterTopicSubject)
+                                .map(([sub, topics]) => (
+                                    <div key={sub} className={`flex flex-col gap-3 ${filterTopicSubject !== 'All' ? 'max-w-2xl mx-auto w-full' : ''}`}>
+                                        <div className="flex items-center gap-2 pb-2 border-b border-white/[0.04]">
+                                            <BookOpen className="w-3.5 h-3.5 text-pink-400" />
+                                            <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">{sub}</span>
+                                        </div>
+                                        <div className={`grid grid-cols-1 ${filterTopicSubject === 'All' ? 'gap-2' : 'sm:grid-cols-2 lg:grid-cols-3 gap-2.5 mx-auto max-w-4xl'}`}>
+                                            {[...topics].sort((a, b) => Number(b.total_questions) - Number(a.total_questions))
+                                                .slice(0, filterTopicSubject === 'All' ? 5 : undefined)
+                                                .map((t, idx) => (
+                                                    <div key={idx} className="flex items-center justify-between gap-3 p-2.5 bg-white/[0.02] border border-white/[0.04] rounded-xl hover:bg-white/[0.05] transition-all group overflow-hidden">
+                                                        <div className="flex items-center gap-2.5 min-w-0">
+                                                            <span className="text-[9px] font-black text-slate-600 group-hover:text-pink-500/50 w-4">#{idx + 1}</span>
+                                                            <div className="min-w-0">
+                                                                <p className="text-xs text-slate-200 font-bold truncate leading-tight mb-0.5">{t.topic_name}</p>
+                                                                <p className="text-[9px] text-slate-500 truncate font-medium">{t.accuracy}% Accuracy</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className={`px-2 py-0.5 rounded-lg text-[11px] font-black ${Number(t.total_questions) > 0 ? 'bg-pink-500/10 text-pink-400 border border-pink-500/20' : 'bg-slate-800 text-slate-500'}`}>
+                                                            {t.total_questions}
+                                                        </div>
                                                     </div>
-                                                    <span className="text-[10px] text-slate-500 w-8">{t.accuracy}% acc</span>
-                                                </div>
-                                            </div>
-                                        ))}
+                                                ))}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
                         </div>
                     </div>
                 )}
@@ -589,14 +603,23 @@ const TestAnalytics = () => {
                     {activeTab === 'topics' && (
                         !global.topicPerformance?.length
                             ? <EmptyState text="No topic data yet." />
-                            : <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {(global.topicPerformance || [])
-                                    .sort((a, b) => Number(b.accuracy) - Number(a.accuracy))
-                                    .map((t, i) => (
-                                        <BreakdownCard key={i} name={t.topic_name} accuracy={Number(t.accuracy)} correct={Number(t.total_correct)} total={Number(t.total_questions)} />
+                            : <div className="space-y-8">
+                                {Object.entries(topicsBySub)
+                                    .sort(([a], [b]) => a.localeCompare(b))
+                                    .map(([sub, topics]) => (
+                                        <div key={sub} className="space-y-4">
+                                            <div className="flex items-center gap-2 pb-2 border-b border-white/[0.04]">
+                                                <BookOpen className="w-3.5 h-3.5 text-pink-400" />
+                                                <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">{sub}</span>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                {topics.sort((a, b) => Number(b.accuracy) - Number(a.accuracy)).map((t, i) => (
+                                                    <BreakdownCard key={i} name={t.topic_name} accuracy={Number(t.accuracy)} correct={Number(t.total_correct)} total={Number(t.total_questions)} />
+                                                ))}
+                                            </div>
+                                        </div>
                                     ))}
                             </div>
-
                     )}
                 </div>
 
@@ -645,7 +668,7 @@ const TestAnalytics = () => {
                                                     </div>
                                                 </div>
                                                 {attemptTab === 'subjects' && <BreakdownList items={a.subjectPerformance} nameKey="subject_name" emptyText="No subject tags on this attempt." />}
-                                                {attemptTab === 'topics' && <BreakdownList items={a.topicPerformance} nameKey="topic_name" emptyText="No topic tags on this attempt." />}
+                                                {attemptTab === 'topics' && <BreakdownList items={a.topicPerformance} nameKey="topic_name" emptyText="No topic tags on this attempt." groupTopicsBySubject={true} />}
                                             </div>
                                         )}
                                     </div>
@@ -684,27 +707,59 @@ const BreakdownCard = ({ name, accuracy, correct, total, marks }) => (
 );
 
 
-const BreakdownList = ({ items, nameKey, emptyText }) => {
+const BreakdownList = ({ items, nameKey, emptyText, groupTopicsBySubject = false }) => {
     if (!items?.length) return <p className="text-xs text-slate-500 text-center py-3">{emptyText}</p>;
-    return (
-        <div className="space-y-2">
-            {items.map((item, i) => {
-                const acc = Number(item.accuracy);
-                return (
-                    <div key={i} className="bg-black/20 rounded-xl p-2.5 border border-white/[0.04] flex items-center gap-3">
-                        <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-white truncate">{item[nameKey]}</p>
-                            <div className="w-full bg-black/30 rounded-full h-1 mt-1.5">
-                                <div className="h-full rounded-full" style={{ width: `${Math.min(100, acc)}%`, backgroundColor: accColor(acc) }} />
-                            </div>
+
+    if (groupTopicsBySubject && nameKey === 'topic_name') {
+        const groups = {};
+        items.forEach(it => {
+            const sub = it.subject_name || 'Other';
+            if (!groups[sub]) groups[sub] = [];
+            groups[sub].push(it);
+        });
+
+        return (
+            <div className="space-y-6">
+                {Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([sub, topics]) => (
+                    <div key={sub} className="space-y-2.5">
+                        <div className="flex items-center gap-2 px-1">
+                            <div className="w-1 h-3 bg-pink-500/40 rounded-full" />
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{sub}</p>
                         </div>
-                        <div className="text-right flex-shrink-0">
-                            <p className="text-xs font-bold" style={{ color: accColor(acc) }}>{acc}%</p>
-                            <p className="text-[10px] text-slate-600">{item.total_correct}/{item.total_questions}</p>
+                        <div className="space-y-2">
+                            {topics.sort((a, b) => Number(b.accuracy) - Number(a.accuracy)).map((item, i) => (
+                                <BreakdownListItem key={i} item={item} nameKey={nameKey} />
+                            ))}
                         </div>
                     </div>
-                );
-            })}
+                ))}
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-2">
+            {items.map((item, i) => (
+                <BreakdownListItem key={i} item={item} nameKey={nameKey} />
+            ))}
+        </div>
+    );
+};
+
+const BreakdownListItem = ({ item, nameKey }) => {
+    const acc = Number(item.accuracy);
+    return (
+        <div className="bg-black/20 rounded-xl p-2.5 border border-white/[0.04] flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-white truncate">{item[nameKey]}</p>
+                <div className="w-full bg-black/30 rounded-full h-1 mt-1.5">
+                    <div className="h-full rounded-full" style={{ width: `${Math.min(100, acc)}%`, backgroundColor: accColor(acc) }} />
+                </div>
+            </div>
+            <div className="text-right flex-shrink-0">
+                <p className="text-xs font-bold" style={{ color: accColor(acc) }}>{acc}%</p>
+                <p className="text-[10px] text-slate-600">{item.total_correct}/{item.total_questions}</p>
+            </div>
         </div>
     );
 };

@@ -12,12 +12,20 @@ export const getTestSeriesDetail = async (id) => {
     return await request(`/test-series/${id}`);
 };
 
+export const getTestSeriesTests = async (id) => {
+    return await request(`/test-series/${id}/tests`);
+};
+
 export const deleteTestSeries = async (id) => {
     return await request(`/test-series/${id}`, { method: 'DELETE' });
 };
 
 export const updateTestSeries = async (id, data) => {
     return await request(`/test-series/${id}`, { method: 'PUT', body: data });
+};
+
+export const getTestSeriesOverview = async (id) => {
+    return await request(`/test-series/${id}/overview`);
 };
 
 

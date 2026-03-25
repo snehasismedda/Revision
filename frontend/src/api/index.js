@@ -86,7 +86,12 @@ export const entriesApi = {
 
 // Analytics
 export const analyticsApi = {
-    overview: (subjectId) => request(`/analytics/${subjectId}/overview`),
+    overview: (subjectId) => {
+        if (Array.isArray(subjectId)) {
+            return request(`/analytics/overview?subjectIds=${subjectId.join(',')}`);
+        }
+        return request(`/analytics/${subjectId}/overview`);
+    },
     topicPerformance: (subjectId) => request(`/analytics/${subjectId}/topic-performance`),
     trends: (subjectId) => request(`/analytics/${subjectId}/trends`),
     weakAreas: (subjectId) => request(`/analytics/${subjectId}/weak-areas`),

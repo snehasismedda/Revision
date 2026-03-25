@@ -9,6 +9,7 @@ router.use(authenticate);
 
 router.post('/', testController.createTest);
 router.get('/:testId', testController.getTestDetail);
+router.get('/:testId/results', testController.getTestResults);
 router.post('/:testId/subjects/:subjectId/results', testController.submitTestResult);
 router.delete('/:testId', testController.deleteTest);
 router.put('/:testId', testController.updateTest);

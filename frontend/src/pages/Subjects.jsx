@@ -1,18 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { subjectsApi } from '../api/index.js';
 import SubjectCard from '../components/SubjectCard.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import SubjectModal from '../components/modals/SubjectModal.jsx';
 import toast from 'react-hot-toast';
 import { LibraryBig, PlusCircle, Trash2, Edit2, BookOpen, Search, X } from 'lucide-react';
 
+import { useSubjects } from '../context/SubjectContext.jsx';
+
 const Subjects = () => {
-    const [subjects, setSubjects] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const { subjects, statsMap, loading, loadSubjects, addSubject, updateSubject, deleteSubject } = useSubjects();
     const [showModal, setShowModal] = useState(false);
     const [editingSubject, setEditingSubject] = useState(null);
-    const [statsMap, setStatsMap] = useState({});
     const [searchParams] = useSearchParams();
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTag, setSelectedTag] = useState('');
@@ -23,43 +22,12 @@ const Subjects = () => {
     useEffect(() => {
         loadSubjects();
         if (searchParams.get('new')) setShowModal(true);
+    }, [searchParams, loadSubjects]);
 
-    }, [searchParams]);
 
-    const loadSubjects = async () => {
-        try {
-            const { subjects: subs } = await subjectsApi.list();
-            setSubjects(subs);
-
-            // Also fetch stats so the SubjectCard shows info
-            const entries = await Promise.allSettled(
-                subs.map(async (s) => {
-                    // Try to import analyticsApi if we haven't already
-                    const { analyticsApi } = await import('../api/index.js');
-                    const data = await analyticsApi.overview(s.id);
-                    return [s.id, data.overview];
-                })
-            );
-            const map = {};
-            entries.forEach((r) => {
-                if (r.status === 'fulfilled') {
-                    const [id, stats] = r.value;
-                    map[id] = stats;
-                }
-            });
-            setStatsMap(map);
-
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleSubjectSaved = (subject, isEditing) => {
-        if (isEditing) {
-            setSubjects((prev) => prev.map((s) => (s.id === subject.id ? subject : s)));
-        } else {
-            setSubjects((prev) => [subject, ...prev]);
-        }
+    const handleSubjectSaved = () => {
+        setShowModal(false);
+        setEditingSubject(null);
     };
 
     const handleEditClick = (subject) => {
@@ -69,13 +37,12 @@ const Subjects = () => {
 
     const handleDelete = async () => {
         const { id, name } = confirmDelete;
-        const loadingToast = toast.loading(`Deleting ${name}...`);
         try {
-            await subjectsApi.delete(id);
-            setSubjects((prev) => prev.filter((s) => s.id !== id));
-            toast.success(`${name} deleted`, { id: loadingToast });
-        } catch {
-            toast.error('Failed to delete subject', { id: loadingToast });
+            await deleteSubject(id, name);
+        } catch (error) {
+            // Error is handled in context
+        } finally {
+            setConfirmDelete({ open: false, id: null, name: '' });
         }
     };
 
@@ -101,8 +68,8 @@ const Subjects = () => {
             />
 
             {/* Header */}
-            <div className="flex items-end justify-between mb-8">
-                <div>
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mb-8">
+                <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                         <LibraryBig className="w-5 h-5 text-primary" />
                         <span className="text-[11px] font-bold tracking-widest text-primary uppercase">Library</span>
@@ -111,13 +78,13 @@ const Subjects = () => {
                     <p className="text-slate-400 text-sm mt-1.5">{subjects.length} subject{subjects.length !== 1 ? 's' : ''} in your library</p>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center items-stretch gap-3 md:gap-4 w-full sm:w-auto">
                     {allTags.length > 0 && (
-                        <div className="hidden md:block">
+                        <div className="relative">
                             <select
                                 value={selectedTag}
                                 onChange={(e) => setSelectedTag(e.target.value)}
-                                className="bg-surface-2/50 border border-white/[0.08] text-slate-200 rounded-xl px-4 py-2 text-[13px] focus:outline-none focus:border-primary/40 focus:bg-surface-2 transition-all appearance-none cursor-pointer pr-10 hover:border-white/[0.15]"
+                                className="w-full sm:w-auto bg-surface-2/50 border border-white/[0.08] text-slate-200 rounded-xl px-4 py-2.5 sm:py-2 text-[13px] focus:outline-none focus:border-primary/40 focus:bg-surface-2 transition-all appearance-none cursor-pointer pr-10 hover:border-white/[0.15]"
                                 style={{
                                     backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(148, 163, 184, 1)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
                                     backgroundRepeat: 'no-repeat',
@@ -132,14 +99,14 @@ const Subjects = () => {
                             </select>
                         </div>
                     )}
-                    <div className="relative group hidden md:block">
+                    <div className="relative group flex-1 sm:flex-none">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-primary transition-colors" />
                         <input
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Filter subjects..."
-                            className="bg-surface-2/50 border border-white/[0.08] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white w-[240px] focus:outline-none focus:border-primary/40 focus:bg-surface-2 transition-all"
+                            className="bg-surface-2/50 border border-white/[0.08] rounded-xl py-2.5 sm:py-2 pl-10 pr-4 text-[13px] text-white w-full sm:w-[200px] md:w-[240px] focus:outline-none focus:border-primary/40 focus:bg-surface-2 transition-all"
                         />
                         {searchQuery && (
                             <button
@@ -155,9 +122,9 @@ const Subjects = () => {
                             setEditingSubject(null);
                             setShowModal(true);
                         }}
-                        className="btn-primary flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl transition-all cursor-pointer"
+                        className="btn-primary flex items-center justify-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl transition-all cursor-pointer whitespace-nowrap"
                     >
-                        <PlusCircle className="w-4 h-4" /> New Subject
+                        <PlusCircle className="w-4 h-4" /> <span>New Subject</span>
                     </button>
                 </div>
             </div>

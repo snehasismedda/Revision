@@ -152,3 +152,23 @@ export const updateTest = async (req, res) => {
     }
 };
 
+export const getTestResults = async (req, res) => {
+    try {
+        const { seriesId, testId } = req.params;
+
+        const series = await testSeriesModel.findTestSeriesById(seriesId, req.user.id);
+        if (!series) return res.status(404).json({ error: 'Test series not found' });
+
+        const results = await db('revision.test_results as tr')
+            .where('tr.test_id', testId)
+            .where('tr.is_deleted', false)
+            .orderBy('tr.created_at', 'desc')
+            .select('*');
+
+        res.status(200).json({ results });
+    } catch (error) {
+        console.error('[getTestResults]', error);
+        res.status(500).json({ error: 'Failed to fetch test results' });
+    }
+};
+

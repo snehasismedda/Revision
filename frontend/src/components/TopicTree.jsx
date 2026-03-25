@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { topicsApi } from '../api/index.js';
+import { useTopics } from '../context/TopicContext.jsx';
 import { ChevronRight, ChevronDown, Trash2, Plus, Pencil, Check, X, GitBranch, Circle, Maximize2, Minimize2 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog.jsx';
 import toast from 'react-hot-toast';
 
-const TopicNode = ({ topic, subjectId, depth = 0, onDeleted, onSubtopicAdded, onRenamed, setConfirmDelete, defaultExpanded = true }) => {
+const TopicNode = ({ topic, subjectId, depth = 0, setConfirmDelete, defaultExpanded = true }) => {
+    const { updateTopic, addTopic } = useTopics();
     const [expanded, setExpanded] = useState(defaultExpanded);
     const [editing, setEditing] = useState(false);
     const [editName, setEditName] = useState(topic.name);
@@ -23,12 +24,9 @@ const TopicNode = ({ topic, subjectId, depth = 0, onDeleted, onSubtopicAdded, on
         }
         setSavingRename(true);
         try {
-            await topicsApi.update(subjectId, topic.id, { name: trimmed });
-            onRenamed?.(topic.id, trimmed);
+            await updateTopic(subjectId, topic.id, { name: trimmed });
             setEditing(false);
-            toast.success('Topic renamed');
         } catch {
-            toast.error('Failed to rename topic');
             setEditName(topic.name);
         } finally {
             setSavingRename(false);
@@ -41,17 +39,15 @@ const TopicNode = ({ topic, subjectId, depth = 0, onDeleted, onSubtopicAdded, on
         if (!trimmed) return;
         setSavingChild(true);
         try {
-            const { topic: created } = await topicsApi.create(subjectId, {
+            await addTopic(subjectId, {
                 name: trimmed,
                 parentId: topic.id,
             });
-            onSubtopicAdded?.(topic.id, { ...created, children: [] });
             setNewChildName('');
             setAddingChild(false);
             setExpanded(true);
-            toast.success(`Subtopic "${trimmed}" added`);
         } catch {
-            toast.error('Failed to add subtopic');
+            // Error handled in context
         } finally {
             setSavingChild(false);
         }
@@ -192,8 +188,6 @@ const TopicNode = ({ topic, subjectId, depth = 0, onDeleted, onSubtopicAdded, on
                                 topic={child}
                                 subjectId={subjectId}
                                 depth={depth + 1}
-                                onSubtopicAdded={onSubtopicAdded}
-                                onRenamed={onRenamed}
                                 setConfirmDelete={setConfirmDelete}
                                 defaultExpanded={defaultExpanded}
                             />
@@ -204,44 +198,19 @@ const TopicNode = ({ topic, subjectId, depth = 0, onDeleted, onSubtopicAdded, on
     );
 };
 
-const TopicTree = ({ topics, subjectId, onTopicDeleted, onTopicsChanged, defaultExpanded = true }) => {
+const TopicTree = ({ topics, subjectId, defaultExpanded = true }) => {
+    const { deleteTopic } = useTopics();
     const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null, name: '' });
 
     const handleDelete = async () => {
-        const { id, name } = confirmDelete;
-        const loadingToast = toast.loading(`Deleting ${name}...`);
+        const { id } = confirmDelete;
         try {
-            await topicsApi.delete(subjectId, id);
-            onTopicDeleted?.(id);
-            toast.success(`Topic "${name}" removed`, { id: loadingToast });
+            await deleteTopic(subjectId, id);
         } catch {
-            toast.error('Failed to delete topic', { id: loadingToast });
+            // Error handled in context
         }
     };
 
-    const handleSubtopicAdded = (parentId, newChild) => {
-        onTopicsChanged?.((prev) => {
-            const addChild = (nodes) =>
-                nodes.map((n) =>
-                    n.id === parentId
-                        ? { ...n, children: [...(n.children || []), newChild] }
-                        : { ...n, children: addChild(n.children || []) }
-                );
-            return addChild(prev);
-        });
-    };
-
-    const handleRenamed = (topicId, newName) => {
-        onTopicsChanged?.((prev) => {
-            const rename = (nodes) =>
-                nodes.map((n) =>
-                    n.id === topicId
-                        ? { ...n, name: newName }
-                        : { ...n, children: rename(n.children || []) }
-                );
-            return rename(prev);
-        });
-    };
 
     if (!topics?.length) {
         return (
@@ -284,8 +253,6 @@ const TopicTree = ({ topics, subjectId, onTopicDeleted, onTopicsChanged, default
                             key={topic.id}
                             topic={topic}
                             subjectId={subjectId}
-                            onSubtopicAdded={handleSubtopicAdded}
-                            onRenamed={handleRenamed}
                             setConfirmDelete={setConfirmDelete}
                             defaultExpanded={defaultExpanded}
                         />

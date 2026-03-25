@@ -7,6 +7,7 @@ const router = express.Router({ mergeParams: true });
 
 router.use(authenticate);
 
+router.get('/overview', getOverview);
 router.get('/:subjectId/overview', getOverview);
 router.get('/:subjectId/topic-performance', getTopicPerformance);
 router.get('/:subjectId/trends', getTrends);

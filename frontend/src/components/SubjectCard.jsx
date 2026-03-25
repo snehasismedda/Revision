@@ -20,7 +20,7 @@ const SubjectCard = ({ subject, stats, variant, onEdit, onDelete }) => {
 
     return (
         <div
-            onClick={() => navigate(`/subjects/${subject.id}`)}
+            onClick={() => navigate(`/subjects/${subject.id}`, { state: { subject, stats } })}
             className={`glass-card glass p-5 cursor-pointer group flex flex-col justify-between transition-all
                 ${isAttention ? 'border-amber-500/15 hover:border-amber-500/30' : ''}`}
             style={{ minHeight: '140px' }}

@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { topicsApi } from '../../api/index.js';
+import { useTopics } from '../../context/TopicContext.jsx';
 import toast from 'react-hot-toast';
 import { X, PlusCircle, Plus, GitBranch } from 'lucide-react';
 import ModalPortal from '../ModalPortal.jsx';
 import TopicTree from '../TopicTree.jsx';
 
-const ManageSyllabusModal = ({ isOpen, onClose, subjectId, onTopicsUpdated, topics }) => {
+const ManageSyllabusModal = ({ isOpen, onClose, subjectId, topics }) => {
+    const { bulkCreateTopics } = useTopics();
     const [bulkTopics, setBulkTopics] = useState('');
     const [addingTopics, setAddingTopics] = useState(false);
 
@@ -23,10 +25,7 @@ const ManageSyllabusModal = ({ isOpen, onClose, subjectId, onTopicsUpdated, topi
 
         try {
             const topicsToCreate = names.map(name => ({ name }));
-            await topicsApi.bulkCreate(subjectId, { topics: topicsToCreate });
-
-            const { topics: freshTree } = await topicsApi.list(subjectId);
-            onTopicsUpdated(freshTree);
+            await bulkCreateTopics(subjectId, { topics: topicsToCreate });
 
             setBulkTopics('');
             toast.success(names.length === 1 ? 'Topic added' : `${names.length} topics added`, { id: loadingToast });
@@ -37,13 +36,6 @@ const ManageSyllabusModal = ({ isOpen, onClose, subjectId, onTopicsUpdated, topi
         }
     };
 
-    const handleTopicDeleted = (topicId) => {
-        const removeFromTree = (nodes) =>
-            nodes
-                .filter((n) => n.id !== topicId)
-                .map((n) => ({ ...n, children: removeFromTree(n.children || []) }));
-        onTopicsUpdated(prev => removeFromTree(prev));
-    };
 
     if (!isOpen) return null;
 
@@ -111,20 +103,17 @@ const ManageSyllabusModal = ({ isOpen, onClose, subjectId, onTopicsUpdated, topi
 
                         {/* ── Section 2: Full Tree Management ───────────── */}
                         <div className="flex flex-col min-h-0">
-                            <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center justify-between mb-4 shrink-0">
                                 <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] flex items-center gap-2">
                                     <GitBranch className="w-3 h-3 rotate-180" /> Manage Hierarchy
                                 </h4>
                                 <span className="text-[10px] text-slate-600 font-medium">Double-click to rename • Hover for actions</span>
                             </div>
 
-                            <div className="rounded-xl overflow-hidden border border-white/[0.04] bg-white/[0.01]">
+                            <div className="rounded-xl overflow-hidden border border-white/[0.04] bg-white/[0.01] overflow-y-auto custom-scrollbar" style={{ maxHeight: '320px' }}>
                                 <TopicTree
-                                    key={`modal-tree-${topics.length}-${topics[0]?.updated_at}`}
                                     topics={topics}
                                     subjectId={subjectId}
-                                    onTopicDeleted={handleTopicDeleted}
-                                    onTopicsChanged={onTopicsUpdated}
                                     defaultExpanded={false}
                                 />
                             </div>

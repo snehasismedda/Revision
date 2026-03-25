@@ -9,6 +9,7 @@ router.use(authenticate);
 router.post('/', testSeriesController.createTestSeries);
 router.get('/', testSeriesController.getTestSeries);
 router.get('/:id', testSeriesController.getTestSeriesDetail);
+router.get('/:id/tests', testSeriesController.getTestsBySeries);
 router.delete('/:id', testSeriesController.deleteTestSeries);
 router.put('/:id', testSeriesController.updateTestSeries);
 
