@@ -210,10 +210,8 @@ const TestSeriesInsights = () => {
                         {/* KPIs */}
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                             <div className="bg-surface-2 border border-white/5 p-5 rounded-2xl flex flex-col gap-1 relative group">
-                                <Activity className="absolute -right-2 -top-2 w-14 h-14 text-pink-500/5" />
-
                                 {/* Card Tooltip */}
-                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/95 backdrop-blur-xl border border-white/10 rounded-xl text-[11px] text-slate-300 z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'total' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
+                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/98 border border-white/10 rounded-xl text-[11px] text-slate-300 z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'total' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
                                     <p className="font-semibold text-pink-400 mb-1">Total Tests</p>
                                     <p className="leading-relaxed opacity-80">Total number of successfully completed tests in this series.</p>
                                 </div>
@@ -231,7 +229,7 @@ const TestSeriesInsights = () => {
                             </div>
 
                             <div className="bg-surface-2 border border-white/5 p-5 rounded-2xl flex flex-col gap-1 relative group">
-                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/95 backdrop-blur-xl border border-white/10 rounded-xl text-[11px] text-slate-300 z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'avg' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
+                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/98 border border-white/10 rounded-xl text-[11px] text-slate-300 z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'avg' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
                                     <p className="font-semibold text-sky-400 mb-1">Avg Accuracy</p>
                                     <p className="leading-relaxed opacity-80">The arithmetic mean of accuracy percentages across all attempted tests.</p>
                                 </div>
@@ -248,7 +246,7 @@ const TestSeriesInsights = () => {
                             </div>
 
                             <div className="bg-surface-2 border border-white/5 p-5 rounded-2xl flex flex-col gap-1 relative group">
-                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/95 backdrop-blur-xl border border-white/10 rounded-xl text-[11px] text-slate-300 z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'best' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
+                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/98 border border-white/10 rounded-xl text-[11px] text-slate-300 z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'best' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
                                     <p className="font-semibold text-emerald-400 mb-1">Best Accuracy</p>
                                     <p className="leading-relaxed opacity-80">The highest accuracy percentage achieved in a single test.</p>
                                 </div>
@@ -265,7 +263,7 @@ const TestSeriesInsights = () => {
                             </div>
 
                             <div className="bg-surface-2 border border-white/5 p-5 rounded-2xl flex flex-col gap-1 relative group">
-                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/95 backdrop-blur-xl border border-white/10 rounded-xl text-[11px] text-slate-300 z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'worst' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
+                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/98 border border-white/10 rounded-xl text-[11px] text-slate-300 z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'worst' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
                                     <p className="font-semibold text-rose-400 mb-1">Worst Accuracy</p>
                                     <p className="leading-relaxed opacity-80">The lowest accuracy percentage recorded in a single test.</p>
                                 </div>
@@ -282,7 +280,7 @@ const TestSeriesInsights = () => {
                             </div>
 
                             <div className="bg-surface-2 border border-white/5 p-5 rounded-2xl flex flex-col gap-1 relative group">
-                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/95 backdrop-blur-xl border border-white/10 rounded-xl text-[11px] text-slate-300 z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'consistency' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
+                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/98 border border-white/10 rounded-xl text-[11px] text-slate-300 z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'consistency' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
                                     <p className="font-semibold text-violet-400 mb-1">Consistency</p>
                                     <p className="leading-relaxed opacity-80">Measures score stability using Standard Deviation. Higher stability (Lower Deviation &lt; 5%) indicates reliable performance.</p>
                                 </div>
@@ -301,7 +299,7 @@ const TestSeriesInsights = () => {
                             </div>
 
                             <div className="bg-surface-2 border border-white/5 p-5 rounded-2xl flex flex-col gap-1 relative group">
-                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/95 backdrop-blur-xl border border-white/10 rounded-xl text-[11px] text-slate-300 z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'momentum' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
+                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/98 border border-white/10 rounded-xl text-[11px] text-slate-300 z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'momentum' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
                                     <p className="font-semibold text-amber-400 mb-1">Momentum</p>
                                     <p className="leading-relaxed opacity-80">Compares the average of your last 2 tests against your overall average. Positive values indicate a recent upward trend.</p>
                                 </div>

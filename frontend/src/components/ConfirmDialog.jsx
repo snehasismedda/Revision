@@ -27,7 +27,7 @@ const ConfirmDialog = ({ isOpen, title, message, onConfirm, onCancel, confirmTex
                 {/* Modal Container */}
                 <div
                     className="relative w-full max-w-md rounded-2xl shadow-2xl fade-in overflow-hidden"
-                    style={{ background: 'rgba(22, 22, 34, 0.95)', border: '1px solid rgba(255,255,255,0.08)' }}
+                    style={{ background: 'rgba(18, 18, 28, 0.9)', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(10px)' }}
                 >
                     {/* Close button */}
                     <button

@@ -138,55 +138,68 @@ const TestSeriesDetail = () => {
 
     return (
         <div className="fade-in max-w-6xl mx-auto">
-            {/* Back Button Row */}
-            <div className="flex items-center gap-3 mb-4">
-                <button
-                    onClick={() => navigate('/tests')}
-                    className="flex items-center gap-2 text-[13px] font-semibold text-slate-400 hover:text-white transition-all hover:bg-white/[0.06] px-3 py-1.5 rounded-lg border border-white/[0.06] hover:border-white/[0.1] transition-all cursor-pointer"
-                >
-                    <ArrowLeft className="w-4 h-4" />
-                    <span>Back</span>
-                </button>
-            </div>
+            <div className="relative mb-6">
+                {/* Background ambient effect */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-5xl h-24 bg-pink-500/5 blur-[70px] -z-10 rounded-full opacity-60" />
+                
+                <div className="flex items-center justify-between gap-6 py-2 px-1">
+                    {/* Left: Back */}
+                    <div className="flex-1 flex justify-start">
+                        <button
+                            onClick={() => navigate('/tests')}
+                            className="flex items-center gap-2 text-[12.5px] font-bold text-slate-400 hover:text-white transition-all hover:bg-white/[0.06] pl-2.5 pr-4 py-2.5 rounded-xl border border-white/[0.04] hover:border-white/[0.1] group/back backdrop-blur-md whitespace-nowrap cursor-pointer"
+                        >
+                            <ArrowLeft className="w-4 h-4 group-hover/back:-translate-x-0.5 transition-transform" />
+                            <span>Back</span>
+                        </button>
+                    </div>
 
-            {/* Header Content matching SubjectDetail approach */}
-            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-4">
-                <div>
-                    <h1 className="text-[22px] md:text-[24px] font-heading font-semibold text-white tracking-tight leading-tight mb-1.5">
-                        {series.name}
-                    </h1>
-                    {series.description && (
-                        <p className="text-slate-500 text-[14px] max-w-2xl leading-[1.6]">{series.description}</p>
-                    )}
+                    {/* Center: Title (Maximum focus) */}
+                    <div className="flex-[4] text-center min-w-0">
+                        <h1 className="text-[28px] md:text-[38px] lg:text-[46px] font-heading font-black text-white tracking-tighter leading-none truncate drop-shadow-2xl selection:bg-pink-500/30 py-1">
+                            {series.name}
+                        </h1>
+                    </div>
+
+                    {/* Right: Actions */}
+                    <div className="flex-1 flex justify-end gap-3">
+                        <button
+                            onClick={() => navigate(`/tests/${seriesId}/insights`)}
+                            className="flex items-center gap-2.5 text-[12px] font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer border border-purple-500/10 bg-purple-500/5 text-purple-400 hover:text-white hover:bg-purple-500/20 hover:border-purple-500/30 group/insights shadow-lg shadow-purple-500/5 backdrop-blur-sm whitespace-nowrap"
+                        >
+                            <BarChart3 className="w-3.5 h-3.5 text-purple-400 group-hover/insights:scale-110 transition-transform" strokeWidth={2.5} />
+                            <span className="hidden sm:inline">Insights</span>
+                        </button>
+                    </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => navigate(`/tests/${seriesId}/insights`)}
-                        className="flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all cursor-pointer border border-white/[0.08] bg-surface-3/50 text-slate-300 hover:text-white hover:bg-surface-3 hover:border-white/[0.12] group"
-                    >
-                        <BarChart3 className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" strokeWidth={2} />
-                        <span className="hidden sm:inline">Series Insights</span>
-                        <span className="sm:hidden">Insights</span>
-                    </button>
-                    <button
-                        onClick={() => setIsCreateTestModalOpen(true)}
-                        className="flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all cursor-pointer border border-pink-500/20 bg-pink-500/10 text-pink-400 hover:text-white hover:bg-pink-500/20 group"
-                    >
-                        <Plus className="w-4 h-4 text-pink-400 group-hover:rotate-90 transition-transform" strokeWidth={2} />
-                        <span>Add Test</span>
-                    </button>
-                </div>
+                {/* Description below title */}
+                {series.description && (
+                    <div className="max-w-2xl mx-auto mt-2 pb-1 text-center">
+                        <p className="text-slate-400/80 text-[13px] md:text-[14px] font-medium leading-relaxed truncate px-4">
+                            {series.description}
+                        </p>
+                    </div>
+                )}
             </div>
 
             {/* Divider and section Heading */}
             <div className="h-px bg-gradient-to-r from-white/[0.08] via-white/[0.06] to-transparent mb-4" />
 
-            <div className="flex items-center gap-2.5 mb-4">
-                <div className="p-1.5 rounded-lg bg-pink-500/10 border border-pink-500/20">
-                    <Notebook className="w-4 h-4 text-pink-400" />
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2.5">
+                    <div className="p-1.5 rounded-lg bg-pink-500/10 border border-pink-500/20">
+                        <Notebook className="w-4 h-4 text-pink-400" />
+                    </div>
+                    <h2 className="text-[20px] font-heading font-bold text-white tracking-tight">All Tests</h2>
                 </div>
-                <h2 className="text-[20px] font-heading font-bold text-white tracking-tight">All Tests</h2>
+                <button
+                    onClick={() => setIsCreateTestModalOpen(true)}
+                    className="flex items-center gap-2 text-[12px] font-bold px-4 py-2 rounded-lg transition-all cursor-pointer border border-pink-500/20 bg-pink-500/10 text-pink-400 hover:text-white hover:bg-pink-500/20 group shadow-lg shadow-pink-500/5 backdrop-blur-sm"
+                >
+                    <Plus className="w-3.5 h-3.5 text-pink-400 group-hover:rotate-90 transition-transform" strokeWidth={2.5} />
+                    <span>Add Test</span>
+                </button>
             </div>
 
             {/* Tests Section */}

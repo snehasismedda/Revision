@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+
 import { useNavigate } from 'react-router-dom';
 import { imagesApi } from '../api/index.js';
 import { useSubjects } from '../context/SubjectContext.jsx';
@@ -260,14 +260,12 @@ const Images = () => {
                                     const hasLink = img.linked_question_id || img.linked_note_id;
 
                                     return (
-                                        <motion.div
+                                        <div
                                             key={img.id}
                                             ref={isLastElement ? lastImageElementRef : null}
-                                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                                            transition={{ duration: 0.4, delay: (groupImgs.indexOf(img) % 10) * 0.05 }}
-                                            className="group relative aspect-square rounded-xl overflow-hidden bg-surface-2 border border-white/[0.04] hover:border-primary/40 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-primary/5 active:scale-[0.98]"
+                                            className="group relative aspect-square rounded-xl overflow-hidden bg-surface-2 border border-white/[0.04] hover:border-primary/40 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-primary/5 active:scale-[0.98] fade-in"
                                             onClick={() => setSelectedImage(img)}
+                                            style={{ animationDelay: `${(groupImgs.indexOf(img) % 10) * 0.05}s` }}
                                         >
                                             <img
                                                 src={img.data}
@@ -325,7 +323,7 @@ const Images = () => {
                                                     <Maximize2 className="w-3 h-3 text-white/60" />
                                                 </div>
                                             </div>
-                                        </motion.div>
+                                        </div>
                                     );
                                 })}
                             </div>

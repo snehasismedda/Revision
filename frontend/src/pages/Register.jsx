@@ -111,7 +111,7 @@ const Register = () => {
                                         required
                                         value={form[key]}
                                         onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                                        className="w-full bg-slate-900/40 backdrop-blur-sm border border-white/[0.06] rounded-xl pl-11 pr-12 py-3.5 text-slate-100 text-sm transition-all focus:border-primary/40 focus:bg-slate-900/60 focus:ring-4 focus:ring-primary/10 outline-none placeholder:text-slate-600/60"
+                                        className="w-full bg-slate-900/60 border border-white/[0.06] rounded-xl pl-11 pr-12 py-3.5 text-slate-100 text-sm transition-all focus:border-primary/40 focus:bg-slate-900/60 focus:ring-4 focus:ring-primary/10 outline-none placeholder:text-slate-600/60"
                                         placeholder={placeholder}
                                         minLength={minLength}
                                     />
@@ -139,7 +139,6 @@ const Register = () => {
                                 <>
                                     <span>Create Free Account</span>
                                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] pointer-events-none" />
                                 </>
                             )}
                         </button>

@@ -53,9 +53,6 @@ const MiniProgressBar = ({ value, max, colorClass = 'bg-primary' }) => {
 // eslint-disable-next-line no-unused-vars
 const StatCard = ({ label, value, sub, icon: Icon, colorClass, delayClass, trend, progressValue, progressMax, progressColor, className = '' }) => (
     <div className={`glass-card glass p-6 min-h-[150px] flex flex-col justify-between fade-in ${delayClass} relative overflow-hidden group ${className}`}>
-        {/* Subtle Background Glow */}
-        <div className={`absolute -right-6 -bottom-6 w-28 h-28 rounded-full blur-3xl opacity-[0.07] group-hover:opacity-[0.14] transition-opacity duration-500 ${colorClass.split(' ')[0].replace('text-', 'bg-')}`} />
-
         <div className="flex justify-between items-start mb-4 relative z-10">
             <div className={`p-3 rounded-xl border border-white/5 bg-white/[0.04] shadow-inner ${colorClass}`}>
                 <Icon className="w-5 h-5" strokeWidth={2.2} />
@@ -337,9 +334,6 @@ const Dashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
                 {/* Global Accuracy & Questions Attempted - Hero Card */}
                 <div className="md:col-span-2 glass-card glass p-8 relative overflow-hidden group border-indigo-500/20 bg-indigo-500/[0.02] flex flex-col justify-between fade-in stagger-1 min-h-[220px]">
-                    {/* Subtle Background Glow */}
-                    <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl group-hover:bg-indigo-500/20 transition-colors duration-700 pointer-events-none" />
-
                     <div className="flex justify-between items-start mb-2 z-10 relative">
                         <div className="flex items-center gap-3">
                             <div className="p-3.5 rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shadow-inner">

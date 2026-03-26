@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { LayoutDashboard, LibraryBig, LogOut, Activity, ChevronLeft, ChevronRight, Settings, Image as ImageIcon, Target } from 'lucide-react';
 import EditProfileModal from './modals/EditProfileModal.jsx';
-import { motion, AnimatePresence } from 'framer-motion';
+
 
 const navItems = [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -123,10 +123,8 @@ const Sidebar = () => {
                                     <>
                                         {/* Simple Selection Indicator */}
                                         {isActive && (
-                                            <motion.div
-                                                initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
-                                                className="absolute inset-0 bg-primary/15 border border-primary/20 rounded-xl z-0"
+                                            <div
+                                                className="absolute inset-0 bg-primary/15 border border-primary/20 rounded-xl z-0 fade-in"
                                             />
                                         )}
 

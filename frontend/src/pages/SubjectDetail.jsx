@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+
 import { useParams, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
 import { sessionsApi, questionsApi, notesApi, imagesApi, aiApi, revisionApi, solutionsApi, analyticsApi } from '../api/index.js';
 import { useTopics } from '../context/TopicContext.jsx';
@@ -1967,7 +1967,7 @@ const SubjectDetail = () => {
             />
 
             <ViewNoteModal
-                isOpen={!!viewingNote}
+                isOpen={!!viewingNote && !editingNote}
                 onClose={() => {
                     if (noteStack.length > 0) {
                         // Pop the parent note from the stack
@@ -2063,51 +2063,58 @@ const SubjectDetail = () => {
                 onQuestionUpdated={handleQuestionUpdated}
             />
 
-            {/* Header Navigation */}
-            <div className="flex items-center gap-3 mb-4">
-                <Link
-                    to="/subjects"
-                    className="flex items-center gap-2 text-[13px] font-semibold text-slate-400 hover:text-white transition-all hover:bg-white/[0.06] px-3 py-1.5 rounded-lg border border-white/[0.06] hover:border-white/[0.1]"
-                >
-                    <ArrowLeft className="w-4 h-4" />
-                    <span>Back</span>
-                </Link>
-            </div>
+            <div className="relative mb-6">
+                {/* Background ambient effect */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-5xl h-24 bg-primary/5 blur-[70px] -z-10 rounded-full opacity-60" />
+                
+                <div className="flex items-center justify-between gap-6 py-2 px-1">
+                    {/* Left: Back */}
+                    <div className="flex-1 flex justify-start">
+                        <Link
+                            to="/subjects"
+                            className="flex items-center gap-2 text-[12.5px] font-bold text-slate-400 hover:text-white transition-all hover:bg-white/[0.06] pl-2.5 pr-4 py-2.5 rounded-xl border border-white/[0.04] hover:border-white/[0.1] group/back backdrop-blur-md whitespace-nowrap"
+                        >
+                            <ArrowLeft className="w-4 h-4 group-hover/back:-translate-x-0.5 transition-transform" />
+                            <span>Back</span>
+                        </Link>
+                    </div>
 
-            {/* Subject Header (Identity) */}
-            <div className="relative mb-4 mt-4">
-                <div className="absolute -inset-x-6 -inset-y-4 bg-gradient-to-b from-indigo-500/5 via-primary/2 to-transparent blur-2xl rounded-[3rem] -z-10 opacity-60" />
-
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-                    <div className="flex-1">
-                        <h1 className="text-[28px] md:text-[32px] font-heading font-extrabold text-white tracking-tight leading-tight mb-2 selection:bg-primary/30">
+                    {/* Center: Title (Maximum focus) */}
+                    <div className="flex-[4] text-center min-w-0">
+                        <h1 className="text-[28px] md:text-[38px] lg:text-[46px] font-heading font-black text-white tracking-tighter leading-none truncate drop-shadow-2xl selection:bg-primary/30 py-1">
                             {subject?.name}
                         </h1>
-                        {subject?.description && (
-                            <p className="text-slate-400/80 text-[14.5px] max-w-2xl leading-relaxed font-medium">
-                                {subject.description}
-                            </p>
-                        )}
                     </div>
-                    <Link
-                        to={`/subjects/${id}/reports`}
-                        className="flex items-center gap-2.5 text-[13px] font-bold px-5 py-3 rounded-xl transition-all cursor-pointer border border-indigo-500/20 bg-indigo-500/10 text-indigo-400 hover:text-white hover:bg-indigo-500/20 hover:border-indigo-500/40 hover:shadow-[0_0_20px_rgba(99,102,241,0.2)] group shrink-0"
-                    >
-                        <BarChart3 className="w-4.5 h-4.5 text-indigo-400 group-hover:scale-110 transition-transform" strokeWidth={2.5} />
-                        <span className="hidden sm:inline tracking-wide font-bold">Analytics</span>
-                        <span className="sm:hidden">Analytics</span>
-                    </Link>
+
+                    {/* Right: Analytics */}
+                    <div className="flex-1 flex justify-end">
+                        <Link
+                            to={`/subjects/${id}/reports`}
+                            className="flex items-center gap-2.5 text-[12px] font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer border border-indigo-500/10 bg-indigo-500/5 text-indigo-400 hover:text-white hover:bg-indigo-500/20 hover:border-indigo-500/30 group/anal shadow-lg shadow-indigo-500/5 backdrop-blur-sm whitespace-nowrap"
+                        >
+                            <BarChart3 className="w-3.5 h-3.5 text-indigo-400 group-hover/anal:scale-110 transition-transform" strokeWidth={2.5} />
+                            <span className="hidden sm:inline">Analytics</span>
+                            <span className="sm:hidden">Insights</span>
+                        </Link>
+                    </div>
                 </div>
+
+                {/* Optional small description below to keep the row height minimal */}
+                {subject?.description && (
+                    <div className="max-w-2xl mx-auto mt-2 pb-1 text-center">
+                        <p className="text-slate-400/80 text-[13px] md:text-[14px] font-medium leading-relaxed truncate px-4">
+                            {subject.description}
+                        </p>
+                    </div>
+                )}
             </div>
 
-            {/* Subtle Decorative Line */}
-            <div className="relative h-px w-full mb-4">
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent blur-[1px]" />
-            </div>
+
+
+
 
             {/* Controls (Sub-Nav + Action) — Glass background wrapper */}
-            <div className="relative p-2 rounded-2xl bg-surface-2/40 border border-white/[0.04] backdrop-blur-md mb-8 ring-1 ring-white/[0.02]">
+            <div className="relative p-2 rounded-2xl bg-surface-2/80 border border-white/[0.04] mb-8 ring-1 ring-white/[0.02]">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-50">
                     {/* Segmented Tabs */}
                     <div className="flex gap-1 p-1 bg-black/20 rounded-xl border border-white/[0.06] overflow-x-auto no-scrollbar max-w-full" >
@@ -3175,9 +3182,6 @@ const SubjectDetail = () => {
                                                 )}
 
                                                 {/* Optional background glow */}
-                                                {notesViewMode === 'grid' && (
-                                                    <div className="absolute -right-10 -top-10 w-24 h-24 bg-emerald-500/10 blur-3xl rounded-full"></div>
-                                                )}
 
                                                 <div className={`flex flex-1 min-w-0 ${notesViewMode === 'list' ? 'items-center px-4 gap-6' : 'flex-col'}`}>
                                                     {/* Title Section */}
@@ -3419,9 +3423,6 @@ const SubjectDetail = () => {
                                                 )}
 
                                                 {/* Optional background glow */}
-                                                {solutionsViewMode === 'grid' && (
-                                                    <div className="absolute -right-10 -top-10 w-24 h-24 bg-blue-500/10 blur-3xl rounded-full"></div>
-                                                )}
 
                                                 <div className={`flex flex-1 min-w-0 ${solutionsViewMode === 'list' ? 'items-center px-4 gap-6' : 'flex-col'}`}>
                                                     {/* Title Section */}

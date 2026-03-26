@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, FileText, Link2 as LinkIcon, Pencil, ChevronLeft, ChevronRight, List, PanelLeftClose, PanelLeftOpen, Plus, ArrowLeft, Wand2, Check, XCircle, Loader2, Maximize2, Minimize2, Sun, Moon } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { X, FileText, Link2 as LinkIcon, Pencil, ChevronLeft, ChevronRight, List, PanelLeftClose, PanelLeftOpen, Plus, ArrowLeft, Wand2, Check, XCircle, Loader2, Sun, Moon } from 'lucide-react';
 
 import ModalPortal from '../ModalPortal.jsx';
 import ReactMarkdown from 'react-markdown';
@@ -38,7 +38,7 @@ const getSidebarStyles = (isLightMode) => ({
         width: '260px',
         minWidth: '260px',
         borderRight: isLightMode ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)',
-        background: isLightMode ? '#f8fafc' : 'linear-gradient(180deg, rgba(18,18,26,0.95) 0%, rgba(14,14,22,0.98) 100%)',
+        background: isLightMode ? '#e5e7eb' : 'linear-gradient(180deg, rgba(18,18,26,0.95) 0%, rgba(14,14,22,0.98) 100%)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
@@ -59,7 +59,7 @@ const getSidebarStyles = (isLightMode) => ({
         flexShrink: 0,
     },
     headerIcon: {
-        color: '#8b5cf6',
+        color: '#10b981',
         opacity: 0.8,
     },
     headerTitle: {
@@ -85,15 +85,15 @@ const getSidebarStyles = (isLightMode) => ({
         fontSize: level === 1 ? '13px' : level === 2 ? '12.5px' : '12px',
         fontWeight: level === 1 ? 600 : level === 2 ? 500 : 400,
         color: isActive
-            ? '#a78bfa'
+            ? '#10b981'
             : level === 1
                 ? (isLightMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.7)')
                 : level === 2
                     ? (isLightMode ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.5)')
                     : (isLightMode ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.4)'),
         lineHeight: '1.5',
-        borderLeft: isActive ? '2px solid #8b5cf6' : '2px solid transparent',
-        background: isActive ? 'rgba(139,92,246,0.06)' : 'transparent',
+        borderLeft: isActive ? '2px solid #10b981' : '2px solid transparent',
+        background: isActive ? 'rgba(16,185,129,0.06)' : 'transparent',
         transition: 'all 0.2s ease',
         textDecoration: 'none',
         fontFamily: "'Inter', sans-serif",
@@ -109,7 +109,7 @@ const getSidebarStyles = (isLightMode) => ({
         borderRadius: '50%',
         marginTop: '7px',
         background: isActive
-            ? '#8b5cf6'
+            ? '#10b981'
             : level === 1
                 ? (isLightMode ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.25)')
                 : (isLightMode ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.12)'),
@@ -125,12 +125,11 @@ const getSidebarStyles = (isLightMode) => ({
 });
 
 /** TOC Sidebar Item */
-const TocItem = ({ heading, isActive, onClick, isLightMode }) => {
+const TocItem = React.memo(({ heading, isActive, onClick, sidebarStyles }) => {
     const [hovered, setHovered] = useState(false);
-    const styles = getSidebarStyles(isLightMode);
     const style = {
-        ...styles.item(heading.level, isActive),
-        ...(hovered && !isActive ? styles.itemHover : {}),
+        ...sidebarStyles.item(heading.level, isActive),
+        ...(hovered && !isActive ? sidebarStyles.itemHover : {}),
     };
 
     return (
@@ -142,11 +141,44 @@ const TocItem = ({ heading, isActive, onClick, isLightMode }) => {
             title={heading.text}
             className="w-full text-left border-none bg-transparent block"
         >
-            <span style={styles.dot(heading.level, isActive)} className="inline-block align-top mr-2" />
+            <span style={sidebarStyles.dot(heading.level, isActive)} className="inline-block align-top mr-2" />
             <span className="inline-block max-w-[calc(100%-15px)] break-words">{heading.text}</span>
         </button>
     );
-};
+});
+
+
+// Memoized linked note button to prevent re-renders on hover
+const LinkedNoteButton = React.memo(({ child, isLightMode, onSafeAction, onOpenChildNote }) => {
+    const baseStyle = useMemo(() => ({
+        color: isLightMode ? 'rgba(124,58,237,0.85)' : 'rgba(167,139,250,0.75)',
+        background: 'transparent',
+        border: '1px solid transparent',
+    }), [isLightMode]);
+
+    const hoverStyle = useMemo(() => ({
+        color: isLightMode ? '#059669' : '#10b981',
+        background: isLightMode ? 'rgba(16,185,129,0.1)' : 'rgba(16,185,129,0.08)',
+        borderColor: 'rgba(16,185,129,0.2)',
+    }), [isLightMode]);
+
+    const [isHovered, setIsHovered] = useState(false);
+
+    return (
+        <button
+            onClick={() => onSafeAction(() => onOpenChildNote && onOpenChildNote(child))}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            className="w-full text-left flex items-center gap-2 px-3 py-2 mb-1 rounded-lg text-[12px] font-medium transition-all cursor-pointer group"
+            style={isHovered ? hoverStyle : baseStyle}
+            title={child.title || 'Untitled Note'}
+        >
+            <FileText size={12} style={{ flexShrink: 0, opacity: 0.6 }} />
+            <span className="truncate flex-1">{child.title || 'Untitled Note'}</span>
+            <LinkIcon size={10} style={{ flexShrink: 0, opacity: 0.3 }} />
+        </button>
+    );
+});
 
 
 // ----------------------------------------------------------------
@@ -266,7 +298,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
 
 
     const [sidebarOpen, setSidebarOpen] = useState(true);
-    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(true);
     const [isLightMode, setIsLightMode] = useState(false);
     const [activeHeadingId, setActiveHeadingId] = useState(null);
     const [headings, setHeadings] = useState([]);
@@ -285,9 +317,36 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
     const [aiResult, setAiResult] = useState('');
     const [aiLoading, setAiLoading] = useState(false);
 
-    const processedContent = preprocessMarkdown(note?.content || '');
+    const handleSafeAction = useCallback((action) => {
+        if (editMode) {
+            if (!window.confirm("You have unsaved edits. Are you sure you want to discard them?")) {
+                return;
+            }
+        }
+        if (action) action();
+    }, [editMode]);
+
+    const processedContent = useMemo(() => preprocessMarkdown(note?.content || ''), [note?.content]);
     const hasHeadings = headings.length > 0;
     const hasLinkedNotes = childNotes && childNotes.length > 0;
+
+    // Memoize sidebar styles to avoid recalculating on every render
+    const sidebarStyles = useMemo(() => getSidebarStyles(isLightMode), [isLightMode]);
+    const sidebarContainerStyle = useMemo(() => sidebarOpen ? sidebarStyles.container : { ...sidebarStyles.container, ...sidebarStyles.containerCollapsed }, [sidebarOpen, sidebarStyles]);
+    const sidebarBoxShadow = useMemo(() => {
+        if (!sidebarOpen) return 'none';
+        return isLightMode ? '4px 0 24px rgba(0,0,0,0.1)' : '4px 0 24px rgba(0,0,0,0.5)';
+    }, [sidebarOpen, isLightMode]);
+    const sidebarBgColor = useMemo(() => isLightMode ? '#e5e7eb' : 'rgba(18,18,26,0.98)', [isLightMode]);
+
+    // Memoize markdown components and plugins to prevent unnecessary re-renders
+    const markdownComponents = useMemo(() => ({
+        table: ({...props}) => <div className="overflow-x-auto w-full my-4 rounded-lg border border-slate-200/20"><table className="w-full text-left border-collapse min-w-[500px]" {...props} /></div>,
+        img: ({...props}) => <img className="max-w-full h-auto rounded-lg" {...props} />
+    }), []);
+
+    const markdownPlugins = useMemo(() => [remarkGfm, remarkMath], []);
+    const markdownRehypePlugins = useMemo(() => [rehypeRaw, [rehypeKatex, { strict: false }]], []);
 
     // Build TOC by reading actual DOM headings after ReactMarkdown renders
     useEffect(() => {
@@ -322,29 +381,39 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [onPrev, onNext, onClose, editMode]);
 
-    // Scroll spy
+    // Scroll spy (throttled for performance)
     useEffect(() => {
         const container = contentRef.current;
         if (!container || headings.length === 0) return;
 
+        let rafId = null;
+
         const handleScroll = () => {
-            const containerRect = container.getBoundingClientRect();
-            let currentId = null;
-            for (const h of headings) {
-                const el = document.getElementById(h.id);
-                if (el) {
-                    const rect = el.getBoundingClientRect();
-                    if (rect.top <= containerRect.top + containerRect.height * 0.4) {
-                        currentId = h.id;
+            if (rafId) return;
+            rafId = requestAnimationFrame(() => {
+                rafId = null;
+                const containerRect = container.getBoundingClientRect();
+                let currentId = null;
+                for (const h of headings) {
+                    const el = document.getElementById(h.id);
+                    if (el) {
+                        const rect = el.getBoundingClientRect();
+                        if (rect.top <= containerRect.top + containerRect.height * 0.4) {
+                            currentId = h.id;
+                        }
                     }
                 }
-            }
-            setActiveHeadingId(currentId);
+                setActiveHeadingId(currentId);
+                lastScrollTop = container.scrollTop;
+            });
         };
 
         container.addEventListener('scroll', handleScroll, { passive: true });
         handleScroll();
-        return () => container.removeEventListener('scroll', handleScroll);
+        return () => {
+            container.removeEventListener('scroll', handleScroll);
+            if (rafId) cancelAnimationFrame(rafId);
+        };
     }, [headings]);
 
     // Helper to extract the markdown snippet corresponding to the plain text selection
@@ -580,27 +649,26 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
 
     return (
         <ModalPortal>
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-6 modal-backdrop fade-in" onClick={onClose}>
+            <div className={`fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 modal-backdrop fade-in ${isLightMode ? 'bg-black/20' : 'bg-black/60'}`}>
                 <div
-                    className={`w-full flex flex-col ${isFullscreen ? 'h-screen md:max-h-screen rounded-none border-none' : 'h-[90vh] md:h-auto md:max-h-[85vh] rounded-2xl shadow-2xl border'} overflow-hidden`}
+                    className={`w-full flex flex-col ${isFullscreen ? 'h-[100dvh] sm:max-h-screen rounded-none border-none' : 'h-[95dvh] sm:h-auto sm:max-h-[85vh] rounded-t-[1.5rem] sm:rounded-2xl shadow-2xl sm:border'} overflow-hidden relative transition-all duration-300 transform`}
                     style={{
-                        background: isLightMode ? '#ffffff' : '#12121a',
+                        background: isLightMode ? '#f3f4f6' : '#0e0e16',
                         borderColor: isLightMode ? '#e2e8f0' : 'rgba(255,255,255,0.08)',
                         maxWidth: isFullscreen ? 'none' : (hasHeadings ? '72rem' : '56rem'),
-                        transition: 'max-width 0.3s ease, border-radius 0.3s ease',
                         contain: 'layout paint style',
                         isolation: 'isolate',
-                        willChange: 'auto',
+                        backdropFilter: 'blur(8px)'
                     }}
                     onClick={e => e.stopPropagation()}
                 >
                     {/* Header */}
-                    <div className={`flex items-center justify-between px-5 py-3.5 border-b shrink-0 ${isLightMode ? 'bg-[#f8fafc] border-slate-200 text-slate-900' : 'bg-surface-2/80 border-white/[0.06] text-white'}`}>
-                        <div className="flex items-center gap-3">
+                    <div className={`flex items-center justify-between px-4 sm:px-5 py-3 sm:py-3.5 border-b shrink-0 z-30 ${isLightMode ? 'bg-[#e5e7eb] border-slate-300/60 text-slate-900' : 'border-white/[0.05] text-white'}`} style={{ background: isLightMode ? '' : 'linear-gradient(180deg, rgba(14,14,22,1) 0%, rgba(14,14,22,0.95) 100%)' }}>
+                        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 pr-2">
                             {(onPrev || onNext) && (
                                 <div className={`hidden md:flex items-center mr-1 rounded-lg border overflow-hidden ${isLightMode ? 'border-slate-300 bg-white' : 'border-white/[0.1] bg-white/[0.02]'}`}>
                                     <button
-                                        onClick={(e) => { e.stopPropagation(); onPrev?.(); }}
+                                        onClick={(e) => { e.stopPropagation(); handleSafeAction(() => onPrev?.()); }}
                                         disabled={!onPrev}
                                         className={`p-1.5 transition-all ${!onPrev ? 'opacity-30 cursor-not-allowed' : isLightMode ? 'hover:bg-slate-100 cursor-pointer' : 'hover:bg-white/[0.1] cursor-pointer'}`}
                                         title="Previous Note"
@@ -609,7 +677,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                     </button>
                                     <div className={`w-[1px] h-4 ${isLightMode ? 'bg-slate-300' : 'bg-white/[0.1]'}`} />
                                     <button
-                                        onClick={(e) => { e.stopPropagation(); onNext?.(); }}
+                                        onClick={(e) => { e.stopPropagation(); handleSafeAction(() => onNext?.()); }}
                                         disabled={!onNext}
                                         className={`p-1.5 transition-all ${!onNext ? 'opacity-30 cursor-not-allowed' : isLightMode ? 'hover:bg-slate-100 cursor-pointer' : 'hover:bg-white/[0.1] cursor-pointer'}`}
                                         title="Next Note"
@@ -621,7 +689,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                             {/* Back to parent note button */}
                             {parentNoteTitle && (
                                 <button
-                                    onClick={onClose}
+                                    onClick={() => handleSafeAction(onClose)}
                                     className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold text-amber-500 hover:bg-amber-500/10 transition-all border border-amber-500/20 hover:border-amber-500/40 cursor-pointer"
                                     title={`Back to "${parentNoteTitle}"`}
                                 >
@@ -629,15 +697,15 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                     <span className="max-w-[120px] truncate hidden sm:inline">Back</span>
                                 </button>
                             )}
-                            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)]">
+                            <div className="p-1.5 sm:p-2 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)] shrink-0">
                                 <FileText className="w-4 h-4" />
                             </div>
-                            <div>
-                                <h3 className={`text-[16px] font-heading font-bold ${isLightMode ? 'text-slate-900' : 'text-white'} tracking-tight leading-snug`}>
+                            <div className="flex-1 min-w-0">
+                                <h3 className={`text-[15px] sm:text-[16px] font-heading font-bold ${isLightMode ? 'text-slate-900' : 'text-white'} tracking-tight leading-snug truncate`}>
                                     {note.title}
                                 </h3>
                                 <div className="flex items-center gap-2 mt-0.5 opacity-80">
-                                    <span className={`text-[11px] font-medium ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                    <span className={`text-[10px] sm:text-[11px] font-medium ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
                                         {new Date(note.created_at).toLocaleDateString(undefined, {
                                             day: 'numeric',
                                             month: 'short',
@@ -648,12 +716,12 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                             </div>
                         </div>
                         {/* Control Panel Group */}
-                        <div className="flex items-center">
+                        <div className="flex items-center shrink-0">
                             <div className={`flex items-center gap-1 p-1 rounded-xl ${isLightMode ? 'bg-slate-100/80 border border-slate-200/60' : 'bg-white/[0.03] border border-white/[0.05]'}`}>
                                 {(hasHeadings || hasLinkedNotes) && (
                                     <button
                                         onClick={() => setSidebarOpen(prev => !prev)}
-                                        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${isLightMode ? 'bg-white shadow-sm text-purple-600 hover:bg-purple-50' : 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30'}`}
+                                        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${isLightMode ? 'bg-white shadow-sm text-emerald-600 hover:bg-emerald-50' : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'}`}
                                         title={sidebarOpen ? 'Hide Sidebar' : 'Show Sidebar'}
                                     >
                                         {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
@@ -661,11 +729,11 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                 )}
                                 {note.question_id && onNavigateToQuestion && (
                                     <button
-                                        onClick={() => {
+                                        onClick={() => handleSafeAction(() => {
                                             onClose();
                                             onNavigateToQuestion(note.question_id);
-                                        }}
-                                        className={`hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${isLightMode ? 'bg-white shadow-sm text-indigo-600 hover:bg-indigo-50' : 'bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30'}`}
+                                        })}
+                                        className={`hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${isLightMode ? 'bg-white shadow-sm text-emerald-600 hover:bg-emerald-50' : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'}`}
                                         title={note.is_note_link ? 'View Note' : 'View Question'}
                                     >
                                         <LinkIcon className="w-4 h-4" />
@@ -673,10 +741,9 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                 )}
                                 {onEdit && (
                                     <button
-                                        onClick={() => {
-                                            onClose();
+                                        onClick={() => handleSafeAction(() => {
                                             onEdit(note);
-                                        }}
+                                        })}
                                         className={`hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${isLightMode ? 'bg-white shadow-sm text-emerald-600 hover:bg-emerald-50' : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'}`}
                                         title="Edit Note"
                                     >
@@ -695,18 +762,10 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                 >
                                     {isLightMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
                                 </button>
-                                <button
-                                    onClick={() => setIsFullscreen(!isFullscreen)}
-                                    className={`hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${isLightMode ? 'bg-white shadow-sm text-blue-600 hover:bg-blue-50' : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'}`}
-                                    title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
-                                >
-                                    {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                                </button>
-
                                 <div className={`w-[1px] h-4 mx-0.5 ${isLightMode ? 'bg-slate-300' : 'bg-white/[0.1]'}`} />
 
                                 <button
-                                    onClick={onClose}
+                                    onClick={() => handleSafeAction(onClose)}
                                     className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all ${isLightMode ? 'text-slate-500 hover:bg-red-50 hover:text-red-500' : 'text-slate-400 hover:bg-red-500/20 hover:text-red-400'}`}
                                     title="Close"
                                 >
@@ -717,29 +776,41 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                     </div>
 
                     {/* Body — Sidebar + Content */}
-                    <div className="flex flex-1 overflow-hidden">
+                    <div className="flex flex-1 overflow-hidden relative">
 
-                        {/* TOC Sidebar — desktop only */}
+                        {/* Mobile Overlay Background for Sidebar */}
+                        {(hasHeadings || hasLinkedNotes) && sidebarOpen && (
+                            <div 
+                                className="md:hidden absolute inset-0 z-10 bg-black/50" 
+                                onClick={() => setSidebarOpen(false)}
+                            />
+                        )}
+
+                        {/* TOC Sidebar */}
                         {(hasHeadings || hasLinkedNotes) && (
                             <div
-                                className="hidden md:flex flex-col"
-                                style={sidebarOpen ? getSidebarStyles(isLightMode).container : { ...getSidebarStyles(isLightMode).container, ...getSidebarStyles(isLightMode).containerCollapsed }}
+                                className="absolute md:relative z-20 h-full flex flex-col md:flex"
+                                style={{
+                                    ...sidebarContainerStyle,
+                                    boxShadow: sidebarBoxShadow,
+                                    backgroundColor: sidebarBgColor
+                                }}
                             >
                                 {/* TOC headings */}
                                 {hasHeadings && (
                                     <>
-                                        <div style={getSidebarStyles(isLightMode).header}>
-                                            <List size={14} style={getSidebarStyles(isLightMode).headerIcon} />
-                                            <span style={getSidebarStyles(isLightMode).headerTitle}>On This Page</span>
+                                        <div style={sidebarStyles.header}>
+                                            <List size={14} style={sidebarStyles.headerIcon} />
+                                            <span style={sidebarStyles.headerTitle}>On This Page</span>
                                         </div>
-                                        <div style={getSidebarStyles(isLightMode).list} className="custom-scrollbar">
+                                        <div style={sidebarStyles.list} className="custom-scrollbar">
                                             {headings.map((h) => (
                                                 <TocItem
                                                     key={h.id}
                                                     heading={h}
                                                     isActive={activeHeadingId === h.id}
                                                     onClick={() => scrollToHeading(h.id)}
-                                                    isLightMode={isLightMode}
+                                                    sidebarStyles={sidebarStyles}
                                                 />
                                             ))}
                                         </div>
@@ -753,11 +824,11 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                         flexShrink: 0,
                                     }}>
                                         <div style={{
-                                            ...getSidebarStyles(isLightMode).header,
+                                            ...sidebarStyles.header,
                                             paddingBottom: '10px',
                                         }}>
                                             <LinkIcon size={13} style={{ color: '#a78bfa', opacity: 0.8 }} />
-                                            <span style={getSidebarStyles(isLightMode).headerTitle}>Linked Notes</span>
+                                            <span style={sidebarStyles.headerTitle}>Linked Notes</span>
                                             <span style={{
                                                 marginLeft: 'auto',
                                                 fontSize: '10px',
@@ -770,31 +841,13 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                         </div>
                                         <div style={{ padding: '0 10px 12px' }}>
                                             {childNotes.map((child) => (
-                                                <button
+                                                <LinkedNoteButton
                                                     key={child.id}
-                                                    onClick={() => onOpenChildNote && onOpenChildNote(child)}
-                                                    className="w-full text-left flex items-center gap-2 px-3 py-2 mb-1 rounded-lg text-[12px] font-medium transition-all cursor-pointer group"
-                                                    style={{
-                                                        color: isLightMode ? 'rgba(124,58,237,0.85)' : 'rgba(167,139,250,0.75)',
-                                                        background: 'transparent',
-                                                        border: '1px solid transparent',
-                                                    }}
-                                                    onMouseEnter={e => {
-                                                        e.currentTarget.style.color = isLightMode ? '#6d28d9' : '#a78bfa';
-                                                        e.currentTarget.style.background = isLightMode ? 'rgba(139,92,246,0.1)' : 'rgba(139,92,246,0.08)';
-                                                        e.currentTarget.style.borderColor = 'rgba(139,92,246,0.2)';
-                                                    }}
-                                                    onMouseLeave={e => {
-                                                        e.currentTarget.style.color = isLightMode ? 'rgba(124,58,237,0.85)' : 'rgba(167,139,250,0.75)';
-                                                        e.currentTarget.style.background = 'transparent';
-                                                        e.currentTarget.style.borderColor = 'transparent';
-                                                    }}
-                                                    title={child.title || 'Untitled Note'}
-                                                >
-                                                    <FileText size={12} style={{ flexShrink: 0, opacity: 0.6 }} />
-                                                    <span className="truncate flex-1">{child.title || 'Untitled Note'}</span>
-                                                    <LinkIcon size={10} style={{ flexShrink: 0, opacity: 0.3 }} />
-                                                </button>
+                                                    child={child}
+                                                    isLightMode={isLightMode}
+                                                    onSafeAction={handleSafeAction}
+                                                    onOpenChildNote={onOpenChildNote}
+                                                />
                                             ))}
                                         </div>
                                     </div>
@@ -805,7 +858,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                         {/* Content Body - Markdown Rendered */}
                         <div
                             ref={contentRef}
-                            className="px-6 py-6 md:px-8 md:py-8 overflow-y-auto custom-scrollbar flex-1 relative"
+                            className="px-4 py-5 md:px-8 md:py-8 overflow-y-auto custom-scrollbar flex-1 relative w-full"
                             style={{ background: isLightMode ? '#ffffff' : '#12121a' }}
                         >
                             {/* Text Selection Toolbar */}
@@ -1013,11 +1066,11 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                 </div>
                             )}
 
-                            <div className={`prose prose-lg max-w-none prose-headings:font-heading prose-headings:font-bold prose-h1:text-[22px] prose-h2:text-[19px] prose-h3:text-[17px] prose-headings:mt-6 prose-headings:mb-3 prose-p:leading-relaxed prose-p:mb-3 prose-ul:my-3 prose-ol:my-3 prose-li:my-1 prose-pre:border prose-code:before:content-none prose-code:after:content-none ${isLightMode ? 'prose-slate text-slate-800 prose-p:text-slate-800 prose-a:text-indigo-600 hover:prose-a:text-indigo-700 prose-strong:text-slate-900 prose-code:text-slate-800 prose-pre:bg-slate-50 prose-pre:border-slate-200' : 'prose-invert prose-p:text-slate-300 prose-a:text-indigo-400 hover:prose-a:text-indigo-300 prose-strong:text-white prose-code:text-slate-300 prose-pre:bg-surface-2 prose-pre:border-white/[0.08]'}`}>
+                            <div className={`prose prose-base sm:prose-lg max-w-none break-words sm:break-normal prose-headings:font-heading prose-headings:font-bold prose-h1:text-[20px] sm:prose-h1:text-[22px] prose-h2:text-[18px] sm:prose-h2:text-[19px] prose-h3:text-[16px] sm:prose-h3:text-[17px] prose-headings:mt-6 prose-headings:mb-3 prose-p:leading-relaxed prose-p:mb-3 prose-ul:my-3 prose-ol:my-3 prose-li:my-1 prose-pre:border prose-pre:max-w-full prose-code:before:content-none prose-code:after:content-none ${isLightMode ? 'prose-slate text-slate-800 prose-p:text-slate-800 prose-a:text-indigo-600 hover:prose-a:text-indigo-700 prose-strong:text-slate-900 prose-code:text-slate-800 prose-pre:bg-slate-50 prose-pre:border-slate-200' : 'prose-invert prose-p:text-slate-300 prose-a:text-indigo-400 hover:prose-a:text-indigo-300 prose-strong:text-white prose-code:text-slate-300 prose-pre:bg-surface-2 prose-pre:border-white/[0.08]'}`}>
                                 <ReactMarkdown
-                                    remarkPlugins={[remarkGfm, remarkMath]}
-                                    rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
-
+                                    remarkPlugins={markdownPlugins}
+                                    rehypePlugins={markdownRehypePlugins}
+                                    components={markdownComponents}
                                 >
                                     {processedContent}
                                 </ReactMarkdown>
@@ -1027,13 +1080,13 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
 
                     {/* Mobile Footer for Source Link */}
                     {note.question_id && onNavigateToQuestion && (
-                        <div className="md:hidden px-6 py-4 border-t border-white/[0.06] shrink-0 bg-surface-2/80">
+                        <div className={`md:hidden px-4 sm:px-6 py-4 border-t shrink-0 z-30 ${isLightMode ? 'bg-[#f8fafc] border-slate-200' : 'bg-surface-2 border-white/[0.06]'}`}>
                             <button
-                                onClick={() => {
+                                onClick={() => handleSafeAction(() => {
                                     onClose();
                                     onNavigateToQuestion(note.question_id);
-                                }}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[14px] font-semibold bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 transition-all border border-indigo-500/20"
+                                })}
+                                className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[14px] font-semibold transition-all ${isLightMode ? 'bg-indigo-50 text-indigo-600 border border-indigo-200 hover:bg-indigo-100' : 'bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 border border-indigo-500/20'}`}
                             >
                                 <LinkIcon className="w-4 h-4" />
                                 <span>View Source Question</span>

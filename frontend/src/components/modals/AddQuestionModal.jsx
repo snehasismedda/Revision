@@ -212,7 +212,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop fade-in" onClick={onClose}>
                 <div
                     className="w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-                    style={{ background: 'rgba(22, 22, 34, 0.95)', border: '1px solid rgba(255,255,255,0.08)' }}
+                    style={{ background: 'rgba(12, 12, 22, 0.95)', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(10px)' }}
                     onClick={e => e.stopPropagation()}
                 >
                     {/* Header */}
