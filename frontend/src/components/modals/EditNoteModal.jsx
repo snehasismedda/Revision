@@ -439,7 +439,7 @@ const EditNoteModal = ({ isOpen, onClose, subjectId, note, onNoteUpdated }) => {
             <div className="fixed inset-0 z-[110] flex items-center justify-center p-0 modal-backdrop fade-in">
                 <div
                     className="w-full h-[100dvh] flex flex-col overflow-hidden"
-                    style={{ background: 'rgba(10, 10, 16, 0.94)', backdropFilter: 'blur(8px)' }}
+                    style={{ background: '#0a0a10', willChange: 'transform, opacity' }}
                     onClick={e => e.stopPropagation()}
                 >
                     {/* Top Bar */}
@@ -485,7 +485,7 @@ const EditNoteModal = ({ isOpen, onClose, subjectId, note, onNoteUpdated }) => {
                     {!isCropping && (
                         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
                             {/* Left Sidebar */}
-                            <div className="w-full lg:w-[380px] xl:w-[420px] shrink-0 border-b lg:border-b-0 lg:border-r border-white/[0.04] flex flex-col overflow-hidden" style={{ background: 'rgba(10, 10, 16, 0.92)' }}>
+                            <div className="w-full lg:w-[380px] xl:w-[420px] shrink-0 border-b lg:border-b-0 lg:border-r border-white/[0.04] flex flex-col overflow-hidden bg-[#0a0a10]">
                                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
                                     <div>
                                         <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.2em] mb-2.5 block">Note Type</label>

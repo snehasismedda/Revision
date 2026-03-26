@@ -23,8 +23,16 @@ export const getNoteImage = async (req, res, next) => {
 export const getNotes = async (req, res, next) => {
     try {
         const { subjectId } = req.params;
-        const notes = await noteModel.getNotesBySubject(subjectId);
-        res.json({ notes });
+        const { limit, offset } = req.query;
+        const limitNum = limit ? parseInt(limit) : undefined;
+        const offsetNum = offset ? parseInt(offset) : 0;
+
+        const [notes, totalCount] = await Promise.all([
+            noteModel.getNotesBySubject(subjectId, limitNum, offsetNum),
+            noteModel.getNoteCountBySubject(subjectId)
+        ]);
+        
+        res.json({ notes, totalCount: parseInt(totalCount.count) });
     } catch (error) {
         next(error);
     }

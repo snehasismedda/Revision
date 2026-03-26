@@ -458,11 +458,11 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
             <div className="fixed inset-0 z-[110] flex items-center justify-center p-0 modal-backdrop fade-in">
                 <div
                     className="w-full h-[100dvh] flex flex-col overflow-hidden"
-                    style={{ background: 'rgba(10, 10, 16, 0.94)', backdropFilter: 'blur(8px)' }}
+                    style={{ background: '#0a0a10', willChange: 'transform, opacity' }}
                     onClick={e => e.stopPropagation()}
                 >
                     {/* ═══ Top Bar ═══ */}
-                    <div className="flex items-center justify-between px-5 sm:px-8 py-3.5 border-b border-white/[0.05] shrink-0" style={{ background: 'linear-gradient(180deg, rgba(14,14,22,1) 0%, rgba(14,14,22,0.95) 100%)' }}>
+                    <div className="flex items-center justify-between px-5 sm:px-8 py-3.5 border-b border-white/[0.05] shrink-0 bg-[#0e0e16]">
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/15 text-emerald-400 flex items-center justify-center">
                                 <PlusCircle className="w-4 h-4" />
@@ -518,7 +518,7 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
                         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
 
                             {/* ─── Left Sidebar (metadata + image) ─── */}
-                            <div className="w-full lg:w-[380px] xl:w-[420px] shrink-0 border-b lg:border-b-0 lg:border-r border-white/[0.04] flex flex-col overflow-hidden" style={{ background: 'rgba(10, 10, 16, 0.92)' }}>
+                            <div className="w-full lg:w-[380px] xl:w-[420px] shrink-0 border-b lg:border-b-0 lg:border-r border-white/[0.04] flex flex-col overflow-hidden bg-[#0a0a10]">
                                 <div className="flex-1 overflow-y-auto custom-scrollbar p-5 sm:p-6 space-y-6">
                                     {/* Type Selector */}
                                     <div>

@@ -123,7 +123,13 @@ export const questionsApi = {
 
 // Notes
 export const notesApi = {
-    list: (subjectId) => request(`/subjects/${subjectId}/notes`),
+    list: (subjectId, limit, offset) => {
+        let q = [];
+        if (limit != null) q.push(`limit=${limit}`);
+        if (offset != null) q.push(`offset=${offset}`);
+        const qs = q.length ? '?' + q.join('&') : '';
+        return request(`/subjects/${subjectId}/notes${qs}`);
+    },
     getTags: (subjectId) => request(`/subjects/${subjectId}/notes/tags`),
     create: (subjectId, body) => request(`/subjects/${subjectId}/notes`, { method: 'POST', body }),
     update: (subjectId, noteId, body) => request(`/subjects/${subjectId}/notes/${noteId}`, { method: 'PUT', body }),

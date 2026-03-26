@@ -38,11 +38,11 @@ const getSidebarStyles = (isLightMode) => ({
         width: '260px',
         minWidth: '260px',
         borderRight: isLightMode ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)',
-        background: isLightMode ? '#e5e7eb' : 'linear-gradient(180deg, rgba(18,18,26,0.95) 0%, rgba(14,14,22,0.98) 100%)',
+        background: isLightMode ? '#e5e7eb' : '#12121a',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        transition: 'width 0.3s cubic-bezier(0.4,0,0.2,1), min-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease',
+        transition: 'transform 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease',
     },
     containerCollapsed: {
         width: '0px',
@@ -233,9 +233,8 @@ const TableEditPanel = ({ editOriginalText, editText, setEditText, editPosition,
                 left: `${Math.max(16, editPosition.x)}px`,
                 top: `${editPosition.y + 8}px`,
                 transform: 'translateX(-50%)',
-                background: 'rgba(20, 20, 35, 0.98)',
-                
-                boxShadow: '0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)',
+                background: isLightMode ? '#ffffff' : '#1a1a2e',
+                boxShadow: isLightMode ? '0 4px 20px rgba(0,0,0,0.1)' : '0 8px 32px rgba(0,0,0,0.5)',
             }}
         >
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
@@ -332,17 +331,23 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
 
     // Memoize sidebar styles to avoid recalculating on every render
     const sidebarStyles = useMemo(() => getSidebarStyles(isLightMode), [isLightMode]);
-    const sidebarContainerStyle = useMemo(() => sidebarOpen ? sidebarStyles.container : { ...sidebarStyles.container, ...sidebarStyles.containerCollapsed }, [sidebarOpen, sidebarStyles]);
+    const sidebarContainerStyle = useMemo(() => {
+        const base = sidebarOpen ? sidebarStyles.container : { ...sidebarStyles.container, ...sidebarStyles.containerCollapsed };
+        return {
+            ...base,
+            willChange: 'transform, opacity'
+        };
+    }, [sidebarOpen, sidebarStyles]);
     const sidebarBoxShadow = useMemo(() => {
         if (!sidebarOpen) return 'none';
-        return isLightMode ? '4px 0 24px rgba(0,0,0,0.1)' : '4px 0 24px rgba(0,0,0,0.5)';
+        return isLightMode ? '2px 0 12px rgba(0,0,0,0.05)' : '2px 0 12px rgba(0,0,0,0.3)';
     }, [sidebarOpen, isLightMode]);
-    const sidebarBgColor = useMemo(() => isLightMode ? '#e5e7eb' : 'rgba(18,18,26,0.98)', [isLightMode]);
+    const sidebarBgColor = useMemo(() => isLightMode ? '#e5e7eb' : '#12121a', [isLightMode]);
 
     // Memoize markdown components and plugins to prevent unnecessary re-renders
     const markdownComponents = useMemo(() => ({
-        table: ({...props}) => <div className="overflow-x-auto w-full my-4 rounded-lg border border-slate-200/20"><table className="w-full text-left border-collapse min-w-[500px]" {...props} /></div>,
-        img: ({...props}) => <img className="max-w-full h-auto rounded-lg" {...props} />
+        table: ({ ...props }) => <div className="overflow-x-auto w-full my-4 rounded-lg border border-slate-200/20"><table className="w-full text-left border-collapse min-w-[500px]" {...props} /></div>,
+        img: ({ ...props }) => <img className="max-w-full h-auto rounded-lg" {...props} />
     }), []);
 
     const markdownPlugins = useMemo(() => [remarkGfm, remarkMath], []);
@@ -657,13 +662,12 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                         borderColor: isLightMode ? '#e2e8f0' : 'rgba(255,255,255,0.08)',
                         maxWidth: isFullscreen ? 'none' : (hasHeadings ? '72rem' : '56rem'),
                         contain: 'layout paint style',
-                        isolation: 'isolate',
-                        backdropFilter: 'blur(8px)'
+                        isolation: 'isolate'
                     }}
                     onClick={e => e.stopPropagation()}
                 >
                     {/* Header */}
-                    <div className={`flex items-center justify-between px-4 sm:px-5 py-3 sm:py-3.5 border-b shrink-0 z-30 ${isLightMode ? 'bg-[#e5e7eb] border-slate-300/60 text-slate-900' : 'border-white/[0.05] text-white'}`} style={{ background: isLightMode ? '' : 'linear-gradient(180deg, rgba(14,14,22,1) 0%, rgba(14,14,22,0.95) 100%)' }}>
+                    <div className={`flex items-center justify-between px-4 sm:px-5 py-3 sm:py-3.5 border-b shrink-0 z-30 ${isLightMode ? 'bg-[#e5e7eb] border-slate-300/60 text-slate-900' : 'bg-[#0e0e16] border-white/[0.05] text-white'}`}>
                         <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 pr-2">
                             {(onPrev || onNext) && (
                                 <div className={`hidden md:flex items-center mr-1 rounded-lg border overflow-hidden ${isLightMode ? 'border-slate-300 bg-white' : 'border-white/[0.1] bg-white/[0.02]'}`}>
@@ -780,8 +784,8 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
 
                         {/* Mobile Overlay Background for Sidebar */}
                         {(hasHeadings || hasLinkedNotes) && sidebarOpen && (
-                            <div 
-                                className="md:hidden absolute inset-0 z-10 bg-black/50" 
+                            <div
+                                className="md:hidden absolute inset-0 z-10 bg-black/50"
                                 onClick={() => setSidebarOpen(false)}
                             />
                         )}
@@ -878,8 +882,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                         style={{
                                             background: isLightMode ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 15, 25, 0.95)',
                                             borderColor: isLightMode ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)',
-                                            
-                                            boxShadow: isLightMode ? '0 4px 24px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)' : '0 4px 24px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)',
+                                            boxShadow: isLightMode ? '0 4px 12px rgba(0,0,0,0.1)' : '0 4px 16px rgba(0,0,0,0.4)',
                                         }}
                                     >
                                         {onAddToNote && (
@@ -944,9 +947,8 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                         left: `${Math.max(16, editPosition.x)}px`,
                                         top: `${editPosition.y + 8}px`,
                                         transform: 'translateX(-50%)',
-                                        background: 'rgba(20, 20, 35, 0.98)',
-                                        
-                                        boxShadow: '0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)',
+                                        background: isLightMode ? '#ffffff' : '#1a1a2e',
+                                        boxShadow: isLightMode ? '0 4px 20px rgba(0,0,0,0.1)' : '0 8px 32px rgba(0,0,0,0.5)',
                                     }}
                                 >
                                     <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
@@ -991,9 +993,8 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                         left: `${Math.max(16, editPosition.x)}px`,
                                         top: `${editPosition.y + 8}px`,
                                         transform: 'translateX(-50%)',
-                                        background: 'rgba(20, 20, 35, 0.98)',
-                                        
-                                        boxShadow: '0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)',
+                                        background: isLightMode ? '#ffffff' : '#1a1a2e',
+                                        boxShadow: isLightMode ? '0 4px 20px rgba(0,0,0,0.1)' : '0 8px 32px rgba(0,0,0,0.5)',
                                     }}
                                 >
                                     <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">

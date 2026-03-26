@@ -1,9 +1,26 @@
 import db from '../knex/db.js';
 
-export const getNotesBySubject = async (subjectId) => {
-    return await db('revision.notes')
+export const getNotesBySubject = async (subjectId, limit, offset) => {
+    let query = db('revision.notes')
         .where({ subject_id: subjectId, is_deleted: false })
         .orderBy('created_at', 'desc');
+    
+    if (limit !== undefined) {
+        query = query.limit(limit);
+    }
+    
+    if (offset !== undefined) {
+        query = query.offset(offset);
+    }
+    
+    return await query;
+};
+
+export const getNoteCountBySubject = async (subjectId) => {
+    return await db('revision.notes')
+        .where({ subject_id: subjectId, is_deleted: false })
+        .count('id as count')
+        .first();
 };
 
 export const getNotesByQuestion = async (questionId) => {

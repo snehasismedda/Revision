@@ -10,6 +10,7 @@ import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import RichTextRenderer from '../components/RichTextRenderer.jsx';
 import toast from 'react-hot-toast';
 import { jsPDF } from 'jspdf';
+import JSZip from 'jszip';
 import unidecode from 'unidecode';
 import autoTable from 'jspdf-autotable';
 import { marked } from 'marked';
@@ -73,7 +74,7 @@ const SubjectDetail = () => {
 
     const { subjects, statsMap, isLoaded: subjectsLoaded, loadSubjects, refreshStats } = useSubjects();
     const { topicsBySubject, loadTopics, deleteTopic } = useTopics();
-    
+
     // Derived from global state
     const topics = topicsBySubject[id] || [];
     const subject = subjects.find(s => s.id === id);
@@ -92,6 +93,13 @@ const SubjectDetail = () => {
     const [loadingMoreImages, setLoadingMoreImages] = useState(false);
     const [hasMoreImages, setHasMoreImages] = useState(true);
     const IMAGE_LIMIT = 20;
+
+    // Pagination for notes
+    const [notePage, setNotePage] = useState(0);
+    const [loadingMoreNotes, setLoadingMoreNotes] = useState(false);
+    const [hasMoreNotes, setHasMoreNotes] = useState(true);
+    const NOTE_LIMIT = 12;
+
     const [activeTab, setActiveTab] = useState('topics');
     const [showTopicModal, setShowTopicModal] = useState(false);
     const [showQuestionModal, setShowQuestionModal] = useState(false);
@@ -1169,6 +1177,60 @@ const SubjectDetail = () => {
         }
     };
 
+    const handleDownloadMarkdownSelected = async () => {
+        if (selectedItems.size === 0) return;
+        const loadingToast = toast.loading('Generating Markdown...');
+
+        try {
+            const itemIds = Array.from(selectedItems);
+            let items = [];
+            if (activeTab === 'notes') {
+                items = itemIds.map(iid => notes.find(n => n.id === iid)).filter(Boolean);
+            } else {
+                items = itemIds.map(iid => questions.find(q => q.id === iid)).filter(Boolean);
+            }
+
+            const itemType = activeTab === 'notes' ? 'Note' : 'Question';
+
+            if (items.length === 1) {
+                // Download single MD file
+                const item = items[0];
+                const content = item.content || '';
+                const title = item.title ? sanitizeForPDF(item.title) : `${itemType}`;
+                const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+                const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+                const fileName = `${title}_${timestamp}.md`.replace(/\s+/g, '_');
+                saveAs(blob, fileName);
+            } else {
+                // Download Zip of MD files
+                const zip = new JSZip();
+                const folderName = `${subject?.name || 'Export'}_${activeTab}`;
+                const folder = zip.folder(folderName);
+
+                items.forEach((item, index) => {
+                    const content = item.content || '';
+                    const title = item.title ? sanitizeForPDF(item.title) : `${itemType}_${index + 1}`;
+                    folder.file(`${title}.md`.replace(/\s+/g, '_'), content);
+                });
+
+                const content = await zip.generateAsync({ type: 'blob' });
+                const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+                saveAs(content, `${folderName}_${timestamp}.zip`.replace(/\s+/g, '_'));
+            }
+
+            setIsSelectionMode(false);
+            setSelectedItems(new Set());
+            toast.success('Markdown generated successfully!', { id: loadingToast, duration: 4000 });
+
+        } catch (error) {
+            console.error('Markdown Export Error:', error);
+            toast.error(`Failed to generate Markdown: ${error.message || String(error)}`, {
+                id: loadingToast,
+                duration: 6000
+            });
+        }
+    };
+
     useEffect(() => {
         if (imagePage === 0) return; // handled by initial load
         const loadMore = async () => {
@@ -1187,6 +1249,24 @@ const SubjectDetail = () => {
         loadMore();
     }, [id, imagePage]);
 
+    useEffect(() => {
+        if (notePage === 0) return;
+        const loadMore = async () => {
+            setLoadingMoreNotes(true);
+            try {
+                const res = await notesApi.list(id, NOTE_LIMIT, notePage * NOTE_LIMIT);
+                const newNotes = res.notes || [];
+                setHasMoreNotes(newNotes.length === NOTE_LIMIT);
+                setNotes(prev => [...prev, ...newNotes]);
+            } catch {
+                toast.error('Failed to load more notes');
+            } finally {
+                setLoadingMoreNotes(false);
+            }
+        };
+        loadMore();
+    }, [id, notePage]);
+
     const fetchTabData = async (tab) => {
         if (loadedTabs.has(tab) || !id) return;
         setTabLoading(true);
@@ -1204,8 +1284,11 @@ const SubjectDetail = () => {
                     setQuestions(qsRes.questions || []);
                     break;
                 case 'notes':
-                    const notesRes = await notesApi.list(id);
-                    setNotes(notesRes.notes || []);
+                    const notesRes = await notesApi.list(id, NOTE_LIMIT, 0);
+                    const initialNotes = notesRes.notes || [];
+                    setNotes(initialNotes);
+                    setHasMoreNotes(initialNotes.length === NOTE_LIMIT);
+                    setNotePage(0);
                     break;
                 case 'solutions':
                     const solutionsRes = await solutionsApi.list(id);
@@ -1263,7 +1346,7 @@ const SubjectDetail = () => {
     useEffect(() => {
         const loadBaseData = async () => {
             if (!id) return;
-            
+
             try {
                 // 1. Ensure subjects are loaded
                 if (!subjectsLoaded) {
@@ -1285,9 +1368,9 @@ const SubjectDetail = () => {
                 // Derived state handles loading
             }
         };
-        
+
         loadBaseData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, subjectsLoaded]); // Only rerun if ID changes or we need to trigger initial load
 
 
@@ -2066,7 +2149,7 @@ const SubjectDetail = () => {
             <div className="relative mb-6">
                 {/* Background ambient effect */}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-5xl h-24 bg-primary/5 blur-[70px] -z-10 rounded-full opacity-60" />
-                
+
                 <div className="flex items-center justify-between gap-6 py-2 px-1">
                     {/* Left: Back */}
                     <div className="flex-1 flex justify-start">
@@ -2122,13 +2205,13 @@ const SubjectDetail = () => {
                             ['topics', 'sessions', 'questions', 'notes', 'solutions', 'revision', 'images'].map((tab) => {
                                 let count;
                                 switch (tab) {
-                                case 'topics': count = overview?.totalTopics ?? topics.length; break;
-                                case 'sessions': count = overview?.totalSessions ?? sessions.length; break;
-                                case 'questions': count = overview?.availableQuestions ?? questions.length; break;
-                                case 'notes': count = overview?.totalNotes ?? notes.length; break;
-                                case 'solutions': count = overview?.totalSolutions ?? solutions.length; break;
-                                case 'images': count = overview?.totalImages ?? images.length; break;
-                                case 'revision': count = overview?.totalRevisionSessions ?? revisionSessions.length; break;
+                                    case 'topics': count = overview?.totalTopics ?? topics.length; break;
+                                    case 'sessions': count = overview?.totalSessions ?? sessions.length; break;
+                                    case 'questions': count = overview?.availableQuestions ?? questions.length; break;
+                                    case 'notes': count = overview?.totalNotes ?? notes.length; break;
+                                    case 'solutions': count = overview?.totalSolutions ?? solutions.length; break;
+                                    case 'images': count = overview?.totalImages ?? images.length; break;
+                                    case 'revision': count = overview?.totalRevisionSessions ?? revisionSessions.length; break;
                                 }
                                 return (
                                     <button
@@ -2218,6 +2301,13 @@ const SubjectDetail = () => {
                                                             >
                                                                 <FileText className="w-4 h-4 text-sky-400 group-hover:scale-110 transition-transform" />
                                                                 Download as Word
+                                                            </button>
+                                                            <button
+                                                                onClick={() => { handleDownloadMarkdownSelected(); setShowExportMenu(false); }}
+                                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium text-slate-300 hover:text-white hover:bg-fuchsia-500/20 rounded-xl transition-colors cursor-pointer group"
+                                                            >
+                                                                <FileText className="w-4 h-4 text-fuchsia-400 group-hover:scale-110 transition-transform" />
+                                                                Download as MD
                                                             </button>
 
                                                             <div className="h-px bg-white/10 my-1 mx-2"></div>
@@ -2318,6 +2408,13 @@ const SubjectDetail = () => {
                                                             >
                                                                 <FileText className="w-4 h-4 text-sky-400 group-hover:scale-110 transition-transform" />
                                                                 Download as Word
+                                                            </button>
+                                                            <button
+                                                                onClick={() => { handleDownloadMarkdownSelected(); setShowExportMenu(false); }}
+                                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium text-slate-300 hover:text-white hover:bg-fuchsia-500/20 rounded-xl transition-colors cursor-pointer group"
+                                                            >
+                                                                <FileText className="w-4 h-4 text-fuchsia-400 group-hover:scale-110 transition-transform" />
+                                                                Download as MD
                                                             </button>
 
                                                             <div className="h-px bg-white/10 my-1 mx-2"></div>
@@ -2420,690 +2517,116 @@ const SubjectDetail = () => {
             ) : (
                 <>
 
-                {activeTab === 'topics' && (
-                    <div className="fade-in">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
-                            <div className="flex items-center gap-2">
-                                <BookOpen className="w-6 h-6 text-indigo-400" />
-                                <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Syllabus</h3>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <button
-                                    onClick={handleDownloadSyllabus}
-                                    disabled={isDownloadingSyllabus}
-                                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 border border-emerald-500/20 transition-all cursor-pointer uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Download Syllabus as PDF"
-                                >
-                                    {isDownloadingSyllabus ? (
-                                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                    ) : (
-                                        <Download className="w-3.5 h-3.5" />
-                                    )}
-                                    <span>Export PDF</span>
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setTopicsDefaultExpanded(true);
-                                        setTreeKey(prev => prev + 1);
-                                    }}
-                                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-400 hover:text-primary hover:bg-primary/10 border border-white/5 transition-all cursor-pointer uppercase tracking-wider"
-                                    title="Expand all"
-                                >
-                                    <Maximize2 className="w-3.5 h-3.5" />
-                                    <span>Expand All</span>
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setTopicsDefaultExpanded(false);
-                                        setTreeKey(prev => prev + 1);
-                                    }}
-                                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white hover:bg-white/10 border border-white/5 transition-all cursor-pointer uppercase tracking-wider"
-                                    title="Collapse all"
-                                >
-                                    <Minimize2 className="w-3.5 h-3.5" />
-                                    <span>Collapse All</span>
-                                </button>
-                            </div>
-                        </div>
-                        {topics.length === 0 ? (
-                            <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5">
-                                    <BookOpen className="w-10 h-10 text-indigo-500/70" />
-                                </div>
-                                <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No topics yet</h3>
-                                <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
-                                    Build your syllabus by adding topics and subtopics to organize your study material.
-                                </p>
-                                <button
-                                    onClick={() => setShowTopicModal(true)}
-                                    className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
-                                >
-                                    <PlusCircle className="w-4 h-4" />
-                                    <span>Manage Syllabus</span>
-                                </button>
-                            </div>
-                        ) : (
-                            <TopicTree
-                                key={treeKey}
-                                topics={topics}
-                                subjectId={id}
-                                defaultExpanded={topicsDefaultExpanded}
-                            />
-                        )}
-                    </div>
-                )}
-
-            {activeTab === 'sessions' && (
-                    <div className="fade-in">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
-                            <div className="flex items-center gap-2">
-                                <Activity className="w-6 h-6 text-indigo-400" />
-                                <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Study Sessions</h3>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <div className="relative group flex-1 sm:min-w-[280px]">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
-                                    <input
-                                        type="text"
-                                        value={sessionSearchQuery}
-                                        onChange={(e) => setSessionSearchQuery(e.target.value)}
-                                        placeholder="Search sessions..."
-                                        className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
-                                    />
-                                    {sessionSearchQuery && (
-                                        <button
-                                            onClick={() => setSessionSearchQuery('')}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </button>
-                                    )}
-                                </div>
-                                <div className="flex bg-surface-2/50 p-1 rounded-xl border border-white/[0.06] shrink-0">
-                                    <button
-                                        onClick={() => setSessionsViewMode('grid')}
-                                        className={`p-1.5 rounded-lg transition-all ${sessionsViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
-                                        title="Grid View"
-                                    >
-                                        <LayoutGrid className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        onClick={() => setSessionsViewMode('list')}
-                                        className={`p-1.5 rounded-lg transition-all ${sessionsViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
-                                        title="List View"
-                                    >
-                                        <List className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-
-                        {sessions.length === 0 ? (
-                            <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5">
-                                    <Activity className="w-10 h-10 text-violet-500/70" />
-                                </div>
-                                <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No learning sessions</h3>
-                                <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
-                                    You haven't recorded any sessions for this subject yet. Start a session to log your correct and incorrect topics.
-                                </p>
-                                <button
-                                    onClick={() => setShowSessionModal(true)}
-                                    className="bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 hover:border-violet-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
-                                >
-                                    <PlusCircle className="w-4 h-4" />
-                                    <span>Record First Session</span>
-                                </button>
-                            </div>
-                        ) : (
-                            <div className={`grid gap-5 ${sessionsViewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
-                                {(() => {
-                                    if (filteredSessions.length === 0 && sessions.length > 0) {
-                                        return (
-                                            <div className="col-span-full py-12 flex flex-col items-center justify-center text-center glass-panel rounded-2xl border-dashed border-white/10">
-                                                <Search className="w-8 h-8 text-slate-600 mb-3" />
-                                                <p className="text-slate-400 font-medium">No sessions match your search</p>
-                                                <button onClick={() => setSessionSearchQuery('')} className="mt-2 text-indigo-400 text-sm hover:underline">Clear search</button>
-                                            </div>
-                                        );
-                                    }
-
-                                    return filteredSessions.map((s) => (
-                                        <SessionCard
-                                            key={s.id}
-                                            session={s}
-                                            subjectId={id}
-                                            viewMode={sessionsViewMode}
-                                            onDelete={(session) => setConfirmDeleteSession({ open: true, session })}
-                                            onEdit={(session) => setEditingSession(session)}
-                                        />
-
-                                    ));
-                                })()}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-            {activeTab === 'questions' && (
-                    <div className="fade-in">
-                        {/* Header for Questions */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
-                            <div className="flex items-center gap-2">
-                                <ListChecks className="w-6 h-6 text-indigo-400" />
-                                <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Question Bank</h3>
-                            </div>
-                            <div className="relative group w-full sm:min-w-[300px] sm:w-auto">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
-                                <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search content or tags..."
-                                    className="w-full sm:w-[300px] bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
-                                />
-                                {searchQuery && (
-                                    <button
-                                        onClick={() => setSearchQuery('')}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-6 items-start">
-                            {/* Form moved to Modal */}
-
-                            {/* Questions List (Full Width) */}
-                            <div className="w-full">
-                                {questions.length === 0 ? (
-                                    <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                        <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 rotate-3">
-                                            <ListChecks className="w-10 h-10 text-indigo-500/70" />
-                                        </div>
-                                        <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">Your question bank is empty</h3>
-                                        <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
-                                            Start adding questions from your books or notes. AI will automatically format them for better readability.
-                                        </p>
-                                        <button
-                                            onClick={() => setShowQuestionModal(true)}
-                                            className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
-                                        >
-                                            <PlusCircle className="w-4 h-4" />
-                                            <span>Add Your First Question</span>
-                                        </button>
-                                    </div>
-                                ) : groupedQuestions.length === 0 ? (
-                                    <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                        <div className="w-16 h-16 rounded-2xl bg-surface-2 flex items-center justify-center mb-4 border border-white/5">
-                                            <Search className="w-8 h-8 text-slate-600" />
-                                        </div>
-                                        <h4 className="text-lg font-bold text-white mb-1">No matching questions</h4>
-                                        <p className="text-slate-500 text-sm">Try adjusting your search query or tags</p>
-                                        <button
-                                            onClick={() => setSearchQuery('')}
-                                            className="mt-6 text-indigo-400 hover:text-indigo-300 text-sm font-semibold"
-                                        >
-                                            Clear Search
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="grid grid-cols-1 gap-7">
-                                        {groupedQuestions.map((group) => {
-                                            const isExpanded = expandedGroups[group.rootId];
-                                            const rootQ = group.questions[0] || group.parent;
-                                            if (!rootQ) return null;
-
-                                            if (!group.isGroup) {
-                                                const q = rootQ;
-                                                const existingAINote = notes.find(n => n.question_id === q.id && n.title?.startsWith('AI Note'));
-                                                return (
-                                                    <div
-                                                        key={q.id}
-                                                        id={`question-${q.id}`}
-                                                        className={`question-card group relative transition-all ${isSelectionMode ? (selectedItems.has(q.id) ? 'ring-2 ring-indigo-500 cursor-pointer bg-indigo-500/5' : 'cursor-pointer hover:bg-white/[0.02]') : ''}`}
-                                                        onClick={() => {
-                                                            if (isSelectionMode) {
-                                                                const next = new Set(selectedItems);
-                                                                if (next.has(q.id)) next.delete(q.id);
-                                                                else next.add(q.id);
-                                                                setSelectedItems(next);
-                                                            }
-                                                        }}
-                                                    >
-                                                        {isSelectionMode && (
-                                                            <div className="absolute top-4 right-4 z-20">
-                                                                <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(q.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-500 bg-surface-3/50'}`}>
-                                                                    {selectedItems.has(q.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                        {/* Card Header — question number + metadata */}
-                                                        <div className="flex items-center gap-3 mb-4 pb-3 border-b border-white/[0.06]">
-                                                            <span className="text-[15px] font-heading font-bold text-primary tracking-tight">
-                                                                Q
-                                                            </span>
-                                                            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-surface-3/80 text-slate-300 rounded-md text-[12px] font-semibold border border-white/5">
-                                                                {q.type === 'image' ? <ImageIcon className="w-4 h-4 text-indigo-400" /> : <FileText className="w-4 h-4 text-emerald-400" />}
-                                                                {q.type === 'image' ? 'Image' : 'Text'}
-                                                            </span>
-                                                            <span className="text-[12px] text-slate-500 ml-auto font-medium">
-                                                                {new Date(q.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                            </span>
-
-                                                            <div className="flex items-center gap-1 ml-2">
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setEditingQuestion(q);
-                                                                        setShowEditQuestionModal(true);
-                                                                    }}
-                                                                    className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer"
-                                                                    title="Edit Question"
-                                                                >
-                                                                    <Pencil className="w-[18px] h-[18px]" />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setSelectedQuestionIdForNote(q.id);
-                                                                        setShowNoteModal(true);
-                                                                    }}
-                                                                    className="p-2 text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-all cursor-pointer"
-                                                                    title="Manual Note"
-                                                                >
-                                                                    <FileText className="w-[18px] h-[18px]" />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        const existingRes = solutions.find(s => s.question_id === q.id);
-                                                                        if (existingRes) {
-                                                                            setViewingSolution(existingRes);
-                                                                            if (existingRes.source_image_id) {
-                                                                                handleFetchSolutionImage(existingRes.id);
-                                                                            }
-                                                                        } else {
-                                                                            setSelectedQuestionIdForSolution(q.id);
-                                                                            setShowSolutionModal(true);
-                                                                        }
-                                                                    }}
-                                                                    className={`p-2 rounded-lg transition-all cursor-pointer ${solutions.some(s => s.question_id === q.id) ? 'text-blue-400 bg-blue-400/10' : 'text-slate-500 hover:text-blue-400 hover:bg-blue-400/10'}`}
-                                                                    title={solutions.some(s => s.question_id === q.id) ? "View Solution" : "Add Solution"}
-                                                                >
-                                                                    <ListChecks className="w-[18px] h-[18px]" />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleGenerateAINote(q.id)}
-                                                                    disabled={generatingAINoteId === q.id}
-                                                                    className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer disabled:opacity-50"
-                                                                    title={existingAINote ? "View AI Note" : "AI Note"}
-                                                                >
-                                                                    {generatingAINoteId === q.id ? (
-                                                                        <div className="w-[18px] h-[18px] border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
-                                                                    ) : existingAINote ? (
-                                                                        <BookOpen className="w-[18px] h-[18px]" />
-                                                                    ) : (
-                                                                        <Wand2 className="w-[18px] h-[18px]" />
-                                                                    )}
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => setConfirmDeleteQuestion({ open: true, questionId: q.id })}
-                                                                    className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all cursor-pointer"
-                                                                    title="Delete Question"
-                                                                >
-                                                                    <Trash2 className="w-[18px] h-[18px]" />
-                                                                </button>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Card Body — question content */}
-                                                        <div className="prose prose-invert prose-lg max-w-none text-slate-200 text-[15px] leading-[1.7]">
-                                                            {q.formatted_content && q.formatted_content.root ? (
-                                                                <RichTextRenderer content={q.formatted_content} />
-                                                            ) : (
-                                                                <ReactMarkdown
-                                                                    remarkPlugins={[remarkGfm, remarkMath]}
-                                                                    rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
-                                                                >
-                                                                    {preprocessMarkdown(q.content)}
-                                                                </ReactMarkdown>
-                                                            )}
-                                                        </div>
-
-                                                        {/* Tags display */}
-                                                        {q.parsedTags && q.parsedTags.length > 0 && (
-                                                            <div className="mt-4 flex flex-wrap gap-2">
-                                                                {q.parsedTags.map((tag, idx) => (
-                                                                    <span key={idx} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                                                        <Hash className="w-2.5 h-2.5" />
-                                                                        {tag}
-                                                                    </span>
-                                                                ))}
-                                                            </div>
-                                                        )}
-
-                                                        {q.type === 'image' && (
-                                                            <div className="mt-5 relative group/img-container w-fit">
-                                                                {fetchedImages[q.id] || fetchedImages[q.source_image_id] ? (
-                                                                    <div className="relative">
-                                                                        <div className="rounded-xl overflow-hidden border border-white/10 inline-block bg-black/40 group/img relative">
-                                                                            <img
-                                                                                src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
-                                                                                alt="Original Question"
-                                                                                className="max-h-80 object-contain transition-all group-hover/img:opacity-50"
-                                                                            />
-                                                                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
-                                                                                <span className="bg-black/60 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/10">
-                                                                                    Original Attachment
-                                                                                </span>
-                                                                            </div>
-                                                                        </div>
-                                                                        <button
-                                                                            onClick={() => handleHideImage(q.id)}
-                                                                            className="absolute -top-2 -right-2 p-1.5 bg-slate-800/90 text-slate-400 hover:text-white rounded-full border border-white/10 shadow-lg opacity-0 group-hover/img-container:opacity-100 transition-all cursor-pointer z-10"
-                                                                            title="Hide Image"
-                                                                        >
-                                                                            <X className="w-3.5 h-3.5" />
-                                                                        </button>
-                                                                    </div>
-                                                                ) : (
-                                                                    <button
-                                                                        onClick={() => handleFetchImage(q.id)}
-                                                                        disabled={fetchingImageId === q.id}
-                                                                        className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-surface-3/80 text-slate-300 hover:text-white hover:bg-surface-3 transition-all border border-white/5 shadow-sm disabled:opacity-50 cursor-pointer"
-                                                                    >
-                                                                        {fetchingImageId === q.id ? (
-                                                                            <div className="w-3.5 h-3.5 border border-white/30 border-t-white rounded-full animate-spin" />
-                                                                        ) : (
-                                                                            <ImageIcon className="w-4 h-4 text-indigo-400" />
-                                                                        )}
-                                                                        <span>
-                                                                            {fetchingImageId === q.id ? 'Loading...' : 'Show Source Image'}
-                                                                        </span>
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        )}
-
-
-                                                    </div>
-                                                );
-                                            }
-
-                                            return (
-                                                <div key={group.rootId} className="flex flex-col gap-3">
-                                                    {/* Group Header */}
-                                                    <div
-                                                        onClick={() => toggleGroup(group.rootId)}
-                                                        className="flex items-center justify-between p-4 rounded-xl bg-surface-2 border border-white/[0.06] cursor-pointer hover:bg-surface-3 transition-colors group/header"
-                                                    >
-                                                        <div className="flex items-center gap-4">
-                                                            <div className="p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
-                                                                {rootQ.type === 'image' ? <ImageIcon className="w-5 h-5 text-indigo-400" /> : <FileText className="w-5 h-5 text-emerald-400" />}
-                                                            </div>
-                                                            <div>
-                                                                <div className="flex items-center gap-3">
-                                                                    <h4 className="text-[15px] font-heading font-bold text-white tracking-tight">
-                                                                        {rootQ.type === 'image' ? 'Image' : 'Text'} Collection
-                                                                    </h4>
-                                                                    <span className="px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-                                                                        {group.questions.length} Items
-                                                                    </span>
-                                                                </div>
-                                                                <p className="text-[12px] text-slate-500 mt-0.5">
-                                                                    Uploaded {new Date(group.newestAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center gap-3">
-                                                            <div className={`p-2 rounded-lg bg-white/[0.03] text-slate-500 group-hover/header:text-white transition-all ${isExpanded ? 'rotate-180' : ''}`}>
-                                                                <ChevronDown className="w-4 h-4" />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Group Content */}
-                                                    {isExpanded && (
-                                                        <div className="flex flex-col gap-5 pl-8 border-l-2 border-white/[0.06] mt-2 mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                                                            {group.questions.map((q, qidx) => {
-                                                                const existingAINote = notes.find(n => n.question_id === q.id && n.title?.startsWith('AI Note'));
-                                                                return (
-                                                                    <div
-                                                                        key={q.id}
-                                                                        id={`question-${q.id}`}
-                                                                        className={`question-card group relative transition-all ${isSelectionMode ? (selectedItems.has(q.id) ? 'ring-2 ring-indigo-500 cursor-pointer bg-indigo-500/5' : 'cursor-pointer hover:bg-white/[0.02]') : ''}`}
-                                                                        onClick={() => {
-                                                                            if (isSelectionMode) {
-                                                                                const next = new Set(selectedItems);
-                                                                                if (next.has(q.id)) next.delete(q.id);
-                                                                                else next.add(q.id);
-                                                                                setSelectedItems(next);
-                                                                            }
-                                                                        }}
-                                                                    >
-                                                                        {isSelectionMode && (
-                                                                            <div className="absolute top-4 right-4 z-20">
-                                                                                <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(q.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-500 bg-surface-3/50'}`}>
-                                                                                    {selectedItems.has(q.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
-                                                                                </div>
-                                                                            </div>
-                                                                        )}
-                                                                        {/* Card Header — question number + metadata */}
-                                                                        <div className="flex items-center gap-3 mb-4 pb-3 border-b border-white/[0.06]">
-                                                                            <span className="text-[15px] font-heading font-bold text-primary tracking-tight">
-                                                                                #{qidx + 1}
-                                                                            </span>
-                                                                            <span className="text-[12px] text-slate-500 ml-auto font-medium">
-                                                                                {new Date(q.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                                            </span>
-
-                                                                            <div className="flex items-center gap-1 ml-2">
-                                                                                <button
-                                                                                    onClick={() => {
-                                                                                        setEditingQuestion(q);
-                                                                                        setShowEditQuestionModal(true);
-                                                                                    }}
-                                                                                    className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer"
-                                                                                    title="Edit Question"
-                                                                                >
-                                                                                    <Pencil className="w-[18px] h-[18px]" />
-                                                                                </button>
-                                                                                <button
-                                                                                    onClick={() => {
-                                                                                        setSelectedQuestionIdForNote(q.id);
-                                                                                        setShowNoteModal(true);
-                                                                                    }}
-                                                                                    className="p-2 text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-all cursor-pointer"
-                                                                                    title="Manual Note"
-                                                                                >
-                                                                                    <FileText className="w-[18px] h-[18px]" />
-                                                                                </button>
-                                                                                <button
-                                                                                    onClick={() => {
-                                                                                        const existingRes = solutions.find(s => s.question_id === q.id);
-                                                                                        if (existingRes) {
-                                                                                            setViewingSolution(existingRes);
-                                                                                            if (existingRes.source_image_id) {
-                                                                                                handleFetchSolutionImage(existingRes.id);
-                                                                                            }
-                                                                                        } else {
-                                                                                            setSelectedQuestionIdForSolution(q.id);
-                                                                                            setShowSolutionModal(true);
-                                                                                        }
-                                                                                    }}
-                                                                                    className={`p-2 rounded-lg transition-all cursor-pointer ${solutions.some(s => s.question_id === q.id) ? 'text-blue-400 bg-blue-400/10' : 'text-slate-500 hover:text-blue-400 hover:bg-blue-400/10'}`}
-                                                                                    title={solutions.some(s => s.question_id === q.id) ? "View Solution" : "Add Solution"}
-                                                                                >
-                                                                                    <ListChecks className="w-[18px] h-[18px]" />
-                                                                                </button>
-                                                                                <button
-                                                                                    onClick={() => handleGenerateAINote(q.id)}
-                                                                                    disabled={generatingAINoteId === q.id}
-                                                                                    className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer disabled:opacity-50"
-                                                                                    title={existingAINote ? "View AI Note" : "AI Note"}
-                                                                                >
-                                                                                    {generatingAINoteId === q.id ? (
-                                                                                        <div className="w-[18px] h-[18px] border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
-                                                                                    ) : existingAINote ? (
-                                                                                        <BookOpen className="w-[18px] h-[18px]" />
-                                                                                    ) : (
-                                                                                        <Wand2 className="w-[18px] h-[18px]" />
-                                                                                    )}
-                                                                                </button>
-                                                                                <button
-                                                                                    onClick={() => setConfirmDeleteQuestion({ open: true, questionId: q.id })}
-                                                                                    className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all cursor-pointer"
-                                                                                    title="Delete Question"
-                                                                                >
-                                                                                    <Trash2 className="w-[18px] h-[18px]" />
-                                                                                </button>
-                                                                            </div>
-                                                                        </div>
-
-                                                                        {/* Card Body — question content */}
-                                                                        <div className="prose prose-invert prose-lg max-w-none text-slate-200 text-[15px] leading-[1.7]">
-                                                                            {q.formatted_content && q.formatted_content.root ? (
-                                                                                <RichTextRenderer content={q.formatted_content} />
-                                                                            ) : (
-                                                                                <ReactMarkdown
-                                                                                    remarkPlugins={[remarkGfm, remarkMath]}
-                                                                                    rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
-                                                                                >
-                                                                                    {preprocessMarkdown(q.content)}
-                                                                                </ReactMarkdown>
-                                                                            )}
-                                                                        </div>
-
-                                                                        {/* Tags display */}
-                                                                        {q.parsedTags && q.parsedTags.length > 0 && (
-                                                                            <div className="mt-4 flex flex-wrap gap-2">
-                                                                                {q.parsedTags.map((tag, idx) => (
-                                                                                    <span key={idx} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                                                                        <Hash className="w-2.5 h-2.5" />
-                                                                                        {tag}
-                                                                                    </span>
-                                                                                ))}
-                                                                            </div>
-                                                                        )}
-
-                                                                        {q.type === 'image' && qidx === 0 && (
-                                                                            <div className="mt-5 relative group/img-container w-fit">
-                                                                                {fetchedImages[q.id] || fetchedImages[q.source_image_id] ? (
-                                                                                    <div className="relative">
-                                                                                        <div className="rounded-xl overflow-hidden border border-white/10 inline-block bg-black/40 group/img relative">
-                                                                                            <img
-                                                                                                src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
-                                                                                                alt="Original Question"
-                                                                                                className="max-h-80 object-contain transition-all group-hover/img:opacity-50"
-                                                                                            />
-                                                                                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
-                                                                                                <span className="bg-black/60 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/10">
-                                                                                                    Source Image
-                                                                                                </span>
-                                                                                            </div>
-                                                                                        </div>
-                                                                                        <button
-                                                                                            onClick={() => handleHideImage(q.id)}
-                                                                                            className="absolute -top-2 -right-2 p-1.5 bg-slate-800/90 text-slate-400 hover:text-white rounded-full border border-white/10 shadow-lg opacity-0 group-hover/img-container:opacity-100 transition-all cursor-pointer z-10"
-                                                                                            title="Hide Image"
-                                                                                        >
-                                                                                            <X className="w-3.5 h-3.5" />
-                                                                                        </button>
-                                                                                    </div>
-                                                                                ) : (
-                                                                                    <button
-                                                                                        onClick={() => handleFetchImage(q.id)}
-                                                                                        disabled={fetchingImageId === q.id}
-                                                                                        className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-surface-3/80 text-slate-300 hover:text-white hover:bg-surface-3 transition-all border border-white/5 shadow-sm disabled:opacity-50 cursor-pointer"
-                                                                                    >
-                                                                                        {fetchingImageId === q.id ? (
-                                                                                            <div className="w-3.5 h-3.5 border border-white/30 border-t-white rounded-full animate-spin" />
-                                                                                        ) : (
-                                                                                            <ImageIcon className="w-4 h-4 text-indigo-400" />
-                                                                                        )}
-                                                                                        <span>
-                                                                                            {fetchingImageId === q.id ? 'Loading...' : 'Show Shared Source Image'}
-                                                                                        </span>
-                                                                                    </button>
-                                                                                )}
-                                                                            </div>
-                                                                        )}
-
-
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-            {activeTab === 'notes' && (
-                    <div className="fade-in">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
-                            <div className="flex items-center gap-2">
-                                <FileText className="w-6 h-6 text-indigo-400" />
-                                <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Notes</h3>
-                            </div>
-                            <div className="flex flex-col sm:flex-row sm:items-center items-stretch gap-3 w-full sm:w-auto">
-                                <div className="relative group flex-1 sm:min-w-[280px]">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
-                                    <input
-                                        type="text"
-                                        value={noteSearchQuery}
-                                        onChange={(e) => setNoteSearchQuery(e.target.value)}
-                                        placeholder="Search notes..."
-                                        className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
-                                    />
-                                    {noteSearchQuery && (
-                                        <button
-                                            onClick={() => setNoteSearchQuery('')}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </button>
-                                    )}
-                                </div>
+                    {activeTab === 'topics' && (
+                        <div className="fade-in">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
                                 <div className="flex items-center gap-2">
-                                    {allNoteTags.length > 0 && (
-                                        <div className="flex-1">
-                                            <select
-                                                value={selectedNoteTag}
-                                                onChange={(e) => setSelectedNoteTag(e.target.value)}
-                                                className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-200 rounded-xl px-4 py-2 text-[13px] focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all appearance-none cursor-pointer pr-10 hover:border-white/[0.15]"
-                                                style={{
-                                                    backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(148, 163, 184, 1)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                                                    backgroundRepeat: 'no-repeat',
-                                                    backgroundPosition: 'right 0.75rem center',
-                                                    backgroundSize: '1em'
-                                                }}
+                                    <BookOpen className="w-6 h-6 text-indigo-400" />
+                                    <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Syllabus</h3>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <button
+                                        onClick={handleDownloadSyllabus}
+                                        disabled={isDownloadingSyllabus}
+                                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 border border-emerald-500/20 transition-all cursor-pointer uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title="Download Syllabus as PDF"
+                                    >
+                                        {isDownloadingSyllabus ? (
+                                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                        ) : (
+                                            <Download className="w-3.5 h-3.5" />
+                                        )}
+                                        <span>Export PDF</span>
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setTopicsDefaultExpanded(true);
+                                            setTreeKey(prev => prev + 1);
+                                        }}
+                                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-400 hover:text-primary hover:bg-primary/10 border border-white/5 transition-all cursor-pointer uppercase tracking-wider"
+                                        title="Expand all"
+                                    >
+                                        <Maximize2 className="w-3.5 h-3.5" />
+                                        <span>Expand All</span>
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setTopicsDefaultExpanded(false);
+                                            setTreeKey(prev => prev + 1);
+                                        }}
+                                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white hover:bg-white/10 border border-white/5 transition-all cursor-pointer uppercase tracking-wider"
+                                        title="Collapse all"
+                                    >
+                                        <Minimize2 className="w-3.5 h-3.5" />
+                                        <span>Collapse All</span>
+                                    </button>
+                                </div>
+                            </div>
+                            {topics.length === 0 ? (
+                                <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
+                                    <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5">
+                                        <BookOpen className="w-10 h-10 text-indigo-500/70" />
+                                    </div>
+                                    <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No topics yet</h3>
+                                    <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                        Build your syllabus by adding topics and subtopics to organize your study material.
+                                    </p>
+                                    <button
+                                        onClick={() => setShowTopicModal(true)}
+                                        className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
+                                    >
+                                        <PlusCircle className="w-4 h-4" />
+                                        <span>Manage Syllabus</span>
+                                    </button>
+                                </div>
+                            ) : (
+                                <TopicTree
+                                    key={treeKey}
+                                    topics={topics}
+                                    subjectId={id}
+                                    defaultExpanded={topicsDefaultExpanded}
+                                />
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'sessions' && (
+                        <div className="fade-in">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                                <div className="flex items-center gap-2">
+                                    <Activity className="w-6 h-6 text-indigo-400" />
+                                    <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Study Sessions</h3>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="relative group flex-1 sm:min-w-[280px]">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                                        <input
+                                            type="text"
+                                            value={sessionSearchQuery}
+                                            onChange={(e) => setSessionSearchQuery(e.target.value)}
+                                            placeholder="Search sessions..."
+                                            className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                                        />
+                                        {sessionSearchQuery && (
+                                            <button
+                                                onClick={() => setSessionSearchQuery('')}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
                                             >
-                                                <option value="">All Tags</option>
-                                                {allNoteTags.map(tag => (
-                                                    <option key={tag} value={tag}>{tag}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    )}
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                    </div>
                                     <div className="flex bg-surface-2/50 p-1 rounded-xl border border-white/[0.06] shrink-0">
                                         <button
-                                            onClick={() => setNotesViewMode('grid')}
-                                            className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                            onClick={() => setSessionsViewMode('grid')}
+                                            className={`p-1.5 rounded-lg transition-all ${sessionsViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
                                             title="Grid View"
                                         >
                                             <LayoutGrid className="w-4 h-4" />
                                         </button>
                                         <button
-                                            onClick={() => setNotesViewMode('list')}
-                                            className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                            onClick={() => setSessionsViewMode('list')}
+                                            className={`p-1.5 rounded-lg transition-all ${sessionsViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
                                             title="List View"
                                         >
                                             <List className="w-4 h-4" />
@@ -3111,819 +2634,1412 @@ const SubjectDetail = () => {
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
 
-                        <div className="w-full">
-                            {notes.length === 0 ? (
+                            {sessions.length === 0 ? (
                                 <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                    <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 -rotate-3">
-                                        <FileText className="w-10 h-10 text-emerald-500/70" />
+                                    <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5">
+                                        <Activity className="w-10 h-10 text-violet-500/70" />
                                     </div>
-                                    <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No notes yet</h3>
+                                    <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No learning sessions</h3>
                                     <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
-                                        Add your first note to start building your knowledge base.
+                                        You haven't recorded any sessions for this subject yet. Start a session to log your correct and incorrect topics.
                                     </p>
                                     <button
-                                        onClick={() => {
-                                            setSelectedQuestionIdForNote(null);
-                                            setShowNoteModal(true);
-                                        }}
-                                        className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
+                                        onClick={() => setShowSessionModal(true)}
+                                        className="bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 hover:border-violet-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
                                     >
                                         <PlusCircle className="w-4 h-4" />
-                                        <span>Add Your First Note</span>
+                                        <span>Record First Session</span>
                                     </button>
                                 </div>
                             ) : (
-                                <div className={`grid gap-5 ${notesViewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
+                                <div className={`grid gap-5 ${sessionsViewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
                                     {(() => {
-                                        const filtered = filteredNotes;
-
-                                        if (filtered.length === 0 && notes.length > 0) {
+                                        if (filteredSessions.length === 0 && sessions.length > 0) {
                                             return (
                                                 <div className="col-span-full py-12 flex flex-col items-center justify-center text-center glass-panel rounded-2xl border-dashed border-white/10">
                                                     <Search className="w-8 h-8 text-slate-600 mb-3" />
-                                                    <p className="text-slate-400 font-medium">No notes match your search</p>
-                                                    <button onClick={() => setNoteSearchQuery('')} className="mt-2 text-indigo-400 text-sm hover:underline">Clear search</button>
+                                                    <p className="text-slate-400 font-medium">No sessions match your search</p>
+                                                    <button onClick={() => setSessionSearchQuery('')} className="mt-2 text-indigo-400 text-sm hover:underline">Clear search</button>
                                                 </div>
                                             );
                                         }
 
-                                        return filtered.map((note) => (
-                                            <div
-                                                key={note.id}
-                                                id={`note-${note.id}`}
-                                                className={`glass-panel rounded-xl border transition-all flex group relative overflow-hidden ${notesViewMode === 'list' ? 'items-center py-3 pr-5 pl-1' : 'flex-col p-5'} ${isSelectionMode ? (selectedItems.has(note.id) ? 'border-indigo-400 bg-indigo-500/10 cursor-pointer shadow-[0_0_15px_rgba(99,102,241,0.2)]' : 'border-white/[0.06] hover:border-white/[0.1] cursor-pointer') : 'border-white/[0.06] hover:border-emerald-500/30 hover:bg-white/[0.02] cursor-pointer'}`}
-                                                onClick={() => {
-                                                    if (isSelectionMode) {
-                                                        const next = new Set(selectedItems);
-                                                        if (next.has(note.id)) next.delete(note.id);
-                                                        else next.add(note.id);
-                                                        setSelectedItems(next);
-                                                    } else {
-                                                        setViewingNote(note);
-                                                        if (note.source_image_id) {
-                                                            handleFetchNoteImage(note.id);
-                                                        }
-                                                    }
-                                                }}
-                                            >
-                                                {isSelectionMode && (
-                                                    <div className="absolute top-3 right-3 z-30">
-                                                        <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(note.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-500 bg-surface-3/50'}`}>
-                                                            {selectedItems.has(note.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {/* List mode progress line/indicator */}
-                                                {notesViewMode === 'list' && (
-                                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500/40" />
-                                                )}
+                                        return filteredSessions.map((s) => (
+                                            <SessionCard
+                                                key={s.id}
+                                                session={s}
+                                                subjectId={id}
+                                                viewMode={sessionsViewMode}
+                                                onDelete={(session) => setConfirmDeleteSession({ open: true, session })}
+                                                onEdit={(session) => setEditingSession(session)}
+                                            />
 
-                                                {/* Optional background glow */}
-
-                                                <div className={`flex flex-1 min-w-0 ${notesViewMode === 'list' ? 'items-center px-4 gap-6' : 'flex-col'}`}>
-                                                    {/* Title Section */}
-                                                    <div className={`flex items-start gap-3 relative z-10 ${notesViewMode === 'list' ? 'w-1/3 shrink-0' : 'mb-4'}`}>
-                                                        <div className={`rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0 ${notesViewMode === 'list' ? 'p-1.5' : 'p-2.5'}`}>
-                                                            <FileText className={`${notesViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
-                                                        </div>
-                                                        <div className="min-w-0">
-                                                            <h4 className={`font-heading font-bold text-white tracking-tight break-words truncate group-hover:text-emerald-400 transition-colors ${notesViewMode === 'list' ? 'text-[14px]' : 'text-[15px]'}`}>
-                                                                {note.title}
-                                                            </h4>
-                                                            <div className="flex items-center gap-2 mt-1">
-                                                                <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap">
-                                                                    {new Date(note.created_at).toLocaleDateString(undefined, {
-                                                                        day: 'numeric',
-                                                                        month: 'short',
-                                                                        year: notesViewMode === 'grid' ? 'numeric' : undefined
-                                                                    })}
-                                                                </span>
-                                                                {notesViewMode === 'list' && note.question_id && (
-                                                                    <>
-                                                                        <div className="w-1 h-1 rounded-full bg-slate-700" />
-                                                                        <span className="text-[10px] text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">Question Link</span>
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                            {notesViewMode === 'list' && (() => {
-                                                                const nTags = Array.isArray(note.tags) ? note.tags : (note.parsedTags || []);
-                                                                if (!nTags || nTags.length === 0) return null;
-                                                                return (
-                                                                    <div className="flex flex-wrap gap-1.5 mt-1">
-                                                                        {nTags.map((tag, idx) => (
-                                                                            <span key={idx} className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider">
-                                                                                {tag}
-                                                                            </span>
-                                                                        ))}
-                                                                    </div>
-                                                                );
-                                                            })()}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Content Section */}
-                                                    {notesViewMode === 'grid' ? (
-                                                        <div className="text-sm text-slate-300 leading-relaxed mb-4 relative z-10 overflow-hidden max-h-[140px] pointer-events-none [mask-image:linear-gradient(to_bottom,black_60%,transparent)]">
-                                                            <div className="prose prose-sm prose-invert max-w-none prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mt-0 prose-p:mb-2 prose-headings:font-bold prose-headings:text-white prose-headings:m-0 prose-headings:mb-1.5 prose-h1:text-[15px] prose-h2:text-[14px] prose-h3:text-[13px] prose-a:text-indigo-400 prose-code:text-slate-300 prose-code:bg-white/[0.06] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
-                                                                <ReactMarkdown
-                                                                    remarkPlugins={[remarkGfm, remarkMath]}
-                                                                    rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
-                                                                >
-                                                                    {preprocessMarkdown(note.content || '')}
-                                                                </ReactMarkdown>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="flex-1 min-w-0 relative z-10 hidden md:block">
-                                                            <p className="text-[12px] text-slate-400 truncate opacity-70 group-hover:opacity-100 transition-opacity">
-                                                                {note.content?.substring(0, 200).replace(/[#*`\n]/g, ' ')}...
-                                                            </p>
-                                                        </div>
-                                                    )}
-
-                                                    {/* Source Image Link Section */}
-                                                    {note.source_image_id && (
-                                                        <div className={`relative z-10 shrink-0 ${notesViewMode === 'list' ? 'mb-0' : 'mb-6'}`}>
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleFetchNoteImage(note.id);
-                                                                    setViewingNote(note);
-                                                                }}
-                                                                disabled={fetchingImageId === `note-${note.id}`}
-                                                                className={`flex items-center gap-2 rounded-xl font-bold bg-white/[0.04] text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all border border-white/[0.08] disabled:opacity-50 cursor-pointer ${notesViewMode === 'list' ? 'p-2' : 'px-4 py-2 text-[12px]'}`}
-                                                                title="View Source Image"
-                                                            >
-                                                                {fetchingImageId === `note-${note.id}` ? (
-                                                                    <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
-                                                                ) : (
-                                                                    <ImageIcon className={`${notesViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
-                                                                )}
-                                                                {notesViewMode === 'grid' && <span>Source Image</span>}
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Actions Section */}
-                                                <div className={`flex items-center relative z-10 ${notesViewMode === 'list' ? 'shrink-0 py-0 border-l border-white/[0.06] pl-5 ml-2 gap-4' : 'w-full pt-3 border-t border-white/[0.06] mt-auto justify-between'}`}>
-                                                    {notesViewMode === 'grid' && (
-                                                        <div className="flex items-center gap-3 overflow-hidden flex-1 mr-2">
-                                                            {note.question_id && (
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        navigateToQuestion(note.question_id);
-                                                                    }}
-                                                                    className="flex items-center gap-1 hover:text-indigo-400 transition-colors cursor-pointer text-[12px] shrink-0"
-                                                                    title="Go to Source Question"
-                                                                >
-                                                                    <LinkIcon className="w-3.5 h-3.5" />
-                                                                    <span>Source</span>
-                                                                </button>
-                                                            )}
-                                                            {(() => {
-                                                                const nTags = Array.isArray(note.tags) ? note.tags : (note.parsedTags || []);
-                                                                if (!nTags || nTags.length === 0) return null;
-                                                                return (
-                                                                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pr-2 w-full" style={{ maskImage: 'linear-gradient(to right, black 80%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to right, black 80%, transparent 100%)' }}>
-                                                                        {nTags.map((tag, idx) => (
-                                                                            <span key={idx} className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider whitespace-nowrap">
-                                                                                {tag}
-                                                                            </span>
-                                                                        ))}
-                                                                    </div>
-                                                                );
-                                                            })()}
-                                                        </div>
-                                                    )}
-
-                                                    <div className={`flex items-center gap-1 shrink-0 ${notesViewMode === 'list' ? 'flex-col sm:flex-row' : 'opacity-0 group-hover:opacity-100 transition-all'}`}>
-                                                        {notesViewMode === 'list' && note.question_id && (
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    navigateToQuestion(note.question_id);
-                                                                }}
-                                                                className="p-1.5 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-md transition-all cursor-pointer"
-                                                                title="Go to Source Question"
-                                                            >
-                                                                <LinkIcon className="w-3.5 h-3.5" />
-                                                            </button>
-                                                        )}
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setEditingNote(note);
-                                                            }}
-                                                            className="p-1.5 text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-md transition-all cursor-pointer"
-                                                            title="Edit Note"
-                                                        >
-                                                            <Pencil className="w-3.5 h-3.5" />
-                                                        </button>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setConfirmDeleteNote({ open: true, note });
-                                                            }}
-                                                            className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-all cursor-pointer"
-                                                            title="Delete Note"
-                                                        >
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
                                         ));
                                     })()}
                                 </div>
                             )}
                         </div>
-                    </div>
-                )}
+                    )}
 
-            {activeTab === 'solutions' && (
-                    <div className="fade-in pb-12">
-                        {/* Header & Search */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
-                            <div className="flex items-center gap-2">
-                                <ListChecks className="w-6 h-6 text-blue-400" />
-                                <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Solutions Library</h3>
-                                <span className="ml-2 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 text-[10px] font-bold border border-blue-500/20 uppercase tracking-widest">{solutions.length}</span>
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                                <div className="relative group flex-1 sm:min-w-[280px]">
-                                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
+                    {activeTab === 'questions' && (
+                        <div className="fade-in">
+                            {/* Header for Questions */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                                <div className="flex items-center gap-2">
+                                    <ListChecks className="w-6 h-6 text-indigo-400" />
+                                    <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Question Bank</h3>
+                                </div>
+                                <div className="relative group w-full sm:min-w-[300px] sm:w-auto">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
                                     <input
                                         type="text"
-                                        value={solutionSearchQuery}
-                                        onChange={(e) => setSolutionSearchQuery(e.target.value)}
-                                        placeholder="Search solutions..."
-                                        className="w-full bg-surface-2/50 border border-white/[0.08] rounded-xl py-2.5 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-blue-500/40 focus:bg-surface-2 transition-all"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        placeholder="Search content or tags..."
+                                        className="w-full sm:w-[300px] bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
                                     />
+                                    {searchQuery && (
+                                        <button
+                                            onClick={() => setSearchQuery('')}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    )}
                                 </div>
-                                <div className="flex bg-surface-2/80 p-1 rounded-xl border border-white/[0.06] shrink-0">
-                                    <button
-                                        onClick={() => setSolutionsViewMode('grid')}
-                                        className={`p-1.5 rounded-lg transition-all ${solutionsViewMode === 'grid' ? 'bg-blue-500 text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
-                                        title="Grid View"
-                                    >
-                                        <LayoutGrid className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        onClick={() => setSolutionsViewMode('list')}
-                                        className={`p-1.5 rounded-lg transition-all ${solutionsViewMode === 'list' ? 'bg-blue-500 text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
-                                        title="List View"
-                                    >
-                                        <List className="w-4 h-4" />
-                                    </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-6 items-start">
+                                {/* Form moved to Modal */}
+
+                                {/* Questions List (Full Width) */}
+                                <div className="w-full">
+                                    {questions.length === 0 ? (
+                                        <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
+                                            <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 rotate-3">
+                                                <ListChecks className="w-10 h-10 text-indigo-500/70" />
+                                            </div>
+                                            <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">Your question bank is empty</h3>
+                                            <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                                Start adding questions from your books or notes. AI will automatically format them for better readability.
+                                            </p>
+                                            <button
+                                                onClick={() => setShowQuestionModal(true)}
+                                                className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
+                                            >
+                                                <PlusCircle className="w-4 h-4" />
+                                                <span>Add Your First Question</span>
+                                            </button>
+                                        </div>
+                                    ) : groupedQuestions.length === 0 ? (
+                                        <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
+                                            <div className="w-16 h-16 rounded-2xl bg-surface-2 flex items-center justify-center mb-4 border border-white/5">
+                                                <Search className="w-8 h-8 text-slate-600" />
+                                            </div>
+                                            <h4 className="text-lg font-bold text-white mb-1">No matching questions</h4>
+                                            <p className="text-slate-500 text-sm">Try adjusting your search query or tags</p>
+                                            <button
+                                                onClick={() => setSearchQuery('')}
+                                                className="mt-6 text-indigo-400 hover:text-indigo-300 text-sm font-semibold"
+                                            >
+                                                Clear Search
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 gap-7">
+                                            {groupedQuestions.map((group) => {
+                                                const isExpanded = expandedGroups[group.rootId];
+                                                const rootQ = group.questions[0] || group.parent;
+                                                if (!rootQ) return null;
+
+                                                if (!group.isGroup) {
+                                                    const q = rootQ;
+                                                    const existingAINote = notes.find(n => n.question_id === q.id && n.title?.startsWith('AI Note'));
+                                                    return (
+                                                        <div
+                                                            key={q.id}
+                                                            id={`question-${q.id}`}
+                                                            className={`question-card group relative transition-all ${isSelectionMode ? (selectedItems.has(q.id) ? 'ring-2 ring-indigo-500 cursor-pointer bg-indigo-500/5' : 'cursor-pointer hover:bg-white/[0.02]') : ''}`}
+                                                            onClick={() => {
+                                                                if (isSelectionMode) {
+                                                                    const next = new Set(selectedItems);
+                                                                    if (next.has(q.id)) next.delete(q.id);
+                                                                    else next.add(q.id);
+                                                                    setSelectedItems(next);
+                                                                }
+                                                            }}
+                                                        >
+                                                            {isSelectionMode && (
+                                                                <div className="absolute top-4 right-4 z-20">
+                                                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(q.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-500 bg-surface-3/50'}`}>
+                                                                        {selectedItems.has(q.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            {/* Card Header — question number + metadata */}
+                                                            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-white/[0.06]">
+                                                                <span className="text-[15px] font-heading font-bold text-primary tracking-tight">
+                                                                    Q
+                                                                </span>
+                                                                <span className="flex items-center gap-1.5 px-2.5 py-1 bg-surface-3/80 text-slate-300 rounded-md text-[12px] font-semibold border border-white/5">
+                                                                    {q.type === 'image' ? <ImageIcon className="w-4 h-4 text-indigo-400" /> : <FileText className="w-4 h-4 text-emerald-400" />}
+                                                                    {q.type === 'image' ? 'Image' : 'Text'}
+                                                                </span>
+                                                                <span className="text-[12px] text-slate-500 ml-auto font-medium">
+                                                                    {new Date(q.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                                </span>
+
+                                                                <div className="flex items-center gap-1 ml-2">
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setEditingQuestion(q);
+                                                                            setShowEditQuestionModal(true);
+                                                                        }}
+                                                                        className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer"
+                                                                        title="Edit Question"
+                                                                    >
+                                                                        <Pencil className="w-[18px] h-[18px]" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setSelectedQuestionIdForNote(q.id);
+                                                                            setShowNoteModal(true);
+                                                                        }}
+                                                                        className="p-2 text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-all cursor-pointer"
+                                                                        title="Manual Note"
+                                                                    >
+                                                                        <FileText className="w-[18px] h-[18px]" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            const existingRes = solutions.find(s => s.question_id === q.id);
+                                                                            if (existingRes) {
+                                                                                setViewingSolution(existingRes);
+                                                                                if (existingRes.source_image_id) {
+                                                                                    handleFetchSolutionImage(existingRes.id);
+                                                                                }
+                                                                            } else {
+                                                                                setSelectedQuestionIdForSolution(q.id);
+                                                                                setShowSolutionModal(true);
+                                                                            }
+                                                                        }}
+                                                                        className={`p-2 rounded-lg transition-all cursor-pointer ${solutions.some(s => s.question_id === q.id) ? 'text-blue-400 bg-blue-400/10' : 'text-slate-500 hover:text-blue-400 hover:bg-blue-400/10'}`}
+                                                                        title={solutions.some(s => s.question_id === q.id) ? "View Solution" : "Add Solution"}
+                                                                    >
+                                                                        <ListChecks className="w-[18px] h-[18px]" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleGenerateAINote(q.id)}
+                                                                        disabled={generatingAINoteId === q.id}
+                                                                        className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer disabled:opacity-50"
+                                                                        title={existingAINote ? "View AI Note" : "AI Note"}
+                                                                    >
+                                                                        {generatingAINoteId === q.id ? (
+                                                                            <div className="w-[18px] h-[18px] border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+                                                                        ) : existingAINote ? (
+                                                                            <BookOpen className="w-[18px] h-[18px]" />
+                                                                        ) : (
+                                                                            <Wand2 className="w-[18px] h-[18px]" />
+                                                                        )}
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => setConfirmDeleteQuestion({ open: true, questionId: q.id })}
+                                                                        className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all cursor-pointer"
+                                                                        title="Delete Question"
+                                                                    >
+                                                                        <Trash2 className="w-[18px] h-[18px]" />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Card Body — question content */}
+                                                            <div className="prose prose-invert prose-lg max-w-none text-slate-200 text-[15px] leading-[1.7]">
+                                                                {q.formatted_content && q.formatted_content.root ? (
+                                                                    <RichTextRenderer content={q.formatted_content} />
+                                                                ) : (
+                                                                    <ReactMarkdown
+                                                                        remarkPlugins={[remarkGfm, remarkMath]}
+                                                                        rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                                                    >
+                                                                        {preprocessMarkdown(q.content)}
+                                                                    </ReactMarkdown>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Tags display */}
+                                                            {q.parsedTags && q.parsedTags.length > 0 && (
+                                                                <div className="mt-4 flex flex-wrap gap-2">
+                                                                    {q.parsedTags.map((tag, idx) => (
+                                                                        <span key={idx} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                                            <Hash className="w-2.5 h-2.5" />
+                                                                            {tag}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+
+                                                            {q.type === 'image' && (
+                                                                <div className="mt-5 relative group/img-container w-fit">
+                                                                    {fetchedImages[q.id] || fetchedImages[q.source_image_id] ? (
+                                                                        <div className="relative">
+                                                                            <div className="rounded-xl overflow-hidden border border-white/10 inline-block bg-black/40 group/img relative">
+                                                                                <img
+                                                                                    src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
+                                                                                    alt="Original Question"
+                                                                                    className="max-h-80 object-contain transition-all group-hover/img:opacity-50"
+                                                                                />
+                                                                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
+                                                                                    <span className="bg-black/60 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/10">
+                                                                                        Original Attachment
+                                                                                    </span>
+                                                                                </div>
+                                                                            </div>
+                                                                            <button
+                                                                                onClick={() => handleHideImage(q.id)}
+                                                                                className="absolute -top-2 -right-2 p-1.5 bg-slate-800/90 text-slate-400 hover:text-white rounded-full border border-white/10 shadow-lg opacity-0 group-hover/img-container:opacity-100 transition-all cursor-pointer z-10"
+                                                                                title="Hide Image"
+                                                                            >
+                                                                                <X className="w-3.5 h-3.5" />
+                                                                            </button>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <button
+                                                                            onClick={() => handleFetchImage(q.id)}
+                                                                            disabled={fetchingImageId === q.id}
+                                                                            className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-surface-3/80 text-slate-300 hover:text-white hover:bg-surface-3 transition-all border border-white/5 shadow-sm disabled:opacity-50 cursor-pointer"
+                                                                        >
+                                                                            {fetchingImageId === q.id ? (
+                                                                                <div className="w-3.5 h-3.5 border border-white/30 border-t-white rounded-full animate-spin" />
+                                                                            ) : (
+                                                                                <ImageIcon className="w-4 h-4 text-indigo-400" />
+                                                                            )}
+                                                                            <span>
+                                                                                {fetchingImageId === q.id ? 'Loading...' : 'Show Source Image'}
+                                                                            </span>
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            )}
+
+
+                                                        </div>
+                                                    );
+                                                }
+
+                                                return (
+                                                    <div key={group.rootId} className="flex flex-col gap-3">
+                                                        {/* Group Header */}
+                                                        <div
+                                                            onClick={() => toggleGroup(group.rootId)}
+                                                            className="flex items-center justify-between p-4 rounded-xl bg-surface-2 border border-white/[0.06] cursor-pointer hover:bg-surface-3 transition-colors group/header"
+                                                        >
+                                                            <div className="flex items-center gap-4">
+                                                                <div className="p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+                                                                    {rootQ.type === 'image' ? <ImageIcon className="w-5 h-5 text-indigo-400" /> : <FileText className="w-5 h-5 text-emerald-400" />}
+                                                                </div>
+                                                                <div>
+                                                                    <div className="flex items-center gap-3">
+                                                                        <h4 className="text-[15px] font-heading font-bold text-white tracking-tight">
+                                                                            {rootQ.type === 'image' ? 'Image' : 'Text'} Collection
+                                                                        </h4>
+                                                                        <span className="px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                                                                            {group.questions.length} Items
+                                                                        </span>
+                                                                    </div>
+                                                                    <p className="text-[12px] text-slate-500 mt-0.5">
+                                                                        Uploaded {new Date(group.newestAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`p-2 rounded-lg bg-white/[0.03] text-slate-500 group-hover/header:text-white transition-all ${isExpanded ? 'rotate-180' : ''}`}>
+                                                                    <ChevronDown className="w-4 h-4" />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Group Content */}
+                                                        {isExpanded && (
+                                                            <div className="flex flex-col gap-5 pl-8 border-l-2 border-white/[0.06] mt-2 mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                                {group.questions.map((q, qidx) => {
+                                                                    const existingAINote = notes.find(n => n.question_id === q.id && n.title?.startsWith('AI Note'));
+                                                                    return (
+                                                                        <div
+                                                                            key={q.id}
+                                                                            id={`question-${q.id}`}
+                                                                            className={`question-card group relative transition-all ${isSelectionMode ? (selectedItems.has(q.id) ? 'ring-2 ring-indigo-500 cursor-pointer bg-indigo-500/5' : 'cursor-pointer hover:bg-white/[0.02]') : ''}`}
+                                                                            onClick={() => {
+                                                                                if (isSelectionMode) {
+                                                                                    const next = new Set(selectedItems);
+                                                                                    if (next.has(q.id)) next.delete(q.id);
+                                                                                    else next.add(q.id);
+                                                                                    setSelectedItems(next);
+                                                                                }
+                                                                            }}
+                                                                        >
+                                                                            {isSelectionMode && (
+                                                                                <div className="absolute top-4 right-4 z-20">
+                                                                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(q.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-500 bg-surface-3/50'}`}>
+                                                                                        {selectedItems.has(q.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                            {/* Card Header — question number + metadata */}
+                                                                            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-white/[0.06]">
+                                                                                <span className="text-[15px] font-heading font-bold text-primary tracking-tight">
+                                                                                    #{qidx + 1}
+                                                                                </span>
+                                                                                <span className="text-[12px] text-slate-500 ml-auto font-medium">
+                                                                                    {new Date(q.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                                                </span>
+
+                                                                                <div className="flex items-center gap-1 ml-2">
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            setEditingQuestion(q);
+                                                                                            setShowEditQuestionModal(true);
+                                                                                        }}
+                                                                                        className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer"
+                                                                                        title="Edit Question"
+                                                                                    >
+                                                                                        <Pencil className="w-[18px] h-[18px]" />
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            setSelectedQuestionIdForNote(q.id);
+                                                                                            setShowNoteModal(true);
+                                                                                        }}
+                                                                                        className="p-2 text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-all cursor-pointer"
+                                                                                        title="Manual Note"
+                                                                                    >
+                                                                                        <FileText className="w-[18px] h-[18px]" />
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            const existingRes = solutions.find(s => s.question_id === q.id);
+                                                                                            if (existingRes) {
+                                                                                                setViewingSolution(existingRes);
+                                                                                                if (existingRes.source_image_id) {
+                                                                                                    handleFetchSolutionImage(existingRes.id);
+                                                                                                }
+                                                                                            } else {
+                                                                                                setSelectedQuestionIdForSolution(q.id);
+                                                                                                setShowSolutionModal(true);
+                                                                                            }
+                                                                                        }}
+                                                                                        className={`p-2 rounded-lg transition-all cursor-pointer ${solutions.some(s => s.question_id === q.id) ? 'text-blue-400 bg-blue-400/10' : 'text-slate-500 hover:text-blue-400 hover:bg-blue-400/10'}`}
+                                                                                        title={solutions.some(s => s.question_id === q.id) ? "View Solution" : "Add Solution"}
+                                                                                    >
+                                                                                        <ListChecks className="w-[18px] h-[18px]" />
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => handleGenerateAINote(q.id)}
+                                                                                        disabled={generatingAINoteId === q.id}
+                                                                                        className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer disabled:opacity-50"
+                                                                                        title={existingAINote ? "View AI Note" : "AI Note"}
+                                                                                    >
+                                                                                        {generatingAINoteId === q.id ? (
+                                                                                            <div className="w-[18px] h-[18px] border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+                                                                                        ) : existingAINote ? (
+                                                                                            <BookOpen className="w-[18px] h-[18px]" />
+                                                                                        ) : (
+                                                                                            <Wand2 className="w-[18px] h-[18px]" />
+                                                                                        )}
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => setConfirmDeleteQuestion({ open: true, questionId: q.id })}
+                                                                                        className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all cursor-pointer"
+                                                                                        title="Delete Question"
+                                                                                    >
+                                                                                        <Trash2 className="w-[18px] h-[18px]" />
+                                                                                    </button>
+                                                                                </div>
+                                                                            </div>
+
+                                                                            {/* Card Body — question content */}
+                                                                            <div className="prose prose-invert prose-lg max-w-none text-slate-200 text-[15px] leading-[1.7]">
+                                                                                {q.formatted_content && q.formatted_content.root ? (
+                                                                                    <RichTextRenderer content={q.formatted_content} />
+                                                                                ) : (
+                                                                                    <ReactMarkdown
+                                                                                        remarkPlugins={[remarkGfm, remarkMath]}
+                                                                                        rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                                                                    >
+                                                                                        {preprocessMarkdown(q.content)}
+                                                                                    </ReactMarkdown>
+                                                                                )}
+                                                                            </div>
+
+                                                                            {/* Tags display */}
+                                                                            {q.parsedTags && q.parsedTags.length > 0 && (
+                                                                                <div className="mt-4 flex flex-wrap gap-2">
+                                                                                    {q.parsedTags.map((tag, idx) => (
+                                                                                        <span key={idx} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                                                            <Hash className="w-2.5 h-2.5" />
+                                                                                            {tag}
+                                                                                        </span>
+                                                                                    ))}
+                                                                                </div>
+                                                                            )}
+
+                                                                            {q.type === 'image' && qidx === 0 && (
+                                                                                <div className="mt-5 relative group/img-container w-fit">
+                                                                                    {fetchedImages[q.id] || fetchedImages[q.source_image_id] ? (
+                                                                                        <div className="relative">
+                                                                                            <div className="rounded-xl overflow-hidden border border-white/10 inline-block bg-black/40 group/img relative">
+                                                                                                <img
+                                                                                                    src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
+                                                                                                    alt="Original Question"
+                                                                                                    className="max-h-80 object-contain transition-all group-hover/img:opacity-50"
+                                                                                                />
+                                                                                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
+                                                                                                    <span className="bg-black/60 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/10">
+                                                                                                        Source Image
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            <button
+                                                                                                onClick={() => handleHideImage(q.id)}
+                                                                                                className="absolute -top-2 -right-2 p-1.5 bg-slate-800/90 text-slate-400 hover:text-white rounded-full border border-white/10 shadow-lg opacity-0 group-hover/img-container:opacity-100 transition-all cursor-pointer z-10"
+                                                                                                title="Hide Image"
+                                                                                            >
+                                                                                                <X className="w-3.5 h-3.5" />
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <button
+                                                                                            onClick={() => handleFetchImage(q.id)}
+                                                                                            disabled={fetchingImageId === q.id}
+                                                                                            className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-surface-3/80 text-slate-300 hover:text-white hover:bg-surface-3 transition-all border border-white/5 shadow-sm disabled:opacity-50 cursor-pointer"
+                                                                                        >
+                                                                                            {fetchingImageId === q.id ? (
+                                                                                                <div className="w-3.5 h-3.5 border border-white/30 border-t-white rounded-full animate-spin" />
+                                                                                            ) : (
+                                                                                                <ImageIcon className="w-4 h-4 text-indigo-400" />
+                                                                                            )}
+                                                                                            <span>
+                                                                                                {fetchingImageId === q.id ? 'Loading...' : 'Show Shared Source Image'}
+                                                                                            </span>
+                                                                                        </button>
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
+
+
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
+                    )}
 
-                        <div className="w-full">
-                            {solutions.length === 0 ? (
-                                <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                    <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 rotate-3">
-                                        <ListChecks className="w-10 h-10 text-blue-500/70" />
-                                    </div>
-                                    <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No solutions yet</h3>
-                                    <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
-                                        Add solutions to questions to keep track of your learning path.
-                                    </p>
+                    {activeTab === 'notes' && (
+                        <div className="fade-in">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                                <div className="flex items-center gap-2">
+                                    <FileText className="w-6 h-6 text-indigo-400" />
+                                    <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Notes</h3>
                                 </div>
-                            ) : (
-                                <div className={`grid gap-5 ${solutionsViewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
-                                    {filteredSolutions.length === 0 ? (
-                                        <div className="col-span-full py-12 flex flex-col items-center justify-center text-center glass-panel rounded-2xl border-dashed border-white/10">
-                                            <Search className="w-8 h-8 text-slate-600 mb-3" />
-                                            <p className="text-slate-400 font-medium">No solutions match your search</p>
-                                            <button onClick={() => setSolutionSearchQuery('')} className="mt-2 text-blue-400 text-sm hover:underline hover:text-blue-300 transition-colors">Clear search</button>
-                                        </div>
-                                    ) : (
-                                        filteredSolutions.map((solution) => (
-                                            <div
-                                                key={solution.id}
-                                                id={`solution-${solution.id}`}
-                                                className={`glass-panel rounded-xl border transition-all flex group relative overflow-hidden ${solutionsViewMode === 'list' ? 'items-center py-3 pr-5 pl-1' : 'flex-col p-5'} border-white/[0.06] hover:border-blue-500/30 hover:bg-white/[0.02] cursor-pointer`}
-                                                onClick={() => {
-                                                    setViewingSolution(solution);
-                                                    if (solution.source_image_id) {
-                                                        handleFetchSolutionImage(solution.id);
-                                                    }
-                                                }}
+                                <div className="flex flex-col sm:flex-row sm:items-center items-stretch gap-3 w-full sm:w-auto">
+                                    <div className="relative group flex-1 sm:min-w-[280px]">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                                        <input
+                                            type="text"
+                                            value={noteSearchQuery}
+                                            onChange={(e) => setNoteSearchQuery(e.target.value)}
+                                            placeholder="Search notes..."
+                                            className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                                        />
+                                        {noteSearchQuery && (
+                                            <button
+                                                onClick={() => setNoteSearchQuery('')}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
                                             >
-                                                {/* List mode progress line/indicator */}
-                                                {solutionsViewMode === 'list' && (
-                                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500/40" />
-                                                )}
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {allNoteTags.length > 0 && (
+                                            <div className="flex-1">
+                                                <select
+                                                    value={selectedNoteTag}
+                                                    onChange={(e) => setSelectedNoteTag(e.target.value)}
+                                                    className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-200 rounded-xl px-4 py-2 text-[13px] focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all appearance-none cursor-pointer pr-10 hover:border-white/[0.15]"
+                                                    style={{
+                                                        backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(148, 163, 184, 1)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                                                        backgroundRepeat: 'no-repeat',
+                                                        backgroundPosition: 'right 0.75rem center',
+                                                        backgroundSize: '1em'
+                                                    }}
+                                                >
+                                                    <option value="">All Tags</option>
+                                                    {allNoteTags.map(tag => (
+                                                        <option key={tag} value={tag}>{tag}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
+                                        <div className="flex bg-surface-2/50 p-1 rounded-xl border border-white/[0.06] shrink-0">
+                                            <button
+                                                onClick={() => setNotesViewMode('grid')}
+                                                className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                                title="Grid View"
+                                            >
+                                                <LayoutGrid className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => setNotesViewMode('list')}
+                                                className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                                title="List View"
+                                            >
+                                                <List className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
-                                                {/* Optional background glow */}
 
-                                                <div className={`flex flex-1 min-w-0 ${solutionsViewMode === 'list' ? 'items-center px-4 gap-6' : 'flex-col'}`}>
-                                                    {/* Title Section */}
-                                                    <div className={`flex items-start gap-3 relative z-10 ${solutionsViewMode === 'list' ? 'w-1/3 shrink-0' : 'mb-4'}`}>
-                                                        <div className={`rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0 ${solutionsViewMode === 'list' ? 'p-1.5' : 'p-2.5'}`}>
-                                                            <ListChecks className={`${solutionsViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
-                                                        </div>
-                                                        <div className="min-w-0">
-                                                            <h4 className={`font-heading font-bold text-white tracking-tight break-words truncate group-hover:text-blue-400 transition-colors ${solutionsViewMode === 'list' ? 'text-[14px]' : 'text-[15px]'}`}>
-                                                                {solution.title || 'Solution'}
-                                                            </h4>
-                                                            <div className="flex items-center gap-2 mt-1">
-                                                                <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap">
-                                                                    {new Date(solution.created_at).toLocaleDateString(undefined, {
-                                                                        day: 'numeric',
-                                                                        month: 'short',
-                                                                        year: solutionsViewMode === 'grid' ? 'numeric' : undefined
-                                                                    })}
-                                                                </span>
-                                                                {solutionsViewMode === 'list' && solution.question_id && (
-                                                                    <>
-                                                                        <div className="w-1 h-1 rounded-full bg-slate-700" />
-                                                                        <span className="text-[10px] text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">Question Link</span>
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        </div>
+                            <div className="w-full">
+                                {notes.length === 0 ? (
+                                    <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
+                                        <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 -rotate-3">
+                                            <FileText className="w-10 h-10 text-emerald-500/70" />
+                                        </div>
+                                        <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No notes yet</h3>
+                                        <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                            Add your first note to start building your knowledge base.
+                                        </p>
+                                        <button
+                                            onClick={() => {
+                                                setSelectedQuestionIdForNote(null);
+                                                setShowNoteModal(true);
+                                            }}
+                                            className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
+                                        >
+                                            <PlusCircle className="w-4 h-4" />
+                                            <span>Add Your First Note</span>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className={`grid gap-5 ${notesViewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
+                                        {(() => {
+                                            const filtered = filteredNotes;
+
+                                            if (filtered.length === 0 && notes.length > 0) {
+                                                return (
+                                                    <div className="col-span-full py-12 flex flex-col items-center justify-center text-center glass-panel rounded-2xl border-dashed border-white/10">
+                                                        <Search className="w-8 h-8 text-slate-600 mb-3" />
+                                                        <p className="text-slate-400 font-medium">No notes match your search</p>
+                                                        <button onClick={() => setNoteSearchQuery('')} className="mt-2 text-indigo-400 text-sm hover:underline">Clear search</button>
                                                     </div>
+                                                );
+                                            }
 
-                                                    {/* Content Section */}
-                                                    {solutionsViewMode === 'grid' ? (
-                                                        <div className="text-sm text-slate-300 leading-relaxed mb-4 relative z-10 overflow-hidden max-h-[140px] pointer-events-none [mask-image:linear-gradient(to_bottom,black_60%,transparent)]">
-                                                            <div className="prose prose-sm prose-invert max-w-none prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mt-0 prose-p:mb-2 prose-headings:font-bold prose-headings:text-white prose-headings:m-0 prose-headings:mb-1.5 prose-h1:text-[15px] prose-h2:text-[14px] prose-h3:text-[13px] prose-a:text-indigo-400 prose-code:text-slate-300 prose-code:bg-white/[0.06] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
-                                                                <ReactMarkdown
-                                                                    remarkPlugins={[remarkGfm, remarkMath]}
-                                                                    rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
-                                                                >
-                                                                    {preprocessMarkdown(solution.content || '')}
-                                                                </ReactMarkdown>
+                                            return filtered.map((note) => (
+                                                <div
+                                                    key={note.id}
+                                                    id={`note-${note.id}`}
+                                                    className={`glass-panel rounded-xl border transition-all flex group relative overflow-hidden ${notesViewMode === 'list' ? 'items-center py-3 pr-5 pl-1' : 'flex-col p-5'} ${isSelectionMode ? (selectedItems.has(note.id) ? 'border-indigo-400 bg-indigo-500/10 cursor-pointer shadow-[0_0_15px_rgba(99,102,241,0.2)]' : 'border-white/[0.06] hover:border-white/[0.1] cursor-pointer') : 'border-white/[0.06] hover:border-emerald-500/30 hover:bg-white/[0.02] cursor-pointer'}`}
+                                                    onClick={() => {
+                                                        if (isSelectionMode) {
+                                                            const next = new Set(selectedItems);
+                                                            if (next.has(note.id)) next.delete(note.id);
+                                                            else next.add(note.id);
+                                                            setSelectedItems(next);
+                                                        } else {
+                                                            setViewingNote(note);
+                                                            if (note.source_image_id) {
+                                                                handleFetchNoteImage(note.id);
+                                                            }
+                                                        }
+                                                    }}
+                                                >
+                                                    {isSelectionMode && (
+                                                        <div className="absolute top-3 right-3 z-30">
+                                                            <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(note.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-500 bg-surface-3/50'}`}>
+                                                                {selectedItems.has(note.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
                                                             </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="flex-1 min-w-0 relative z-10 hidden md:block">
-                                                            <p className="text-[12px] text-slate-400 truncate opacity-70 group-hover:opacity-100 transition-opacity">
-                                                                {solution.content?.substring(0, 200).replace(/[#*`\n]/g, ' ')}...
-                                                            </p>
                                                         </div>
                                                     )}
+                                                    {/* List mode progress line/indicator */}
+                                                    {notesViewMode === 'list' && (
+                                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500/40" />
+                                                    )}
 
-                                                    {/* Source Image Link Section */}
-                                                    {solution.source_image_id && (
-                                                        <div className={`relative z-10 shrink-0 ${solutionsViewMode === 'list' ? 'mb-0' : 'mb-6'}`}>
+                                                    {/* Optional background glow */}
+
+                                                    <div className={`flex flex-1 min-w-0 ${notesViewMode === 'list' ? 'items-center px-4 gap-6' : 'flex-col'}`}>
+                                                        {/* Title Section */}
+                                                        <div className={`flex items-start gap-3 relative z-10 ${notesViewMode === 'list' ? 'w-1/3 shrink-0' : 'mb-4'}`}>
+                                                            <div className={`rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0 ${notesViewMode === 'list' ? 'p-1.5' : 'p-2.5'}`}>
+                                                                <FileText className={`${notesViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <h4 className={`font-heading font-bold text-white tracking-tight break-words truncate group-hover:text-emerald-400 transition-colors ${notesViewMode === 'list' ? 'text-[14px]' : 'text-[15px]'}`}>
+                                                                    {note.title}
+                                                                </h4>
+                                                                <div className="flex items-center gap-2 mt-1">
+                                                                    <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap">
+                                                                        {new Date(note.created_at).toLocaleDateString(undefined, {
+                                                                            day: 'numeric',
+                                                                            month: 'short',
+                                                                            year: notesViewMode === 'grid' ? 'numeric' : undefined
+                                                                        })}
+                                                                    </span>
+                                                                    {notesViewMode === 'list' && note.question_id && (
+                                                                        <>
+                                                                            <div className="w-1 h-1 rounded-full bg-slate-700" />
+                                                                            <span className="text-[10px] text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">Question Link</span>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                                {notesViewMode === 'list' && (() => {
+                                                                    const nTags = Array.isArray(note.tags) ? note.tags : (note.parsedTags || []);
+                                                                    if (!nTags || nTags.length === 0) return null;
+                                                                    return (
+                                                                        <div className="flex flex-wrap gap-1.5 mt-1">
+                                                                            {nTags.map((tag, idx) => (
+                                                                                <span key={idx} className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider">
+                                                                                    {tag}
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                    );
+                                                                })()}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Content Section */}
+                                                        {notesViewMode === 'grid' ? (
+                                                            <div className="text-sm text-slate-300 leading-relaxed mb-4 relative z-10 overflow-hidden max-h-[140px] pointer-events-none [mask-image:linear-gradient(to_bottom,black_60%,transparent)]">
+                                                                <div className="prose prose-sm prose-invert max-w-none prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mt-0 prose-p:mb-2 prose-headings:font-bold prose-headings:text-white prose-headings:m-0 prose-headings:mb-1.5 prose-h1:text-[15px] prose-h2:text-[14px] prose-h3:text-[13px] prose-a:text-indigo-400 prose-code:text-slate-300 prose-code:bg-white/[0.06] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
+                                                                    <ReactMarkdown
+                                                                        remarkPlugins={[remarkGfm, remarkMath]}
+                                                                        rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                                                    >
+                                                                        {preprocessMarkdown(note.content || '')}
+                                                                    </ReactMarkdown>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex-1 min-w-0 relative z-10 hidden md:block">
+                                                                <p className="text-[12px] text-slate-400 truncate opacity-70 group-hover:opacity-100 transition-opacity">
+                                                                    {note.content?.substring(0, 200).replace(/[#*`\n]/g, ' ')}...
+                                                                </p>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Source Image Link Section */}
+                                                        {note.source_image_id && (
+                                                            <div className={`relative z-10 shrink-0 ${notesViewMode === 'list' ? 'mb-0' : 'mb-6'}`}>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleFetchNoteImage(note.id);
+                                                                        setViewingNote(note);
+                                                                    }}
+                                                                    disabled={fetchingImageId === `note-${note.id}`}
+                                                                    className={`flex items-center gap-2 rounded-xl font-bold bg-white/[0.04] text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all border border-white/[0.08] disabled:opacity-50 cursor-pointer ${notesViewMode === 'list' ? 'p-2' : 'px-4 py-2 text-[12px]'}`}
+                                                                    title="View Source Image"
+                                                                >
+                                                                    {fetchingImageId === `note-${note.id}` ? (
+                                                                        <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
+                                                                    ) : (
+                                                                        <ImageIcon className={`${notesViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
+                                                                    )}
+                                                                    {notesViewMode === 'grid' && <span>Source Image</span>}
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Actions Section */}
+                                                    <div className={`flex items-center relative z-10 ${notesViewMode === 'list' ? 'shrink-0 py-0 border-l border-white/[0.06] pl-5 ml-2 gap-4' : 'w-full pt-3 border-t border-white/[0.06] mt-auto justify-between'}`}>
+                                                        {notesViewMode === 'grid' && (
+                                                            <div className="flex items-center gap-3 overflow-hidden flex-1 mr-2">
+                                                                {note.question_id && (
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            navigateToQuestion(note.question_id);
+                                                                        }}
+                                                                        className="flex items-center gap-1 hover:text-indigo-400 transition-colors cursor-pointer text-[12px] shrink-0"
+                                                                        title="Go to Source Question"
+                                                                    >
+                                                                        <LinkIcon className="w-3.5 h-3.5" />
+                                                                        <span>Source</span>
+                                                                    </button>
+                                                                )}
+                                                                {(() => {
+                                                                    const nTags = Array.isArray(note.tags) ? note.tags : (note.parsedTags || []);
+                                                                    if (!nTags || nTags.length === 0) return null;
+                                                                    return (
+                                                                        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pr-2 w-full" style={{ maskImage: 'linear-gradient(to right, black 80%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to right, black 80%, transparent 100%)' }}>
+                                                                            {nTags.map((tag, idx) => (
+                                                                                <span key={idx} className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider whitespace-nowrap">
+                                                                                    {tag}
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                    );
+                                                                })()}
+                                                            </div>
+                                                        )}
+
+                                                        <div className={`flex items-center gap-1 shrink-0 ${notesViewMode === 'list' ? 'flex-col sm:flex-row' : 'opacity-0 group-hover:opacity-100 transition-all'}`}>
+                                                            {notesViewMode === 'list' && note.question_id && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        navigateToQuestion(note.question_id);
+                                                                    }}
+                                                                    className="p-1.5 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-md transition-all cursor-pointer"
+                                                                    title="Go to Source Question"
+                                                                >
+                                                                    <LinkIcon className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    handleFetchSolutionImage(solution.id);
-                                                                    setViewingSolution(solution);
+                                                                    setEditingNote(note);
                                                                 }}
-                                                                disabled={fetchingImageId === `solution-${solution.id}`}
-                                                                className={`flex items-center gap-2 rounded-xl font-bold bg-white/[0.04] text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 transition-all border border-white/[0.08] disabled:opacity-50 cursor-pointer ${solutionsViewMode === 'list' ? 'p-2' : 'px-4 py-2 text-[12px]'}`}
-                                                                title="View Source Image"
+                                                                className="p-1.5 text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-md transition-all cursor-pointer"
+                                                                title="Edit Note"
                                                             >
-                                                                {fetchingImageId === `solution-${solution.id}` ? (
-                                                                    <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
-                                                                ) : (
-                                                                    <ImageIcon className={`${solutionsViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
-                                                                )}
-                                                                {solutionsViewMode === 'grid' && <span>Source Image</span>}
+                                                                <Pencil className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setConfirmDeleteNote({ open: true, note });
+                                                                }}
+                                                                className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-all cursor-pointer"
+                                                                title="Delete Note"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
                                                             </button>
                                                         </div>
-                                                    )}
+                                                    </div>
                                                 </div>
+                                            ));
+                                        })()}
 
-                                                {/* Actions Section */}
-                                                <div className={`flex items-center relative z-10 ${solutionsViewMode === 'list' ? 'shrink-0 py-0 border-l border-white/[0.06] pl-5 ml-2 gap-4' : 'w-full pt-3 border-t border-white/[0.06] mt-auto justify-between'}`}>
-                                                    {solutionsViewMode === 'grid' && (
-                                                        <div className="flex items-center gap-3 overflow-hidden flex-1 mr-2">
-                                                            {solution.question_id && (
+                                        {hasMoreNotes && !noteSearchQuery && !selectedNoteTag && (
+                                            <div className="col-span-full mt-12 flex justify-center">
+                                                <button
+                                                    onClick={() => setNotePage(prev => prev + 1)}
+                                                    disabled={loadingMoreNotes}
+                                                    className="group relative flex items-center gap-3 px-10 py-4 bg-surface-2/40 hover:bg-emerald-500/10 border border-white/5 hover:border-emerald-500/30 rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                                >
+                                                    <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl blur-xl" />
+                                                    {loadingMoreNotes ? (
+                                                        <RefreshCw className="w-5 h-5 text-emerald-400 animate-spin" />
+                                                    ) : (
+                                                        <ChevronDown className="w-5 h-5 text-emerald-400 group-hover:translate-y-0.5 transition-transform" />
+                                                    )}
+                                                    <span className="text-slate-300 group-hover:text-white font-semibold tracking-wide">
+                                                        {loadingMoreNotes ? 'Loading Notes...' : 'Load More Notes'}
+                                                    </span>
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'solutions' && (
+                        <div className="fade-in pb-12">
+                            {/* Header & Search */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                                <div className="flex items-center gap-2">
+                                    <ListChecks className="w-6 h-6 text-blue-400" />
+                                    <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Solutions Library</h3>
+                                </div>
+
+                                <div className="flex items-center gap-3">
+                                    <div className="relative group flex-1 sm:min-w-[280px]">
+                                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
+                                        <input
+                                            type="text"
+                                            value={solutionSearchQuery}
+                                            onChange={(e) => setSolutionSearchQuery(e.target.value)}
+                                            placeholder="Search solutions..."
+                                            className="w-full bg-surface-2/50 border border-white/[0.08] rounded-xl py-2.5 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-blue-500/40 focus:bg-surface-2 transition-all"
+                                        />
+                                    </div>
+                                    <div className="flex bg-surface-2/80 p-1 rounded-xl border border-white/[0.06] shrink-0">
+                                        <button
+                                            onClick={() => setSolutionsViewMode('grid')}
+                                            className={`p-1.5 rounded-lg transition-all ${solutionsViewMode === 'grid' ? 'bg-blue-500 text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                            title="Grid View"
+                                        >
+                                            <LayoutGrid className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => setSolutionsViewMode('list')}
+                                            className={`p-1.5 rounded-lg transition-all ${solutionsViewMode === 'list' ? 'bg-blue-500 text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                            title="List View"
+                                        >
+                                            <List className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="w-full">
+                                {solutions.length === 0 ? (
+                                    <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
+                                        <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 rotate-3">
+                                            <ListChecks className="w-10 h-10 text-blue-500/70" />
+                                        </div>
+                                        <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No solutions yet</h3>
+                                        <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                            Add solutions to questions to keep track of your learning path.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className={`grid gap-5 ${solutionsViewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
+                                        {filteredSolutions.length === 0 ? (
+                                            <div className="col-span-full py-12 flex flex-col items-center justify-center text-center glass-panel rounded-2xl border-dashed border-white/10">
+                                                <Search className="w-8 h-8 text-slate-600 mb-3" />
+                                                <p className="text-slate-400 font-medium">No solutions match your search</p>
+                                                <button onClick={() => setSolutionSearchQuery('')} className="mt-2 text-blue-400 text-sm hover:underline hover:text-blue-300 transition-colors">Clear search</button>
+                                            </div>
+                                        ) : (
+                                            filteredSolutions.map((solution) => (
+                                                <div
+                                                    key={solution.id}
+                                                    id={`solution-${solution.id}`}
+                                                    className={`glass-panel rounded-xl border transition-all flex group relative overflow-hidden ${solutionsViewMode === 'list' ? 'items-center py-3 pr-5 pl-1' : 'flex-col p-5'} border-white/[0.06] hover:border-blue-500/30 hover:bg-white/[0.02] cursor-pointer`}
+                                                    onClick={() => {
+                                                        setViewingSolution(solution);
+                                                        if (solution.source_image_id) {
+                                                            handleFetchSolutionImage(solution.id);
+                                                        }
+                                                    }}
+                                                >
+                                                    {/* List mode progress line/indicator */}
+                                                    {solutionsViewMode === 'list' && (
+                                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500/40" />
+                                                    )}
+
+                                                    {/* Optional background glow */}
+
+                                                    <div className={`flex flex-1 min-w-0 ${solutionsViewMode === 'list' ? 'items-center px-4 gap-6' : 'flex-col'}`}>
+                                                        {/* Title Section */}
+                                                        <div className={`flex items-start gap-3 relative z-10 ${solutionsViewMode === 'list' ? 'w-1/3 shrink-0' : 'mb-4'}`}>
+                                                            <div className={`rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0 ${solutionsViewMode === 'list' ? 'p-1.5' : 'p-2.5'}`}>
+                                                                <ListChecks className={`${solutionsViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <h4 className={`font-heading font-bold text-white tracking-tight break-words truncate group-hover:text-blue-400 transition-colors ${solutionsViewMode === 'list' ? 'text-[14px]' : 'text-[15px]'}`}>
+                                                                    {solution.title || 'Solution'}
+                                                                </h4>
+                                                                <div className="flex items-center gap-2 mt-1">
+                                                                    <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap">
+                                                                        {new Date(solution.created_at).toLocaleDateString(undefined, {
+                                                                            day: 'numeric',
+                                                                            month: 'short',
+                                                                            year: solutionsViewMode === 'grid' ? 'numeric' : undefined
+                                                                        })}
+                                                                    </span>
+                                                                    {solutionsViewMode === 'list' && solution.question_id && (
+                                                                        <>
+                                                                            <div className="w-1 h-1 rounded-full bg-slate-700" />
+                                                                            <span className="text-[10px] text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">Question Link</span>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Content Section */}
+                                                        {solutionsViewMode === 'grid' ? (
+                                                            <div className="text-sm text-slate-300 leading-relaxed mb-4 relative z-10 overflow-hidden max-h-[140px] pointer-events-none [mask-image:linear-gradient(to_bottom,black_60%,transparent)]">
+                                                                <div className="prose prose-sm prose-invert max-w-none prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mt-0 prose-p:mb-2 prose-headings:font-bold prose-headings:text-white prose-headings:m-0 prose-headings:mb-1.5 prose-h1:text-[15px] prose-h2:text-[14px] prose-h3:text-[13px] prose-a:text-indigo-400 prose-code:text-slate-300 prose-code:bg-white/[0.06] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
+                                                                    <ReactMarkdown
+                                                                        remarkPlugins={[remarkGfm, remarkMath]}
+                                                                        rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                                                    >
+                                                                        {preprocessMarkdown(solution.content || '')}
+                                                                    </ReactMarkdown>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex-1 min-w-0 relative z-10 hidden md:block">
+                                                                <p className="text-[12px] text-slate-400 truncate opacity-70 group-hover:opacity-100 transition-opacity">
+                                                                    {solution.content?.substring(0, 200).replace(/[#*`\n]/g, ' ')}...
+                                                                </p>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Source Image Link Section */}
+                                                        {solution.source_image_id && (
+                                                            <div className={`relative z-10 shrink-0 ${solutionsViewMode === 'list' ? 'mb-0' : 'mb-6'}`}>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleFetchSolutionImage(solution.id);
+                                                                        setViewingSolution(solution);
+                                                                    }}
+                                                                    disabled={fetchingImageId === `solution-${solution.id}`}
+                                                                    className={`flex items-center gap-2 rounded-xl font-bold bg-white/[0.04] text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 transition-all border border-white/[0.08] disabled:opacity-50 cursor-pointer ${solutionsViewMode === 'list' ? 'p-2' : 'px-4 py-2 text-[12px]'}`}
+                                                                    title="View Source Image"
+                                                                >
+                                                                    {fetchingImageId === `solution-${solution.id}` ? (
+                                                                        <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
+                                                                    ) : (
+                                                                        <ImageIcon className={`${solutionsViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
+                                                                    )}
+                                                                    {solutionsViewMode === 'grid' && <span>Source Image</span>}
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Actions Section */}
+                                                    <div className={`flex items-center relative z-10 ${solutionsViewMode === 'list' ? 'shrink-0 py-0 border-l border-white/[0.06] pl-5 ml-2 gap-4' : 'w-full pt-3 border-t border-white/[0.06] mt-auto justify-between'}`}>
+                                                        {solutionsViewMode === 'grid' && (
+                                                            <div className="flex items-center gap-3 overflow-hidden flex-1 mr-2">
+                                                                {solution.question_id && (
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            navigateToQuestion(solution.question_id);
+                                                                        }}
+                                                                        className="flex items-center gap-1 hover:text-indigo-400 transition-colors cursor-pointer text-[12px] shrink-0"
+                                                                        title="Go to Source Question"
+                                                                    >
+                                                                        <LinkIcon className="w-3.5 h-3.5" />
+                                                                        <span>Source</span>
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        <div className={`flex items-center gap-1 shrink-0 ${solutionsViewMode === 'list' ? 'flex-col sm:flex-row' : 'opacity-0 group-hover:opacity-100 transition-all'}`}>
+                                                            {solutionsViewMode === 'list' && solution.question_id && (
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
                                                                         navigateToQuestion(solution.question_id);
                                                                     }}
-                                                                    className="flex items-center gap-1 hover:text-indigo-400 transition-colors cursor-pointer text-[12px] shrink-0"
+                                                                    className="p-1.5 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-md transition-all cursor-pointer"
                                                                     title="Go to Source Question"
                                                                 >
                                                                     <LinkIcon className="w-3.5 h-3.5" />
-                                                                    <span>Source</span>
                                                                 </button>
                                                             )}
-                                                        </div>
-                                                    )}
-
-                                                    <div className={`flex items-center gap-1 shrink-0 ${solutionsViewMode === 'list' ? 'flex-col sm:flex-row' : 'opacity-0 group-hover:opacity-100 transition-all'}`}>
-                                                        {solutionsViewMode === 'list' && solution.question_id && (
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    navigateToQuestion(solution.question_id);
+                                                                    handleOpenEditSolution(solution);
                                                                 }}
-                                                                className="p-1.5 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-md transition-all cursor-pointer"
-                                                                title="Go to Source Question"
+                                                                className="p-1.5 text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-md transition-all cursor-pointer"
+                                                                title="Edit Solution"
                                                             >
-                                                                <LinkIcon className="w-3.5 h-3.5" />
+                                                                <Pencil className="w-3.5 h-3.5" />
                                                             </button>
-                                                        )}
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleOpenEditSolution(solution);
-                                                            }}
-                                                            className="p-1.5 text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-md transition-all cursor-pointer"
-                                                            title="Edit Solution"
-                                                        >
-                                                            <Pencil className="w-3.5 h-3.5" />
-                                                        </button>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setConfirmDeleteNote({ open: true, note: { ...solution, isSolution: true } });
-                                                            }}
-                                                            className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-md transition-all cursor-pointer"
-                                                            title="Delete Solution"
-                                                        >
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </button>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setConfirmDeleteNote({ open: true, note: { ...solution, isSolution: true } });
+                                                                }}
+                                                                className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-md transition-all cursor-pointer"
+                                                                title="Delete Solution"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            )}
+                                            ))
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
-            {activeTab === 'revision' && (() => {
-                    const renderSession = (session) => {
-                        const isExpanded = activeRevisionSessionId === session.id;
-                        const totalTopics = session.topics?.length || 0;
-                        const doneCount = session.topics?.filter(t => t.status === 'completed').length || 0;
-                        const progressPct = totalTopics > 0 ? Math.round((doneCount / totalTopics) * 100) : 0;
+                    {activeTab === 'revision' && (() => {
+                        const renderSession = (session) => {
+                            const isExpanded = activeRevisionSessionId === session.id;
+                            const totalTopics = session.topics?.length || 0;
+                            const doneCount = session.topics?.filter(t => t.status === 'completed').length || 0;
+                            const progressPct = totalTopics > 0 ? Math.round((doneCount / totalTopics) * 100) : 0;
 
-                        return (
-                            <div key={session.id} className="glass-panel rounded-2xl border border-white/[0.06] overflow-hidden mb-4">
-                                {/* Session Header */}
-                                <div
-                                    className={`p-4 flex items-center justify-between cursor-pointer transition-colors hover:bg-white/[0.02] ${isExpanded ? 'border-b border-white/[0.05] bg-white/[0.02]' : ''}`}
-                                    onClick={() => setActiveRevisionSessionId(isExpanded ? null : session.id)}
-                                >
-                                    <div className="flex-1 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                        <div className="flex flex-col gap-1.5">
-                                            <div className="flex items-center gap-3">
-                                                <h4 className="text-base font-bold text-white tracking-tight">{session.name}</h4>
-                                                <span className="text-[10px] text-slate-500 font-medium tracking-wide">
-                                                    {new Date(session.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-[150px] h-1.5 bg-surface-3 rounded-full overflow-hidden">
-                                                    <div
-                                                        className={`h-full rounded-full transition-all duration-700 ${progressPct === 100 ? 'bg-emerald-500' : 'bg-gradient-to-r from-violet-600 to-violet-400'}`}
-                                                        style={{ width: `${progressPct}%` }}
-                                                    />
-                                                </div>
-                                                <span className="text-[11px] font-semibold text-slate-400">
-                                                    {progressPct}%
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-4 mr-4">
-                                            <div className="flex items-center gap-2 bg-surface-2/80 px-3 py-1.5 rounded-lg border border-white/[0.05]">
-                                                <div className="flex flex-col text-right">
-                                                    <span className="text-xs font-bold text-white leading-tight">
-                                                        <span className={doneCount === totalTopics ? 'text-emerald-400' : 'text-violet-400'}>{doneCount}</span>
-                                                        <span className="text-slate-500 mx-1">/</span>
-                                                        <span>{totalTopics}</span>
+                            return (
+                                <div key={session.id} className="glass-panel rounded-2xl border border-white/[0.06] overflow-hidden mb-4">
+                                    {/* Session Header */}
+                                    <div
+                                        className={`p-4 flex items-center justify-between cursor-pointer transition-colors hover:bg-white/[0.02] ${isExpanded ? 'border-b border-white/[0.05] bg-white/[0.02]' : ''}`}
+                                        onClick={() => setActiveRevisionSessionId(isExpanded ? null : session.id)}
+                                    >
+                                        <div className="flex-1 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                            <div className="flex flex-col gap-1.5">
+                                                <div className="flex items-center gap-3">
+                                                    <h4 className="text-base font-bold text-white tracking-tight">{session.name}</h4>
+                                                    <span className="text-[10px] text-slate-500 font-medium tracking-wide">
+                                                        {new Date(session.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
                                                     </span>
-                                                    <span className="text-[9px] text-slate-500 uppercase tracking-wider font-bold">Topics Done</span>
                                                 </div>
-                                                <div className="w-1 h-8 rounded-full bg-white/[0.05]" />
-                                                {doneCount > 0 && doneCount === totalTopics ? (
-                                                    <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-                                                        <CheckCircle className="w-4 h-4" />
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-[150px] h-1.5 bg-surface-3 rounded-full overflow-hidden">
+                                                        <div
+                                                            className={`h-full rounded-full transition-all duration-700 ${progressPct === 100 ? 'bg-emerald-500' : 'bg-gradient-to-r from-violet-600 to-violet-400'}`}
+                                                            style={{ width: `${progressPct}%` }}
+                                                        />
                                                     </div>
-                                                ) : (
-                                                    <div className="w-8 h-8 rounded-full bg-surface-3 flex items-center justify-center text-slate-400 relative">
-                                                        <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 36 36">
-                                                            <path className="text-white/5" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
-                                                            <path className="text-violet-500" strokeDasharray={`${progressPct}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
-                                                        </svg>
+                                                    <span className="text-[11px] font-semibold text-slate-400">
+                                                        {progressPct}%
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-4 mr-4">
+                                                <div className="flex items-center gap-2 bg-surface-2/80 px-3 py-1.5 rounded-lg border border-white/[0.05]">
+                                                    <div className="flex flex-col text-right">
+                                                        <span className="text-xs font-bold text-white leading-tight">
+                                                            <span className={doneCount === totalTopics ? 'text-emerald-400' : 'text-violet-400'}>{doneCount}</span>
+                                                            <span className="text-slate-500 mx-1">/</span>
+                                                            <span>{totalTopics}</span>
+                                                        </span>
+                                                        <span className="text-[9px] text-slate-500 uppercase tracking-wider font-bold">Topics Done</span>
                                                     </div>
-                                                )}
+                                                    <div className="w-1 h-8 rounded-full bg-white/[0.05]" />
+                                                    {doneCount > 0 && doneCount === totalTopics ? (
+                                                        <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                                                            <CheckCircle className="w-4 h-4" />
+                                                        </div>
+                                                    ) : (
+                                                        <div className="w-8 h-8 rounded-full bg-surface-3 flex items-center justify-center text-slate-400 relative">
+                                                            <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 36 36">
+                                                                <path className="text-white/5" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
+                                                                <path className="text-violet-500" strokeDasharray={`${progressPct}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
+                                                            </svg>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setEditingRevisionSession(session);
+                                                }}
+                                                className="p-2 rounded-lg text-slate-500 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                                                title="Edit Session"
+                                            >
+                                                <Pencil className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setConfirmDeleteRevisionSession({ open: true, sessionId: session.id });
+                                                }}
+                                                className="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                                title="Delete Session"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                            <div className={`p-2 rounded-lg text-slate-500 transition-transform ${isExpanded ? 'rotate-180 text-white' : ''}`}>
+                                                <ChevronDown className="w-5 h-5" />
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setEditingRevisionSession(session);
-                                            }}
-                                            className="p-2 rounded-lg text-slate-500 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
-                                            title="Edit Session"
-                                        >
-                                            <Pencil className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setConfirmDeleteRevisionSession({ open: true, sessionId: session.id });
-                                            }}
-                                            className="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                                            title="Delete Session"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                        <div className={`p-2 rounded-lg text-slate-500 transition-transform ${isExpanded ? 'rotate-180 text-white' : ''}`}>
-                                            <ChevronDown className="w-5 h-5" />
-                                        </div>
-                                    </div>
-                                </div>
 
-                                {/* Session Content (Topics) */}
-                                {isExpanded && (
-                                    <div className="p-4 bg-surface-1/50">
-                                        <div className="flex flex-col gap-2">
-                                            {session.topics?.length === 0 ? (
-                                                <p className="text-sm text-slate-500 italic py-2">No topics in this session.</p>
-                                            ) : (() => {
-                                                // Render topics
-                                                const allTopics = session.topics;
-                                                const allIds = new Set(allTopics.map(t => t.topicId));
-                                                const childrenOf = (parentId) => allTopics.filter(t => t.parentId === parentId);
-                                                // A topic is a "root" to display if it has no parent, OR its parent wasn't added to the session.
-                                                const allRoots = allTopics.filter(t => !t.parentId || !allIds.has(t.parentId));
+                                    {/* Session Content (Topics) */}
+                                    {isExpanded && (
+                                        <div className="p-4 bg-surface-1/50">
+                                            <div className="flex flex-col gap-2">
+                                                {session.topics?.length === 0 ? (
+                                                    <p className="text-sm text-slate-500 italic py-2">No topics in this session.</p>
+                                                ) : (() => {
+                                                    // Render topics
+                                                    const allTopics = session.topics;
+                                                    const allIds = new Set(allTopics.map(t => t.topicId));
+                                                    const childrenOf = (parentId) => allTopics.filter(t => t.parentId === parentId);
+                                                    // A topic is a "root" to display if it has no parent, OR its parent wasn't added to the session.
+                                                    const allRoots = allTopics.filter(t => !t.parentId || !allIds.has(t.parentId));
 
-                                                const renderTopicRow = (item) => {
-                                                    const isDone = item.status === 'completed';
-                                                    const isToggling = togglingTopicId === item.topicId;
-                                                    const children = childrenOf(item.topicId);
-                                                    const hasChildren = children.length > 0;
-                                                    const isGrpExpanded = expandedRevisionGroups[`${session.id}_${item.topicId}`] !== false;
+                                                    const renderTopicRow = (item) => {
+                                                        const isDone = item.status === 'completed';
+                                                        const isToggling = togglingTopicId === item.topicId;
+                                                        const children = childrenOf(item.topicId);
+                                                        const hasChildren = children.length > 0;
+                                                        const isGrpExpanded = expandedRevisionGroups[`${session.id}_${item.topicId}`] !== false;
 
-                                                    if (hasChildren) {
-                                                        const childDone = children.filter(c => c.status === 'completed').length;
-                                                        return (
-                                                            <div key={item.topicId} className="flex flex-col">
-                                                                <div
-                                                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all cursor-pointer group
+                                                        if (hasChildren) {
+                                                            const childDone = children.filter(c => c.status === 'completed').length;
+                                                            return (
+                                                                <div key={item.topicId} className="flex flex-col">
+                                                                    <div
+                                                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all cursor-pointer group
                                                                     ${isDone ? 'bg-emerald-500/[0.06] border-emerald-500/20' : 'bg-surface-2/50 border-white/[0.06]'}
                                                                     hover:border-white/[0.12]`}
-                                                                    onClick={() => setExpandedRevisionGroups(prev => ({ ...prev, [`${session.id}_${item.topicId}`]: !isGrpExpanded }))}
-                                                                >
-                                                                    <button
-                                                                        onClick={(e) => { e.stopPropagation(); handleRevisionToggle(session.id, item.topicId, item.status); }}
-                                                                        disabled={isToggling}
-                                                                        className={`shrink-0 w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer
+                                                                        onClick={() => setExpandedRevisionGroups(prev => ({ ...prev, [`${session.id}_${item.topicId}`]: !isGrpExpanded }))}
+                                                                    >
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); handleRevisionToggle(session.id, item.topicId, item.status); }}
+                                                                            disabled={isToggling}
+                                                                            className={`shrink-0 w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer
                                                                         ${isDone ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-600 hover:border-emerald-500/60 bg-transparent'}
                                                                         ${isToggling ? 'opacity-50' : ''}`}
-                                                                    >
-                                                                        {isToggling
-                                                                            ? <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
-                                                                            : isDone && <CheckCircle className="w-3.5 h-3.5" />
-                                                                        }
-                                                                    </button>
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <span className={`font-semibold text-[14px] ${isDone ? 'text-white' : 'text-slate-200'}`}>
-                                                                            {item.topicName}
-                                                                        </span>
-                                                                        <span className="ml-2 text-[11px] text-slate-500">{childDone}/{children.length} done</span>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-2 shrink-0">
-                                                                        <div className={`p-1 rounded text-slate-500 transition-transform ${isGrpExpanded ? 'rotate-180' : ''}`}>
-                                                                            <ChevronDown className="w-4 h-4" />
+                                                                        >
+                                                                            {isToggling
+                                                                                ? <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
+                                                                                : isDone && <CheckCircle className="w-3.5 h-3.5" />
+                                                                            }
+                                                                        </button>
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <span className={`font-semibold text-[14px] ${isDone ? 'text-white' : 'text-slate-200'}`}>
+                                                                                {item.topicName}
+                                                                            </span>
+                                                                            <span className="ml-2 text-[11px] text-slate-500">{childDone}/{children.length} done</span>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-2 shrink-0">
+                                                                            <div className={`p-1 rounded text-slate-500 transition-transform ${isGrpExpanded ? 'rotate-180' : ''}`}>
+                                                                                <ChevronDown className="w-4 h-4" />
+                                                                            </div>
                                                                         </div>
                                                                     </div>
+                                                                    {isGrpExpanded && (
+                                                                        <div className="ml-6 border-l-2 border-white/[0.06] pl-3 flex flex-col gap-1.5 mt-1.5 mb-1">
+                                                                            {children.map(child => renderTopicRow(child))}
+                                                                        </div>
+                                                                    )}
                                                                 </div>
-                                                                {isGrpExpanded && (
-                                                                    <div className="ml-6 border-l-2 border-white/[0.06] pl-3 flex flex-col gap-1.5 mt-1.5 mb-1">
-                                                                        {children.map(child => renderTopicRow(child))}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    }
+                                                            );
+                                                        }
 
-                                                    return (
-                                                        <div
-                                                            key={item.topicId}
-                                                            className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all group
+                                                        return (
+                                                            <div
+                                                                key={item.topicId}
+                                                                className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all group
                                                             ${isDone ? 'bg-emerald-500/[0.06] border-emerald-500/20' : 'bg-surface-2/40 border-white/[0.05] hover:border-white/[0.1]'}`}
-                                                        >
-                                                            <button
-                                                                onClick={() => handleRevisionToggle(session.id, item.topicId, item.status)}
-                                                                disabled={isToggling}
-                                                                className={`shrink-0 w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer
+                                                            >
+                                                                <button
+                                                                    onClick={() => handleRevisionToggle(session.id, item.topicId, item.status)}
+                                                                    disabled={isToggling}
+                                                                    className={`shrink-0 w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer
                                                                 ${isDone ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-600 hover:border-emerald-500/60 bg-transparent'}
                                                                 ${isToggling ? 'opacity-50' : ''}`}
-                                                            >
-                                                                {isToggling
-                                                                    ? <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
-                                                                    : isDone && <CheckCircle className="w-3.5 h-3.5" />
-                                                                }
-                                                            </button>
-                                                            <span className={`flex-1 text-[13px] font-medium transition-colors ${isDone ? 'text-slate-400 line-through decoration-slate-600' : 'text-slate-200'}`}>
-                                                                {item.topicName}
-                                                            </span>
-                                                            <div className="flex items-center gap-2 shrink-0 ml-auto">
-                                                                {item.completedAt && (
-                                                                    <span className="text-[10px] text-slate-600 font-medium hidden md:block">
-                                                                        {new Date(item.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                                    </span>
-                                                                )}
+                                                                >
+                                                                    {isToggling
+                                                                        ? <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
+                                                                        : isDone && <CheckCircle className="w-3.5 h-3.5" />
+                                                                    }
+                                                                </button>
+                                                                <span className={`flex-1 text-[13px] font-medium transition-colors ${isDone ? 'text-slate-400 line-through decoration-slate-600' : 'text-slate-200'}`}>
+                                                                    {item.topicName}
+                                                                </span>
+                                                                <div className="flex items-center gap-2 shrink-0 ml-auto">
+                                                                    {item.completedAt && (
+                                                                        <span className="text-[10px] text-slate-600 font-medium hidden md:block">
+                                                                            {new Date(item.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    );
-                                                };
+                                                        );
+                                                    };
 
-                                                return allRoots.map(item => renderTopicRow(item));
-                                            })()}
+                                                    return allRoots.map(item => renderTopicRow(item));
+                                                })()}
+                                            </div>
                                         </div>
+                                    )}
+                                </div>
+                            );
+                        };
+
+                        return (
+                            <div className="fade-in">
+                                {/* Header */}
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                                    <div className="flex items-center gap-2">
+                                        <RefreshCw className="w-6 h-6 text-indigo-400" />
+                                        <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Revision Tracker</h3>
+                                    </div>
+                                </div>
+
+                                {revisionSessions.length === 0 ? (
+                                    <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
+                                        <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5">
+                                            <RefreshCw className="w-10 h-10 text-violet-500/70" />
+                                        </div>
+                                        <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No revision sessions</h3>
+                                        <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                            Create a targeted session of specific topics from the syllabus to start your revision.
+                                        </p>
+                                        <button
+                                            onClick={() => setShowCreateRevisionSession(true)}
+                                            className="bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 hover:border-violet-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
+                                        >
+                                            <PlusCircle className="w-4 h-4" />
+                                            <span>Create Revision Session</span>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col gap-2">
+                                        {revisionSessions.map(renderSession)}
                                     </div>
                                 )}
                             </div>
                         );
-                    };
+                    })()}
 
-                    return (
-                        <div className="fade-in">
-                            {/* Header */}
+                    {activeTab === 'images' && (
+                        <div className="fade-in pb-12 px-1">
                             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
                                 <div className="flex items-center gap-2">
-                                    <RefreshCw className="w-6 h-6 text-indigo-400" />
-                                    <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Revision Tracker</h3>
+                                    <ImageIcon className="w-6 h-6 text-indigo-400" />
+                                    <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Image Gallery</h3>
+                                </div>
+                                <div className="relative group min-w-[300px]">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                                    <input
+                                        type="text"
+                                        value={imageSearchQuery}
+                                        onChange={(e) => setImageSearchQuery(e.target.value)}
+                                        placeholder="Search by date..."
+                                        className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                                    />
+                                    {imageSearchQuery && (
+                                        <button
+                                            onClick={() => setImageSearchQuery('')}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    )}
                                 </div>
                             </div>
 
-                            {revisionSessions.length === 0 ? (
+                            {images.length === 0 ? (
                                 <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                    <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5">
-                                        <RefreshCw className="w-10 h-10 text-violet-500/70" />
+                                    <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 rotate-3">
+                                        <ImageIcon className="w-10 h-10 text-indigo-500/70" />
                                     </div>
-                                    <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No revision sessions</h3>
+                                    <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No images yet</h3>
                                     <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
-                                        Create a targeted session of specific topics from the syllabus to start your revision.
+                                        Upload diagrams, textbook snippets, or handwritten notes. They'll be saved here for easy reference and AI analysis.
                                     </p>
                                     <button
-                                        onClick={() => setShowCreateRevisionSession(true)}
-                                        className="bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 hover:border-violet-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
+                                        onClick={() => setShowImageModal(true)}
+                                        className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
                                     >
                                         <PlusCircle className="w-4 h-4" />
-                                        <span>Create Revision Session</span>
+                                        <span>Upload Your First Image</span>
                                     </button>
                                 </div>
                             ) : (
-                                <div className="flex flex-col gap-2">
-                                    {revisionSessions.map(renderSession)}
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
+                                    {images
+                                        .filter(img =>
+                                            new Date(img.created_at).toLocaleDateString().includes(imageSearchQuery)
+                                        )
+                                        .map((img, index, arr) => {
+                                            const isLast = index === arr.length - 1;
+                                            return (
+                                                <motion.div
+                                                    key={img.id}
+                                                    ref={isLast ? lastImageElementRef : null}
+                                                    initial={{ opacity: 0, y: 20 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    transition={{ duration: 0.5, delay: (index % 10) * 0.05 }}
+                                                    className="group relative aspect-square rounded-2xl overflow-hidden bg-surface-2 border border-white/[0.06] hover:border-indigo-500/50 transition-all cursor-pointer shadow-lg hover:shadow-indigo-500/20 active:scale-[0.98]"
+                                                >
+                                                    {/* Source Indicator Button */}
+                                                    {(img.linked_question_id || img.linked_note_id) && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (img.linked_question_id) {
+                                                                    navigateToQuestion(img.linked_question_id);
+                                                                } else if (img.linked_note_id) {
+                                                                    const note = notes.find(n => n.id === img.linked_note_id);
+                                                                    if (note) {
+                                                                        setViewingNote(note);
+                                                                        if (note.source_image_id) handleFetchNoteImage(note.id);
+                                                                    }
+                                                                }
+                                                            }}
+                                                            className="absolute top-3 right-3 p-2 bg-black/60 rounded-xl text-indigo-400 border border-white/[0.08] opacity-0 group-hover:opacity-100 transition-all shadow-2xl z-20 hover:scale-110 active:scale-95 hover:bg-indigo-500/20"
+                                                            title="View Linked Content"
+                                                        >
+                                                            <LinkIcon className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+
+                                                    <img
+                                                        src={img.data}
+                                                        alt="Subject material"
+                                                        className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
+                                                        loading="lazy"
+                                                    />
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-4">
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <p className="text-[11px] font-bold text-white/70 flex items-center gap-1.5">
+                                                                <Activity className="w-3 h-3 text-indigo-400" />
+                                                                {new Date(img.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                            </p>
+                                                            {img.linked_question_id && <span className="text-[9px] font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">Question</span>}
+                                                            {img.linked_note_id && <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">Note</span>}
+                                                        </div>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                const fakeNote = {
+                                                                    id: `img-${img.id}`,
+                                                                    title: 'Source Image',
+                                                                    content: 'Original captured material.',
+                                                                    source_image_id: img.id,
+                                                                    created_at: img.created_at
+                                                                };
+                                                                setFetchedImages(prev => ({ ...prev, [`note-img-${img.id}`]: img.data }));
+                                                                setViewingNote(fakeNote);
+                                                            }}
+                                                            className="w-full py-2 bg-white text-black text-[12px] font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 transition-colors shadow-lg active:scale-95"
+                                                        >
+                                                            <Maximize2 className="w-3.5 h-3.5" />
+                                                            View Full
+                                                        </button>
+                                                    </div>
+                                                </motion.div>
+                                            );
+                                        })}
+                                </div>
+                            )}
+
+                            {loadingMoreImages && (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5 mt-5">
+                                    {[...Array(5)].map((_, i) => (
+                                        <div key={`skeleton-${i}`} className="aspect-square rounded-2xl bg-surface-2/40 border border-white/[0.04] animate-pulse overflow-hidden">
+                                            <div className="w-full h-full bg-indigo-500/5" />
+                                        </div>
+                                    ))}
                                 </div>
                             )}
                         </div>
-                    );
-                })()}
-
-            {activeTab === 'images' && (
-                    <div className="fade-in pb-12 px-1">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
-                            <div className="flex items-center gap-2">
-                                <ImageIcon className="w-6 h-6 text-indigo-400" />
-                                <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Image Gallery</h3>
-                            </div>
-                            <div className="relative group min-w-[300px]">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
-                                <input
-                                    type="text"
-                                    value={imageSearchQuery}
-                                    onChange={(e) => setImageSearchQuery(e.target.value)}
-                                    placeholder="Search by date..."
-                                    className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
-                                />
-                                {imageSearchQuery && (
-                                    <button
-                                        onClick={() => setImageSearchQuery('')}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        {images.length === 0 ? (
-                            <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 rotate-3">
-                                    <ImageIcon className="w-10 h-10 text-indigo-500/70" />
-                                </div>
-                                <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No images yet</h3>
-                                <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
-                                    Upload diagrams, textbook snippets, or handwritten notes. They'll be saved here for easy reference and AI analysis.
-                                </p>
-                                <button
-                                    onClick={() => setShowImageModal(true)}
-                                    className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
-                                >
-                                    <PlusCircle className="w-4 h-4" />
-                                    <span>Upload Your First Image</span>
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
-                                {images
-                                    .filter(img =>
-                                        new Date(img.created_at).toLocaleDateString().includes(imageSearchQuery)
-                                    )
-                                    .map((img, index, arr) => {
-                                        const isLast = index === arr.length - 1;
-                                        return (
-                                            <motion.div
-                                                key={img.id}
-                                                ref={isLast ? lastImageElementRef : null}
-                                                initial={{ opacity: 0, y: 20 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                transition={{ duration: 0.5, delay: (index % 10) * 0.05 }}
-                                                className="group relative aspect-square rounded-2xl overflow-hidden bg-surface-2 border border-white/[0.06] hover:border-indigo-500/50 transition-all cursor-pointer shadow-lg hover:shadow-indigo-500/20 active:scale-[0.98]"
-                                            >
-                                                {/* Source Indicator Button */}
-                                                {(img.linked_question_id || img.linked_note_id) && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            if (img.linked_question_id) {
-                                                                navigateToQuestion(img.linked_question_id);
-                                                            } else if (img.linked_note_id) {
-                                                                const note = notes.find(n => n.id === img.linked_note_id);
-                                                                if (note) {
-                                                                    setViewingNote(note);
-                                                                    if (note.source_image_id) handleFetchNoteImage(note.id);
-                                                                }
-                                                            }
-                                                        }}
-                                                        className="absolute top-3 right-3 p-2 bg-black/60 rounded-xl text-indigo-400 border border-white/[0.08] opacity-0 group-hover:opacity-100 transition-all shadow-2xl z-20 hover:scale-110 active:scale-95 hover:bg-indigo-500/20"
-                                                        title="View Linked Content"
-                                                    >
-                                                        <LinkIcon className="w-3.5 h-3.5" />
-                                                    </button>
-                                                )}
-
-                                                <img
-                                                    src={img.data}
-                                                    alt="Subject material"
-                                                    className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
-                                                    loading="lazy"
-                                                />
-                                                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-4">
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <p className="text-[11px] font-bold text-white/70 flex items-center gap-1.5">
-                                                            <Activity className="w-3 h-3 text-indigo-400" />
-                                                            {new Date(img.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                                        </p>
-                                                        {img.linked_question_id && <span className="text-[9px] font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">Question</span>}
-                                                        {img.linked_note_id && <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">Note</span>}
-                                                    </div>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            const fakeNote = {
-                                                                id: `img-${img.id}`,
-                                                                title: 'Source Image',
-                                                                content: 'Original captured material.',
-                                                                source_image_id: img.id,
-                                                                created_at: img.created_at
-                                                            };
-                                                            setFetchedImages(prev => ({ ...prev, [`note-img-${img.id}`]: img.data }));
-                                                            setViewingNote(fakeNote);
-                                                        }}
-                                                        className="w-full py-2 bg-white text-black text-[12px] font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 transition-colors shadow-lg active:scale-95"
-                                                    >
-                                                        <Maximize2 className="w-3.5 h-3.5" />
-                                                        View Full
-                                                    </button>
-                                                </div>
-                                            </motion.div>
-                                        );
-                                    })}
-                            </div>
-                        )}
-
-                        {loadingMoreImages && (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5 mt-5">
-                                {[...Array(5)].map((_, i) => (
-                                    <div key={`skeleton-${i}`} className="aspect-square rounded-2xl bg-surface-2/40 border border-white/[0.04] animate-pulse overflow-hidden">
-                                        <div className="w-full h-full bg-indigo-500/5" />
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )
-            }
+                    )
+                    }
                 </>
             )}
 
