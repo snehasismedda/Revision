@@ -606,3 +606,264 @@ export const getTestSeriesDetailedStats = async (seriesId) => {
         }
     };
 };
+
+/**
+ * getActivityMap — aggregates daily activity across all user collections.
+ * Returns an array of { date, notes, solutions, questions, sessions, test_attempts, revision_sessions, topics_revised }
+ * for the last `months` months.
+ */
+export const getActivityMap = async (userId, months = 6) => {
+    const sinceDate = new Date();
+    sinceDate.setMonth(sinceDate.getMonth() - months);
+    const since = sinceDate.toISOString().split('T')[0]; // YYYY-MM-DD
+
+
+    // 1. Notes created per day
+    const notesPerDay = db('revision.notes as n')
+        .join('revision.subjects as sub', 'n.subject_id', 'sub.id')
+        .where('sub.user_id', userId)
+        .where('n.is_deleted', false)
+        .where('sub.is_deleted', false)
+        .whereRaw("n.created_at >= ?::date", [since])
+        .groupByRaw("DATE(n.created_at)")
+        .select(
+            db.raw("DATE(n.created_at) as activity_date"),
+            db.raw("COUNT(*)::int as notes"),
+            db.raw("0::int as solutions"),
+            db.raw("0::int as questions"),
+            db.raw("0::int as sessions"),
+            db.raw("0::int as test_attempts"),
+            db.raw("0::int as revision_sessions"),
+            db.raw("0::int as topics_revised")
+        );
+
+    // 2. Solutions created per day
+    const solutionsPerDay = db('revision.solutions as s')
+        .join('revision.subjects as sub', 's.subject_id', 'sub.id')
+        .where('sub.user_id', userId)
+        .where('s.is_deleted', false)
+        .where('sub.is_deleted', false)
+        .whereRaw("s.created_at >= ?::date", [since])
+        .groupByRaw("DATE(s.created_at)")
+        .select(
+            db.raw("DATE(s.created_at) as activity_date"),
+            db.raw("0::int as notes"),
+            db.raw("COUNT(*)::int as solutions"),
+            db.raw("0::int as questions"),
+            db.raw("0::int as sessions"),
+            db.raw("0::int as test_attempts"),
+            db.raw("0::int as revision_sessions"),
+            db.raw("0::int as topics_revised")
+        );
+
+    // 3. Questions created per day
+    const questionsPerDay = db('revision.questions as q')
+        .join('revision.subjects as sub', 'q.subject_id', 'sub.id')
+        .where('sub.user_id', userId)
+        .where('q.is_deleted', false)
+        .where('sub.is_deleted', false)
+        .whereRaw("q.created_at >= ?::date", [since])
+        .groupByRaw("DATE(q.created_at)")
+        .select(
+            db.raw("DATE(q.created_at) as activity_date"),
+            db.raw("0::int as notes"),
+            db.raw("0::int as solutions"),
+            db.raw("COUNT(*)::int as questions"),
+            db.raw("0::int as sessions"),
+            db.raw("0::int as test_attempts"),
+            db.raw("0::int as revision_sessions"),
+            db.raw("0::int as topics_revised")
+        );
+
+    // 4. Study sessions per day (session_date is already a plain date, no offset needed)
+    const sessionsPerDay = db('revision.sessions as s')
+        .join('revision.subjects as sub', 's.subject_id', 'sub.id')
+        .where('sub.user_id', userId)
+        .where('s.is_deleted', false)
+        .where('sub.is_deleted', false)
+        .whereRaw("s.session_date >= ?::date", [since])
+        .groupByRaw("DATE(s.session_date)")
+        .select(
+            db.raw("DATE(s.session_date) as activity_date"),
+            db.raw("0::int as notes"),
+            db.raw("0::int as solutions"),
+            db.raw("0::int as questions"),
+            db.raw("COUNT(*)::int as sessions"),
+            db.raw("0::int as test_attempts"),
+            db.raw("0::int as revision_sessions"),
+            db.raw("0::int as topics_revised")
+        );
+
+    // 5. Test attempts per day
+    const testAttemptsPerDay = db('revision.test_results as tr')
+        .join('revision.tests as t', 'tr.test_id', 't.id')
+        .join('revision.test_series as ts', 't.test_series_id', 'ts.id')
+        .where('ts.user_id', userId)
+        .where('tr.is_deleted', false)
+        .where('t.is_deleted', false)
+        .whereRaw("tr.created_at >= ?::date", [since])
+        .groupByRaw("DATE(tr.created_at)")
+        .select(
+            db.raw("DATE(tr.created_at) as activity_date"),
+            db.raw("0::int as notes"),
+            db.raw("0::int as solutions"),
+            db.raw("0::int as questions"),
+            db.raw("0::int as sessions"),
+            db.raw("COUNT(*)::int as test_attempts"),
+            db.raw("0::int as revision_sessions"),
+            db.raw("0::int as topics_revised")
+        );
+
+    // 6. Revision sessions per day + topics revised count
+    const revisionPerDay = db('revision.revision_sessions as rs')
+        .leftJoin('revision.revision_session_tracker as rst', 'rst.revision_session_id', 'rs.id')
+        .where('rs.user_id', userId)
+        .whereRaw("rs.created_at >= ?::date", [since])
+        .groupByRaw("DATE(rs.created_at)")
+        .select(
+            db.raw("DATE(rs.created_at) as activity_date"),
+            db.raw("0::int as notes"),
+            db.raw("0::int as solutions"),
+            db.raw("0::int as questions"),
+            db.raw("0::int as sessions"),
+            db.raw("0::int as test_attempts"),
+            db.raw("COUNT(DISTINCT rs.id)::int as revision_sessions"),
+            db.raw("COUNT(CASE WHEN rst.status = 'completed' THEN 1 END)::int as topics_revised")
+        );
+
+    // UNION ALL and aggregate by date
+    const raw = await db.raw(`
+        SELECT 
+            activity_date,
+            SUM(notes) as notes,
+            SUM(solutions) as solutions,
+            SUM(questions) as questions,
+            SUM(sessions) as sessions,
+            SUM(test_attempts) as test_attempts,
+            SUM(revision_sessions) as revision_sessions,
+            SUM(topics_revised) as topics_revised
+        FROM (
+            (${notesPerDay.toQuery()})
+            UNION ALL
+            (${solutionsPerDay.toQuery()})
+            UNION ALL
+            (${questionsPerDay.toQuery()})
+            UNION ALL
+            (${sessionsPerDay.toQuery()})
+            UNION ALL
+            (${testAttemptsPerDay.toQuery()})
+            UNION ALL
+            (${revisionPerDay.toQuery()})
+        ) as combined
+        GROUP BY activity_date
+        ORDER BY activity_date ASC
+    `);
+
+    return (raw.rows || []).map(row => ({
+        date: row.activity_date instanceof Date ? row.activity_date.toISOString() : String(row.activity_date),
+        notes: parseInt(row.notes || 0),
+        solutions: parseInt(row.solutions || 0),
+        questions: parseInt(row.questions || 0),
+        sessions: parseInt(row.sessions || 0),
+        testAttempts: parseInt(row.test_attempts || 0),
+        revisionSessions: parseInt(row.revision_sessions || 0),
+        topicsRevised: parseInt(row.topics_revised || 0),
+    }));
+};
+
+/**
+ * getMonthActivityDetail — fetches granular activity counts per subject for a specific month.
+ */
+export const getMonthActivityDetail = async (userId, month, year) => {
+    const start = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+    const end = new Date(year, month + 1, 0).toISOString().split('T')[0];
+
+
+    // 1. Fetch individual activity types grouped by subject AND date
+    const notes = await db('revision.notes as n')
+        .join('revision.subjects as sub', 'n.subject_id', 'sub.id')
+        .where('sub.user_id', userId)
+        .where('n.is_deleted', false)
+        .where('sub.is_deleted', false)
+        .whereBetween('n.created_at', [start + ' 00:00:00', end + ' 23:59:59'])
+        .groupBy('sub.id', 'sub.name', db.raw('DATE(n.created_at)'))
+        .select('sub.id', 'sub.name', db.raw('DATE(n.created_at) as activity_date'), db.raw('COUNT(*)::int as count'));
+
+    const solutions = await db('revision.solutions as s')
+        .join('revision.subjects as sub', 's.subject_id', 'sub.id')
+        .where('sub.user_id', userId)
+        .where('s.is_deleted', false)
+        .where('sub.is_deleted', false)
+        .whereBetween('s.created_at', [start + ' 00:00:00', end + ' 23:59:59'])
+        .groupBy('sub.id', 'sub.name', db.raw('DATE(s.created_at)'))
+        .select('sub.id', 'sub.name', db.raw('DATE(s.created_at) as activity_date'), db.raw('COUNT(*)::int as count'));
+
+    const questions = await db('revision.questions as q')
+        .join('revision.subjects as sub', 'q.subject_id', 'sub.id')
+        .where('sub.user_id', userId)
+        .where('q.is_deleted', false)
+        .where('sub.is_deleted', false)
+        .whereBetween('q.created_at', [start + ' 00:00:00', end + ' 23:59:59'])
+        .groupBy('sub.id', 'sub.name', db.raw('DATE(q.created_at)'))
+        .select('sub.id', 'sub.name', db.raw('DATE(q.created_at) as activity_date'), db.raw('COUNT(*)::int as count'));
+
+    const sessions = await db('revision.sessions as s')
+        .join('revision.subjects as sub', 's.subject_id', 'sub.id')
+        .where('sub.user_id', userId)
+        .where('s.is_deleted', false)
+        .where('sub.is_deleted', false)
+        .whereBetween('s.session_date', [start, end])
+        .groupBy('sub.id', 'sub.name', db.raw('DATE(s.session_date)'))
+        .select('sub.id', 'sub.name', db.raw('DATE(s.session_date) as activity_date'), db.raw('COUNT(*)::int as count'));
+
+    const revisions = await db('revision.revision_sessions as rs')
+        .join('revision.subjects as sub', 'rs.subject_id', 'sub.id')
+        .leftJoin('revision.revision_session_tracker as rst', 'rst.revision_session_id', 'rs.id')
+        .where('rs.user_id', userId)
+        .where('sub.is_deleted', false)
+        .whereBetween('rs.created_at', [start + ' 00:00:00', end + ' 23:59:59'])
+        .groupBy('sub.id', 'sub.name', db.raw('DATE(rs.created_at)'))
+        .select(
+            'sub.id',
+            'sub.name',
+            db.raw('DATE(rs.created_at) as activity_date'),
+            db.raw("COUNT(CASE WHEN rst.status = 'completed' THEN 1 END)::int as count")
+        );
+
+    const testAttempts = await db('revision.test_results as tr')
+        .join('revision.tests as t', 'tr.test_id', 't.id')
+        .join('revision.test_series as ts', 't.test_series_id', 'ts.id')
+        .where('ts.user_id', userId)
+        .where('tr.is_deleted', false)
+        .where('t.is_deleted', false)
+        .where('ts.is_deleted', false)
+        .whereBetween('tr.created_at', [start + ' 00:00:00', end + ' 23:59:59'])
+        .groupBy('ts.name', db.raw('DATE(tr.created_at)'))
+        .select('ts.name', db.raw('DATE(tr.created_at) as activity_date'), db.raw('COUNT(*)::int as count'));
+
+    // 2. Aggregate counts into a single structure
+    const dailyData = {};
+    const getDay = (date) => {
+        const d = date instanceof Date ? date.toISOString() : String(date);
+        if (!dailyData[d]) dailyData[d] = { subjects: {}, tests: [] };
+        return dailyData[d];
+    };
+    const getSub = (dayObj, id, name) => {
+        if (!dayObj.subjects[id]) dayObj.subjects[id] = { id, name, notes: 0, solutions: 0, questions: 0, sessions: 0, topics_revised: 0 };
+        return dayObj.subjects[id];
+    };
+
+    notes.forEach(n => getSub(getDay(n.activity_date), n.id, n.name).notes = n.count);
+    solutions.forEach(s => getSub(getDay(s.activity_date), s.id, s.name).solutions = s.count);
+    questions.forEach(q => getSub(getDay(q.activity_date), q.id, q.name).questions = q.count);
+    sessions.forEach(s => getSub(getDay(s.activity_date), s.id, s.name).sessions = s.count);
+    revisions.forEach(r => getSub(getDay(r.activity_date), r.id, r.name).topics_revised = r.count);
+    testAttempts.forEach(t => getDay(t.activity_date).tests.push({ name: t.name, count: t.count }));
+
+    return {
+        daily: dailyData,
+        period: { month, year, start, end }
+    };
+};
+
+

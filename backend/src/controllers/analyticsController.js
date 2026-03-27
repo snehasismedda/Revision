@@ -171,3 +171,35 @@ export const getTestAnalytics = async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch test analytics' });
     }
 };
+
+export const getActivityMap = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const months = parseInt(req.query.months) || 6;
+        const activityMap = await analyticsModel.getActivityMap(userId, months);
+        res.status(200).json({ activityMap });
+    } catch (error) {
+        console.error('[getActivityMap]', error);
+        res.status(500).json({ error: 'Failed to fetch activity map' });
+    }
+};
+
+export const getMonthActivityDetail = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const month = parseInt(req.query.month);
+        const year = parseInt(req.query.year);
+
+        if (isNaN(month) || isNaN(year)) {
+            return res.status(400).json({ error: 'Month and year are required' });
+        }
+
+        const detail = await analyticsModel.getMonthActivityDetail(userId, month, year);
+        res.status(200).json(detail);
+    } catch (error) {
+        console.error('[getMonthActivityDetail]', error);
+        res.status(500).json({ error: 'Failed to fetch month activity detail' });
+    }
+};
+
+

@@ -98,6 +98,8 @@ export const analyticsApi = {
     testSeries: (seriesId) => request(`/analytics/test-series/${seriesId}`),
     test: (seriesId, testId) => request(`/analytics/test-series/${seriesId}/tests/${testId}`),
     testInsights: (seriesId, testId) => request(`/analytics/test-series/${seriesId}/tests/${testId}/insights`),
+    activityMap: (months) => request(`/analytics/activity-map${months ? `?months=${months}` : ''}`),
+    monthActivityDetail: (month, year) => request(`/analytics/month-detail?month=${month}&year=${year}`),
 };
 
 // AI

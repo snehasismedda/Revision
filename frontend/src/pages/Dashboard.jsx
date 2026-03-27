@@ -6,6 +6,7 @@ import { useTestSeries } from '../context/TestSeriesContext.jsx';
 import SubjectCard from '../components/SubjectCard.jsx';
 import SubjectModal from '../components/modals/SubjectModal.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
+import ActivityHeatmap from '../components/ActivityHeatmap.jsx';
 import toast from 'react-hot-toast';
 import {
     BookOpen, Target, Activity, CheckCircle2,
@@ -13,11 +14,11 @@ import {
     TrendingUp, ArrowUpRight, Sparkles, Wand2, Download,
     Edit2, Save, CheckCircle, ArrowRight
 } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
-import rehypeRaw from 'rehype-raw';
-import rehypeKatex from 'rehype-katex';
+// import ReactMarkdown from 'react-markdown';
+// import remarkGfm from 'remark-gfm';
+// import remarkMath from 'remark-math';
+// import rehypeRaw from 'rehype-raw';
+// import rehypeKatex from 'rehype-katex';
 
 const preprocessMarkdown = (text) => {
     if (!text) return '';
@@ -77,17 +78,17 @@ const StatCard = ({ label, value, sub, icon: Icon, colorClass, delayClass, trend
 
 const Dashboard = () => {
     const navigate = useNavigate();
-    const { 
-        subjects, 
-        statsMap, 
-        loadSubjects, 
-        deleteSubject 
-    } = useSubjects(); 
+    const {
+        subjects,
+        statsMap,
+        loadSubjects,
+        deleteSubject
+    } = useSubjects();
 
 
-    const { 
-        testSeries, 
-        loadTestSeries 
+    const {
+        testSeries,
+        loadTestSeries
     } = useTestSeries();
 
     const [loading, setLoading] = useState(true);
@@ -103,7 +104,7 @@ const Dashboard = () => {
             try {
                 // Batch fetch subjects and stats
                 await loadSubjects();
-                
+
                 // Fetch test series centrally
                 await loadTestSeries();
             } catch (err) {
@@ -211,6 +212,9 @@ const Dashboard = () => {
                     <p className="text-slate-400 text-sm mt-2 leading-relaxed">Your learning performance at a glance.</p>
                 </div>
             </div>
+
+            {/* Smart Activity Heatmap */}
+            <ActivityHeatmap />
 
             {/* AI Strategic Insights Section — Top Level Analysis
             <div className="mb-10 fade-in stagger-1">

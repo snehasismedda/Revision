@@ -3,6 +3,7 @@ import { useAuth, AuthProvider } from './context/AuthContext.jsx';
 import { SubjectProvider } from './context/SubjectContext.jsx';
 import { TestSeriesProvider } from './context/TestSeriesContext.jsx';
 import { TopicProvider } from './context/TopicContext.jsx';
+import { AnalyticsProvider } from './context/AnalyticsContext.jsx';
 import Layout from './components/Layout.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
@@ -72,22 +73,24 @@ const App = () => (
       <SubjectProvider>
         <TestSeriesProvider>
           <TopicProvider>
-            <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 4000,
-            style: {
-              background: '#1a1a2e',
-              color: '#fff',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: '12px',
-              fontSize: '14px',
-              padding: '12px 16px',
-              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-            },
-          }}
-        />
-            <AppRoutes />
+            <AnalyticsProvider>
+              <Toaster
+                position="top-right"
+                toastOptions={{
+                  duration: 4000,
+                  style: {
+                    background: '#1a1a2e',
+                    color: '#fff',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    padding: '12px 16px',
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                  },
+                }}
+              />
+              <AppRoutes />
+            </AnalyticsProvider>
           </TopicProvider>
         </TestSeriesProvider>
       </SubjectProvider>

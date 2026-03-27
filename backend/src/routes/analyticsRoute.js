@@ -1,5 +1,5 @@
 import express from 'express';
-import { getOverview, getTopicPerformance, getTrends, getWeakAreas, getSessionTopicDistribution, getTestSeriesAnalytics, getTestAnalytics } from '../controllers/analyticsController.js';
+import { getOverview, getTopicPerformance, getTrends, getWeakAreas, getSessionTopicDistribution, getTestSeriesAnalytics, getTestAnalytics, getActivityMap, getMonthActivityDetail } from '../controllers/analyticsController.js';
 import { getTestInsights } from '../controllers/aiController.js';
 import authenticate from '../middlewares/authenticate.js';
 
@@ -7,6 +7,8 @@ const router = express.Router({ mergeParams: true });
 
 router.use(authenticate);
 
+router.get('/activity-map', getActivityMap);
+router.get('/month-detail', getMonthActivityDetail);
 router.get('/overview', getOverview);
 router.get('/:subjectId/overview', getOverview);
 router.get('/:subjectId/topic-performance', getTopicPerformance);
@@ -18,3 +20,4 @@ router.get('/test-series/:seriesId/tests/:testId/insights', getTestInsights);
 router.get('/test-series/:seriesId', getTestSeriesAnalytics);
 
 export default router;
+
