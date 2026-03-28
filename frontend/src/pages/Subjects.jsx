@@ -4,17 +4,18 @@ import SubjectCard from '../components/SubjectCard.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import SubjectModal from '../components/modals/SubjectModal.jsx';
 import toast from 'react-hot-toast';
-import { LibraryBig, PlusCircle, Trash2, Edit2, BookOpen, Search, X } from 'lucide-react';
+import { LibraryBig, PlusCircle, Trash2, Edit2, BookOpen, Search, X, Archive } from 'lucide-react';
 
 import { useSubjects } from '../context/SubjectContext.jsx';
 
 const Subjects = () => {
-    const { subjects, statsMap, loading, loadSubjects, addSubject, updateSubject, deleteSubject } = useSubjects();
+    const { subjects, statsMap, loading, loadSubjects, addSubject, updateSubject, deleteSubject, archiveSubject } = useSubjects();
     const [showModal, setShowModal] = useState(false);
     const [editingSubject, setEditingSubject] = useState(null);
     const [searchParams] = useSearchParams();
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTag, setSelectedTag] = useState('');
+    const [showArchived, setShowArchived] = useState(false);
 
     // Custom confirm state
     const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null, name: '' });
@@ -118,6 +119,13 @@ const Subjects = () => {
                         )}
                     </div>
                     <button
+                        onClick={() => setShowArchived(!showArchived)}
+                        className={`btn-secondary flex items-center justify-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer whitespace-nowrap border ${showArchived ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' : 'bg-surface-2/50 border-white/[0.08] text-slate-400 hover:text-white hover:border-white/20'}`}
+                    >
+                        <Archive className="w-3.5 h-3.5" />
+                        <span>{showArchived ? 'Hide Archive' : 'Show Archive'}</span>
+                    </button>
+                    <button
                         onClick={() => {
                             setEditingSubject(null);
                             setShowModal(true);
@@ -168,28 +176,55 @@ const Subjects = () => {
                     </button>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {subjects
-                        .filter(s => {
-                            const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.description?.toLowerCase().includes(searchQuery.toLowerCase());
-                            let sTags = s.tags || [];
-                            if (typeof sTags === 'string') {
-                                try { sTags = JSON.parse(sTags); } catch { sTags = []; }
-                            }
-                            sTags = Array.isArray(sTags) ? sTags : [];
+                <div className="space-y-10">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {subjects
+                            .filter(s => {
+                                if (s.is_archived) return false;
+                                const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.description?.toLowerCase().includes(searchQuery.toLowerCase());
+                                let sTags = s.tags || [];
+                                if (typeof sTags === 'string') {
+                                    try { sTags = JSON.parse(sTags); } catch { sTags = []; }
+                                }
+                                sTags = Array.isArray(sTags) ? sTags : [];
 
-                            const matchesTag = selectedTag ? sTags.includes(selectedTag) : true;
-                            return matchesSearch && matchesTag;
-                        })
-                        .map((s) => (
-                            <SubjectCard
-                                key={s.id}
-                                subject={s}
-                                stats={statsMap[s.id]}
-                                onEdit={handleEditClick}
-                                onDelete={(subj) => setConfirmDelete({ open: true, id: subj.id, name: subj.name })}
-                            />
-                        ))}
+                                const matchesTag = selectedTag ? sTags.includes(selectedTag) : true;
+                                return matchesSearch && matchesTag;
+                            })
+                            .map((s) => (
+                                <SubjectCard
+                                    key={s.id}
+                                    subject={s}
+                                    stats={statsMap[s.id]}
+                                    onEdit={handleEditClick}
+                                    onDelete={(subj) => setConfirmDelete({ open: true, id: subj.id, name: subj.name })}
+                                    onArchive={(subj, status) => archiveSubject(subj.id, status)}
+                                />
+                            ))}
+                    </div>
+
+                    {showArchived && subjects.some(s => s.is_archived) && (
+                        <div className="pt-10 border-t border-white/[0.05]">
+                            <div className="flex items-center gap-3 mb-6">
+                                <Archive className="w-5 h-5 text-amber-500/50" />
+                                <h2 className="text-xl font-heading font-bold text-slate-500 tracking-tight">Archived Subjects</h2>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 opacity-60 hover:opacity-100 transition-opacity">
+                                {subjects
+                                    .filter(s => s.is_archived)
+                                    .map((s) => (
+                                        <SubjectCard
+                                            key={s.id}
+                                            subject={s}
+                                            stats={statsMap[s.id]}
+                                            onEdit={handleEditClick}
+                                            onDelete={(subj) => setConfirmDelete({ open: true, id: subj.id, name: subj.name })}
+                                            onArchive={(subj, status) => archiveSubject(subj.id, status)}
+                                        />
+                                    ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

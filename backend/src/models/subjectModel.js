@@ -17,7 +17,7 @@ export const findSubjectsByUser = async (data) => {
         .where('user_id', data.userId)
         .where('is_deleted', false)
         .select([
-            'id', 'name', 'description', 'tags', 'created_at', 'updated_at',
+            'id', 'name', 'description', 'tags', 'is_archived', 'created_at', 'updated_at',
         ])
         .orderBy('updated_at', 'desc');
 };
@@ -52,6 +52,7 @@ export const updateSubject = async (data) => {
             name: data.name,
             description: data.description,
             tags: JSON.stringify(Array.isArray(data.tags) ? data.tags : []),
+            is_archived: data.isArchived !== undefined ? data.isArchived : db.raw('is_archived'),
             updated_at: new Date(),
         })
         .returning('*');

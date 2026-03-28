@@ -82,7 +82,8 @@ const Dashboard = () => {
         subjects,
         statsMap,
         loadSubjects,
-        deleteSubject
+        deleteSubject,
+        archiveSubject
     } = useSubjects();
 
 
@@ -170,15 +171,16 @@ const Dashboard = () => {
 
     const totalIncorrect = totalQuestions - totalCorrect;
 
-    const needsAttentionCount = subjects.filter((s) => statsMap[s.id]?.accuracy != null && statsMap[s.id].totalQuestions > 0 && statsMap[s.id].accuracy < 75).length;
+    const activeSubjects = subjects.filter(s => !s.is_archived);
+    const needsAttentionCount = activeSubjects.filter((s) => statsMap[s.id]?.accuracy != null && statsMap[s.id].totalQuestions > 0 && statsMap[s.id].accuracy < 75).length;
 
-    const weakSubjects = subjects
+    const weakSubjects = activeSubjects
         .filter((s) => statsMap[s.id]?.accuracy != null && statsMap[s.id].totalQuestions > 0 && statsMap[s.id].accuracy < 75)
         .sort((a, b) => (statsMap[a.id]?.accuracy ?? 100) - (statsMap[b.id]?.accuracy ?? 100))
         .slice(0, 3);
 
-    const topSubject = subjects.length > 0
-        ? [...subjects]
+    const topSubject = activeSubjects.length > 0
+        ? [...activeSubjects]
             .filter(s => statsMap[s.id]?.totalQuestions > 0)
             .sort((a, b) => (statsMap[b.id]?.accuracy ?? 0) - (statsMap[a.id]?.accuracy ?? 0))[0]
         : null;
@@ -399,8 +401,8 @@ const Dashboard = () => {
                 <StatCard
                     delayClass="stagger-2"
                     label="Active Subjects"
-                    value={subjects.length}
-                    sub={needsAttentionCount > 0 ? `${needsAttentionCount} ${needsAttentionCount === 1 ? 'subject needs' : 'subjects need'} attention` : (subjects.length > 0 ? 'All subjects performing well' : 'No active subjects')}
+                    value={activeSubjects.length}
+                    sub={needsAttentionCount > 0 ? `${needsAttentionCount} ${needsAttentionCount === 1 ? 'subject needs' : 'subjects need'} attention` : (activeSubjects.length > 0 ? 'All subjects performing well' : 'No active subjects')}
                     icon={BookOpen}
                     colorClass="text-primary"
                 />
@@ -457,6 +459,7 @@ const Dashboard = () => {
                                     setShowModal(true);
                                 }}
                                 onDelete={(subj) => setConfirmDelete({ open: true, id: subj.id, name: subj.name })}
+                                onArchive={(subj, status) => archiveSubject(subj.id, status)}
                             />
                         ))}
                     </div>
@@ -473,7 +476,7 @@ const Dashboard = () => {
                         </div>
                         <h2 className="text-xl font-heading font-bold text-white tracking-tight">Active Subjects</h2>
                     </div>
-                    {subjects.length > 6 && (
+                    {activeSubjects.length > 6 && (
                         <button
                             onClick={() => navigate('/subjects')}
                             className="flex items-center gap-2 text-primary hover:text-primary/80 text-sm font-semibold transition-colors cursor-pointer group/see-all"
@@ -509,7 +512,7 @@ const Dashboard = () => {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                        {subjects.slice(0, 6).map((s) => (
+                        {activeSubjects.slice(0, 6).map((s) => (
                             <SubjectCard
                                 key={s.id}
                                 subject={s}
@@ -519,6 +522,7 @@ const Dashboard = () => {
                                     setShowModal(true);
                                 }}
                                 onDelete={(subj) => setConfirmDelete({ open: true, id: subj.id, name: subj.name })}
+                                onArchive={(subj, status) => archiveSubject(subj.id, status)}
                             />
                         ))}
                     </div>

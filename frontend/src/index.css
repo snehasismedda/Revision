@@ -99,7 +99,6 @@ h6 {
 /* Interactive Card Hover */
 .glass-card {
   position: relative;
-  overflow: hidden;
 }
 
 .glass-card:hover {

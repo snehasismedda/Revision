@@ -44,13 +44,14 @@ export const getSubject = async (req, res) => {
 
 export const updateSubject = async (req, res) => {
     try {
-        const { name, description, tags } = req.body;
+        const { name, description, tags, isArchived } = req.body;
         const updated = await subjectModel.updateSubject({
             id: req.params.id,
             userId: req.user.id,
             name,
             description,
             tags: Array.isArray(tags) ? tags : [],
+            isArchived,
         });
         if (!updated) return res.status(404).json({ error: 'Subject not found' });
         res.status(200).json({ subject: updated });

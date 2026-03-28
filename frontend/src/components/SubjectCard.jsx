@@ -1,9 +1,22 @@
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PerformanceBadge from './PerformanceBadge.jsx';
-import { BookMarked, BrainCircuit, Activity, ArrowRight, Trash2, Edit2, FileText } from 'lucide-react';
+import { BookMarked, BrainCircuit, Activity, Trash2, Edit2, FileText, MoreVertical, Archive } from 'lucide-react';
 
-const SubjectCard = ({ subject, stats, variant, onEdit, onDelete }) => {
+const SubjectCard = ({ subject, stats, variant, onEdit, onDelete, onArchive }) => {
     const navigate = useNavigate();
+    const [showMenu, setShowMenu] = useState(false);
+    const menuRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (menuRef.current && !menuRef.current.contains(event.target)) {
+                setShowMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const accuracy = stats?.accuracy ?? null;
     const totalQ = stats?.totalQuestions ?? 0;
@@ -21,7 +34,7 @@ const SubjectCard = ({ subject, stats, variant, onEdit, onDelete }) => {
     return (
         <div
             onClick={() => navigate(`/subjects/${subject.id}`, { state: { subject, stats } })}
-            className={`glass-card glass p-5 cursor-pointer group flex flex-col justify-between transition-all
+            className={`glass-card glass p-5 cursor-pointer group flex flex-col justify-between transition-all !overflow-visible
                 ${isAttention ? 'border-amber-500/15 hover:border-amber-500/30' : ''}`}
             style={{ minHeight: '140px' }}
         >
@@ -94,30 +107,64 @@ const SubjectCard = ({ subject, stats, variant, onEdit, onDelete }) => {
                 </div>
 
                 {(onEdit || onDelete) && (
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-200">
-                        {onEdit && (
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onEdit(subject);
-                                }}
-                                className="p-1 text-slate-500 hover:text-blue-400 transition-colors cursor-pointer"
-                                title="Edit Subject"
+                    <div className="relative" ref={menuRef}>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowMenu(!showMenu);
+                            }}
+                            className={`p-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center
+                                ${showMenu ? 'bg-white/10 text-primary' : 'text-slate-500 hover:text-white hover:bg-white/5 opacity-0 group-hover:opacity-100'}`}
+                            title="Options"
+                        >
+                            <MoreVertical className="w-3.5 h-3.5" />
+                        </button>
+
+                        {showMenu && (
+                            <div
+                                className="absolute right-0 bottom-full mb-2 w-36 glass rounded-xl border border-white/10 shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200"
+                                onClick={(e) => e.stopPropagation()}
                             >
-                                <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                        )}
-                        {onDelete && (
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onDelete(subject);
-                                }}
-                                className="p-1 text-slate-500 hover:text-red-400 transition-colors cursor-pointer"
-                                title="Delete Subject"
-                            >
-                                <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                                {onEdit && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowMenu(false);
+                                            onEdit(subject);
+                                        }}
+                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                    >
+                                        <Edit2 className="w-3 h-3 text-blue-400" />
+                                        <span>Edit Subject</span>
+                                    </button>
+                                )}
+                                {onArchive && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowMenu(false);
+                                            onArchive(subject, !subject.is_archived);
+                                        }}
+                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                    >
+                                        <Archive className={`w-3 h-3 ${subject.is_archived ? 'text-emerald-400' : 'text-amber-400'}`} />
+                                        <span>{subject.is_archived ? 'Restore Subject' : 'Add to Archive'}</span>
+                                    </button>
+                                )}
+                                {onDelete && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowMenu(false);
+                                            onDelete(subject);
+                                        }}
+                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-red-400 hover:bg-red-500/10 transition-colors text-left"
+                                    >
+                                        <Trash2 className="w-3 h-3 text-red-400" />
+                                        <span>Delete Subject</span>
+                                    </button>
+                                )}
+                            </div>
                         )}
                     </div>
                 )}

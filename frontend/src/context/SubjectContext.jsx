@@ -113,6 +113,21 @@ export const SubjectProvider = ({ children }) => {
         }
     }, []);
 
+    const archiveSubject = useCallback(async (id, isArchived) => {
+        const action = isArchived ? 'Archiving' : 'Restoring';
+        const loadingToast = toast.loading(`${action} subject...`);
+        try {
+            const { subject } = await subjectsApi.update(id, { isArchived });
+            setSubjects(prev => prev.map(s => s.id === id ? subject : s));
+            toast.success(`Subject ${isArchived ? 'archived' : 'restored'}`, { id: loadingToast });
+            return subject;
+        } catch (error) {
+            console.error(`Failed to ${isArchived ? 'archive' : 'unarchive'} subject:`, error);
+            toast.error(`Failed to ${isArchived ? 'archive' : 'restore'} subject`, { id: loadingToast });
+            throw error;
+        }
+    }, []);
+
     return (
         <SubjectContext.Provider value={{ 
             subjects, 
@@ -123,6 +138,7 @@ export const SubjectProvider = ({ children }) => {
             addSubject, 
             updateSubject, 
             deleteSubject,
+            archiveSubject,
             refreshStats
         }}>
             {children}

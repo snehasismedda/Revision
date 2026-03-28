@@ -312,7 +312,7 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
                     </div>
 
                     {/* Viewfinder */}
-                    <div className="relative aspect-[4/3] rounded-xl overflow-hidden border border-white/[0.06] flex items-center justify-center" style={{ background: 'radial-gradient(ellipse at center, #131320 0%, #0a0a10 100%)' }}>
+                    <div className="relative aspect-[4/3] rounded-xl overflow-hidden border border-white/[0.06] flex items-center justify-center" style={{ background: 'radial-gradient(ellipse at center, #131320 0%, #0e0e16 100%)' }}>
                         {isCameraLoading ? (
                             <div className="flex flex-col items-center gap-2.5">
                                 <div className="w-7 h-7 border-[2.5px] border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
@@ -455,10 +455,10 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
 
     return (
         <ModalPortal>
-            <div className="fixed inset-0 z-[110] flex items-center justify-center p-0 modal-backdrop fade-in">
+            <div className="fixed inset-0 z-[110] flex items-center justify-center p-0 modal-backdrop fade-in bg-black/60">
                 <div
                     className="w-full h-[100dvh] flex flex-col overflow-hidden"
-                    style={{ background: '#0a0a10', willChange: 'transform, opacity' }}
+                    style={{ background: '#0e0e16', willChange: 'transform, opacity' }}
                     onClick={e => e.stopPropagation()}
                 >
                     {/* ═══ Top Bar ═══ */}
@@ -518,7 +518,7 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
                         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
 
                             {/* ─── Left Sidebar (metadata + image) ─── */}
-                            <div className="w-full lg:w-[380px] xl:w-[420px] shrink-0 border-b lg:border-b-0 lg:border-r border-white/[0.04] flex flex-col overflow-hidden bg-[#0a0a10]">
+                            <div className="w-full lg:w-[380px] xl:w-[420px] shrink-0 border-b lg:border-b-0 lg:border-r border-white/[0.04] flex flex-col overflow-hidden bg-[#0e0e16]">
                                 <div className="flex-1 overflow-y-auto custom-scrollbar p-5 sm:p-6 space-y-6">
                                     {/* Type Selector */}
                                     <div>

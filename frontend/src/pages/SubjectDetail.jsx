@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 
 import { useParams, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
 import { sessionsApi, questionsApi, notesApi, imagesApi, aiApi, revisionApi, solutionsApi, analyticsApi } from '../api/index.js';
@@ -16,7 +16,7 @@ import autoTable from 'jspdf-autotable';
 import { marked } from 'marked';
 import { saveAs } from 'file-saver';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, ImageRun, Table, TableRow, TableCell, WidthType, AlignmentType } from 'docx';
-import { ArrowLeft, PlusCircle, BarChart3, Wand2, BookOpen, Activity, ListChecks, FileText, Image as ImageIcon, Trash2, ChevronDown, Pencil, Hash, Search, X, Link2 as LinkIcon, Maximize2, Minimize2, LayoutGrid, List, CheckCircle, Download, ClipboardList, RotateCcw, Clock, RefreshCw, Notebook, MoreHorizontal } from 'lucide-react';
+import { ArrowLeft, PlusCircle, BarChart3, Wand2, BookOpen, Activity, ListChecks, FileText, Image as ImageIcon, Trash2, ChevronDown, Pencil, Hash, Search, X, Link2 as LinkIcon, Maximize2, Minimize2, LayoutGrid, List, CheckCircle, Download, ClipboardList, RotateCcw, Clock, RefreshCw, Notebook, MoreHorizontal, MoreVertical } from 'lucide-react';
 
 import ManageSyllabusModal from '../components/modals/ManageSyllabusModal.jsx';
 import AddQuestionModal from '../components/modals/AddQuestionModal.jsx';
@@ -161,6 +161,24 @@ const SubjectDetail = () => {
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [confirmBulkDelete, setConfirmBulkDelete] = useState({ open: false, type: null, count: 0 });
     const [isDownloadingSyllabus, setIsDownloadingSyllabus] = useState(false);
+    const [activeNoteDropdown, setActiveNoteDropdown] = useState(null);
+    const [activeQuestionDropdown, setActiveQuestionDropdown] = useState(null);
+    const [highlightedNoteId, setHighlightedNoteId] = useState(null);
+    const noteDropdownRef = useRef(null);
+    const questionDropdownRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (activeNoteDropdown && noteDropdownRef.current && !noteDropdownRef.current.contains(event.target)) {
+                setActiveNoteDropdown(null);
+            }
+            if (activeQuestionDropdown && questionDropdownRef.current && !questionDropdownRef.current.contains(event.target)) {
+                setActiveQuestionDropdown(null);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [activeNoteDropdown, activeQuestionDropdown]);
 
     useEffect(() => {
         setIsSelectionMode(false);
@@ -1280,8 +1298,19 @@ const SubjectDetail = () => {
                     setSessions(sesRes.sessions);
                     break;
                 case 'questions':
-                    const qsRes = await questionsApi.list(id);
+                    // Proactively fetch notes and solutions when questions tab is clicked to ensure icons/badges are accurate
+                    const [qsRes, nRes, solRes] = await Promise.all([
+                        questionsApi.list(id),
+                        notesApi.list(id, NOTE_LIMIT, 0).catch(() => ({ notes: [] })),
+                        solutionsApi.list(id).catch(() => ({ solutions: [] }))
+                    ]);
                     setQuestions(qsRes.questions || []);
+                    setNotes(nRes.notes || []);
+                    setSolutions(solRes.solutions || []);
+                    setHasMoreNotes((nRes.notes || []).length === NOTE_LIMIT);
+                    setNotePage(0);
+                    // Mark notes and solutions as loaded so their tabs don't refetch
+                    setLoadedTabs(prev => new Set(prev).add('notes').add('solutions'));
                     break;
                 case 'notes':
                     const notesRes = await notesApi.list(id, NOTE_LIMIT, 0);
@@ -1791,22 +1820,21 @@ const SubjectDetail = () => {
 
     const handleGenerateAINote = async (questionId) => {
         // If an AI note exists for this question, just navigate to it
-        const existingNote = notes.find(n => n.question_id === questionId && n.title?.startsWith('AI Note'));
+        const existingNote = notes.find(n => n.question_id == questionId && n.title?.startsWith('AI Note'));
         if (existingNote) {
             setActiveTab('notes');
+            // Slight delay for the tab to switch before highlighting
             setTimeout(() => {
+                setHighlightedNoteId(existingNote.id);
                 const el = document.getElementById(`note-${existingNote.id}`);
                 if (el) {
                     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    // Premium highlight effect
-                    el.style.transition = 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
-                    el.classList.add('ring-2', 'ring-emerald-500', 'ring-offset-4', 'ring-offset-slate-900', 'scale-[1.01]', 'z-50');
-
-                    setTimeout(() => {
-                        el.classList.remove('ring-2', 'ring-emerald-500', 'ring-offset-4', 'ring-offset-slate-900', 'scale-[1.01]', 'z-50');
-                    }, 2500);
                 }
             }, 100);
+            
+            setTimeout(() => {
+                setHighlightedNoteId(null);
+            }, 3500);
             return;
         }
 
@@ -2339,13 +2367,6 @@ const SubjectDetail = () => {
                                     ) : (
                                         <>
                                             <button
-                                                onClick={() => setIsSelectionMode(true)}
-                                                className="bg-surface-3/50 text-slate-300 hover:text-white hover:bg-surface-3 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all border border-white/[0.08] cursor-pointer"
-                                            >
-                                                <CheckCircle className="w-4 h-4" />
-                                                <span>Select</span>
-                                            </button>
-                                            <button
                                                 onClick={() => setShowQuestionModal(true)}
                                                 className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
                                             >
@@ -2445,13 +2466,6 @@ const SubjectDetail = () => {
                                         </div>
                                     ) : (
                                         <>
-                                            <button
-                                                onClick={() => setIsSelectionMode(true)}
-                                                className="bg-surface-3/50 text-slate-300 hover:text-white hover:bg-surface-3 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all border border-white/[0.08] cursor-pointer"
-                                            >
-                                                <CheckCircle className="w-4 h-4" />
-                                                <span>Select</span>
-                                            </button>
                                             <button
                                                 onClick={() => setShowNoteModal(true)}
                                                 className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
@@ -2761,7 +2775,7 @@ const SubjectDetail = () => {
                                                         <div
                                                             key={q.id}
                                                             id={`question-${q.id}`}
-                                                            className={`question-card group relative transition-all ${isSelectionMode ? (selectedItems.has(q.id) ? 'ring-2 ring-indigo-500 cursor-pointer bg-indigo-500/5' : 'cursor-pointer hover:bg-white/[0.02]') : ''}`}
+                                                            className={`question-card group relative transition-all overflow-visible ${activeQuestionDropdown === q.id ? 'border-indigo-500/40 shadow-xl' : ''} ${isSelectionMode ? (selectedItems.has(q.id) ? 'ring-2 ring-indigo-500 cursor-pointer bg-indigo-500/5' : 'cursor-pointer hover:bg-white/[0.02]') : ''}`}
                                                             onClick={() => {
                                                                 if (isSelectionMode) {
                                                                     const next = new Set(selectedItems);
@@ -2787,70 +2801,109 @@ const SubjectDetail = () => {
                                                                     {q.type === 'image' ? <ImageIcon className="w-4 h-4 text-indigo-400" /> : <FileText className="w-4 h-4 text-emerald-400" />}
                                                                     {q.type === 'image' ? 'Image' : 'Text'}
                                                                 </span>
-                                                                <span className="text-[12px] text-slate-500 ml-auto font-medium">
-                                                                    {new Date(q.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                                </span>
+                                                                <div className="flex items-center gap-1 ml-auto relative" ref={activeQuestionDropdown === q.id ? questionDropdownRef : null}>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setActiveQuestionDropdown(activeQuestionDropdown === q.id ? null : q.id);
+                                                                        }}
+                                                                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${activeQuestionDropdown === q.id ? 'bg-white/10 text-indigo-400' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}
+                                                                        title="More Options"
+                                                                    >
+                                                                        <MoreVertical className="w-4.5 h-4.5" />
+                                                                    </button>
 
-                                                                <div className="flex items-center gap-1 ml-2">
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setEditingQuestion(q);
-                                                                            setShowEditQuestionModal(true);
-                                                                        }}
-                                                                        className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer"
-                                                                        title="Edit Question"
-                                                                    >
-                                                                        <Pencil className="w-[18px] h-[18px]" />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setSelectedQuestionIdForNote(q.id);
-                                                                            setShowNoteModal(true);
-                                                                        }}
-                                                                        className="p-2 text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-all cursor-pointer"
-                                                                        title="Manual Note"
-                                                                    >
-                                                                        <FileText className="w-[18px] h-[18px]" />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            const existingRes = solutions.find(s => s.question_id === q.id);
-                                                                            if (existingRes) {
-                                                                                setViewingSolution(existingRes);
-                                                                                if (existingRes.source_image_id) {
-                                                                                    handleFetchSolutionImage(existingRes.id);
-                                                                                }
-                                                                            } else {
-                                                                                setSelectedQuestionIdForSolution(q.id);
-                                                                                setShowSolutionModal(true);
-                                                                            }
-                                                                        }}
-                                                                        className={`p-2 rounded-lg transition-all cursor-pointer ${solutions.some(s => s.question_id === q.id) ? 'text-blue-400 bg-blue-400/10' : 'text-slate-500 hover:text-blue-400 hover:bg-blue-400/10'}`}
-                                                                        title={solutions.some(s => s.question_id === q.id) ? "View Solution" : "Add Solution"}
-                                                                    >
-                                                                        <ListChecks className="w-[18px] h-[18px]" />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleGenerateAINote(q.id)}
-                                                                        disabled={generatingAINoteId === q.id}
-                                                                        className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer disabled:opacity-50"
-                                                                        title={existingAINote ? "View AI Note" : "AI Note"}
-                                                                    >
-                                                                        {generatingAINoteId === q.id ? (
-                                                                            <div className="w-[18px] h-[18px] border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
-                                                                        ) : existingAINote ? (
-                                                                            <BookOpen className="w-[18px] h-[18px]" />
-                                                                        ) : (
-                                                                            <Wand2 className="w-[18px] h-[18px]" />
-                                                                        )}
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => setConfirmDeleteQuestion({ open: true, questionId: q.id })}
-                                                                        className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all cursor-pointer"
-                                                                        title="Delete Question"
-                                                                    >
-                                                                        <Trash2 className="w-[18px] h-[18px]" />
-                                                                    </button>
+                                                                    {activeQuestionDropdown === q.id && (
+                                                                        <div 
+                                                                            className="absolute right-0 top-full mt-2 w-44 glass rounded-xl border border-white/10 shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                        >
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setIsSelectionMode(true);
+                                                                                    setSelectedItems(new Set([q.id]));
+                                                                                    setActiveQuestionDropdown(null);
+                                                                                }}
+                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                            >
+                                                                                <CheckCircle className="w-3.5 h-3.5 text-indigo-400" />
+                                                                                <span>Select Question</span>
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setActiveQuestionDropdown(null);
+                                                                                    setEditingQuestion(q);
+                                                                                    setShowEditQuestionModal(true);
+                                                                                }}
+                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                            >
+                                                                                <Pencil className="w-3.5 h-3.5 text-indigo-400" />
+                                                                                <span>Edit Question</span>
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setActiveQuestionDropdown(null);
+                                                                                    setSelectedQuestionIdForNote(q.id);
+                                                                                    setShowNoteModal(true);
+                                                                                }}
+                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                            >
+                                                                                <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                                                                                <span>Manual Note</span>
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setActiveQuestionDropdown(null);
+                                                                                    const existingRes = solutions.find(s => s.question_id === q.id);
+                                                                                    if (existingRes) {
+                                                                                        setViewingSolution(existingRes);
+                                                                                        if (existingRes.source_image_id) handleFetchSolutionImage(existingRes.id);
+                                                                                    } else {
+                                                                                        setSelectedQuestionIdForSolution(q.id);
+                                                                                        setShowSolutionModal(true);
+                                                                                    }
+                                                                                }}
+                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                            >
+                                                                                <ListChecks className="w-3.5 h-3.5 text-blue-400" />
+                                                                                <span>{solutions.some(s => s.question_id === q.id) ? "View Solution" : "Add Solution"}</span>
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setActiveQuestionDropdown(null);
+                                                                                    handleGenerateAINote(q.id);
+                                                                                }}
+                                                                                disabled={generatingAINoteId === q.id}
+                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left disabled:opacity-50"
+                                                                            >
+                                                                                {generatingAINoteId === q.id ? (
+                                                                                    <div className="w-3.5 h-3.5 border border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+                                                                                ) : existingAINote ? (
+                                                                                    <BookOpen className="w-3.5 h-3.5 text-purple-400" />
+                                                                                ) : (
+                                                                                    <Wand2 className="w-3.5 h-3.5 text-amber-400" />
+                                                                                )}
+                                                                                <span>{existingAINote ? "View AI Note" : "AI Note"}</span>
+                                                                            </button>
+                                                                            <div className="h-px bg-white/5 my-1" />
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setActiveQuestionDropdown(null);
+                                                                                    setConfirmDeleteQuestion({ open: true, questionId: q.id });
+                                                                                }}
+                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-red-400 hover:bg-red-500/10 transition-colors text-left"
+                                                                            >
+                                                                                <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                                                                                <span>Delete Question</span>
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </div>
 
@@ -2969,7 +3022,7 @@ const SubjectDetail = () => {
                                                                         <div
                                                                             key={q.id}
                                                                             id={`question-${q.id}`}
-                                                                            className={`question-card group relative transition-all ${isSelectionMode ? (selectedItems.has(q.id) ? 'ring-2 ring-indigo-500 cursor-pointer bg-indigo-500/5' : 'cursor-pointer hover:bg-white/[0.02]') : ''}`}
+                                                                            className={`question-card group relative transition-all overflow-visible ${activeQuestionDropdown === q.id ? 'border-indigo-500/40 shadow-xl' : ''} ${isSelectionMode ? (selectedItems.has(q.id) ? 'ring-2 ring-indigo-500 cursor-pointer bg-indigo-500/5' : 'cursor-pointer hover:bg-white/[0.02]') : ''}`}
                                                                             onClick={() => {
                                                                                 if (isSelectionMode) {
                                                                                     const next = new Set(selectedItems);
@@ -2995,66 +3048,109 @@ const SubjectDetail = () => {
                                                                                     {new Date(q.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
                                                                                 </span>
 
-                                                                                <div className="flex items-center gap-1 ml-2">
+                                                                                <div className="flex items-center gap-1 ml-2 relative" ref={activeQuestionDropdown === q.id ? questionDropdownRef : null}>
                                                                                     <button
-                                                                                        onClick={() => {
-                                                                                            setEditingQuestion(q);
-                                                                                            setShowEditQuestionModal(true);
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            setActiveQuestionDropdown(activeQuestionDropdown === q.id ? null : q.id);
                                                                                         }}
-                                                                                        className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer"
-                                                                                        title="Edit Question"
+                                                                                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${activeQuestionDropdown === q.id ? 'bg-white/10 text-indigo-400' : 'text-slate-500 hover:text-white hover:bg-white/5 opacity-0 group-hover:opacity-100'}`}
+                                                                                        title="More Options"
                                                                                     >
-                                                                                        <Pencil className="w-[18px] h-[18px]" />
+                                                                                        <MoreVertical className="w-4.5 h-4.5" />
                                                                                     </button>
-                                                                                    <button
-                                                                                        onClick={() => {
-                                                                                            setSelectedQuestionIdForNote(q.id);
-                                                                                            setShowNoteModal(true);
-                                                                                        }}
-                                                                                        className="p-2 text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-all cursor-pointer"
-                                                                                        title="Manual Note"
-                                                                                    >
-                                                                                        <FileText className="w-[18px] h-[18px]" />
-                                                                                    </button>
-                                                                                    <button
-                                                                                        onClick={() => {
-                                                                                            const existingRes = solutions.find(s => s.question_id === q.id);
-                                                                                            if (existingRes) {
-                                                                                                setViewingSolution(existingRes);
-                                                                                                if (existingRes.source_image_id) {
-                                                                                                    handleFetchSolutionImage(existingRes.id);
-                                                                                                }
-                                                                                            } else {
-                                                                                                setSelectedQuestionIdForSolution(q.id);
-                                                                                                setShowSolutionModal(true);
-                                                                                            }
-                                                                                        }}
-                                                                                        className={`p-2 rounded-lg transition-all cursor-pointer ${solutions.some(s => s.question_id === q.id) ? 'text-blue-400 bg-blue-400/10' : 'text-slate-500 hover:text-blue-400 hover:bg-blue-400/10'}`}
-                                                                                        title={solutions.some(s => s.question_id === q.id) ? "View Solution" : "Add Solution"}
-                                                                                    >
-                                                                                        <ListChecks className="w-[18px] h-[18px]" />
-                                                                                    </button>
-                                                                                    <button
-                                                                                        onClick={() => handleGenerateAINote(q.id)}
-                                                                                        disabled={generatingAINoteId === q.id}
-                                                                                        className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-lg transition-all cursor-pointer disabled:opacity-50"
-                                                                                        title={existingAINote ? "View AI Note" : "AI Note"}
-                                                                                    >
-                                                                                        {generatingAINoteId === q.id ? (
-                                                                                            <div className="w-[18px] h-[18px] border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
-                                                                                        ) : existingAINote ? (
-                                                                                            <BookOpen className="w-[18px] h-[18px]" />
-                                                                                        ) : (
-                                                                                            <Wand2 className="w-[18px] h-[18px]" />
-                                                                                        )}
-                                                                                    </button>
-                                                                                    <button
-                                                                                        onClick={() => setConfirmDeleteQuestion({ open: true, questionId: q.id })}
-                                                                                        className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all cursor-pointer"
-                                                                                        title="Delete Question"
-                                                                                    >
-                                                                                        <Trash2 className="w-[18px] h-[18px]" />
-                                                                                    </button>
+
+                                                                                    {activeQuestionDropdown === q.id && (
+                                                                                        <div 
+                                                                                            className="absolute right-0 top-full mt-2 w-44 glass rounded-xl border border-white/10 shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+                                                                                            onClick={(e) => e.stopPropagation()}
+                                                                                        >
+                                                                                            <button
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    setIsSelectionMode(true);
+                                                                                                    setSelectedItems(new Set([q.id]));
+                                                                                                    setActiveQuestionDropdown(null);
+                                                                                                }}
+                                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                                            >
+                                                                                                <CheckCircle className="w-3.5 h-3.5 text-indigo-400" />
+                                                                                                <span>Select Question</span>
+                                                                                            </button>
+                                                                                            <button
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    setActiveQuestionDropdown(null);
+                                                                                                    setEditingQuestion(q);
+                                                                                                    setShowEditQuestionModal(true);
+                                                                                                }}
+                                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                                            >
+                                                                                                <Pencil className="w-3.5 h-3.5 text-indigo-400" />
+                                                                                                <span>Edit Question</span>
+                                                                                            </button>
+                                                                                            <button
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    setActiveQuestionDropdown(null);
+                                                                                                    setSelectedQuestionIdForNote(q.id);
+                                                                                                    setShowNoteModal(true);
+                                                                                                }}
+                                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                                            >
+                                                                                                <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                                                                                                <span>Manual Note</span>
+                                                                                            </button>
+                                                                                            <button
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    setActiveQuestionDropdown(null);
+                                                                                                    const existingRes = solutions.find(s => s.question_id === q.id);
+                                                                                                    if (existingRes) {
+                                                                                                        setViewingSolution(existingRes);
+                                                                                                        if (existingRes.source_image_id) handleFetchSolutionImage(existingRes.id);
+                                                                                                    } else {
+                                                                                                        setSelectedQuestionIdForSolution(q.id);
+                                                                                                        setShowSolutionModal(true);
+                                                                                                    }
+                                                                                                }}
+                                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                                            >
+                                                                                                <ListChecks className="w-3.5 h-3.5 text-blue-400" />
+                                                                                                <span>{solutions.some(s => s.question_id === q.id) ? "View Solution" : "Add Solution"}</span>
+                                                                                            </button>
+                                                                                            <button
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    setActiveQuestionDropdown(null);
+                                                                                                    handleGenerateAINote(q.id);
+                                                                                                }}
+                                                                                                disabled={generatingAINoteId === q.id}
+                                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left disabled:opacity-50"
+                                                                                            >
+                                                                                                {generatingAINoteId === q.id ? (
+                                                                                                    <div className="w-3.5 h-3.5 border border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+                                                                                                ) : existingAINote ? (
+                                                                                                    <BookOpen className="w-3.5 h-3.5 text-purple-400" />
+                                                                                                ) : (
+                                                                                                    <Wand2 className="w-3.5 h-3.5 text-amber-400" />
+                                                                                                )}
+                                                                                                <span>{existingAINote ? "View AI Note" : "AI Note"}</span>
+                                                                                            </button>
+                                                                                            <div className="h-px bg-white/5 my-1" />
+                                                                                            <button
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    setActiveQuestionDropdown(null);
+                                                                                                    setConfirmDeleteQuestion({ open: true, questionId: q.id });
+                                                                                                }}
+                                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-red-400 hover:bg-red-500/10 transition-colors text-left"
+                                                                                            >
+                                                                                                <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                                                                                                <span>Delete Question</span>
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    )}
                                                                                 </div>
                                                                             </div>
 
@@ -3251,7 +3347,7 @@ const SubjectDetail = () => {
                                                 <div
                                                     key={note.id}
                                                     id={`note-${note.id}`}
-                                                    className={`glass-panel rounded-xl border transition-all flex group relative overflow-hidden ${notesViewMode === 'list' ? 'items-center py-3 pr-5 pl-1' : 'flex-col p-5'} ${isSelectionMode ? (selectedItems.has(note.id) ? 'border-indigo-400 bg-indigo-500/10 cursor-pointer shadow-[0_0_15px_rgba(99,102,241,0.2)]' : 'border-white/[0.06] hover:border-white/[0.1] cursor-pointer') : 'border-white/[0.06] hover:border-emerald-500/30 hover:bg-white/[0.02] cursor-pointer'}`}
+                                                    className={`glass-panel rounded-xl border transition-all flex group relative overflow-visible ${highlightedNoteId == note.id ? 'ring-4 ring-emerald-500 scale-[1.05] shadow-[0_0_40px_rgba(16,185,129,0.5)] z-[100] border-emerald-400 opacity-100' : ''} ${notesViewMode === 'list' ? 'items-center py-3 pr-5 pl-1' : 'flex-col p-5'} ${activeNoteDropdown === note.id ? 'border-emerald-500/40 shadow-xl' : ''} ${isSelectionMode ? (selectedItems.has(note.id) ? 'border-indigo-400 bg-indigo-500/10 cursor-pointer shadow-[0_0_15px_rgba(99,102,241,0.2)]' : 'border-white/[0.06] hover:border-white/[0.1] cursor-pointer') : 'border-white/[0.06] hover:border-emerald-500/30 hover:bg-white/[0.02] cursor-pointer'}`}
                                                     onClick={() => {
                                                         if (isSelectionMode) {
                                                             const next = new Set(selectedItems);
@@ -3398,7 +3494,7 @@ const SubjectDetail = () => {
                                                             </div>
                                                         )}
 
-                                                        <div className={`flex items-center gap-1 shrink-0 ${notesViewMode === 'list' ? 'flex-col sm:flex-row' : 'opacity-0 group-hover:opacity-100 transition-all'}`}>
+                                                        <div className={`flex items-center gap-1 shrink-0 ${notesViewMode === 'list' ? 'flex-col sm:flex-row' : 'opacity-0 group-hover:opacity-100 transition-all'}`} ref={activeNoteDropdown === note.id ? noteDropdownRef : null}>
                                                             {notesViewMode === 'list' && note.question_id && (
                                                                 <button
                                                                     onClick={(e) => {
@@ -3411,26 +3507,60 @@ const SubjectDetail = () => {
                                                                     <LinkIcon className="w-3.5 h-3.5" />
                                                                 </button>
                                                             )}
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setEditingNote(note);
-                                                                }}
-                                                                className="p-1.5 text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-md transition-all cursor-pointer"
-                                                                title="Edit Note"
-                                                            >
-                                                                <Pencil className="w-3.5 h-3.5" />
-                                                            </button>
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setConfirmDeleteNote({ open: true, note });
-                                                                }}
-                                                                className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-all cursor-pointer"
-                                                                title="Delete Note"
-                                                            >
-                                                                <Trash2 className="w-3.5 h-3.5" />
-                                                            </button>
+                                                            <div className="relative">
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setActiveNoteDropdown(activeNoteDropdown === note.id ? null : note.id);
+                                                                    }}
+                                                                    className={`p-1.5 rounded-md transition-all cursor-pointer ${activeNoteDropdown === note.id ? 'bg-white/10 text-emerald-400' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}
+                                                                    title="More Options"
+                                                                >
+                                                                    <MoreVertical className="w-3.5 h-3.5" />
+                                                                </button>
+                                                                
+                                                                {activeNoteDropdown === note.id && (
+                                                                    <div 
+                                                                        className="absolute right-0 bottom-full mb-2 w-36 glass rounded-xl border border-white/10 shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200"
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                    >
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                setIsSelectionMode(true);
+                                                                                setSelectedItems(new Set([note.id]));
+                                                                                setActiveNoteDropdown(null);
+                                                                            }}
+                                                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                        >
+                                                                            <CheckCircle className="w-3.5 h-3.5 text-indigo-400" />
+                                                                            <span>Select</span>
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                setActiveNoteDropdown(null);
+                                                                                setEditingNote(note);
+                                                                            }}
+                                                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                        >
+                                                                            <Pencil className="w-3.5 h-3.5 text-emerald-400" />
+                                                                            <span>Edit Note</span>
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                setActiveNoteDropdown(null);
+                                                                                setConfirmDeleteNote({ open: true, note });
+                                                                            }}
+                                                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-red-400 hover:bg-red-500/10 transition-colors text-left"
+                                                                        >
+                                                                            <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                                                                            <span>Delete Note</span>
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -3958,13 +4088,11 @@ const SubjectDetail = () => {
                                         .map((img, index, arr) => {
                                             const isLast = index === arr.length - 1;
                                             return (
-                                                <motion.div
+                                                <div
                                                     key={img.id}
                                                     ref={isLast ? lastImageElementRef : null}
-                                                    initial={{ opacity: 0, y: 20 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    transition={{ duration: 0.5, delay: (index % 10) * 0.05 }}
-                                                    className="group relative aspect-square rounded-2xl overflow-hidden bg-surface-2 border border-white/[0.06] hover:border-indigo-500/50 transition-all cursor-pointer shadow-lg hover:shadow-indigo-500/20 active:scale-[0.98]"
+                                                    style={{ animationDelay: `${(index % 10) * 0.05}s` }}
+                                                    className="group relative aspect-square rounded-2xl overflow-hidden bg-surface-2 border border-white/[0.06] hover:border-indigo-500/50 transition-all cursor-pointer shadow-lg hover:shadow-indigo-500/20 active:scale-[0.98] fade-in"
                                                 >
                                                     {/* Source Indicator Button */}
                                                     {(img.linked_question_id || img.linked_note_id) && (
@@ -4022,7 +4150,7 @@ const SubjectDetail = () => {
                                                             View Full
                                                         </button>
                                                     </div>
-                                                </motion.div>
+                                                </div>
                                             );
                                         })}
                                 </div>
