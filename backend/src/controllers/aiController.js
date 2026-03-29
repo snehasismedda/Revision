@@ -4,7 +4,7 @@ import * as topicModel from '../models/topicModel.js';
 import * as analyticsModel from '../models/analyticsModel.js';
 import db from '../knex/db.js';
 import { ollama, models } from '../config/ollama.js';
-import { syllabusPrompt, insightPrompt, globalInsightPrompt, noteAnalysisPrompt, enhanceNotePrompt, noteDescriptionPrompt, editSectionPrompt } from '../system_prompts/index.js';
+import { syllabusPrompt, insightPrompt, globalInsightPrompt, noteAnalysisPrompt, enhanceNotePrompt, noteFormatterPrompt, noteDescriptionPrompt, editSectionPrompt } from '../system_prompts/index.js';
 
 export const editSection = async (req, res) => {
     try {
@@ -65,6 +65,30 @@ export const enhanceNote = async (req, res) => {
     } catch (error) {
         console.error('enhanceNote error:', error);
         res.status(500).json({ error: 'Failed to enhance note' });
+    }
+};
+
+export const formatNote = async (req, res) => {
+    try {
+        const { title, content } = req.body;
+        if (!content) return res.status(400).json({ error: 'Content is required' });
+
+        const messages = [
+            { role: "system", content: noteFormatterPrompt },
+            { role: "user", content: `Title: ${title}\nContent: ${content}` }
+        ];
+
+        const response = await ollama.chat({
+            model: models.TEXT,
+            messages,
+            stream: false,
+            format: 'json'
+        });
+        const result = JSON.parse(response.message?.content || '{}');
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('formatNote error:', error);
+        res.status(500).json({ error: 'Failed to format note' });
     }
 };
 

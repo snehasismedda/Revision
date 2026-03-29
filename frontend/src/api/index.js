@@ -47,6 +47,7 @@ export const authApi = {
     logout: () => request('/auth/logout', { method: 'POST' }),
     me: () => request('/auth/me'),
     updateProfile: (body) => request('/auth/me', { method: 'PUT', body }),
+    updatePreferences: (body) => request('/auth/update-preferences', { method: 'PUT', body }),
     refresh: () => request('/auth/refresh', { method: 'POST' }),
 };
 
@@ -111,6 +112,7 @@ export const aiApi = {
     parseNote: (body) => request('/ai/parse-note', { method: 'POST', body }),
     describeImage: (body) => request('/ai/describe-image', { method: 'POST', body }),
     enhanceNote: (body) => request('/ai/enhance-note', { method: 'POST', body }),
+    formatNote: (body) => request('/ai/format-note', { method: 'POST', body }),
     editSection: (body) => request('/ai/edit-section', { method: 'POST', body }),
 };
 

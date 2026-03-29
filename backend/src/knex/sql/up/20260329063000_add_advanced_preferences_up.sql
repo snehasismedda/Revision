@@ -1,0 +1,4 @@
+ALTER TABLE revision.user_preferences 
+ADD COLUMN IF NOT EXISTS line_height NUMERIC DEFAULT 1.6,
+ADD COLUMN IF NOT EXISTS primary_color_light VARCHAR(20) DEFAULT '#10b981',
+ADD COLUMN IF NOT EXISTS primary_color_dark VARCHAR(20) DEFAULT '#34d399';

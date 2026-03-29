@@ -1,0 +1,7 @@
+CREATE TABLE revision.user_preferences (
+    user_id UUID PRIMARY KEY REFERENCES revision.users(id) ON DELETE CASCADE,
+    font_size INTEGER NOT NULL DEFAULT 16,
+    code_font_size INTEGER NOT NULL DEFAULT 15,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

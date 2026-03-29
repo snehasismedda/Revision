@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { X, FileText, Link2 as LinkIcon, Pencil, ChevronLeft, ChevronRight, List, PanelLeftClose, PanelLeftOpen, Plus, ArrowLeft, Wand2, Check, XCircle, Loader2, Sun, Moon } from 'lucide-react';
+import { X, FileText, Link2 as LinkIcon, Pencil, ChevronLeft, ChevronRight, List, Copy, PanelLeftClose, PanelLeftOpen, Plus, ArrowLeft, Wand2, Check, XCircle, Loader2, Sun, Moon, Settings, Type, Palette } from 'lucide-react';
+import { authApi } from '../../api/index.js';
 
 import ModalPortal from '../ModalPortal.jsx';
 import ReactMarkdown from 'react-markdown';
@@ -33,12 +34,12 @@ const preprocessMarkdown = (text) => {
 /* ================================================================
    TOC Sidebar Styles (inline to keep it self-contained)
    ================================================================ */
-const getSidebarStyles = (isLightMode) => ({
+const getSidebarStyles = (isLightMode, primaryColor) => ({
     container: {
         width: '260px',
         minWidth: '260px',
         borderRight: isLightMode ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.06)',
-        background: isLightMode ? '#e5e7eb' : '#12121a',
+        background: isLightMode ? '#ffffff' : '#12121a',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
@@ -59,7 +60,7 @@ const getSidebarStyles = (isLightMode) => ({
         flexShrink: 0,
     },
     headerIcon: {
-        color: '#10b981',
+        color: primaryColor,
         opacity: 0.8,
     },
     headerTitle: {
@@ -85,15 +86,15 @@ const getSidebarStyles = (isLightMode) => ({
         fontSize: level === 1 ? '13px' : level === 2 ? '12.5px' : '12px',
         fontWeight: level === 1 ? 600 : level === 2 ? 500 : 400,
         color: isActive
-            ? '#10b981'
+            ? primaryColor
             : level === 1
                 ? (isLightMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.7)')
                 : level === 2
                     ? (isLightMode ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.5)')
                     : (isLightMode ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.4)'),
         lineHeight: '1.5',
-        borderLeft: isActive ? '2px solid #10b981' : '2px solid transparent',
-        background: isActive ? 'rgba(16,185,129,0.06)' : 'transparent',
+        borderLeft: isActive ? `2px solid ${primaryColor}` : '2px solid transparent',
+        background: isActive ? `${primaryColor}0f` : 'transparent',
         transition: 'all 0.2s ease',
         textDecoration: 'none',
         fontFamily: "'Inter', sans-serif",
@@ -109,7 +110,7 @@ const getSidebarStyles = (isLightMode) => ({
         borderRadius: '50%',
         marginTop: '7px',
         background: isActive
-            ? '#10b981'
+            ? primaryColor
             : level === 1
                 ? (isLightMode ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.25)')
                 : (isLightMode ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.12)'),
@@ -139,43 +140,142 @@ const TocItem = React.memo(({ heading, isActive, onClick, sidebarStyles }) => {
             onMouseLeave={() => setHovered(false)}
             style={style}
             title={heading.text}
-            className="w-full text-left border-none bg-transparent block"
+            className="w-full text-left border-none bg-transparent block relative group"
         >
+            <div className={`absolute left-0 top-[15%] bottom-[15%] w-[3px] rounded-r-full transition-all duration-300
+                ${isActive ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-50'}`}
+                 style={{ backgroundColor: style.color }} />
             <span style={sidebarStyles.dot(heading.level, isActive)} className="inline-block align-top mr-2" />
-            <span className="inline-block max-w-[calc(100%-15px)] break-words">{heading.text}</span>
+            <span className={`inline-block max-w-[calc(100%-15px)] break-words transition-transform duration-200 ${hovered && !isActive ? 'translate-x-1' : ''}`}>
+                {heading.text}
+            </span>
         </button>
     );
 });
 
+// Enhanced Code Block with Language Detection and Copy Button
+// ----------------------------------------------------------------
+const SimpleCodeBlock = React.memo(({ children, isLightMode, fontSize = 20, primaryColor, className }) => {
+    const [copied, setCopied] = useState(false);
+    
+    // Extract language from className (e.g., 'language-javascript' -> 'javascript')
+    const language = useMemo(() => {
+        if (!className) return null;
+        const match = /language-(\w+)/.exec(className);
+        return match ? match[1].toUpperCase() : null;
+    }, [className]);
+
+    const handleCopy = async () => {
+        try {
+            await navigator.clipboard.writeText(String(children).replace(/\n$/, ''));
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+            console.error('Copy failed:', err);
+        }
+    };
+
+    return (
+        <div className={`relative group/code my-8 rounded-2xl border overflow-hidden transition-all duration-300 shadow-sm hover:shadow-md
+            ${isLightMode 
+                ? 'bg-slate-50 border-slate-200/60' 
+                : 'bg-[#0f0f19] border-white/5 shadow-black/20'}`}>
+            
+            {/* Header / Meta bar */}
+            {(language || true) && (
+                <div className={`flex items-center justify-between px-6 py-2.5 border-b text-[10px] font-bold uppercase tracking-widest
+                    ${isLightMode ? 'bg-slate-100/60 border-slate-200/60 text-slate-500' : 'bg-white/5 border-white/5 text-slate-400'}`}>
+                    <div className="flex items-center gap-2">
+                         {language || 'CODE'}
+                    </div>
+                    <button
+                        onClick={handleCopy}
+                        className={`p-1.5 rounded-md transition-all duration-200 cursor-pointer flex items-center gap-1
+                            ${isLightMode ? 'hover:bg-slate-200 text-slate-600' : 'hover:bg-white/10 text-slate-300'}`}
+                        style={copied ? { color: primaryColor } : {}}
+                    >
+                        {copied ? (
+                            <>
+                                <Check size={11} style={{ color: primaryColor }} />
+                                <span style={{ color: primaryColor }} className="text-[9px]">Copied</span>
+                            </>
+                        ) : (
+                            <>
+                                <Copy size={11} />
+                                <span className="text-[9px]">Copy</span>
+                            </>
+                        )}
+                    </button>
+                </div>
+            )}
+            
+            <pre className={`px-6 py-5 overflow-x-auto font-mono leading-relaxed custom-scrollbar selection:bg-primary/20 ${isLightMode ? '!text-slate-800' : '!text-slate-200'}`} 
+                 style={{ fontSize: `${fontSize}px`, scrollbarWidth: 'thin' }}>
+                <code className={isLightMode ? '!text-slate-800' : '!text-slate-200'}>{children}</code>
+            </pre>
+        </div>
+    );
+});
+
+// Premium Callout / Alert Component
+// ----------------------------------------------------------------
+const MarkdownCallout = React.memo(({ type, children, isLightMode, primaryColor }) => {
+    const config = useMemo(() => {
+        const types = {
+            note: { icon: <Settings size={16} />, color: '#3b82f6', label: 'Note', bg: 'bg-blue-500/10', border: 'border-blue-500/30' },
+            tip: { icon: <Wand2 size={16} />, color: '#10b981', label: 'Tip', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
+            important: { icon: <FileText size={16} />, color: '#8b5cf6', label: 'Important', bg: 'bg-violet-500/10', border: 'border-violet-500/30' },
+            warning: { icon: <Settings size={16} />, color: '#f59e0b', label: 'Warning', bg: 'bg-amber-500/10', border: 'border-amber-500/30' },
+            caution: { icon: <XCircle size={16} />, color: '#ef4444', label: 'Caution', bg: 'bg-red-500/10', border: 'border-red-500/30' },
+        };
+        return types[type.toLowerCase()] || types.note;
+    }, [type]);
+
+    return (
+        <div className={`my-6 p-4 rounded-xl border-l-[3.5px] border ${config.bg} ${config.border} shadow-sm overflow-hidden`}>
+            <div className="flex items-center gap-2 mb-2 font-bold text-[11px] uppercase tracking-widest" style={{ color: config.color }}>
+                {config.icon}
+                {config.label}
+            </div>
+            <div className={`text-[14px] leading-relaxed ${isLightMode ? 'text-slate-700' : 'text-slate-300'}`}>
+                {children}
+            </div>
+        </div>
+    );
+});
 
 // Memoized linked note button to prevent re-renders on hover
-const LinkedNoteButton = React.memo(({ child, isLightMode, onSafeAction, onOpenChildNote }) => {
+const LinkedNoteButton = React.memo(({ child, isLightMode, onSafeAction, onOpenChildNote, primaryColor }) => {
     const baseStyle = useMemo(() => ({
-        color: isLightMode ? 'rgba(124,58,237,0.85)' : 'rgba(167,139,250,0.75)',
+        color: isLightMode ? `${primaryColor}d9` : `${primaryColor}bf`,
         background: 'transparent',
         border: '1px solid transparent',
-    }), [isLightMode]);
-
-    const hoverStyle = useMemo(() => ({
-        color: isLightMode ? '#059669' : '#10b981',
-        background: isLightMode ? 'rgba(16,185,129,0.1)' : 'rgba(16,185,129,0.08)',
-        borderColor: 'rgba(16,185,129,0.2)',
-    }), [isLightMode]);
+    }), [isLightMode, primaryColor]);
 
     const [isHovered, setIsHovered] = useState(false);
+
+    const hoverStyle = useMemo(() => ({
+        color: primaryColor,
+        background: isLightMode ? `${primaryColor}0a` : `${primaryColor}14`,
+        borderColor: `${primaryColor}26`,
+        transform: 'translateX(4px)',
+    }), [primaryColor, isLightMode]);
 
     return (
         <button
             onClick={() => onSafeAction(() => onOpenChildNote && onOpenChildNote(child))}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            className="w-full text-left flex items-center gap-2 px-3 py-2 mb-1 rounded-lg text-[12px] font-medium transition-all cursor-pointer group"
+            className="w-full text-left flex items-center gap-3 px-3 py-2.5 mb-1.5 rounded-xl text-[12.5px] font-medium transition-all cursor-pointer group relative overflow-hidden"
             style={isHovered ? hoverStyle : baseStyle}
             title={child.title || 'Untitled Note'}
         >
-            <FileText size={12} style={{ flexShrink: 0, opacity: 0.6 }} />
-            <span className="truncate flex-1">{child.title || 'Untitled Note'}</span>
-            <LinkIcon size={10} style={{ flexShrink: 0, opacity: 0.3 }} />
+            <div className={`p-1.5 rounded-lg shrink-0 transition-colors ${isHovered ? '' : (isLightMode ? 'bg-slate-100' : 'bg-white/5')}`}
+                 style={isHovered ? { backgroundColor: `${primaryColor}20` } : {}}>
+                <FileText size={13} className="opacity-70" />
+            </div>
+            <span className="truncate flex-1 font-semibold">{child.title || 'Untitled Note'}</span>
+            <ChevronRight size={12} className={`shrink-0 transition-all ${isHovered ? 'translate-x-0 opacity-100' : '-translate-x-1 opacity-0'}`} />
         </button>
     );
 });
@@ -214,7 +314,7 @@ const isMdTable = (text) => {
         lines.some(l => l.split('|').slice(1).every(c => /^[:\-\s]+$/.test(c)));
 };
 
-const TableEditPanel = ({ editOriginalText, editText, setEditText, editPosition, handleCancelEdit, handleSaveEdit }) => {
+const TableEditPanel = ({ editOriginalText, editText, setEditText, editPosition, handleCancelEdit, handleSaveEdit, isLightMode, primaryColor }) => {
     const isTable = isMdTable(editOriginalText);
     const [tableData, setTableData] = useState(() =>
         isTable ? parseMarkdownTable(editOriginalText) : []
@@ -228,23 +328,24 @@ const TableEditPanel = ({ editOriginalText, editText, setEditText, editPosition,
 
     return (
         <div
-            className="absolute z-[100] w-[95%] max-w-[640px] rounded-xl border border-blue-500/20 overflow-hidden shadow-2xl"
+            className="absolute z-[100] w-[95%] max-w-[640px] rounded-xl border overflow-hidden shadow-2xl"
             style={{
                 left: `${Math.max(16, editPosition.x)}px`,
                 top: `${editPosition.y + 8}px`,
                 transform: 'translateX(-50%)',
                 background: isLightMode ? '#ffffff' : '#1a1a2e',
+                borderColor: `${primaryColor}33`,
                 boxShadow: isLightMode ? '0 4px 20px rgba(0,0,0,0.1)' : '0 8px 32px rgba(0,0,0,0.5)',
             }}
         >
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
-                <span className="text-[11px] font-bold text-blue-400 uppercase tracking-wider flex items-center gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: primaryColor }}>
                     <Pencil className="w-3.5 h-3.5" />
                     {isTable ? '✦ Edit Table' : 'Editing Selection'}
                 </span>
                 <div className="flex items-center gap-2">
                     <button onClick={handleCancelEdit} className="text-[11px] font-semibold text-slate-400 hover:text-white px-2.5 py-1 rounded-md hover:bg-white/[0.06] transition-all cursor-pointer">Cancel</button>
-                    <button onClick={handleSaveEdit} className="text-[11px] font-bold text-emerald-400 px-3 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all cursor-pointer flex items-center gap-1.5">
+                    <button onClick={handleSaveEdit} className="text-[11px] font-bold px-3 py-1 rounded-md border transition-all cursor-pointer flex items-center gap-1.5" style={{ color: primaryColor, backgroundColor: `${primaryColor}10`, borderColor: `${primaryColor}33` }}>
                         <Check className="w-3 h-3" /> Save
                     </button>
                 </div>
@@ -255,7 +356,7 @@ const TableEditPanel = ({ editOriginalText, editText, setEditText, editPosition,
                     <table className="w-full border-collapse">
                         <tbody>
                             {tableData.map((row, ri) => (
-                                <tr key={ri} style={{ background: ri === 0 ? 'rgba(59,130,246,0.08)' : 'transparent' }}>
+                                <tr key={ri} style={{ background: ri === 0 ? `${primaryColor}14` : 'transparent' }}>
                                     {row.map((cell, ci) => (
                                         <td key={ci} className="border border-white/[0.1] p-0">
                                             <input
@@ -268,7 +369,7 @@ const TableEditPanel = ({ editOriginalText, editText, setEditText, editPosition,
                                                         )
                                                     );
                                                 }}
-                                                className={`w-full bg-transparent px-3 py-2 text-[12px] focus:outline-none transition-colors ${ri === 0 ? 'text-white font-bold focus:bg-blue-500/10' : 'text-slate-300 focus:bg-white/[0.04]'
+                                                className={`w-full bg-transparent px-3 py-2 text-[12px] focus:outline-none transition-colors ${ri === 0 ? 'text-white font-bold' : 'text-slate-300'
                                                     }`}
                                             />
                                         </td>
@@ -298,7 +399,61 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
 
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [isFullscreen, setIsFullscreen] = useState(true);
-    const [isLightMode, setIsLightMode] = useState(false);
+    const [isLightMode, setIsLightMode] = useState(localStorage.getItem('theme') !== 'dark');
+    const [fontSize, setFontSize] = useState(17);
+    const [codeFontSize, setCodeFontSize] = useState(20);
+    const [lineHeight, setLineHeight] = useState(1.6);
+    const [primaryColorLight, setPrimaryColorLight] = useState('#10b981'); // Emerald-500
+    const [primaryColorDark, setPrimaryColorDark] = useState('#34d399');  // Emerald-400
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isSavingSettings, setIsSavingSettings] = useState(false);
+    const [readingProgress, setReadingProgress] = useState(0);
+
+    const activePrimaryColor = isLightMode ? primaryColorLight : primaryColorDark;
+
+    // Fetch user preferences on mount
+    useEffect(() => {
+        const fetchPreferences = async () => {
+            try {
+                const data = await authApi.me();
+                if (data.user?.preferences) {
+                    setFontSize(data.user.preferences.font_size || 17);
+                    setCodeFontSize(data.user.preferences.code_font_size || 20);
+                    setLineHeight(Number(data.user.preferences.line_height) || 1.6);
+                    setPrimaryColorLight(data.user.preferences.primary_color_light || '#10b981');
+                    setPrimaryColorDark(data.user.preferences.primary_color_dark || '#34d399');
+                }
+            } catch (err) {
+                console.error('Error fetching preferences:', err);
+            }
+        };
+        fetchPreferences();
+    }, []);
+
+    const handleUpdateSettings = async (type, val) => {
+        let updateBody = {
+            font_size: fontSize,
+            code_font_size: codeFontSize,
+            line_height: lineHeight,
+            primary_color_light: primaryColorLight,
+            primary_color_dark: primaryColorDark
+        };
+
+        if (type === 'font') { setFontSize(val); updateBody.font_size = val; }
+        else if (type === 'code') { setCodeFontSize(val); updateBody.code_font_size = val; }
+        else if (type === 'line') { setLineHeight(val); updateBody.line_height = val; }
+        else if (type === 'color_light') { setPrimaryColorLight(val); updateBody.primary_color_light = val; }
+        else if (type === 'color_dark') { setPrimaryColorDark(val); updateBody.primary_color_dark = val; }
+        
+        setIsSavingSettings(true);
+        try {
+            await authApi.updatePreferences(updateBody);
+        } catch (err) {
+            console.error('Error saving preferences:', err);
+        } finally {
+            setIsSavingSettings(false);
+        }
+    };
     const [activeHeadingId, setActiveHeadingId] = useState(null);
     const [headings, setHeadings] = useState([]);
     const contentRef = useRef(null);
@@ -330,7 +485,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
     const hasLinkedNotes = childNotes && childNotes.length > 0;
 
     // Memoize sidebar styles to avoid recalculating on every render
-    const sidebarStyles = useMemo(() => getSidebarStyles(isLightMode), [isLightMode]);
+    const sidebarStyles = useMemo(() => getSidebarStyles(isLightMode, activePrimaryColor), [isLightMode, activePrimaryColor]);
     const sidebarContainerStyle = useMemo(() => {
         const base = sidebarOpen ? sidebarStyles.container : { ...sidebarStyles.container, ...sidebarStyles.containerCollapsed };
         return {
@@ -342,13 +497,108 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
         if (!sidebarOpen) return 'none';
         return isLightMode ? '2px 0 12px rgba(0,0,0,0.05)' : '2px 0 12px rgba(0,0,0,0.3)';
     }, [sidebarOpen, isLightMode]);
-    const sidebarBgColor = useMemo(() => isLightMode ? '#e5e7eb' : '#12121a', [isLightMode]);
+    const sidebarBgColor = useMemo(() => isLightMode ? '#f1f3f6' : '#1e1e2d', [isLightMode]);
+
+    // Helper to extract plain text from React children to check for Callout labels
+    const extractText = (node) => {
+        if (!node) return '';
+        if (typeof node === 'string') return node;
+        if (Array.isArray(node)) return node.map(extractText).join('');
+        if (node.props && node.props.children) return extractText(node.props.children);
+        return '';
+    };
 
     // Memoize markdown components and plugins to prevent unnecessary re-renders
     const markdownComponents = useMemo(() => ({
-        table: ({ ...props }) => <div className="overflow-x-auto w-full my-4 rounded-lg border border-slate-200/20"><table className="w-full text-left border-collapse min-w-[500px]" {...props} /></div>,
-        img: ({ ...props }) => <img className="max-w-full h-auto rounded-lg" {...props} />
-    }), []);
+        pre: ({ children }) => children, // Bypass default pre-container to prevent nesting and ensure true alignment
+        table: ({ ...props }) => <div className="overflow-x-auto w-full my-8 rounded-xl border border-slate-200/20 shadow-sm"><table className="w-full text-left border-collapse min-w-[500px]" {...props} /></div>,
+        thead: ({ ...props }) => <thead className={`${isLightMode ? 'bg-slate-50' : 'bg-white/5'}`} {...props} />,
+        th: ({ ...props }) => <th className="px-4 py-3 font-bold uppercase tracking-wider text-[11px] border-b border-white/5" {...props} />,
+        td: ({ ...props }) => <td className="px-4 py-3 border-b border-white/5 text-[13px]" {...props} />,
+        img: ({ ...props }) => (
+            <div className="my-8 group relative flex flex-col items-center">
+                <img className="max-w-full h-auto rounded-2xl shadow-lg ring-1 ring-black/5 transition-transform duration-500 group-hover:scale-[1.01]" {...props} />
+                {props.alt && props.alt !== 'Source reference' && (
+                    <span className="mt-3 text-[11px] font-medium opacity-50 italic">{props.alt}</span>
+                )}
+            </div>
+        ),
+        blockquote: ({ children, ...props }) => {
+            const rawText = extractText(children);
+            const alertMatch = rawText.match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/i);
+            
+            if (alertMatch) {
+                const type = alertMatch[1];
+                // Strip the [!TYPE] marker from the content
+                const cleanChildren = React.Children.map(children, child => {
+                    if (typeof child === 'string') {
+                        return child.replace(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/i, '').trim();
+                    }
+                    if (child.props && typeof child.props.children === 'string') {
+                        const newText = child.props.children.replace(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/i, '').trim();
+                        if (!newText) return null;
+                        return React.cloneElement(child, { children: newText });
+                    }
+                    if (Array.isArray(child.props?.children)) {
+                         const first = child.props.children[0];
+                         if (typeof first === 'string') {
+                             const newFirst = first.replace(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/i, '').trim();
+                             const newChildren = [...child.props.children];
+                             if (!newFirst) newChildren.shift();
+                             else newChildren[0] = newFirst;
+                             return React.cloneElement(child, { children: newChildren });
+                         }
+                    }
+                    return child;
+                });
+
+                return (
+                    <MarkdownCallout type={type} isLightMode={isLightMode} primaryColor={activePrimaryColor}>
+                        {cleanChildren}
+                    </MarkdownCallout>
+                );
+            }
+            return (
+                <blockquote className={`my-6 pl-4 border-l-4 italic opacity-90 ${isLightMode ? 'border-slate-300' : 'border-white/10'}`} {...props}>
+                    {children}
+                </blockquote>
+            );
+        },
+        code: ({ node, className, children, ...props }) => {
+            // Robust detection for block vs inline code in ReactMarkdown v10
+            const isBlock = /language-(\w+)/.exec(className || '') || String(children).includes('\n');
+            
+            return isBlock ? (
+                <SimpleCodeBlock isLightMode={isLightMode} fontSize={codeFontSize} primaryColor={activePrimaryColor} className={className}>
+                    {children}
+                </SimpleCodeBlock>
+            ) : (
+                <code 
+                    className={`px-1.5 py-0.5 rounded-md text-[0.85em] font-bold font-mono border transition-colors select-all`} 
+                    style={{ 
+                        backgroundColor: `${activePrimaryColor}15`, 
+                        color: activePrimaryColor,
+                        borderColor: `${activePrimaryColor}25`
+                    }} 
+                    {...props}
+                >
+                    {children}
+                </code>
+            );
+        },
+        a: ({ children, ...props }) => (
+            <a 
+                {...props} 
+                className="font-bold underline decoration-2 underline-offset-4 transition-colors" 
+                style={{ color: activePrimaryColor, textDecorationColor: `${activePrimaryColor}40` }}
+                target="_blank" 
+                rel="noopener noreferrer"
+            >
+                {children}
+                {props.href?.startsWith('http') && <LinkIcon size={10} className="inline ml-1 mb-1 opacity-50" />}
+            </a>
+        )
+    }), [isLightMode, codeFontSize, activePrimaryColor]);
 
     const markdownPlugins = useMemo(() => [remarkGfm, remarkMath], []);
     const markdownRehypePlugins = useMemo(() => [rehypeRaw, [rehypeKatex, { strict: false }]], []);
@@ -392,6 +642,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
         if (!container || headings.length === 0) return;
 
         let rafId = null;
+        let lastScrollTop = container.scrollTop;
 
         const handleScroll = () => {
             if (rafId) return;
@@ -409,6 +660,11 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                     }
                 }
                 setActiveHeadingId(currentId);
+                
+                // Progress bar
+                const scrollHeight = container.scrollHeight - container.clientHeight;
+                setReadingProgress(scrollHeight > 0 ? (container.scrollTop / scrollHeight) * 100 : 0);
+                
                 lastScrollTop = container.scrollTop;
             });
         };
@@ -654,11 +910,13 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
 
     return (
         <ModalPortal>
-            <div className={`fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 modal-backdrop fade-in ${isLightMode ? 'bg-black/20' : 'bg-black/60'}`}>
+            <div className={`fixed inset-0 z-[100] flex items-end sm:items-center justify-center modal-backdrop fade-in ${isLightMode ? 'bg-black/20' : 'bg-black/80'}`}
+                 style={{ padding: isFullscreen ? '0' : 'undefined' }} // Clear padding for true fullscreen
+            >
                 <div
                     className={`w-full flex flex-col ${isFullscreen ? 'h-[100dvh] sm:max-h-screen rounded-none border-none' : 'h-[95dvh] sm:h-auto sm:max-h-[85vh] rounded-t-[1.5rem] sm:rounded-2xl shadow-2xl sm:border'} overflow-hidden relative transition-all duration-300 transform`}
                     style={{
-                        background: isLightMode ? '#f3f4f6' : '#0e0e16',
+                        background: isLightMode ? '#f5f7fa' : '#161625',
                         borderColor: isLightMode ? '#e2e8f0' : 'rgba(255,255,255,0.08)',
                         maxWidth: isFullscreen ? 'none' : (hasHeadings ? '72rem' : '56rem'),
                         contain: 'layout paint style',
@@ -667,7 +925,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                     onClick={e => e.stopPropagation()}
                 >
                     {/* Header */}
-                    <div className={`flex items-center justify-between px-4 sm:px-5 py-3 sm:py-3.5 border-b shrink-0 z-30 ${isLightMode ? 'bg-[#e5e7eb] border-slate-300/60 text-slate-900' : 'bg-[#0e0e16] border-white/[0.05] text-white'}`}>
+                    <div className={`flex items-center justify-between px-4 sm:px-5 py-3 sm:py-3.5 border-b shrink-0 z-30 ${isLightMode ? 'bg-[#e5e7eb] border-slate-300/60 text-slate-900' : 'bg-[#161625] border-white/[0.05] text-white'}`}>
                         <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 pr-2">
                             {(onPrev || onNext) && (
                                 <div className={`hidden md:flex items-center mr-1 rounded-lg border overflow-hidden ${isLightMode ? 'border-slate-300 bg-white' : 'border-white/[0.1] bg-white/[0.02]'}`}>
@@ -701,7 +959,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                     <span className="max-w-[120px] truncate hidden sm:inline">Back</span>
                                 </button>
                             )}
-                            <div className="p-1.5 sm:p-2 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)] shrink-0">
+                            <div className="p-1.5 sm:p-2 rounded-xl shrink-0" style={{ backgroundColor: `${activePrimaryColor}15`, color: activePrimaryColor, border: `1px solid ${activePrimaryColor}30`, boxShadow: `0 0 10px ${activePrimaryColor}10` }}>
                                 <FileText className="w-4 h-4" />
                             </div>
                             <div className="flex-1 min-w-0">
@@ -725,7 +983,8 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                 {(hasHeadings || hasLinkedNotes) && (
                                     <button
                                         onClick={() => setSidebarOpen(prev => !prev)}
-                                        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${isLightMode ? 'bg-white shadow-sm text-emerald-600 hover:bg-emerald-50' : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'}`}
+                                        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors`}
+                                        style={sidebarOpen ? { backgroundColor: activePrimaryColor, color: '#fff' } : { backgroundColor: `${activePrimaryColor}20`, color: activePrimaryColor }}
                                         title={sidebarOpen ? 'Hide Sidebar' : 'Show Sidebar'}
                                     >
                                         {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
@@ -737,7 +996,8 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                             onClose();
                                             onNavigateToQuestion(note.question_id);
                                         })}
-                                        className={`hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${isLightMode ? 'bg-white shadow-sm text-emerald-600 hover:bg-emerald-50' : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'}`}
+                                        className={`hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-colors`}
+                                        style={{ backgroundColor: `${activePrimaryColor}20`, color: activePrimaryColor }}
                                         title={note.is_note_link ? 'View Note' : 'View Question'}
                                     >
                                         <LinkIcon className="w-4 h-4" />
@@ -748,7 +1008,8 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                         onClick={() => handleSafeAction(() => {
                                             onEdit(note);
                                         })}
-                                        className={`hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${isLightMode ? 'bg-white shadow-sm text-emerald-600 hover:bg-emerald-50' : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'}`}
+                                        className={`hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-colors`}
+                                        style={{ backgroundColor: `${activePrimaryColor}20`, color: activePrimaryColor }}
                                         title="Edit Note"
                                     >
                                         <Pencil className="w-4 h-4" />
@@ -768,6 +1029,136 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                 </button>
                                 <div className={`w-[1px] h-4 mx-0.5 ${isLightMode ? 'bg-slate-300' : 'bg-white/[0.1]'}`} />
 
+                                <div className="relative">
+                                    <button
+                                        onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                                        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors ${isSettingsOpen ? 'shadow-md ring-2 ring-white/10' : isLightMode ? 'bg-white shadow-sm text-slate-500 hover:bg-slate-50' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}
+                                        style={isSettingsOpen ? { backgroundColor: activePrimaryColor, color: '#fff' } : {}}
+                                        title="Reading Settings"
+                                    >
+                                        {isSavingSettings ? <Loader2 className="w-4 h-4 animate-spin" /> : <Settings className="w-4 h-4" />}
+                                    </button>
+
+                                    {isSettingsOpen && (
+                                        <>
+                                            <div className="fixed inset-0 z-[100]" onClick={() => setIsSettingsOpen(false)} />
+                                            <div 
+                                                className={`absolute right-0 mt-2 w-[260px] p-4 rounded-xl border shadow-2xl z-[101] backdrop-blur-md transition-all animate-in fade-in slide-in-from-top-2 duration-200
+                                                    ${isLightMode ? 'bg-white/95 border-slate-200 text-slate-800' : 'bg-[#1a1a2e]/95 border-white/5 text-white'}`}
+                                            >
+                                                <div className="flex items-center gap-2 mb-4">
+                                                    <div className="p-1.5 rounded-lg" style={{ backgroundColor: `${activePrimaryColor}15`, color: activePrimaryColor }}>
+                                                        <Settings size={14} />
+                                                    </div>
+                                                    <span className="text-[12px] font-bold uppercase tracking-wider opacity-80">Reading Preferences</span>
+                                                </div>
+
+                                                <div className="space-y-6">
+                                                    {/* Font Selection */}
+                                                    <div className="space-y-3">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <Type size={11} className="opacity-60" />
+                                                            <span className="text-[11px] font-bold opacity-60 uppercase tracking-tight">Typography</span>
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-[11px] font-medium opacity-80">Body Size</span>
+                                                                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: `${activePrimaryColor}15`, color: activePrimaryColor }}>{fontSize}px</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                {[14, 16, 17, 18, 20].map(s => (
+                                                                    <button 
+                                                                        key={s} 
+                                                                        onClick={() => handleUpdateSettings('font', s)}
+                                                                        className={`flex-1 h-7 rounded-md text-[11px] font-bold transition-all
+                                                                            ${fontSize === s ? 'text-white' : isLightMode ? 'bg-slate-100 hover:bg-slate-200' : 'bg-white/5 hover:bg-white/10'}`}
+                                                                        style={fontSize === s ? { backgroundColor: activePrimaryColor, boxShadow: `0 4px 12px ${activePrimaryColor}30` } : {}}
+                                                                    >
+                                                                        {s === 17 ? 'N' : s}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div className="space-y-2">
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-[11px] font-medium opacity-80">Code Size</span>
+                                                                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: `${activePrimaryColor}15`, color: activePrimaryColor }}>{codeFontSize}px</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                {[14, 15, 18, 20, 24].map(s => (
+                                                                    <button 
+                                                                        key={s} 
+                                                                        onClick={() => handleUpdateSettings('code', s)}
+                                                                        className={`flex-1 h-7 rounded-md text-[11px] font-bold transition-all
+                                                                            ${codeFontSize === s ? 'text-white' : isLightMode ? 'bg-slate-100 hover:bg-slate-200' : 'bg-white/5 hover:bg-white/10'}`}
+                                                                        style={codeFontSize === s ? { backgroundColor: activePrimaryColor, boxShadow: `0 4px 12px ${activePrimaryColor}30` } : {}}
+                                                                    >
+                                                                        {s === 15 ? 'N' : s}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Gap Settings */}
+                                                    <div className="space-y-3 pt-1 border-t border-white/5">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-[11px] font-bold opacity-60 uppercase tracking-tight">Line Spacing</span>
+                                                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: `${activePrimaryColor}15`, color: activePrimaryColor }}>{lineHeight}x</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            {[1.4, 1.6, 1.8, 2.0].map(s => (
+                                                                <button 
+                                                                    key={s} 
+                                                                    onClick={() => handleUpdateSettings('line', s)}
+                                                                    className={`flex-1 h-7 rounded-md text-[11px] font-bold transition-all
+                                                                        ${lineHeight === s ? 'text-white' : isLightMode ? 'bg-slate-100 hover:bg-slate-200' : 'bg-white/5 hover:bg-white/10'}`}
+                                                                    style={lineHeight === s ? { backgroundColor: activePrimaryColor, boxShadow: `0 4px 12px ${activePrimaryColor}30` } : {}}
+                                                                >
+                                                                    {s === 1.4 ? 'I' : s === 1.6 ? 'II' : s === 1.8 ? 'III' : 'IV'}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Color Palette */}
+                                                    <div className="space-y-3 pt-1 border-t border-white/5">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <Palette size={11} className="opacity-60" />
+                                                            <span className="text-[11px] font-bold opacity-60 uppercase tracking-tight">Accent Color</span>
+                                                        </div>
+                                                        <div className="flex items-center justify-between gap-1">
+                                                            {[
+                                                                { l: '#10b981', d: '#34d399', name: 'Emerald' },
+                                                                { l: '#6366f1', d: '#818cf8', name: 'Indigo' },
+                                                                { l: '#8b5cf6', d: '#a78bfa', name: 'Violet' },
+                                                                { l: '#f59e0b', d: '#fbbf24', name: 'Amber' },
+                                                                { l: '#f43f5e', d: '#fb7185', name: 'Rose' }
+                                                            ].map(color => (
+                                                                <button
+                                                                    key={color.l}
+                                                                    onClick={() => {
+                                                                        handleUpdateSettings('color_light', color.l);
+                                                                        handleUpdateSettings('color_dark', color.d);
+                                                                    }}
+                                                                    className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 flex items-center justify-center
+                                                                        ${(isLightMode ? primaryColorLight === color.l : primaryColorDark === color.d) ? 'border-white ring-2 ring-violet-500/20 shadow-lg' : 'border-transparent'}`}
+                                                                    style={{ backgroundColor: isLightMode ? color.l : color.d }}
+                                                                >
+                                                                    {(isLightMode ? primaryColorLight === color.l : primaryColorDark === color.d) && <Check size={12} className="text-white" />}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+
+                                <div className={`w-[1px] h-4 mx-0.5 ${isLightMode ? 'bg-slate-300' : 'bg-white/[0.1]'}`} />
+
                                 <button
                                     onClick={() => handleSafeAction(onClose)}
                                     className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all ${isLightMode ? 'text-slate-500 hover:bg-red-50 hover:text-red-500' : 'text-slate-400 hover:bg-red-500/20 hover:text-red-400'}`}
@@ -777,6 +1168,18 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                 </button>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Reading Progress Bar (Fixed top) */}
+                    <div className="w-full h-[3.5px] bg-transparent absolute left-0 z-40 transition-opacity duration-500 overflow-hidden pointer-events-none" style={{ top: '57px', opacity: readingProgress > 0 ? 1 : 0 }}>
+                        <div 
+                            className="h-full transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]"
+                            style={{ 
+                                width: `${readingProgress}%`, 
+                                backgroundColor: activePrimaryColor,
+                                boxShadow: `0 0 15px ${activePrimaryColor}60`
+                            }} 
+                        />
                     </div>
 
                     {/* Body — Sidebar + Content */}
@@ -837,20 +1240,21 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                                 marginLeft: 'auto',
                                                 fontSize: '10px',
                                                 fontWeight: 700,
-                                                color: 'rgba(167,139,250,0.5)',
-                                                background: 'rgba(139,92,246,0.1)',
+                                                color: `${activePrimaryColor}80`,
+                                                background: `${activePrimaryColor}15`,
                                                 padding: '1px 6px',
                                                 borderRadius: '10px',
                                             }}>{childNotes.length}</span>
                                         </div>
-                                        <div style={{ padding: '0 10px 12px' }}>
-                                            {childNotes.map((child) => (
+                                        <div className="custom-scrollbar overflow-y-auto max-h-[300px] p-1.5 space-y-1">
+                                            {childNotes.map(child => (
                                                 <LinkedNoteButton
                                                     key={child.id}
                                                     child={child}
                                                     isLightMode={isLightMode}
                                                     onSafeAction={handleSafeAction}
                                                     onOpenChildNote={onOpenChildNote}
+                                                    primaryColor={activePrimaryColor}
                                                 />
                                             ))}
                                         </div>
@@ -863,7 +1267,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                         <div
                             ref={contentRef}
                             className="px-4 py-5 md:px-8 md:py-8 overflow-y-auto custom-scrollbar flex-1 relative w-full"
-                            style={{ background: isLightMode ? '#ffffff' : '#12121a' }}
+                            style={{ background: isLightMode ? '#fdfdfb' : '#1c1c28' }}
                         >
                             {/* Text Selection Toolbar */}
                             {selectionTooltip && !editMode && (
@@ -891,7 +1295,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold cursor-pointer transition-all ${isLightMode ? 'hover:bg-black/[0.05] text-slate-700' : 'hover:bg-white/[0.08] text-[rgba(255,255,255,0.85)]'}`}
                                                 title="Create a new note from selection"
                                             >
-                                                <Plus className="w-3 h-3 text-emerald-400" />
+                                                <Plus className="w-3 h-3" style={{ color: activePrimaryColor }} />
                                                 <span>Note</span>
                                             </button>
                                         )}
@@ -903,7 +1307,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                                     className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold cursor-pointer transition-all ${isLightMode ? 'hover:bg-black/[0.05] text-slate-700' : 'hover:bg-white/[0.08] text-[rgba(255,255,255,0.85)]'}`}
                                                     title="Edit this selection"
                                                 >
-                                                    <Pencil className="w-3 h-3 text-blue-400" />
+                                                    <Pencil className="w-3 h-3" style={{ color: activePrimaryColor }} />
                                                     <span>Edit</span>
                                                 </button>
                                             </>
@@ -916,7 +1320,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                                     className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold cursor-pointer transition-all ${isLightMode ? 'hover:bg-black/[0.05] text-slate-700' : 'hover:bg-white/[0.08] text-[rgba(255,255,255,0.85)]'}`}
                                                     title="Edit with AI"
                                                 >
-                                                    <Wand2 className="w-3 h-3 text-violet-400" />
+                                                    <Wand2 className="w-3 h-3" style={{ color: activePrimaryColor }} />
                                                     <span>AI Edit</span>
                                                 </button>
                                             </>
@@ -936,23 +1340,26 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                     editPosition={editPosition}
                                     handleCancelEdit={handleCancelEdit}
                                     handleSaveEdit={handleSaveEdit}
+                                    isLightMode={isLightMode}
+                                    primaryColor={activePrimaryColor}
                                 />
                             )}
 
                             {/* Floating AI Edit — Instruction Input */}
                             {editMode === 'ai-instruction' && (
                                 <div
-                                    className="absolute z-[100] w-[90%] max-w-[480px] rounded-xl border border-violet-500/20 overflow-hidden shadow-2xl"
+                                    className="absolute z-[100] w-[90%] max-w-[480px] rounded-xl border overflow-hidden shadow-2xl"
                                     style={{
                                         left: `${Math.max(16, editPosition.x)}px`,
                                         top: `${editPosition.y + 8}px`,
                                         transform: 'translateX(-50%)',
                                         background: isLightMode ? '#ffffff' : '#1a1a2e',
+                                        borderColor: `${activePrimaryColor}33`,
                                         boxShadow: isLightMode ? '0 4px 20px rgba(0,0,0,0.1)' : '0 8px 32px rgba(0,0,0,0.5)',
                                     }}
                                 >
                                     <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
-                                        <span className="text-[11px] font-bold text-violet-400 uppercase tracking-wider flex items-center gap-2">
+                                        <span className="text-[11px] font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: activePrimaryColor }}>
                                             <Wand2 className="w-3.5 h-3.5" /> AI Edit
                                         </span>
                                         <button onClick={handleCancelEdit} className="text-[11px] font-semibold text-slate-400 hover:text-white px-2.5 py-1 rounded-md hover:bg-white/[0.06] transition-all cursor-pointer">Cancel</button>
@@ -970,13 +1377,15 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                                 onChange={(e) => setAiInstruction(e.target.value)}
                                                 onKeyDown={(e) => { if (e.key === 'Enter' && aiInstruction.trim()) handleSubmitAIEdit(); }}
                                                 placeholder="e.g., Simplify this, add examples, fix errors..."
-                                                className="flex-1 bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-lg px-3 py-2.5 text-[13px] focus:outline-none focus:border-violet-400/40 focus:ring-1 focus:ring-violet-400/15 transition-all"
+                                                className="flex-1 bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-lg px-3 py-2.5 text-[13px] focus:outline-none focus:ring-1 transition-all"
+                                                style={{ borderColor: `${activePrimaryColor}33` }}
                                                 autoFocus
                                             />
                                             <button
                                                 onClick={handleSubmitAIEdit}
                                                 disabled={!aiInstruction.trim()}
-                                                className="px-4 py-2.5 rounded-lg text-[12px] font-bold bg-violet-500/15 text-violet-400 border border-violet-500/25 hover:bg-violet-500/25 transition-all disabled:opacity-40 cursor-pointer flex items-center gap-1.5"
+                                                className="px-4 py-2.5 rounded-lg text-[12px] font-bold transition-all disabled:opacity-40 cursor-pointer flex items-center gap-1.5"
+                                                style={{ backgroundColor: `${activePrimaryColor}26`, color: activePrimaryColor, border: `1px solid ${activePrimaryColor}40` }}
                                             >
                                                 <Wand2 className="w-3.5 h-3.5" /> Apply
                                             </button>
@@ -988,17 +1397,18 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                             {/* Floating AI Edit — Preview Result */}
                             {editMode === 'ai-preview' && (
                                 <div
-                                    className="absolute z-[100] w-[90%] max-w-[520px] rounded-xl border border-violet-500/20 overflow-hidden shadow-2xl"
+                                    className="absolute z-[100] w-[90%] max-w-[520px] rounded-xl border overflow-hidden shadow-2xl"
                                     style={{
                                         left: `${Math.max(16, editPosition.x)}px`,
                                         top: `${editPosition.y + 8}px`,
                                         transform: 'translateX(-50%)',
                                         background: isLightMode ? '#ffffff' : '#1a1a2e',
+                                        borderColor: `${activePrimaryColor}33`,
                                         boxShadow: isLightMode ? '0 4px 20px rgba(0,0,0,0.1)' : '0 8px 32px rgba(0,0,0,0.5)',
                                     }}
                                 >
                                     <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
-                                        <span className="text-[11px] font-bold text-violet-400 uppercase tracking-wider flex items-center gap-2">
+                                        <span className="text-[11px] font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: activePrimaryColor }}>
                                             <Wand2 className="w-3.5 h-3.5" /> AI Suggestion
                                         </span>
                                         {!aiLoading && (
@@ -1006,7 +1416,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                                 <button onClick={handleCancelEdit} className="text-[11px] font-semibold text-red-400 hover:text-red-300 px-2.5 py-1 rounded-md hover:bg-red-500/10 transition-all cursor-pointer flex items-center gap-1">
                                                     <XCircle className="w-3 h-3" /> Reject
                                                 </button>
-                                                <button onClick={handleAcceptAIEdit} className="text-[11px] font-bold text-emerald-400 px-3 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all cursor-pointer flex items-center gap-1.5">
+                                                <button onClick={handleAcceptAIEdit} className="text-[11px] font-bold px-3 py-1 rounded-md border transition-all cursor-pointer flex items-center gap-1.5" style={{ color: activePrimaryColor, backgroundColor: `${activePrimaryColor}10`, borderColor: `${activePrimaryColor}33` }}>
                                                     <Check className="w-3 h-3" /> Accept
                                                 </button>
                                             </div>
@@ -1027,8 +1437,8 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                                     </div>
                                                 </div>
                                                 <div>
-                                                    <div className="text-[10px] text-emerald-400/60 font-bold uppercase tracking-wider mb-1.5">AI Result</div>
-                                                    <div className="text-[12px] text-emerald-300 bg-emerald-500/[0.04] rounded-lg px-3 py-2 border border-emerald-500/10 max-h-[160px] overflow-y-auto font-mono leading-relaxed">
+                                                    <div className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: `${activePrimaryColor}a0` }}>AI Result</div>
+                                                    <div className="text-[12px] bg-white/[0.03] rounded-lg px-3 py-2 border max-h-[160px] overflow-y-auto font-mono leading-relaxed" style={{ color: activePrimaryColor, borderColor: `${activePrimaryColor}20` }}>
                                                         {aiResult}
                                                     </div>
                                                 </div>
@@ -1043,8 +1453,8 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                 <div className={`mb-10 rounded-2xl overflow-hidden ${isLightMode ? 'border-none bg-slate-100' : 'border border-white/[0.08] bg-black/40'} shadow-2xl relative group`}>
                                     {isFetchingImage ? (
                                         <div className={`aspect-video flex flex-col items-center justify-center gap-4 ${isLightMode ? 'bg-slate-50' : 'bg-surface-2/30'}`}>
-                                            <div className="w-10 h-10 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
-                                            <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-widest animate-pulse">Loading Source Image...</span>
+                                            <div className="w-10 h-10 border-4 rounded-full animate-spin" style={{ borderColor: `${activePrimaryColor}33`, borderTopColor: activePrimaryColor }} />
+                                            <span className="text-[11px] font-bold uppercase tracking-widest animate-pulse" style={{ color: activePrimaryColor }}>Loading Source Image...</span>
                                         </div>
                                     ) : (
                                         <div className="relative">
@@ -1056,8 +1466,9 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                             <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/80 to-transparent flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <span className="text-[10px] font-bold text-white uppercase tracking-widest">Original Source Image</span>
                                                 <button
-                                                    onClick={handleOpenOriginal}
-                                                    className="text-[10px] font-bold text-emerald-400 hover:underline cursor-pointer bg-transparent border-none p-0"
+                                                    onClick={() => window.open(sourceImage, '_blank')}
+                                                    className="text-[10px] font-bold hover:underline cursor-pointer bg-transparent border-none p-0"
+                                                    style={{ color: activePrimaryColor }}
                                                 >
                                                     Open Original
                                                 </button>
@@ -1067,7 +1478,30 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                 </div>
                             )}
 
-                            <div className={`prose prose-base sm:prose-lg max-w-none break-words sm:break-normal prose-headings:font-heading prose-headings:font-bold prose-h1:text-[20px] sm:prose-h1:text-[22px] prose-h2:text-[18px] sm:prose-h2:text-[19px] prose-h3:text-[16px] sm:prose-h3:text-[17px] prose-headings:mt-6 prose-headings:mb-3 prose-p:leading-relaxed prose-p:mb-3 prose-ul:my-3 prose-ol:my-3 prose-li:my-1 prose-pre:border prose-pre:max-w-full prose-code:before:content-none prose-code:after:content-none ${isLightMode ? 'prose-slate text-slate-800 prose-p:text-slate-800 prose-a:text-indigo-600 hover:prose-a:text-indigo-700 prose-strong:text-slate-900 prose-code:text-slate-800 prose-pre:bg-slate-50 prose-pre:border-slate-200' : 'prose-invert prose-p:text-slate-300 prose-a:text-indigo-400 hover:prose-a:text-indigo-300 prose-strong:text-white prose-code:text-slate-300 prose-pre:bg-surface-2 prose-pre:border-white/[0.08]'}`}>
+                            <div className={`prose prose-base sm:prose-lg max-w-none break-words sm:break-normal 
+                                    prose-headings:font-heading prose-headings:font-bold prose-headings:tracking-tight 
+                                    prose-h1:text-[32px] sm:prose-h1:text-[42px] prose-h1:mb-10 prose-h1:mt-4 prose-h1:leading-tight
+                                    prose-h2:text-[24px] sm:prose-h2:text-[28px] prose-h2:mb-6 prose-h2:mt-12 prose-h2:border-b prose-h2:pb-3 prose-h2:leading-snug
+                                    prose-h3:text-[19px] sm:prose-h3:text-[22px] prose-h3:mb-4 prose-h3:mt-8 prose-h3:leading-snug
+                                    prose-p:leading-relaxed prose-p:mb-6
+                                    prose-ul:my-6 prose-ol:my-6 prose-li:my-2
+                                    prose-strong:font-extrabold
+                                    prose-pre:p-0 prose-pre:bg-transparent prose-pre:border-none
+                                    prose-code:before:content-none prose-code:after:content-none
+                                    prose-img:rounded-3xl
+                                    ${isLightMode 
+                                        ? 'prose-slate text-slate-800 prose-p:text-slate-700/90 prose-headings:text-slate-900 prose-strong:text-slate-900' 
+                                        : 'prose-invert prose-p:text-slate-300/90 prose-headings:text-white prose-strong:text-white'}`}
+                                    style={{ 
+                                        fontSize: `${fontSize}px`,
+                                        lineHeight: lineHeight,
+                                        '--tw-prose-invert-p-margin-bottom': `${lineHeight * 0.5}rem`,
+                                        '--tw-prose-p-margin-bottom': `${lineHeight * 0.5}rem`,
+                                        '--tw-prose-links': activePrimaryColor,
+                                        '--tw-prose-invert-links': activePrimaryColor,
+                                        '--tw-prose-counters': activePrimaryColor,
+                                        '--tw-prose-bullets': activePrimaryColor,
+                                    }}>
                                 <ReactMarkdown
                                     remarkPlugins={markdownPlugins}
                                     rehypePlugins={markdownRehypePlugins}

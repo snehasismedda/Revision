@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import * as userModel from '../models/userModel.js';
+import * as userPreferenceModel from '../models/userPreferenceModel.js';
 import { sendPasswordResetEmail } from '../services/mailService.js';
 
 const COOKIE_OPTS = {
@@ -151,7 +152,16 @@ export const getMe = async (req, res) => {
     try {
         const user = await userModel.findUserById({ id: req.user.id });
         if (!user) return res.status(404).json({ error: 'User not found' });
-        res.status(200).json({ user });
+        
+        // Fetch preferences
+        const preferences = await userPreferenceModel.getPreference(req.user.id);
+        
+        res.status(200).json({ 
+            user: { 
+                ...user, 
+                preferences: preferences || { font_size: 16, code_font_size: 15 } 
+            } 
+        });
     } catch (error) {
         res.status(500).json({ error: 'Failed to get user' });
     }
@@ -186,9 +196,34 @@ export const updateMe = async (req, res) => {
         }
 
         const user = await userModel.updateUser(req.user.id, updateData);
-        res.status(200).json({ user: { id: user.id, name: user.name, email: user.email, profile_picture: user.profile_picture } });
+        const preferences = await userPreferenceModel.getPreference(req.user.id);
+        
+        res.status(200).json({ 
+            user: { 
+                id: user.id, 
+                name: user.name, 
+                email: user.email, 
+                profile_picture: user.profile_picture,
+                preferences: preferences || { font_size: 16, code_font_size: 15 }
+            } 
+        });
     } catch (error) {
         console.error('updateMe error:', error);
         res.status(500).json({ error: 'Failed to update profile' });
+    }
+};
+
+export const updatePreferences = async (req, res) => {
+    try {
+        const { font_size, code_font_size } = req.body;
+        if (!font_size && !code_font_size) {
+            return res.status(400).json({ error: 'Nothing to update' });
+        }
+        
+        const prefs = await userPreferenceModel.updatePreference(req.user.id, { font_size, code_font_size });
+        res.status(200).json({ preferences: prefs });
+    } catch (error) {
+        console.error('updatePreferences error:', error);
+        res.status(500).json({ error: 'Failed to update preferences' });
     }
 };
