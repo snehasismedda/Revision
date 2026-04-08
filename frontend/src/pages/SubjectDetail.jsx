@@ -1831,7 +1831,7 @@ const SubjectDetail = () => {
                     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
             }, 100);
-            
+
             setTimeout(() => {
                 setHighlightedNoteId(null);
             }, 3500);
@@ -2124,9 +2124,8 @@ const SubjectDetail = () => {
                         toast.error('Failed to update note');
                     }
                 }}
-                onAIEditSection={async (selectedText, instruction) => {
+                onAIEditSection={async (selectedText, instruction, onChunk) => {
                     try {
-                        // Extract surrounding content for context (buffer ~500 chars each side)
                         const fullContent = viewingNote?.content || '';
                         const selectionIndex = fullContent.indexOf(selectedText);
                         const BUFFER = 500;
@@ -2138,18 +2137,24 @@ const SubjectDetail = () => {
                             const afterEnd = Math.min(fullContent.length, selectionIndex + selectedText.length + BUFFER);
                             contentAfter = fullContent.substring(selectionIndex + selectedText.length, afterEnd);
                         }
-                        const result = await aiApi.editSection({
+
+                        // Use streaming API
+                        await aiApi.editSectionStream({
                             selectedText,
                             instruction,
                             noteTitle: viewingNote?.title || '',
                             contentBefore,
                             contentAfter,
-                        });
-                        return result.editedText || '';
-                    } catch {
+                        }, onChunk);
+                    } catch (error) {
                         toast.error('AI edit failed');
-                        throw new Error('AI edit failed');
+                        throw error;
                     }
+                }}
+                allNotes={filteredNotes}
+                onNavigateToNote={(n) => {
+                    setViewingNote(n);
+                    if (n.source_image_id) handleFetchNoteImage(n.id);
                 }}
             />
 
@@ -2814,7 +2819,7 @@ const SubjectDetail = () => {
                                                                     </button>
 
                                                                     {activeQuestionDropdown === q.id && (
-                                                                        <div 
+                                                                        <div
                                                                             className="absolute right-0 top-full mt-2 w-44 glass rounded-xl border border-white/10 shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
                                                                             onClick={(e) => e.stopPropagation()}
                                                                         >
@@ -3061,7 +3066,7 @@ const SubjectDetail = () => {
                                                                                     </button>
 
                                                                                     {activeQuestionDropdown === q.id && (
-                                                                                        <div 
+                                                                                        <div
                                                                                             className="absolute right-0 top-full mt-2 w-44 glass rounded-xl border border-white/10 shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
                                                                                             onClick={(e) => e.stopPropagation()}
                                                                                         >
@@ -3518,9 +3523,9 @@ const SubjectDetail = () => {
                                                                 >
                                                                     <MoreVertical className="w-3.5 h-3.5" />
                                                                 </button>
-                                                                
+
                                                                 {activeNoteDropdown === note.id && (
-                                                                    <div 
+                                                                    <div
                                                                         className="absolute right-0 bottom-full mb-2 w-36 glass rounded-xl border border-white/10 shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200"
                                                                         onClick={(e) => e.stopPropagation()}
                                                                     >

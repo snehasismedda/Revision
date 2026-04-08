@@ -8,7 +8,7 @@ import { syllabusPrompt, insightPrompt, globalInsightPrompt, noteAnalysisPrompt,
 
 export const editSection = async (req, res) => {
     try {
-        const { selectedText, instruction, noteTitle, contentBefore, contentAfter } = req.body;
+        const { selectedText, instruction, noteTitle, contentBefore, contentAfter, stream = false } = req.body;
         if (!selectedText || !instruction) return res.status(400).json({ error: 'selectedText and instruction are required' });
 
         // Build a structured user message with all available context
@@ -30,6 +30,28 @@ export const editSection = async (req, res) => {
             { role: "user", content: userMessage }
         ];
 
+        if (stream) {
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+            res.setHeader('Transfer-Encoding', 'chunked');
+            
+            const response = await ollama.chat({
+                model: models.TEXT,
+                messages: [
+                    ...messages,
+                    { role: 'user', content: 'IMPORTANT: Output ONLY the edited text. NO JSON. NO explanations.' }
+                ],
+                stream: true
+            });
+
+            for await (const part of response) {
+                if (part.message?.content) {
+                    res.write(part.message.content);
+                }
+            }
+            res.end();
+            return;
+        }
+
         const response = await ollama.chat({
             model: models.TEXT,
             messages,
@@ -46,13 +68,33 @@ export const editSection = async (req, res) => {
 
 export const enhanceNote = async (req, res) => {
     try {
-        const { title, content } = req.body;
+        const { title, content, stream = false } = req.body;
         if (!content) return res.status(400).json({ error: 'Content is required' });
 
         const messages = [
             { role: "system", content: enhanceNotePrompt },
             { role: "user", content: `Title: ${title}\nContent: ${content}` }
         ];
+
+        if (stream) {
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+            res.setHeader('Transfer-Encoding', 'chunked');
+            
+            const response = await ollama.chat({
+                model: models.TEXT,
+                messages,
+                stream: true,
+                format: 'json'
+            });
+
+            for await (const part of response) {
+                if (part.message?.content) {
+                    res.write(part.message.content);
+                }
+            }
+            res.end();
+            return;
+        }
 
         const response = await ollama.chat({
             model: models.TEXT,
@@ -70,7 +112,7 @@ export const enhanceNote = async (req, res) => {
 
 export const formatNote = async (req, res) => {
     try {
-        const { title, content } = req.body;
+        const { title, content, stream = false } = req.body;
         if (!content) return res.status(400).json({ error: 'Content is required' });
 
         const messages = [
@@ -78,14 +120,31 @@ export const formatNote = async (req, res) => {
             { role: "user", content: `Title: ${title}\nContent: ${content}` }
         ];
 
+        if (stream) {
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+            res.setHeader('Transfer-Encoding', 'chunked');
+            
+            const response = await ollama.chat({
+                model: models.TEXT,
+                messages,
+                stream: true
+            });
+
+            for await (const part of response) {
+                if (part.message?.content) {
+                    res.write(part.message.content);
+                }
+            }
+            res.end();
+            return;
+        }
+
         const response = await ollama.chat({
             model: models.TEXT,
             messages,
-            stream: false,
-            format: 'json'
+            stream: false
         });
-        const result = JSON.parse(response.message?.content || '{}');
-        res.status(200).json(result);
+        res.status(200).send(response.message?.content || '');
     } catch (error) {
         console.error('formatNote error:', error);
         res.status(500).json({ error: 'Failed to format note' });
@@ -124,7 +183,7 @@ export const describeImage = async (req, res) => {
 
 export const parseNote = async (req, res) => {
     try {
-        const { content, type } = req.body;
+        const { content, type, stream = false } = req.body;
         if (!content) return res.status(400).json({ error: 'Content is required' });
 
         const model = type === 'image' ? models.IMAGE : models.TEXT;
@@ -144,6 +203,26 @@ export const parseNote = async (req, res) => {
                 role: 'user',
                 content: `Extract the title and structured study notes from the following text:\n\n${content}`
             });
+        }
+
+        if (stream) {
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+            res.setHeader('Transfer-Encoding', 'chunked');
+            
+            const response = await ollama.chat({
+                model,
+                messages,
+                stream: true,
+                format: 'json'
+            });
+
+            for await (const part of response) {
+                if (part.message?.content) {
+                    res.write(part.message.content);
+                }
+            }
+            res.end();
+            return;
         }
 
         const response = await ollama.chat({

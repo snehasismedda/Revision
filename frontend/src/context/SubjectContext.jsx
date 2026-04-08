@@ -12,6 +12,7 @@ export const SubjectProvider = ({ children }) => {
     const [loading, setLoading] = useState(false);
     const [isLoaded, setIsLoaded] = useState(false);
     const isLoadedRef = useRef(false);
+    const isArchivedLoadedRef = useRef(false);
     const loadingPromiseRef = useRef(null);
 
     // Reset state when user changes/logs out
@@ -21,24 +22,47 @@ export const SubjectProvider = ({ children }) => {
             setStatsMap({});
             setIsLoaded(false);
             isLoadedRef.current = false;
+            isArchivedLoadedRef.current = false;
         }
     }, [user]);
 
-    const loadSubjects = useCallback(async (force = false) => {
-        if (isLoadedRef.current && !force) return;
+    const loadSubjects = useCallback(async (queryParam = 'false', force = false) => {
+        // If archived is 'false', we check isLoaded to avoid re-fetching
+        if (queryParam === 'false' && isLoadedRef.current && !force) return;
+        // If archived is 'true', we check isArchivedLoaded to avoid re-fetching
+        if (queryParam === 'true' && isArchivedLoadedRef.current && !force) return;
+        
         if (loadingPromiseRef.current && !force) return loadingPromiseRef.current;
         
         const load = async () => {
             setLoading(true);
             try {
-                const { subjects: subs } = await subjectsApi.list();
-                setSubjects(subs);
-                setIsLoaded(true);
-                isLoadedRef.current = true;
+                const { subjects: subs } = await subjectsApi.list(queryParam);
+                
+                setSubjects(prev => {
+                    if (queryParam === 'all') return subs;
+                    
+                    // Merge new subjects into existing ones, avoiding duplicates
+                    const existingIds = new Set(prev.map(s => s.id));
+                    const newSubs = subs.filter(s => !existingIds.has(s.id));
+                    return [...prev, ...newSubs];
+                });
+
+                if (queryParam === 'false') {
+                    setIsLoaded(true);
+                    isLoadedRef.current = true;
+                }
+                
+                if (queryParam === 'true') {
+                    isArchivedLoadedRef.current = true;
+                }
 
                 if (subs.length > 0) {
                     const data = await analyticsApi.overview(subs.map(s => s.id));
-                    setStatsMap(data.overviews || {});
+                    setStatsMap(prev => ({
+                        ...prev,
+                        ...(data.overviews || {})
+                    }));
                 }
             } catch (error) {
                 console.error('Failed to load subjects:', error);

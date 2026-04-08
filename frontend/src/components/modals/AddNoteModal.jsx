@@ -176,8 +176,16 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
     const handleAnalyzeImage = async (image) => {
         if (!image) return;
         setIsAnalyzing(true);
+        let fullResponse = '';
         try {
-            const result = await aiApi.parseNote({ content: image, type: 'image' });
+            await aiApi.parseNoteStream({ content: image, type: 'image' }, (chunk) => {
+                fullResponse += chunk;
+                // Currently just collecting JSON, but streaming prevents timeouts
+            });
+
+            const cleaned = fullResponse.replace(/```json\n?|```/g, '').trim();
+            const result = JSON.parse(cleaned);
+
             if (result.title) setTitle(result.title);
             if (result.content) setContent(result.content);
             toast.success('AI analysis complete');
@@ -192,12 +200,24 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
     const handleEnhance = async () => {
         if (!content.trim()) return;
         setIsEnhancing(true);
+        let fullResponse = '';
         try {
-            const result = await aiApi.enhanceNote({ title, content });
+            await aiApi.enhanceNoteStream({ title, content }, (chunk) => {
+                fullResponse += chunk;
+                // Try to parse the partial JSON if possible, or just wait till end
+                // For now, simpler to just collect and parse at the end to avoid broken JSON issues
+                // But we can show the user something is happening
+            });
+
+            // Clean JSON string - sometimes AI adds markdown fences
+            const cleaned = fullResponse.replace(/```json\n?|```/g, '').trim();
+            const result = JSON.parse(cleaned);
+
             if (result.title) setTitle(result.title);
             if (result.content) setContent(result.content);
         } catch (error) {
             console.error('Enhance error:', error);
+            toast.error('Failed to enhance note');
         } finally {
             setIsEnhancing(false);
         }
@@ -206,12 +226,24 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
     const handleFormat = async () => {
         if (!content.trim()) return;
         setIsFormatting(true);
+        let streamedContent = '';
         try {
-            const result = await aiApi.formatNote({ title, content });
-            if (result.title) setTitle(result.title);
-            if (result.content) setContent(result.content);
+            await aiApi.formatNoteStream({ title, content }, (chunk) => {
+                streamedContent += chunk;
+                setContent(streamedContent);
+            });
+            
+            // Extract title if it starts with #
+            if (streamedContent.startsWith('# ')) {
+                const lines = streamedContent.split('\n');
+                const extractedTitle = lines[0].replace('# ', '').trim();
+                if (extractedTitle) setTitle(extractedTitle);
+                // Optionally remove title from content if you don't want it doubled
+                // setContent(lines.slice(1).join('\n').trim());
+            }
         } catch (error) {
             console.error('Format error:', error);
+            toast.error('Failed to format note');
         } finally {
             setIsFormatting(false);
         }

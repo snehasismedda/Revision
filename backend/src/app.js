@@ -16,8 +16,9 @@ import noteRoute from './routes/noteRoute.js';
 import imageRoute from './routes/imageRoute.js';
 import testSeriesRoute from './routes/testSeriesRoute.js';
 import testRoute from './routes/testRoute.js';
-import revisionTrackerRoute from './routes/revisionTrackerRoute.js';
 import solutionRoute from './routes/solutionRoute.js';
+import revisionTrackerRoute from './routes/revisionTrackerRoute.js';
+import { dateSerializationMiddleware } from './utils/serialization.js';
 
 const app = express();
 
@@ -29,6 +30,8 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cookieParser());
+app.use(dateSerializationMiddleware);
+
 
 // --- Routes ---
 app.use('/api/auth', authRoute);

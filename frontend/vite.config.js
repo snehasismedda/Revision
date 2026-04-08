@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import react from '@vitejs/plugin-react-swc';
 import tailwindcss from '@tailwindcss/vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 
@@ -7,11 +7,7 @@ export default defineConfig({
   plugins: [
     basicSsl(),
     tailwindcss(),
-    react({
-      babel: {
-        plugins: [['babel-plugin-react-compiler']],
-      },
-    }),
+    react(),
   ],
   server: {
     host: true,
@@ -35,14 +31,21 @@ export default defineConfig({
     },
   },
   build: {
+    minify: 'esbuild',
+    sourcemap: false,
+    reportCompressedSize: false,
     chunkSizeWarningLimit: 1600,
     rollupOptions: {
       output: {
         manualChunks: {
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-vendor': ['lucide-react', 'react-hot-toast', 'recharts'],
-          'markdown-vendor': ['react-markdown', 'remark-gfm', 'remark-math', 'rehype-raw', 'rehype-katex'],
-          'export-vendor': ['jspdf', 'jspdf-autotable', 'docx', 'html2canvas', 'html-to-image', 'file-saver'],
+          'ui-vendor': ['lucide-react', 'react-hot-toast'],
+          'recharts-vendor': ['recharts'],
+          'markdown-vendor': ['react-markdown', 'remark-gfm', 'remark-math', 'rehype-raw', 'rehype-katex', 'marked'],
+          'syntax-highlight-vendor': ['react-syntax-highlighter'],
+          'pdf-vendor': ['jspdf', 'jspdf-autotable', 'html-to-image'],
+          'docx-vendor': ['docx'],
+          'utils-vendor': ['unidecode', 'jszip', 'file-saver', 'jszip'],
         },
       },
     },

@@ -7,6 +7,7 @@ import { Image as ImageIcon, PlusCircle, Search, X, Calendar, Activity, Maximize
 import toast from 'react-hot-toast';
 import AddImageModal from '../components/modals/AddImageModal.jsx';
 import ViewNoteModal from '../components/modals/ViewNoteModal.jsx';
+import { formatDate } from '../utils/dateUtils';
 
 const Images = () => {
     const navigate = useNavigate();
@@ -318,7 +319,7 @@ const Images = () => {
                                                 </div>
                                                 <div className="flex items-center justify-between">
                                                     <p className="text-[11px] font-semibold text-white truncate">
-                                                        {new Date(img.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                                                        {formatDate(img.created_at, { day: 'numeric', month: 'short' })}
                                                     </p>
                                                     <Maximize2 className="w-3 h-3 text-white/60" />
                                                 </div>

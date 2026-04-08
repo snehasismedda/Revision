@@ -21,9 +21,15 @@ const Subjects = () => {
     const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null, name: '' });
 
     useEffect(() => {
-        loadSubjects();
+        loadSubjects('false');
         if (searchParams.get('new')) setShowModal(true);
     }, [searchParams, loadSubjects]);
+
+    useEffect(() => {
+        if (showArchived) {
+            loadSubjects('true');
+        }
+    }, [showArchived, loadSubjects]);
 
 
     const handleSubjectSaved = () => {
@@ -56,6 +62,9 @@ const Subjects = () => {
         return Array.isArray(t) ? t : [];
     }))).sort();
 
+    const activeSubjects = subjects.filter(s => !s.is_archived);
+    const activeCount = activeSubjects.length;
+
     return (
         <div className="fade-in max-w-6xl mx-auto">
             {/* Custom Confirm Dialog */}
@@ -76,7 +85,9 @@ const Subjects = () => {
                         <span className="text-[11px] font-bold tracking-widest text-primary uppercase">Library</span>
                     </div>
                     <h1 className="text-3xl font-heading font-bold text-white tracking-tight">Subjects</h1>
-                    <p className="text-slate-400 text-sm mt-1.5">{subjects.length} subject{subjects.length !== 1 ? 's' : ''} in your library</p>
+                    <p className="text-slate-400 text-sm mt-1.5">
+                        {activeCount} subject{activeCount !== 1 ? 's' : ''} in your library
+                    </p>
                 </div>
 
                 <div className="flex flex-col sm:flex-row sm:items-center items-stretch gap-3 md:gap-4 w-full sm:w-auto">
@@ -178,9 +189,8 @@ const Subjects = () => {
             ) : (
                 <div className="space-y-10">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                        {subjects
+                        {activeSubjects
                             .filter(s => {
-                                if (s.is_archived) return false;
                                 const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.description?.toLowerCase().includes(searchQuery.toLowerCase());
                                 let sTags = s.tags || [];
                                 if (typeof sTags === 'string') {

@@ -1,14 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { X, FileText, Link2 as LinkIcon, Pencil, ChevronLeft, ChevronRight, List, Copy, PanelLeftClose, PanelLeftOpen, Plus, ArrowLeft, Wand2, Check, XCircle, Loader2, Sun, Moon, Settings, Type, Palette } from 'lucide-react';
+import { X, FileText, Link2 as LinkIcon, Pencil, ChevronLeft, ChevronRight, List, Copy, PanelLeftClose, PanelLeftOpen, Plus, ArrowLeft, Wand2, Check, XCircle, Loader2, Sun, Moon, Settings, Type, Palette, Trash2, Edit3, Maximize2, Minimize2, ExternalLink, Hash, Image as ImageIcon, Sparkles, RefreshCw, Type as TypeIcon, Layout } from 'lucide-react';
 import { authApi } from '../../api/index.js';
+import { formatDate } from '../../utils/dateUtils';
 
 import ModalPortal from '../ModalPortal.jsx';
+
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+
+// Syntax Highlighting imports
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 const preprocessMarkdown = (text) => {
     if (!text) return '';
@@ -144,7 +150,7 @@ const TocItem = React.memo(({ heading, isActive, onClick, sidebarStyles }) => {
         >
             <div className={`absolute left-0 top-[15%] bottom-[15%] w-[3px] rounded-r-full transition-all duration-300
                 ${isActive ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-50'}`}
-                 style={{ backgroundColor: style.color }} />
+                style={{ backgroundColor: style.color }} />
             <span style={sidebarStyles.dot(heading.level, isActive)} className="inline-block align-top mr-2" />
             <span className={`inline-block max-w-[calc(100%-15px)] break-words transition-transform duration-200 ${hovered && !isActive ? 'translate-x-1' : ''}`}>
                 {heading.text}
@@ -155,14 +161,16 @@ const TocItem = React.memo(({ heading, isActive, onClick, sidebarStyles }) => {
 
 // Enhanced Code Block with Language Detection and Copy Button
 // ----------------------------------------------------------------
+// Enhanced Code Block with Language Detection, Syntax Highlighting and Copy Button
+// ----------------------------------------------------------------
 const SimpleCodeBlock = React.memo(({ children, isLightMode, fontSize = 20, primaryColor, className }) => {
     const [copied, setCopied] = useState(false);
-    
+
     // Extract language from className (e.g., 'language-javascript' -> 'javascript')
-    const language = useMemo(() => {
-        if (!className) return null;
+    const languageMatch = useMemo(() => {
+        if (!className) return 'text';
         const match = /language-(\w+)/.exec(className);
-        return match ? match[1].toUpperCase() : null;
+        return match ? match[1] : 'text';
     }, [className]);
 
     const handleCopy = async () => {
@@ -175,44 +183,75 @@ const SimpleCodeBlock = React.memo(({ children, isLightMode, fontSize = 20, prim
         }
     };
 
+    // ChatGPT-like code theme styling
+    const customStyle = {
+        margin: 0,
+        padding: '1.5rem',
+        fontSize: `${fontSize}px`,
+        lineHeight: '1.6',
+        backgroundColor: 'transparent',
+        fontFamily: "'JetBrains Mono', 'Fira Code', 'Roboto Mono', monospace",
+    };
+
     return (
-        <div className={`relative group/code my-8 rounded-2xl border overflow-hidden transition-all duration-300 shadow-sm hover:shadow-md
-            ${isLightMode 
-                ? 'bg-slate-50 border-slate-200/60' 
-                : 'bg-[#0f0f19] border-white/5 shadow-black/20'}`}>
-            
+        <div className={`relative group/code my-8 rounded-2xl border overflow-hidden transition-all duration-500 shadow-xl
+            ${isLightMode
+                ? 'bg-[#fdfdfd] border-slate-200/60 shadow-slate-200/30'
+                : 'bg-[#0f0f1b] border-white/[0.06] shadow-black/40'}`}>
+
             {/* Header / Meta bar */}
-            {(language || true) && (
-                <div className={`flex items-center justify-between px-6 py-2.5 border-b text-[10px] font-bold uppercase tracking-widest
-                    ${isLightMode ? 'bg-slate-100/60 border-slate-200/60 text-slate-500' : 'bg-white/5 border-white/5 text-slate-400'}`}>
-                    <div className="flex items-center gap-2">
-                         {language || 'CODE'}
+            <div className={`flex items-center justify-between px-6 py-3 border-b transition-colors duration-300
+                ${isLightMode ? 'bg-[#f1f3f7] border-slate-200/60' : 'bg-white/[0.03] border-white/[0.05]'}`}>
+                <div className="flex items-center gap-2.5">
+                    <div className="flex gap-1.5 mr-2">
+                        <div className={`w-2.5 h-2.5 rounded-full ${isLightMode ? 'bg-slate-300' : 'bg-white/10'}`} />
+                        <div className={`w-2.5 h-2.5 rounded-full ${isLightMode ? 'bg-slate-300' : 'bg-white/10'}`} />
+                        <div className={`w-2.5 h-2.5 rounded-full ${isLightMode ? 'bg-slate-300' : 'bg-white/10'}`} />
                     </div>
-                    <button
-                        onClick={handleCopy}
-                        className={`p-1.5 rounded-md transition-all duration-200 cursor-pointer flex items-center gap-1
-                            ${isLightMode ? 'hover:bg-slate-200 text-slate-600' : 'hover:bg-white/10 text-slate-300'}`}
-                        style={copied ? { color: primaryColor } : {}}
-                    >
-                        {copied ? (
-                            <>
-                                <Check size={11} style={{ color: primaryColor }} />
-                                <span style={{ color: primaryColor }} className="text-[9px]">Copied</span>
-                            </>
-                        ) : (
-                            <>
-                                <Copy size={11} />
-                                <span className="text-[9px]">Copy</span>
-                            </>
-                        )}
-                    </button>
+                    <span className={`text-[10px] font-black uppercase tracking-[0.2em] font-heading
+                        ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                        {languageMatch || 'CODE'}
+                    </span>
                 </div>
-            )}
-            
-            <pre className={`px-6 py-5 overflow-x-auto font-mono leading-relaxed custom-scrollbar selection:bg-primary/20 ${isLightMode ? '!text-slate-800' : '!text-slate-200'}`} 
-                 style={{ fontSize: `${fontSize}px`, scrollbarWidth: 'thin' }}>
-                <code className={isLightMode ? '!text-slate-800' : '!text-slate-200'}>{children}</code>
-            </pre>
+                <button
+                    onClick={handleCopy}
+                    className={`px-3 py-1.5 rounded-lg transition-all duration-300 cursor-pointer flex items-center gap-2 group/btn
+                        ${isLightMode
+                            ? 'hover:bg-slate-200/60 text-slate-600'
+                            : 'hover:bg-white/10 text-slate-300'}`}
+                    style={copied ? { color: primaryColor, backgroundColor: `${primaryColor}15` } : {}}
+                >
+                    {copied ? (
+                        <>
+                            <Check size={12} strokeWidth={3} style={{ color: primaryColor }} className="animate-in zoom-in-50 duration-300" />
+                            <span style={{ color: primaryColor }} className="text-[10px] font-bold">Copied!</span>
+                        </>
+                    ) : (
+                        <>
+                            <Copy size={12} className="group-hover/btn:scale-110 transition-transform" />
+                            <span className="text-[10px] font-bold">Copy code</span>
+                        </>
+                    )}
+                </button>
+            </div>
+
+            <div className="relative overflow-hidden group/pre">
+                <SyntaxHighlighter
+                    language={languageMatch}
+                    style={isLightMode ? oneLight : oneDark}
+                    customStyle={customStyle}
+                    codeTagProps={{
+                        style: {
+                            fontFamily: 'inherit',
+                            fontSize: 'inherit',
+                        }
+                    }}
+                    PreTag="div"
+                    className="custom-scrollbar"
+                >
+                    {String(children).replace(/\n$/, '')}
+                </SyntaxHighlighter>
+            </div>
         </div>
     );
 });
@@ -271,7 +310,7 @@ const LinkedNoteButton = React.memo(({ child, isLightMode, onSafeAction, onOpenC
             title={child.title || 'Untitled Note'}
         >
             <div className={`p-1.5 rounded-lg shrink-0 transition-colors ${isHovered ? '' : (isLightMode ? 'bg-slate-100' : 'bg-white/5')}`}
-                 style={isHovered ? { backgroundColor: `${primaryColor}20` } : {}}>
+                style={isHovered ? { backgroundColor: `${primaryColor}20` } : {}}>
                 <FileText size={13} className="opacity-70" />
             </div>
             <span className="truncate flex-1 font-semibold">{child.title || 'Untitled Note'}</span>
@@ -394,7 +433,8 @@ const TableEditPanel = ({ editOriginalText, editText, setEditText, editPosition,
 };
 
 
-const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImage, isFetchingImage, onEdit, onPrev, onNext, onAddToNote, parentNoteTitle, onUpdateNoteContent, onAIEditSection, childNotes, onOpenChildNote }) => {
+const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImage, isFetchingImage, onEdit, onPrev, onNext, onAddToNote, parentNoteTitle, onUpdateNoteContent, onAIEditSection, childNotes, onOpenChildNote, allNotes = [], onNavigateToNote }) => {
+
 
 
     const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -408,6 +448,18 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isSavingSettings, setIsSavingSettings] = useState(false);
     const [readingProgress, setReadingProgress] = useState(0);
+    const [showNotesList, setShowNotesList] = useState(false);
+    const [notesListSearch, setNotesListSearch] = useState('');
+    const notesListRef = useRef(null);
+
+    // Close notes list on outside click
+    useEffect(() => {
+        const handler = (e) => {
+            if (notesListRef.current && !notesListRef.current.contains(e.target)) setShowNotesList(false);
+        };
+        if (showNotesList) document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [showNotesList]);
 
     const activePrimaryColor = isLightMode ? primaryColorLight : primaryColorDark;
 
@@ -444,7 +496,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
         else if (type === 'line') { setLineHeight(val); updateBody.line_height = val; }
         else if (type === 'color_light') { setPrimaryColorLight(val); updateBody.primary_color_light = val; }
         else if (type === 'color_dark') { setPrimaryColorDark(val); updateBody.primary_color_dark = val; }
-        
+
         setIsSavingSettings(true);
         try {
             await authApi.updatePreferences(updateBody);
@@ -526,7 +578,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
         blockquote: ({ children, ...props }) => {
             const rawText = extractText(children);
             const alertMatch = rawText.match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/i);
-            
+
             if (alertMatch) {
                 const type = alertMatch[1];
                 // Strip the [!TYPE] marker from the content
@@ -540,14 +592,14 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                         return React.cloneElement(child, { children: newText });
                     }
                     if (Array.isArray(child.props?.children)) {
-                         const first = child.props.children[0];
-                         if (typeof first === 'string') {
-                             const newFirst = first.replace(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/i, '').trim();
-                             const newChildren = [...child.props.children];
-                             if (!newFirst) newChildren.shift();
-                             else newChildren[0] = newFirst;
-                             return React.cloneElement(child, { children: newChildren });
-                         }
+                        const first = child.props.children[0];
+                        if (typeof first === 'string') {
+                            const newFirst = first.replace(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/i, '').trim();
+                            const newChildren = [...child.props.children];
+                            if (!newFirst) newChildren.shift();
+                            else newChildren[0] = newFirst;
+                            return React.cloneElement(child, { children: newChildren });
+                        }
                     }
                     return child;
                 });
@@ -567,19 +619,19 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
         code: ({ node, className, children, ...props }) => {
             // Robust detection for block vs inline code in ReactMarkdown v10
             const isBlock = /language-(\w+)/.exec(className || '') || String(children).includes('\n');
-            
+
             return isBlock ? (
                 <SimpleCodeBlock isLightMode={isLightMode} fontSize={codeFontSize} primaryColor={activePrimaryColor} className={className}>
                     {children}
                 </SimpleCodeBlock>
             ) : (
-                <code 
-                    className={`px-1.5 py-0.5 rounded-md text-[0.85em] font-bold font-mono border transition-colors select-all`} 
-                    style={{ 
-                        backgroundColor: `${activePrimaryColor}15`, 
+                <code
+                    className={`px-1.5 py-0.5 rounded-md text-[0.85em] font-bold font-mono border transition-colors select-all`}
+                    style={{
+                        backgroundColor: `${activePrimaryColor}15`,
                         color: activePrimaryColor,
                         borderColor: `${activePrimaryColor}25`
-                    }} 
+                    }}
                     {...props}
                 >
                     {children}
@@ -587,11 +639,11 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
             );
         },
         a: ({ children, ...props }) => (
-            <a 
-                {...props} 
-                className="font-bold underline decoration-2 underline-offset-4 transition-colors" 
+            <a
+                {...props}
+                className="font-bold underline decoration-2 underline-offset-4 transition-colors"
                 style={{ color: activePrimaryColor, textDecorationColor: `${activePrimaryColor}40` }}
-                target="_blank" 
+                target="_blank"
                 rel="noopener noreferrer"
             >
                 {children}
@@ -660,11 +712,11 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                     }
                 }
                 setActiveHeadingId(currentId);
-                
+
                 // Progress bar
                 const scrollHeight = container.scrollHeight - container.clientHeight;
                 setReadingProgress(scrollHeight > 0 ? (container.scrollTop / scrollHeight) * 100 : 0);
-                
+
                 lastScrollTop = container.scrollTop;
             });
         };
@@ -875,10 +927,16 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
         if (!editOriginalText || !aiInstruction.trim() || !onAIEditSection) return;
         setAiLoading(true);
         setEditMode('ai-preview');
+        setAiResult(''); // Clear previous result
         try {
-            const result = await onAIEditSection(editOriginalText, aiInstruction);
-            setAiResult(result);
-        } catch {
+            // Updated to handle streaming via a callback
+            await onAIEditSection(editOriginalText, aiInstruction, (chunk) => {
+                setAiLoading(false); // Once chunks start coming, we're no longer "loading" initial state
+                setAiResult(prev => prev + chunk);
+            });
+        } catch (error) {
+            console.error('AI Edit stream error:', error);
+            toast.error('AI edit failed');
             setAiResult('');
             setEditMode('ai-instruction');
         } finally {
@@ -911,7 +969,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
     return (
         <ModalPortal>
             <div className={`fixed inset-0 z-[100] flex items-end sm:items-center justify-center modal-backdrop fade-in ${isLightMode ? 'bg-black/20' : 'bg-black/80'}`}
-                 style={{ padding: isFullscreen ? '0' : 'undefined' }} // Clear padding for true fullscreen
+                style={{ padding: isFullscreen ? '0' : 'undefined' }} // Clear padding for true fullscreen
             >
                 <div
                     className={`w-full flex flex-col ${isFullscreen ? 'h-[100dvh] sm:max-h-screen rounded-none border-none' : 'h-[95dvh] sm:h-auto sm:max-h-[85vh] rounded-t-[1.5rem] sm:rounded-2xl shadow-2xl sm:border'} overflow-hidden relative transition-all duration-300 transform`}
@@ -927,6 +985,134 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                     {/* Header */}
                     <div className={`flex items-center justify-between px-4 sm:px-5 py-3 sm:py-3.5 border-b shrink-0 z-30 ${isLightMode ? 'bg-[#e5e7eb] border-slate-300/60 text-slate-900' : 'bg-[#161625] border-white/[0.05] text-white'}`}>
                         <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 pr-2">
+                            {/* LeetCode-style List button */}
+                            <div className="relative hidden md:block" ref={notesListRef}>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setShowNotesList(v => !v); setNotesListSearch(''); }}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-bold transition-all border ${
+                                        showNotesList
+                                            ? isLightMode ? 'bg-primary/10 text-primary border-primary/30' : 'bg-primary/20 text-primary border-primary/40'
+                                            : isLightMode ? 'bg-white border-slate-200 text-slate-600 hover:border-primary/30 hover:text-primary' : 'bg-white/[0.04] border-white/[0.08] text-slate-400 hover:border-primary/30 hover:text-primary'
+                                    }`}
+                                    title="All Notes"
+                                >
+                                    <List className="w-3.5 h-3.5" />
+                                    <span>List</span>
+                                    {allNotes.length > 0 && <span className="opacity-60 text-[10px] font-medium">{allNotes.length}</span>}
+                                </button>
+
+                                {showNotesList && (
+                                    <div className={`absolute top-full left-0 mt-2 w-80 max-h-[480px] rounded-xl shadow-2xl border overflow-hidden flex flex-col z-[200] animate-in fade-in slide-in-from-top-2 duration-200
+                                        ${isLightMode ? 'bg-white border-slate-200 shadow-slate-300/40' : 'bg-[#13131f] border-white/10 shadow-black/70'}`}>
+                                        {/* Header */}
+                                        <div className={`flex items-center justify-between px-4 py-3 border-b shrink-0 ${
+                                            isLightMode ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'
+                                        }`}>
+                                            <div className="flex items-center gap-2">
+                                                <List size={13} style={{ color: activePrimaryColor }} />
+                                                <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: activePrimaryColor }}>All Notes</span>
+                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                                                    isLightMode ? 'bg-slate-200 text-slate-500' : 'bg-white/10 text-slate-400'
+                                                }`}>{allNotes.length}</span>
+                                            </div>
+                                        </div>
+                                        {/* Search */}
+                                        <div className={`px-3 py-2.5 border-b shrink-0 ${ isLightMode ? 'border-slate-100' : 'border-white/[0.04]' }`}>
+                                            <div className="relative">
+                                                <input
+                                                    autoFocus
+                                                    type="text"
+                                                    placeholder="Search notes..."
+                                                    value={notesListSearch}
+                                                    onChange={e => setNotesListSearch(e.target.value)}
+                                                    className={`w-full text-[12px] rounded-lg px-8 py-2 outline-none border transition-all font-medium
+                                                        ${isLightMode
+                                                            ? 'bg-slate-50 border-slate-200 focus:border-slate-300 text-slate-700 placeholder:text-slate-400'
+                                                            : 'bg-white/[0.04] border-white/[0.07] focus:border-white/20 text-white placeholder:text-slate-600'}`}
+                                                />
+                                                <Hash className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${ isLightMode ? 'text-slate-400' : 'text-slate-600' }`} />
+                                            </div>
+                                        </div>
+                                        {/* List */}
+                                        <div className="flex-1 overflow-y-auto custom-scrollbar p-1.5 space-y-0.5">
+                                            {allNotes.length === 0 ? (
+                                                <div className="py-10 text-center">
+                                                    <FileText className={`w-8 h-8 mx-auto mb-2 opacity-20 ${ isLightMode ? 'text-slate-800' : 'text-white' }`} />
+                                                    <p className={`text-[11px] font-bold uppercase tracking-widest ${ isLightMode ? 'text-slate-400' : 'text-slate-600' }`}>No notes</p>
+                                                </div>
+                                            ) : (
+                                                allNotes
+                                                    .filter(n => (n.title || '').toLowerCase().includes(notesListSearch.toLowerCase()))
+                                                    .map((n, idx) => {
+                                                        const isActive = n.id?.toString() === note?.id?.toString();
+                                                        return (
+                                                            <button
+                                                                key={n.id}
+                                                                onClick={() => {
+                                                                    setShowNotesList(false);
+                                                                    setNotesListSearch('');
+                                                                    handleSafeAction(() => onNavigateToNote && onNavigateToNote(n));
+                                                                }}
+                                                                className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 transition-all cursor-pointer group/ni ${
+                                                                    isActive
+                                                                        ? (isLightMode ? 'bg-primary/10' : 'bg-primary/20')
+                                                                        : (isLightMode ? 'hover:bg-slate-100' : 'hover:bg-white/[0.05]')
+                                                                }`}
+                                                                style={isActive ? { borderLeft: `3px solid ${activePrimaryColor}`, paddingLeft: '10px' } : { borderLeft: '3px solid transparent', paddingLeft: '10px' }}
+                                                            >
+                                                                <span className={`text-[10px] font-black w-5 shrink-0 text-center tabular-nums ${
+                                                                    isActive ? '' : (isLightMode ? 'text-slate-400' : 'text-slate-600')
+                                                                }`} style={isActive ? { color: activePrimaryColor } : {}}>{idx + 1}</span>
+                                                                <span className={`text-[12px] font-semibold truncate flex-1 leading-snug ${
+                                                                    isActive
+                                                                        ? (isLightMode ? 'text-primary font-bold' : 'text-primary-light font-bold')
+                                                                        : (isLightMode ? 'text-slate-700' : 'text-slate-300')
+                                                                }`} style={isActive ? { color: activePrimaryColor } : {}}>
+                                                                    {n.title || 'Untitled Note'}
+                                                                </span>
+                                                                {isActive && <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: activePrimaryColor }} />}
+                                                            </button>
+                                                        );
+                                                    })
+                                            )}
+                                            {allNotes.length > 0 && allNotes.filter(n => (n.title || '').toLowerCase().includes(notesListSearch.toLowerCase())).length === 0 && (
+                                                <div className="py-8 text-center">
+                                                    <p className={`text-[11px] font-bold ${ isLightMode ? 'text-slate-400' : 'text-slate-600' }`}>No matches</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                        {/* Footer nav */}
+                                        {(onPrev || onNext) && (
+                                            <div className={`flex items-center justify-between px-3 py-2.5 border-t shrink-0 ${
+                                                isLightMode ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.02] border-white/[0.06]'
+                                            }`}>
+                                                <button
+                                                    onClick={() => { setShowNotesList(false); handleSafeAction(() => onPrev?.()); }}
+                                                    disabled={!onPrev}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                                                        !onPrev ? 'opacity-30 cursor-not-allowed' : (isLightMode ? 'hover:bg-slate-200 cursor-pointer text-slate-600' : 'hover:bg-white/10 cursor-pointer text-slate-400')
+                                                    }`}
+                                                >
+                                                    <ChevronLeft size={13} /> Prev
+                                                </button>
+                                                <span className={`text-[10px] font-medium ${ isLightMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                                    {allNotes.findIndex(n => n.id?.toString() === note?.id?.toString()) + 1} / {allNotes.length}
+                                                </span>
+                                                <button
+                                                    onClick={() => { setShowNotesList(false); handleSafeAction(() => onNext?.()); }}
+                                                    disabled={!onNext}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                                                        !onNext ? 'opacity-30 cursor-not-allowed' : (isLightMode ? 'hover:bg-slate-200 cursor-pointer text-slate-600' : 'hover:bg-white/10 cursor-pointer text-slate-400')
+                                                    }`}
+                                                >
+                                                    Next <ChevronRight size={13} />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
                             {(onPrev || onNext) && (
                                 <div className={`hidden md:flex items-center mr-1 rounded-lg border overflow-hidden ${isLightMode ? 'border-slate-300 bg-white' : 'border-white/[0.1] bg-white/[0.02]'}`}>
                                     <button
@@ -968,12 +1154,9 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                 </h3>
                                 <div className="flex items-center gap-2 mt-0.5 opacity-80">
                                     <span className={`text-[10px] sm:text-[11px] font-medium ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                        {new Date(note.created_at).toLocaleDateString(undefined, {
-                                            day: 'numeric',
-                                            month: 'short',
-                                            year: 'numeric'
-                                        })}
+                                        {formatDate(note.created_at)}
                                     </span>
+
                                 </div>
                             </div>
                         </div>
@@ -1042,7 +1225,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                     {isSettingsOpen && (
                                         <>
                                             <div className="fixed inset-0 z-[100]" onClick={() => setIsSettingsOpen(false)} />
-                                            <div 
+                                            <div
                                                 className={`absolute right-0 mt-2 w-[260px] p-4 rounded-xl border shadow-2xl z-[101] backdrop-blur-md transition-all animate-in fade-in slide-in-from-top-2 duration-200
                                                     ${isLightMode ? 'bg-white/95 border-slate-200 text-slate-800' : 'bg-[#1a1a2e]/95 border-white/5 text-white'}`}
                                             >
@@ -1067,8 +1250,8 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                                             </div>
                                                             <div className="flex items-center gap-2">
                                                                 {[14, 16, 17, 18, 20].map(s => (
-                                                                    <button 
-                                                                        key={s} 
+                                                                    <button
+                                                                        key={s}
                                                                         onClick={() => handleUpdateSettings('font', s)}
                                                                         className={`flex-1 h-7 rounded-md text-[11px] font-bold transition-all
                                                                             ${fontSize === s ? 'text-white' : isLightMode ? 'bg-slate-100 hover:bg-slate-200' : 'bg-white/5 hover:bg-white/10'}`}
@@ -1079,7 +1262,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                                                 ))}
                                                             </div>
                                                         </div>
-                                                        
+
                                                         <div className="space-y-2">
                                                             <div className="flex items-center justify-between">
                                                                 <span className="text-[11px] font-medium opacity-80">Code Size</span>
@@ -1087,8 +1270,8 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                                             </div>
                                                             <div className="flex items-center gap-2">
                                                                 {[14, 15, 18, 20, 24].map(s => (
-                                                                    <button 
-                                                                        key={s} 
+                                                                    <button
+                                                                        key={s}
                                                                         onClick={() => handleUpdateSettings('code', s)}
                                                                         className={`flex-1 h-7 rounded-md text-[11px] font-bold transition-all
                                                                             ${codeFontSize === s ? 'text-white' : isLightMode ? 'bg-slate-100 hover:bg-slate-200' : 'bg-white/5 hover:bg-white/10'}`}
@@ -1109,8 +1292,8 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                                         </div>
                                                         <div className="flex items-center gap-2">
                                                             {[1.4, 1.6, 1.8, 2.0].map(s => (
-                                                                <button 
-                                                                    key={s} 
+                                                                <button
+                                                                    key={s}
                                                                     onClick={() => handleUpdateSettings('line', s)}
                                                                     className={`flex-1 h-7 rounded-md text-[11px] font-bold transition-all
                                                                         ${lineHeight === s ? 'text-white' : isLightMode ? 'bg-slate-100 hover:bg-slate-200' : 'bg-white/5 hover:bg-white/10'}`}
@@ -1172,13 +1355,13 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
 
                     {/* Reading Progress Bar (Fixed top) */}
                     <div className="w-full h-[3.5px] bg-transparent absolute left-0 z-40 transition-opacity duration-500 overflow-hidden pointer-events-none" style={{ top: '57px', opacity: readingProgress > 0 ? 1 : 0 }}>
-                        <div 
+                        <div
                             className="h-full transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]"
-                            style={{ 
-                                width: `${readingProgress}%`, 
+                            style={{
+                                width: `${readingProgress}%`,
                                 backgroundColor: activePrimaryColor,
                                 boxShadow: `0 0 15px ${activePrimaryColor}60`
-                            }} 
+                            }}
                         />
                     </div>
 
@@ -1489,19 +1672,19 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                     prose-pre:p-0 prose-pre:bg-transparent prose-pre:border-none
                                     prose-code:before:content-none prose-code:after:content-none
                                     prose-img:rounded-3xl
-                                    ${isLightMode 
-                                        ? 'prose-slate text-slate-800 prose-p:text-slate-700/90 prose-headings:text-slate-900 prose-strong:text-slate-900' 
-                                        : 'prose-invert prose-p:text-slate-300/90 prose-headings:text-white prose-strong:text-white'}`}
-                                    style={{ 
-                                        fontSize: `${fontSize}px`,
-                                        lineHeight: lineHeight,
-                                        '--tw-prose-invert-p-margin-bottom': `${lineHeight * 0.5}rem`,
-                                        '--tw-prose-p-margin-bottom': `${lineHeight * 0.5}rem`,
-                                        '--tw-prose-links': activePrimaryColor,
-                                        '--tw-prose-invert-links': activePrimaryColor,
-                                        '--tw-prose-counters': activePrimaryColor,
-                                        '--tw-prose-bullets': activePrimaryColor,
-                                    }}>
+                                    ${isLightMode
+                                    ? 'prose-slate text-slate-800 prose-p:text-slate-700/90 prose-headings:text-slate-900 prose-strong:text-slate-900'
+                                    : 'prose-invert prose-p:text-slate-300/90 prose-headings:text-white prose-strong:text-white'}`}
+                                style={{
+                                    fontSize: `${fontSize}px`,
+                                    lineHeight: lineHeight,
+                                    '--tw-prose-invert-p-margin-bottom': `${lineHeight * 0.5}rem`,
+                                    '--tw-prose-p-margin-bottom': `${lineHeight * 0.5}rem`,
+                                    '--tw-prose-links': activePrimaryColor,
+                                    '--tw-prose-invert-links': activePrimaryColor,
+                                    '--tw-prose-counters': activePrimaryColor,
+                                    '--tw-prose-bullets': activePrimaryColor,
+                                }}>
                                 <ReactMarkdown
                                     remarkPlugins={markdownPlugins}
                                     rehypePlugins={markdownRehypePlugins}

@@ -3,7 +3,11 @@ import * as deletionService from '../services/deletionService.js';
 
 export const getSubjects = async (req, res) => {
     try {
-        const subjects = await subjectModel.findSubjectsByUser({ userId: req.user.id });
+        const archived = req.query.archived;
+        const subjects = await subjectModel.findSubjectsByUser({ 
+            userId: req.user.id,
+            archived 
+        });
         res.status(200).json({ subjects });
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch subjects' });

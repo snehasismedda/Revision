@@ -4,12 +4,13 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const migrationName = process.argv[2];
+const migrationName = process.argv.slice(2).join('_');
 
 if (!migrationName) {
     console.error('Please provide a migration name');
     process.exit(1);
 }
+
 
 const timestamp = new Date().toISOString().replace(/[-:T]/g, '').split('.')[0];
 const fileName = `${timestamp}_${migrationName}`;

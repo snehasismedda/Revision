@@ -1,3 +1,4 @@
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth, AuthProvider } from './context/AuthContext.jsx';
 import { SubjectProvider } from './context/SubjectContext.jsx';
@@ -5,21 +6,23 @@ import { TestSeriesProvider } from './context/TestSeriesContext.jsx';
 import { TopicProvider } from './context/TopicContext.jsx';
 import { AnalyticsProvider } from './context/AnalyticsContext.jsx';
 import Layout from './components/Layout.jsx';
-import Login from './pages/Login.jsx';
-import Register from './pages/Register.jsx';
-import Dashboard from './pages/Dashboard.jsx';
-import Subjects from './pages/Subjects.jsx';
-import SubjectDetail from './pages/SubjectDetail.jsx';
-import NewSession from './pages/NewSession.jsx';
-import SessionDetail from './pages/SessionDetail.jsx';
-import TagTopics from './pages/TagTopics.jsx';
-import Reports from './pages/Reports.jsx';
-import Images from './pages/Images.jsx';
-import TestSeriesList from './pages/TestSeriesList.jsx';
-import TestSeriesDetail from './pages/TestSeriesDetail.jsx';
-import TestDetail from './pages/TestDetail.jsx';
-import TestAnalytics from './pages/TestAnalytics.jsx';
-import TestSeriesInsights from './pages/TestSeriesInsights.jsx';
+
+// Lazy load pages
+const Login = lazy(() => import('./pages/Login.jsx'));
+const Register = lazy(() => import('./pages/Register.jsx'));
+const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
+const Subjects = lazy(() => import('./pages/Subjects.jsx'));
+const SubjectDetail = lazy(() => import('./pages/SubjectDetail.jsx'));
+const NewSession = lazy(() => import('./pages/NewSession.jsx'));
+const SessionDetail = lazy(() => import('./pages/SessionDetail.jsx'));
+const TagTopics = lazy(() => import('./pages/TagTopics.jsx'));
+const Reports = lazy(() => import('./pages/Reports.jsx'));
+const Images = lazy(() => import('./pages/Images.jsx'));
+const TestSeriesList = lazy(() => import('./pages/TestSeriesList.jsx'));
+const TestSeriesDetail = lazy(() => import('./pages/TestSeriesDetail.jsx'));
+const TestDetail = lazy(() => import('./pages/TestDetail.jsx'));
+const TestAnalytics = lazy(() => import('./pages/TestAnalytics.jsx'));
+const TestSeriesInsights = lazy(() => import('./pages/TestSeriesInsights.jsx'));
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -38,31 +41,40 @@ const PublicRoute = ({ children }) => {
 };
 
 const AppRoutes = () => (
-  <Routes>
-    {/* Public */}
-    <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-    <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+  <Suspense fallback={
+    <div className="min-h-screen bg-[#0f0f1a] flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-8 h-8 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
+        <div className="text-purple-400 text-sm animate-pulse">Initializing view…</div>
+      </div>
+    </div>
+  }>
+    <Routes>
+      {/* Public */}
+      <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+      <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
 
-    {/* Protected — inside Layout */}
-    <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-      <Route index element={<Dashboard />} />
-      <Route path="subjects" element={<Subjects />} />
-      <Route path="subjects/:id" element={<SubjectDetail />} />
-      <Route path="subjects/:subjectId/sessions/new" element={<NewSession />} />
-      <Route path="subjects/:subjectId/reports" element={<Reports />} />
-      <Route path="subjects/:subjectId/sessions/:id" element={<SessionDetail />} />
-      <Route path="subjects/:subjectId/sessions/:id/tag" element={<TagTopics />} />
-      <Route path="tests" element={<TestSeriesList />} />
-      <Route path="tests/:seriesId" element={<TestSeriesDetail />} />
-      <Route path="tests/:seriesId/test/:testId" element={<TestDetail />} />
-      <Route path="tests/:seriesId/test/:testId/analytics" element={<TestAnalytics />} />
-      <Route path="tests/:seriesId/insights" element={<TestSeriesInsights />} />
-      <Route path="images" element={<Images />} />
-    </Route>
+      {/* Protected — inside Layout */}
+      <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+        <Route index element={<Dashboard />} />
+        <Route path="subjects" element={<Subjects />} />
+        <Route path="subjects/:id" element={<SubjectDetail />} />
+        <Route path="subjects/:subjectId/sessions/new" element={<NewSession />} />
+        <Route path="subjects/:subjectId/reports" element={<Reports />} />
+        <Route path="subjects/:subjectId/sessions/:id" element={<SessionDetail />} />
+        <Route path="subjects/:subjectId/sessions/:id/tag" element={<TagTopics />} />
+        <Route path="tests" element={<TestSeriesList />} />
+        <Route path="tests/:seriesId" element={<TestSeriesDetail />} />
+        <Route path="tests/:seriesId/test/:testId" element={<TestDetail />} />
+        <Route path="tests/:seriesId/test/:testId/analytics" element={<TestAnalytics />} />
+        <Route path="tests/:seriesId/insights" element={<TestSeriesInsights />} />
+        <Route path="images" element={<Images />} />
+      </Route>
 
-    {/* Fallback */}
-    <Route path="*" element={<Navigate to="/" replace />} />
-  </Routes>
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  </Suspense>
 );
 
 import { Toaster } from 'react-hot-toast';

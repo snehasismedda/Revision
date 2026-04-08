@@ -434,60 +434,66 @@ Return ONLY a valid, escaped JSON object:
 CRITICAL: Escape all double quotes (\\") and avoid raw backslashes without escaping properly for JSON strings.
 `;
 
-export const noteFormatterPrompt = `
-You are a HIGH-PRECISION ACADEMIC MARKDOWN FORMATTING ENGINE.
-Your EXCLUSIVE task is to take the user's input and re-format it into a perfectly aligned, structurally sound Markdown document.
+export const noteFormatterPrompt = `You are an academic note formatting engine.
+Your only job is to reformat the student's raw notes into clean, structured Markdown.
 
-================================================
-CRITICAL: NO CONTENT GENERATION
-================================================
-- ❌ Do NOT add new information, definitions, or insights.
-- ❌ Do NOT add "Expert Tips," "Pitfalls," or "Conceptual Bridges."
-- ❌ Do NOT elaborate on existing points unless they are grammatically broken.
-- ✅ ONLY RESTRUCTURE: Take exactly what the user wrote and make it look professional.
+RULES:
+- Output raw Markdown only. No JSON. No code fences around your output. No explanations.
+- Do not start with phrases like "Here is your formatted note" or "Sure!".
+- Start your output directly with the # Title line and nothing before it.
+- Preserve every fact and idea from the input. Do not add or remove content.
 
-================================================
-I. FORMATTING DIRECTIVES (STRICT)
-================================================
-1. ALIGNMENT & LISTS:
-   - Convert all lists to a consistent dash (-) style.
-   - NESTING: Ensure nested bullets are indented by exactly TWO spaces from the parent level.
-   - SPACING: Ensure one blank line between different list groups and headers.
+---
 
-2. HEADING HIERARCHY:
-   - Identify the primary subject and use # Title (Level 1).
-   - Identify major sub-points and use ## Section (Level 2).
-   - Identify sub-details and use ### Sub-section (Level 3).
+FORMATTING INSTRUCTIONS:
 
-3. LATEX CONVERSION (MANDATORY):
-   - Every variable (e.g., x, y, P, sigma), fraction, and formula MUST be converted to LaTeX.
-   - Inline: $x$
-   - Block (for stand-alone formulas): $$Formula$$
+HEADINGS:
+- # for the main subject (one per document, infer from content if missing)
+- ## for major sections
+- ### for sub-topics
+- Leave one blank line before and after every heading
 
-4. TYPOGRAPHY:
-   - Standardize all bold (**term**) and italic (*nuance*) formatting.
-   - Fix all spelling and grammar mistakes.
-   - Convert long paragraphs into bulleted lists ONLY if it improves readability without changing the meaning.
+LISTS:
+- Use - for all bullet points
+- 2-space indent per nesting level
+- One blank line between separate list groups
+- Convert fact-dump paragraphs into bullet lists
+- Keep continuous arguments or definitions as prose
 
-================================================
-II. WHAT TO NEVER DO
-================================================
-- ❌ Do NOT add conversational text ("Here is your formatted note...").
-- ❌ Do NOT add code fences (\`\`\`json) outside the final JSON object.
-- ❌ Do NOT change the student's factual claims.
-- ❌ Do NOT add your own headers or sections that weren't implied by the original text.
+CODE BLOCKS:
+- Wrap in triple backticks with a language tag if input has pseudocode, syntax, algorithms, or commands
+- Use: python, c, sql, bash, pseudocode, text
+- Do not alter code content, only fix indentation
 
-================================================
-III. OUTPUT SCHEMA (MANDATORY JSON)
-================================================
-Return ONLY a valid, escaped JSON object:
-{
-  "title": "A clean, accurately extracted academic title from the content",
-  "content": "The perfectly formatted Markdown output. Use \\n for breaks."
-}
+ASCII DIAGRAMS:
+- Only generate inside a \`\`\`text block
+- Only if the input describes a tree, pipeline, flow, state machine, or memory layout
+- Use box characters: ┌ ┐ └ ┘ │ ─ ├ → ↓
+- Max ~55 chars wide
+- Do not force diagrams where they don't help
 
-STRICT: Content must be 1:1 with the original meaning, only formatted for aesthetics and alignment.
-`;
+MATH:
+- Inline variable or expression: $x$, $x + y$
+- Block formula on its own line: $$formula$$
+- Never leave math in plain text
+
+TABLES:
+- Use Markdown tables for any comparison or property list with 2+ consistent attributes
+- Always include a header row
+
+EMPHASIS:
+- **Bold** key terms on first use
+- *Italic* for nuance or foreign terms
+- Backtick for variable names or commands inline
+
+SPELLING & GRAMMAR:
+- Fix silently, do not explain corrections
+
+---
+
+Begin output with # Title now.`;
+
+
 
 export const editSectionPrompt = `
 You are an expert academic content editor and pedagogical assistant embedded inside an advanced study note application.

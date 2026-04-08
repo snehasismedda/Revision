@@ -53,7 +53,11 @@ export const authApi = {
 
 // Subjects
 export const subjectsApi = {
-    list: () => request('/subjects'),
+    list: (archived) => {
+        let url = '/subjects';
+        if (archived !== undefined) url += `?archived=${archived}`;
+        return request(url);
+    },
     get: (id) => request(`/subjects/${id}`),
     create: (body) => request('/subjects', { method: 'POST', body }),
     update: (id, body) => request(`/subjects/${id}`, { method: 'PUT', body }),
@@ -103,6 +107,56 @@ export const analyticsApi = {
     monthActivityDetail: (month, year) => request(`/analytics/month-detail?month=${month}&year=${year}`),
 };
 
+export const streamRequest = async (path, body, onChunk, options = {}) => {
+    let res = await fetch(`${BASE_URL}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...options.headers },
+        credentials: 'include',
+        body: JSON.stringify({ ...body, stream: true }),
+        ...options,
+    });
+
+    // If 401, try to refresh once (simplified for stream)
+    if (res.status === 401 && !options._retry) {
+        try {
+            const refreshRes = await fetch(`${BASE_URL}/auth/refresh`, {
+                method: 'POST',
+                credentials: 'include',
+            });
+            if (refreshRes.ok) {
+                res = await fetch(`${BASE_URL}${path}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...options.headers },
+                    credentials: 'include',
+                    body: JSON.stringify({ ...body, stream: true }),
+                    ...options,
+                    _retry: true
+                });
+            }
+        } catch (e) {
+            console.error('Refresh failed during stream', e);
+        }
+    }
+
+    if (!res.ok) {
+        const error = await res.json().catch(() => ({ error: 'Streaming failed' }));
+        throw new Error(error.error || `HTTP ${res.status}`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let done = false;
+
+    while (!done) {
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+        const chunkValue = decoder.decode(value);
+        if (chunkValue) {
+            onChunk(chunkValue);
+        }
+    }
+};
+
 // AI
 export const aiApi = {
     parseSyllabus: (body) => request('/ai/parse-syllabus', { method: 'POST', body }),
@@ -110,10 +164,14 @@ export const aiApi = {
     sessionInsights: (subjectId, sessionId) => request(`/ai/insights/${subjectId}/sessions/${sessionId}`),
     globalInsights: () => request('/ai/global-insights'),
     parseNote: (body) => request('/ai/parse-note', { method: 'POST', body }),
+    parseNoteStream: (body, onChunk) => streamRequest('/ai/parse-note', body, onChunk),
     describeImage: (body) => request('/ai/describe-image', { method: 'POST', body }),
     enhanceNote: (body) => request('/ai/enhance-note', { method: 'POST', body }),
+    enhanceNoteStream: (body, onChunk) => streamRequest('/ai/enhance-note', body, onChunk),
     formatNote: (body) => request('/ai/format-note', { method: 'POST', body }),
+    formatNoteStream: (body, onChunk) => streamRequest('/ai/format-note', body, onChunk),
     editSection: (body) => request('/ai/edit-section', { method: 'POST', body }),
+    editSectionStream: (body, onChunk) => streamRequest('/ai/edit-section', body, onChunk),
 };
 
 // Questions

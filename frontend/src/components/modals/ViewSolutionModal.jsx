@@ -1,12 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, FileText, Link2 as LinkIcon, Maximize2, Minimize2, Sun, Moon, Loader2, Pencil } from 'lucide-react';
+import { X, FileText, Link2 as LinkIcon, Maximize2, Minimize2, Sun, Moon, Loader2, Pencil, Check, Copy } from 'lucide-react';
 import ModalPortal from '../ModalPortal.jsx';
+import { formatDate } from '../../utils/dateUtils';
+
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+
+// Syntax Highlighting imports
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 const preprocessMarkdown = (text) => {
     if (!text) return '';
@@ -22,8 +28,99 @@ const preprocessMarkdown = (text) => {
         .replace(/\$\$\$\$/g, '$$\n$$')
         .replace(/\$ \$/g, '$$')
         .replace(/([^\n])\$\$/g, '$1\n$$')
-        .replace(/\$\$([^\n])/g, '$$\n$1');
+        .replace(/\$$([^\n])/g, '$$\n$1');
 };
+
+// Enhanced Code Block with Language Detection, Syntax Highlighting and Copy Button
+const SimpleCodeBlock = React.memo(({ children, isLightMode, fontSize = 16, primaryColor = '#3b82f6', className }) => {
+    const [copied, setCopied] = useState(false);
+    
+    const languageMatch = React.useMemo(() => {
+        if (!className) return 'text';
+        const match = /language-(\w+)/.exec(className);
+        return match ? match[1] : 'text';
+    }, [className]);
+
+    const handleCopy = async () => {
+        try {
+            await navigator.clipboard.writeText(String(children).replace(/\n$/, ''));
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+            console.error('Copy failed:', err);
+        }
+    };
+
+    const customStyle = {
+        margin: 0,
+        padding: '1.5rem',
+        fontSize: `${fontSize}px`,
+        lineHeight: '1.6',
+        backgroundColor: 'transparent',
+        fontFamily: "'JetBrains Mono', 'Fira Code', 'Roboto Mono', monospace",
+    };
+
+    return (
+        <div className={`relative group/code my-8 rounded-2xl border overflow-hidden transition-all duration-500 shadow-xl
+            ${isLightMode 
+                ? 'bg-[#fdfdfd] border-slate-200/60 shadow-slate-200/30' 
+                : 'bg-[#0f0f1b] border-white/[0.06] shadow-black/40'}`}>
+            
+            <div className={`flex items-center justify-between px-6 py-3 border-b transition-colors duration-300
+                ${isLightMode ? 'bg-[#f1f3f7] border-slate-200/60' : 'bg-white/[0.03] border-white/[0.05]'}`}>
+                <div className="flex items-center gap-2.5">
+                    <div className="flex gap-1.5 mr-2">
+                         <div className={`w-2.5 h-2.5 rounded-full ${isLightMode ? 'bg-slate-300' : 'bg-white/10'}`} />
+                         <div className={`w-2.5 h-2.5 rounded-full ${isLightMode ? 'bg-slate-300' : 'bg-white/10'}`} />
+                         <div className={`w-2.5 h-2.5 rounded-full ${isLightMode ? 'bg-slate-300' : 'bg-white/10'}`} />
+                    </div>
+                    <span className={`text-[10px] font-black uppercase tracking-[0.2em]
+                        ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                        {languageMatch || 'CODE'}
+                    </span>
+                </div>
+                <button
+                    onClick={handleCopy}
+                    className={`px-3 py-1.5 rounded-lg transition-all duration-300 cursor-pointer flex items-center gap-2 group/btn
+                        ${isLightMode 
+                            ? 'hover:bg-slate-200/60 text-slate-600' 
+                            : 'hover:bg-white/10 text-slate-300'}`}
+                    style={copied ? { color: primaryColor, backgroundColor: `${primaryColor}15` } : {}}
+                >
+                    {copied ? (
+                        <>
+                            <Check size={12} strokeWidth={3} style={{ color: primaryColor }} className="animate-in zoom-in-50 duration-300" />
+                            <span style={{ color: primaryColor }} className="text-[10px] font-bold">Copied!</span>
+                        </>
+                    ) : (
+                        <>
+                            <Copy size={12} className="group-hover/btn:scale-110 transition-transform" />
+                            <span className="text-[10px] font-bold">Copy code</span>
+                        </>
+                    )}
+                </button>
+            </div>
+            
+            <div className="relative overflow-hidden group/pre">
+                <SyntaxHighlighter
+                    language={languageMatch}
+                    style={isLightMode ? oneLight : oneDark}
+                    customStyle={customStyle}
+                    codeTagProps={{
+                        style: {
+                            fontFamily: 'inherit',
+                            fontSize: 'inherit',
+                        }
+                    }}
+                    PreTag="div"
+                    className="custom-scrollbar"
+                >
+                    {String(children).replace(/\n$/, '')}
+                </SyntaxHighlighter>
+            </div>
+        </div>
+    );
+});
 
 const ViewSolutionModal = ({ isOpen, onClose, solution, sourceImage, isFetchingImage, onEdit }) => {
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -95,7 +192,8 @@ const ViewSolutionModal = ({ isOpen, onClose, solution, sourceImage, isFetchingI
                                 </h3>
                                 <div className="flex items-center gap-2 mt-0.5 opacity-80">
                                     <span className={`text-[11px] font-medium ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                        Solution  ·  {new Date(solution.created_at).toLocaleDateString()}
+                                        Solution  ·  {formatDate(solution.created_at)}
+
                                     </span>
                                 </div>
                             </div>
@@ -167,6 +265,27 @@ const ViewSolutionModal = ({ isOpen, onClose, solution, sourceImage, isFetchingI
                                     ),
                                     th: ({ node, ...props }) => <th className={`px-4 py-3 bg-surface-3/50 text-left font-bold ${isLightMode ? 'text-slate-700' : 'text-slate-200'}`} {...props} />,
                                     td: ({ node, ...props }) => <td className={`px-4 py-3 border-t border-white/5 ${isLightMode ? 'text-slate-600' : 'text-slate-400'}`} {...props} />,
+                                    pre: ({ children }) => children,
+                                    code: ({ node, className, children, ...props }) => {
+                                        const isBlock = /language-(\w+)/.exec(className || '') || String(children).includes('\n');
+                                        return isBlock ? (
+                                            <SimpleCodeBlock isLightMode={isLightMode} className={className}>
+                                                {children}
+                                            </SimpleCodeBlock>
+                                        ) : (
+                                            <code 
+                                                className={`px-1.5 py-0.5 rounded-md text-[0.85em] font-bold font-mono border transition-colors select-all`} 
+                                                style={{ 
+                                                    backgroundColor: isLightMode ? '#f1f5f9' : 'rgba(255,255,255,0.05)',
+                                                    color: '#3b82f6',
+                                                    borderColor: isLightMode ? '#e2e8f0' : 'rgba(255,255,255,0.1)'
+                                                }} 
+                                                {...props}
+                                            >
+                                                {children}
+                                            </code>
+                                        );
+                                    }
                                 }}
                             >
                                 {processedContent}
@@ -179,8 +298,6 @@ const ViewSolutionModal = ({ isOpen, onClose, solution, sourceImage, isFetchingI
                 .prose { max-width: 100%; color: ${isLightMode ? '#334155' : 'rgba(255,255,255,0.7)'}; }
                 .prose h1, .prose h2, .prose h3 { color: ${isLightMode ? '#0f172a' : 'white'}; }
                 .prose blockquote { border-left-color: #3b82f6; background: rgba(59,130,246,0.05); padding: 1rem; border-radius: 0 0.75rem 0.75rem 0; font-style: italic; }
-                .prose code { background: ${isLightMode ? '#f1f5f9' : 'rgba(255,255,255,0.05)'}; color: #3b82f6; padding: 0.2rem 0.4rem; border-radius: 0.25rem; }
-                .prose pre { background: #011627 !important; border-radius: 1rem; padding: 1.5rem; border: 1px solid rgba(255,255,255,0.1); }
             `}</style>
         </ModalPortal>
     );

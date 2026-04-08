@@ -2,9 +2,12 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAnalytics } from '../context/AnalyticsContext.jsx';
 import {
     CalendarDays, FileText, HelpCircle, Lightbulb,
-    Activity, Target, BookOpen, ChevronLeft, ChevronRight, Flame, RefreshCw
+    Activity, Target, BookOpen, ChevronLeft, ChevronRight, Flame, RefreshCw,
+    Trophy, MousePointer2
 } from 'lucide-react';
+import ModalPortal from './ModalPortal.jsx';
 import ActivityDetailModal from './modals/ActivityDetailModal.jsx';
+import { formatDate } from '../utils/dateUtils';
 
 
 /* ────────────────────── constants ────────────────────── */
@@ -58,11 +61,11 @@ const getIntensity = (data) => {
 
 /* Richer intensity palette — layered violet fills with subtle differentiation */
 const CELL_COLORS = [
-    { bg: 'rgba(255,255,255,0.025)', border: 'rgba(255,255,255,0.03)' },                  // 0 — empty
-    { bg: 'rgba(139,92,246,0.15)',   border: 'rgba(139,92,246,0.08)' },                    // 1 — low
-    { bg: 'rgba(139,92,246,0.32)',   border: 'rgba(139,92,246,0.15)' },                    // 2 — medium
-    { bg: 'rgba(124,58,237,0.52)',   border: 'rgba(139,92,246,0.25)' },                    // 3 — high
-    { bg: 'rgba(109,40,217,0.78)',   border: 'rgba(139,92,246,0.40)' },                    // 4 — max
+    { bg: 'rgba(255,255,255,0.02)', border: 'rgba(255,255,255,0.03)', glow: 'none' },                  // 0 — empty
+    { bg: 'rgba(139,92,246,0.12)',   border: 'rgba(139,92,246,0.08)', glow: 'none' },                    // 1 — low
+    { bg: 'rgba(139,92,246,0.28)',   border: 'rgba(139,92,246,0.15)', glow: 'none' },                    // 2 — medium
+    { bg: 'rgba(124,58,237,0.48)',   border: 'rgba(139,92,246,0.25)', glow: 'rgba(139,92,246,0.1)' },    // 3 — high
+    { bg: 'rgba(109,40,217,0.75)',   border: 'rgba(139,92,246,0.40)', glow: 'rgba(139,92,246,0.25)' },   // 4 — max
 ];
 
 /** Compute current streak from today backwards */
@@ -101,11 +104,10 @@ const STAT_ITEMS = [
 
 const Tooltip = ({ date, data, x, y, containerWidth }) => {
     if (!date) return null;
-    const d = new Date(date + 'T00:00:00');
-    const formatted = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const formatted = formatDate(date, { weekday: 'short', month: 'short', day: 'numeric' });
     const total = getTotal(data);
 
-    const tooltipWidth = 240;
+    const tooltipWidth = 220;
     const shouldFlipLeft = x + tooltipWidth / 2 > containerWidth - 20;
     const shouldFlipRight = x - tooltipWidth / 2 < 20;
 
@@ -115,69 +117,78 @@ const Tooltip = ({ date, data, x, y, containerWidth }) => {
 
     return (
         <div
-            className="absolute z-50 pointer-events-none"
-            style={{ left: x, top: y - 10, transform: `translate(${translateX}, -100%)` }}
+            className="absolute z-50 pointer-events-none fade-in"
+            style={{ left: x, top: y - 12, transform: `translate(${translateX}, -100%)` }}
         >
             <div style={{
-                background: 'rgba(10,10,18,0.97)',
-                border: '1px solid rgba(139,92,246,0.15)',
-                borderRadius: 16,
-                padding: '14px 16px',
+                background: 'rgba(15,15,25,0.95)',
+                border: '1px solid rgba(139,92,246,0.25)',
+                borderRadius: 20,
+                padding: '16px',
                 width: tooltipWidth,
-                backdropFilter: 'blur(24px)',
-                boxShadow: '0 24px 48px -12px rgba(0,0,0,0.6), 0 0 0 1px rgba(139,92,246,0.06)',
+                backdropFilter: 'blur(16px)',
+                boxShadow: '0 20px 40px -10px rgba(0,0,0,0.7), 0 0 20px rgba(139,92,246,0.1)',
             }}>
                 {/* Date header */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: total > 0 ? 10 : 0, paddingBottom: total > 0 ? 8 : 0, borderBottom: total > 0 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#cbd5e1', letterSpacing: '0.01em' }}>{formatted}</span>
-                    <span style={{
-                        fontSize: 10, fontWeight: 800, letterSpacing: '0.05em',
-                        color: total > 0 ? '#a78bfa' : '#475569',
-                        background: total > 0 ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.04)',
-                        padding: '3px 10px',
-                        borderRadius: 20,
-                    }}>
-                        {total} {total === 1 ? 'action' : 'actions'}
-                    </span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: total > 0 ? 12 : 0, paddingBottom: total > 0 ? 10 : 0, borderBottom: total > 0 ? '1px solid rgba(255,255,255,0.08)' : 'none' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: 13, fontWeight: 800, color: '#f8fafc', fontFamily: 'Outfit, sans-serif' }}>{formatted}</span>
+                        <span style={{ fontSize: 10, color: '#64748b', fontWeight: 600, marginTop: 2 }}>{total === 0 ? 'No activities' : `${total} ${total === 1 ? 'activity' : 'activities'}`}</span>
+                    </div>
+                    {total > 0 && (
+                        <div style={{
+                            width: 32, height: 32, borderRadius: 10,
+                            background: 'rgba(139,92,246,0.15)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            border: '1px solid rgba(139,92,246,0.2)'
+                        }}>
+                             <Activity style={{ width: 14, height: 14, color: '#a78bfa' }} strokeWidth={2.5} />
+                        </div>
+                    )}
                 </div>
 
                 {/* Stat rows */}
                 {total > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                         {STAT_ITEMS.filter(s => data && data[s.key] > 0).map(({ key, icon: Icon, label, color }) => (
-                            <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '3px 0' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <div style={{
-                                        width: 22, height: 22, borderRadius: 6,
-                                        background: `${color}12`,
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    }}>
-                                        <Icon style={{ width: 11, height: 11, color }} strokeWidth={2.5} />
-                                    </div>
-                                    <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>{label}</span>
+                            <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <Icon style={{ width: 12, height: 12, color, opacity: 0.9 }} strokeWidth={2.5} />
+                                    <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>{label}</span>
                                 </div>
                                 <span style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0', fontFamily: 'Outfit, sans-serif' }}>{data[key]}</span>
                             </div>
                         ))}
                         {data && data.topicsRevised > 0 && (
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                                <span style={{ fontSize: 10, color: '#64748b', fontWeight: 600 }}>Topics Revised</span>
-                                <span style={{ fontSize: 11, fontWeight: 700, color: '#c4b5fd' }}>{data.topicsRevised}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                                <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Topics Revised</span>
+                                <span style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa' }}>{data.topicsRevised}</span>
                             </div>
                         )}
                     </div>
                 )}
 
                 {total === 0 && (
-                    <p style={{ fontSize: 11, color: '#475569', textAlign: 'center', margin: '6px 0 2px' }}>No activity recorded</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', padding: '4px 0' }}>
+                        <span style={{ fontSize: 11, color: '#475569', fontWeight: 600 }}>Stay consistent!</span>
+                    </div>
                 )}
             </div>
+            {/* Arrow */}
+            <div style={{
+                position: 'absolute',
+                bottom: -6,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: 0,
+                height: 0,
+                borderLeft: '6px solid transparent',
+                borderRight: '6px solid transparent',
+                borderTop: '6px solid rgba(139,92,246,0.25)',
+            }} />
         </div>
     );
 };
-
-
-
 
 
 /* ────────────────────── Month Card ────────────────────── */
@@ -195,36 +206,38 @@ const MonthCard = ({ grid, activityData, onCellHover, onCellLeave, isCurrentMont
             onClick={() => onMonthClick(grid.month, grid.year)}
         >
             {/* Month Header */}
-            <div className="flex items-center justify-between mb-4 px-0.5 transition-all duration-300 group-hover/month:translate-x-0.5">
-                <div className="flex items-center gap-2">
-                    <span className={`text-[15px] font-heading font-black tracking-tight transition-colors duration-300 ${isCurrentMonth
+            <div className="flex items-center justify-between mb-4 px-1">
+                <div className="flex flex-col gap-0.5">
+                    <span className={`text-[16px] font-heading font-black tracking-tight transition-all duration-300 ${isCurrentMonth
                         ? 'text-white'
                         : 'text-slate-400 group-hover/month:text-slate-200'
                         }`}>
                         {grid.monthName}
                     </span>
-                    <span className="text-[9px] font-black tracking-widest text-slate-700 bg-white/[0.03] px-1.5 py-0.5 rounded border border-white/5 opacity-60">
-                        {grid.year}
-                    </span>
+                    <div className="flex items-center gap-1.5 opacity-60">
+                         <span className="text-[9px] font-black tracking-wider text-slate-500 uppercase">
+                            {grid.year}
+                        </span>
+                    </div>
                 </div>
                 
-                <div className="flex items-center gap-1.5">
-                    <div className="flex items-baseline gap-0.5">
-                        <span className={`text-[13px] font-black tabular-nums transition-all duration-300 ${
+                <div className="flex flex-col items-end gap-1">
+                    <div className="flex items-baseline gap-1">
+                        <span className={`text-[14px] font-black tabular-nums transition-all duration-300 ${
                             activeDays > 0 
                             ? (isCurrentMonth ? 'text-violet-400' : 'text-slate-200') 
                             : 'text-slate-600'
                         }`}>
                             {activeDays}
                         </span>
-                        <span className="text-[10px] font-bold text-slate-600 opacity-50">/</span>
-                        <span className="text-[10px] font-bold text-slate-600 opacity-60">
+                        <span className="text-[10px] font-bold text-slate-500 opacity-40">/</span>
+                        <span className="text-[10px] font-bold text-slate-500">
                             {totalDays}
                         </span>
                     </div>
-                    <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 scale-75 ${
+                    <div className={`h-[2px] w-8 rounded-full transition-all duration-500 ${
                         activeDays > 0 
-                        ? (isCurrentMonth ? 'bg-violet-500 shadow-[0_0_10px_rgba(139,92,246,0.8)]' : 'bg-slate-500') 
+                        ? (isCurrentMonth ? 'bg-violet-500 shadow-[0_0_8px_rgba(139,92,246,0.6)]' : 'bg-slate-600') 
                         : 'bg-slate-800'
                     }`} />
                 </div>
@@ -232,38 +245,39 @@ const MonthCard = ({ grid, activityData, onCellHover, onCellLeave, isCurrentMont
 
             {/* Grid Body */}
             <div
-                className="p-4 rounded-2xl transition-all duration-500 group-hover/month:border-white/10 group-hover/month:bg-white/[0.05] group-hover/month:shadow-xl group-hover/month:shadow-black/20"
+                className="p-4.5 rounded-[1.25rem] transition-all duration-500 group-hover/month:border-white/10 group-hover/month:bg-white/[0.04] group-hover/month:shadow-2xl group-hover/month:shadow-black/40"
                 style={{
                     background: isCurrentMonth
-                        ? 'linear-gradient(180deg, rgba(139,92,246,0.06) 0%, rgba(255,255,255,0.01) 100%)'
+                        ? 'linear-gradient(180deg, rgba(139,92,246,0.08) 0%, rgba(20,20,30,0.4) 100%)'
                         : 'rgba(255,255,255,0.02)',
                     border: isCurrentMonth
-                        ? '1px solid rgba(139,92,246,0.15)'
-                        : '1px solid rgba(255,255,255,0.05)',
+                        ? '1px solid rgba(139,92,246,0.2)'
+                        : '1px solid rgba(255,255,255,0.06)',
                 }}
             >
                 <div style={{ display: 'flex', gap: 0 }}>
                     {/* Day labels column */}
-                    <div className="flex flex-col gap-[3px] mr-3 opacity-20 pointer-events-none select-none">
+                    <div className="flex flex-col gap-[4px] mr-3 opacity-30 pointer-events-none select-none">
                         {DAY_LABELS.map((label, i) => (
                             <div key={i} className="h-[14px] flex items-center justify-end w-4">
-                                <span className="text-[7.5px] font-black uppercase text-white leading-none">{label}</span>
+                                <span className="text-[8px] font-black uppercase text-slate-400 leading-none">{label}</span>
                             </div>
                         ))}
                     </div>
 
                     {/* Week columns */}
-                    <div className="flex gap-[3.5px] flex-1">
+                    <div className="flex gap-[4px] flex-1">
                         {grid.weeks.map((week, wi) => (
-                            <div key={wi} className="flex flex-col gap-[3.5px] flex-1">
+                            <div key={wi} className="flex flex-col gap-[4px] flex-1">
                                 {week.map((date, di) => {
                                     if (!date) {
-                                        return <div key={di} className="h-[14px] rounded-[3px] bg-white/[0.01]" />;
+                                        return <div key={di} className="h-[15px] rounded-[4px] bg-white/[0.015]" />;
                                     }
 
                                     const data = activityData[date];
                                     const intensity = getIntensity(data);
                                     const isToday = date === todayStr;
+                                    const dayNum = date.split('-')[2].replace(/^0/, '');
 
                                     return (
                                         <div
@@ -274,29 +288,40 @@ const MonthCard = ({ grid, activityData, onCellHover, onCellLeave, isCurrentMont
                                                 e.stopPropagation();
                                                 onDayClick(date);
                                             }}
-                                            className="h-[16px] rounded-[3px] transition-all duration-200 relative group/cell"
+                                            className="h-[15px] rounded-[4px] transition-all duration-300 relative group/cell flex items-center justify-center overflow-hidden"
                                             style={{
                                                 background: CELL_COLORS[intensity].bg,
+                                                boxShadow: intensity > 2 ? `0 0 10px ${CELL_COLORS[intensity].glow}` : 'none',
                                                 cursor: 'pointer',
-                                                outline: isToday ? '1.5px solid rgba(139,92,246,0.7)' : 'none',
-                                                outlineOffset: 1.5,
+                                                outline: isToday ? '1.5px solid #a78bfa' : 'none',
+                                                outlineOffset: 2,
+                                                zIndex: isToday ? 10 : 0
                                             }}
                                             onMouseOver={(e) => {
-                                                e.currentTarget.style.transform = 'scale(1.4) translateY(-1px)';
+                                                e.currentTarget.style.transform = 'scale(1.25) translateY(-2px)';
                                                 e.currentTarget.style.zIndex = '50';
                                                 e.currentTarget.style.boxShadow = intensity > 0
-                                                    ? '0 4px 12px rgba(139,92,246,0.45)'
-                                                    : '0 4px 8px rgba(255,255,255,0.1)';
-                                                e.currentTarget.style.borderRadius = '4px';
+                                                    ? '0 6px 15px rgba(139,92,246,0.4)'
+                                                    : '0 4px 10px rgba(255,255,255,0.08)';
+                                                e.currentTarget.style.background = intensity === 0 ? 'rgba(255,255,255,0.08)' : CELL_COLORS[intensity].bg;
                                             }}
                                             onMouseOut={(e) => {
                                                 e.currentTarget.style.transform = 'scale(1)';
-                                                e.currentTarget.style.zIndex = '0';
-                                                e.currentTarget.style.boxShadow = 'none';
-                                                e.currentTarget.style.borderRadius = '3px';
+                                                e.currentTarget.style.zIndex = isToday ? '10' : '0';
+                                                e.currentTarget.style.boxShadow = intensity > 2 ? `0 0 10px ${CELL_COLORS[intensity].glow}` : 'none';
+                                                e.currentTarget.style.background = CELL_COLORS[intensity].bg;
                                             }}
-                                        />
+                                        >
+                                            <span 
+                                                className={`text-[7px] font-black select-none pointer-events-none transition-all duration-300
+                                                    ${intensity > 0 ? 'text-white/40 group-hover/cell:text-white' : 'text-transparent group-hover/cell:text-slate-500'}
+                                                `}
+                                            >
+                                                {dayNum}
+                                            </span>
+                                        </div>
                                     );
+
                                 })}
                             </div>
                         ))}
@@ -407,107 +432,104 @@ const ActivityHeatmap = () => {
     return (
         <div
             ref={containerRef}
-            className="glass-card glass px-8 pt-8 pb-7 mb-8 fade-in relative overflow-hidden group/main"
+            className="glass-card glass px-8 pt-8 pb-8 mb-8 fade-in relative overflow-hidden group/main"
         >
+            {/* ── Background Decoration ── */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-violet-600/5 blur-[100px] pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-600/5 blur-[100px] pointer-events-none" />
+
             {/* ── Header ── */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                    <div style={{
-                        width: 48, height: 48, borderRadius: 15,
-                        background: 'linear-gradient(135deg, rgba(139,92,246,0.15) 0%, rgba(139,92,246,0.05) 100%)',
-                        border: '1px solid rgba(139,92,246,0.2)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        boxShadow: '0 8px 16px -4px rgba(139,92,246,0.2)',
-                    }}>
-                        <CalendarDays style={{ width: 20, height: 20, color: '#a78bfa' }} strokeWidth={2.2} />
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 relative z-10">
+                <div className="flex items-center gap-5">
+                    <div className="relative">
+                        <div className="absolute inset-0 bg-violet-500/20 blur-xl rounded-full" />
+                        <div style={{
+                            width: 52, height: 52, borderRadius: 16,
+                            background: 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(139,92,246,0.05) 100%)',
+                            border: '1px solid rgba(139,92,246,0.3)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            boxShadow: '0 12px 24px -6px rgba(139,92,246,0.3)',
+                            position: 'relative'
+                        }}>
+                            <CalendarDays style={{ width: 22, height: 22, color: '#a78bfa' }} strokeWidth={2.2} />
+                        </div>
                     </div>
                     <div>
-                        <h3 style={{
-                            fontSize: 18, fontWeight: 800, color: '#f8fafc',
-                            fontFamily: 'Outfit, sans-serif', letterSpacing: '-0.02em',
-                            margin: 0, lineHeight: 1.1,
-                        }}>
-                            Study Heatmap
+                        <h3 className="text-xl font-black text-slate-50 font-heading tracking-tight m-0 flex items-center gap-2">
+                            Consistency Map
+                            <span className="text-[10px] font-black tracking-widest text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-full border border-violet-500/20 border-opacity-50 uppercase">
+                                Analysis
+                            </span>
                         </h3>
-                        <p style={{ fontSize: 12, color: '#64748b', fontWeight: 500, margin: '4px 0 0', opacity: 0.8 }}>
-                            Visualizing your consistency across time
+                        <p className="text-sm text-slate-500 font-medium mt-1">
+                            Your learning journey visualized over time
                         </p>
                     </div>
                 </div>
 
-                {/* Right side — Streak + Navigation */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    {/* Only Streak Badge */}
-                    {stats.streak > 0 && (
-                        <div style={{
-                            display: 'flex', alignItems: 'center', gap: 10,
-                            padding: '10px 18px',
-                            borderRadius: 16,
-                            background: 'linear-gradient(135deg, rgba(249,115,22,0.15) 0%, rgba(249,115,22,0.05) 100%)',
-                            border: '1px solid rgba(249,115,22,0.2)',
-                            boxShadow: '0 8px 20px -6px rgba(249,115,22,0.25)',
-                            transition: 'all 0.3s ease',
-                        }}
-                            className="hover:scale-105 active:scale-95 cursor-default"
-                        >
-                            <div style={{
-                                width: 28, height: 28, borderRadius: 10,
-                                background: 'rgba(249,115,22,0.15)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            }}>
-                                <Flame style={{ width: 14, height: 14, color: '#fb923c' }} strokeWidth={2.5} />
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <span style={{ fontSize: 18, fontWeight: 900, color: '#fb923c', fontFamily: 'Outfit, sans-serif', lineHeight: 1 }}>
-                                    {stats.streak}
-                                </span>
-                                <span style={{ fontSize: 9, fontWeight: 800, color: '#9a3412', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 1 }}>
-                                    Day Streak
-                                </span>
+                {/* Header Stats Row */}
+                <div className="flex flex-wrap items-center gap-3">
+                    {/* Activity Stats */}
+                    <div className="flex items-center bg-white/[0.03] border border-white/5 rounded-2xl p-1.5 pr-4 gap-4">
+                        <div className="flex items-center gap-4 border-white/10 pr-4 pl-1">
+                            {/* Streak Badge */}
+                            <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-orange-500/10 border border-orange-500/20 shadow-[0_4px_12px_rgba(249,115,22,0.1)]">
+                                <Flame className="w-4 h-4 text-orange-400 fill-orange-400/20" />
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-black text-orange-400 leading-none">{stats.streak}</span>
+                                    <span className="text-[8px] font-black text-orange-400/60 uppercase tracking-tighter">Streak</span>
+                                </div>
                             </div>
                         </div>
-                    )}
 
-                    <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.06)', margin: '0 4px' }} />
+                        {/* Best Day / Trophy */}
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center">
+                                <Trophy className="w-3.5 h-3.5 text-yellow-500" />
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-sm font-black text-slate-200 leading-none">{stats.bestDay}</span>
+                                <span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter">Peak Day</span>
+                            </div>
+                        </div>
+                    </div>
 
-                    {/* Controls */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.02)', padding: 4, borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)' }}>
+                    <div className="hidden md:block w-px h-10 bg-white/5 mx-1" />
+
+                    {/* Navigation Controls */}
+                    <div className="flex items-center gap-2 bg-slate-900/40 p-1.5 rounded-2xl border border-white/5">
                         <button
                             onClick={refreshActivityMap}
                             disabled={loadingActivity}
-                            className="p-2 rounded-lg transition-all duration-200 hover:bg-white/5 text-slate-500 hover:text-white disabled:opacity-30 group/refresh relative"
+                            className="p-2.5 rounded-xl transition-all duration-200 hover:bg-white/5 text-slate-400 hover:text-white disabled:opacity-30 group/refresh relative"
                         >
                             <RefreshCw
-                                className={`w-3.5 h-3.5 transition-transform duration-700 ${loadingActivity ? 'animate-spin text-primary' : ''}`}
+                                className={`w-4 h-4 transition-transform duration-700 ${loadingActivity ? 'animate-spin text-violet-400' : 'group-hover/refresh:rotate-180'}`}
                             />
-                            {/* Hover Label */}
-                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1 rounded-md bg-white/10 backdrop-blur-md border border-white/10 text-[9px] font-black text-white uppercase tracking-widest whitespace-nowrap opacity-0 group-hover/refresh:opacity-100 transition-all duration-300 pointer-events-none scale-90 group-hover/refresh:scale-100 origin-bottom">
-                                Refresh Stats
-                            </span>
                         </button>
                         
-                        <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.06)' }} />
+                        <div className="w-px h-5 bg-white/10" />
                         
                         <button
                             onClick={() => setMonthOffset(p => p + 1)}
                             disabled={!canGoBack}
-                            className="p-2 rounded-lg transition-all duration-200 hover:bg-white/5 text-slate-500 hover:text-slate-300 disabled:opacity-20"
+                            className="p-2.5 rounded-xl transition-all duration-200 hover:bg-white/5 text-slate-500 hover:text-slate-200 disabled:opacity-20"
                         >
-                            <ChevronLeft style={{ width: 16, height: 16 }} />
+                            <ChevronLeft className="w-4.5 h-4.5" />
                         </button>
                         <button
                             onClick={() => setMonthOffset(p => p - 1)}
                             disabled={!canGoForward}
-                            className="p-2 rounded-lg transition-all duration-200 hover:bg-white/5 text-slate-500 hover:text-slate-300 disabled:opacity-20"
+                            className="p-2.5 rounded-xl transition-all duration-200 hover:bg-white/5 text-slate-500 hover:text-slate-200 disabled:opacity-20"
                         >
-                            <ChevronRight style={{ width: 16, height: 16 }} />
+                            <ChevronRight className="w-4.5 h-4.5" />
                         </button>
                     </div>
                 </div>
             </div>
 
             {/* ── Month Grid Row ── */}
-            <div style={{ display: 'flex', gap: 16 }}>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative z-10">
                 {monthGrids.map((grid) => (
                     <MonthCard
                         key={`${grid.year}-${grid.month}`}
@@ -520,6 +542,26 @@ const ActivityHeatmap = () => {
                         onDayClick={handleDayClick}
                     />
                 ))}
+            </div>
+
+            {/* Hint Footer */}
+            <div className="mt-8 pt-6 border-top border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Less</span>
+                        <div className="flex gap-[3px]">
+                            {CELL_COLORS.map((c, i) => (
+                                <div key={i} className="w-[10px] h-[10px] rounded-[2px]" style={{ background: c.bg, border: `1px solid ${c.border}` }} />
+                            ))}
+                        </div>
+                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">More</span>
+                    </div>
+                </div>
+                
+                <div className="flex items-center gap-2 text-slate-600">
+                    <MousePointer2 className="w-3 h-3" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Click month or day for details</span>
+                </div>
             </div>
 
 
