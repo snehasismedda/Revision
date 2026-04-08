@@ -192,6 +192,8 @@ export const notesApi = {
         const qs = q.length ? '?' + q.join('&') : '';
         return request(`/subjects/${subjectId}/notes${qs}`);
     },
+    get: (subjectId, noteId) => request(`/subjects/${subjectId}/notes/${noteId}`),
+    getBatch: (subjectId, noteIds) => request(`/subjects/${subjectId}/notes/${noteIds.join(',')}`),
     getTags: (subjectId) => request(`/subjects/${subjectId}/notes/tags`),
     create: (subjectId, body) => request(`/subjects/${subjectId}/notes`, { method: 'POST', body }),
     update: (subjectId, noteId, body) => request(`/subjects/${subjectId}/notes/${noteId}`, { method: 'PUT', body }),
@@ -222,21 +224,25 @@ export const solutionsApi = {
     getImage: (subjectId, solutionId) => request(`/subjects/${subjectId}/solutions/${solutionId}/image`),
 };
 
-// Images
-export const imagesApi = {
-    list: (limit, offset) => {
+// Files
+export const filesApi = {
+    list: (limit, offset, type) => {
         let q = [];
         if (limit != null) q.push(`limit=${limit}`);
         if (offset != null) q.push(`offset=${offset}`);
+        if (type != null) q.push(`type=${type}`);
         const qs = q.length ? '?' + q.join('&') : '';
-        return request(`/images${qs}`);
+        return request(`/files${qs}`);
     },
-    listBySubject: (subjectId, limit, offset) => {
+    listBySubject: (subjectId, limit, offset, type) => {
         let q = [];
         if (limit != null) q.push(`limit=${limit}`);
         if (offset != null) q.push(`offset=${offset}`);
+        if (type != null) q.push(`type=${type}`);
         const qs = q.length ? '?' + q.join('&') : '';
-        return request(`/images/subject/${subjectId}${qs}`);
+        return request(`/files/subject/${subjectId}${qs}`);
     },
-    saveAs: (body) => request('/images/save-as', { method: 'POST', body }),
+    saveAs: (body) => request('/files/save-as', { method: 'POST', body }),
+    delete: (subjectId, fileId) => request(`/files/subject/${subjectId}/${fileId}`, { method: 'DELETE' }),
+    update: (subjectId, fileId, body) => request(`/files/subject/${subjectId}/${fileId}`, { method: 'PUT', body }),
 };

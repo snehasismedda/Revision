@@ -17,7 +17,7 @@ const NewSession = lazy(() => import('./pages/NewSession.jsx'));
 const SessionDetail = lazy(() => import('./pages/SessionDetail.jsx'));
 const TagTopics = lazy(() => import('./pages/TagTopics.jsx'));
 const Reports = lazy(() => import('./pages/Reports.jsx'));
-const Images = lazy(() => import('./pages/Images.jsx'));
+const Library = lazy(() => import('./pages/Library.jsx'));
 const TestSeriesList = lazy(() => import('./pages/TestSeriesList.jsx'));
 const TestSeriesDetail = lazy(() => import('./pages/TestSeriesDetail.jsx'));
 const TestDetail = lazy(() => import('./pages/TestDetail.jsx'));
@@ -41,21 +41,18 @@ const PublicRoute = ({ children }) => {
 };
 
 const AppRoutes = () => (
-  <Suspense fallback={
-    <div className="min-h-screen bg-[#0f0f1a] flex items-center justify-center">
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-8 h-8 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
-        <div className="text-purple-400 text-sm animate-pulse">Initializing view…</div>
-      </div>
-    </div>
-  }>
+  <Suspense fallback={null}>
     <Routes>
       {/* Public */}
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
 
       {/* Protected — inside Layout */}
-      <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+      <Route element={
+        <ProtectedRoute>
+          <Layout />
+        </ProtectedRoute>
+      }>
         <Route index element={<Dashboard />} />
         <Route path="subjects" element={<Subjects />} />
         <Route path="subjects/:id" element={<SubjectDetail />} />
@@ -68,7 +65,7 @@ const AppRoutes = () => (
         <Route path="tests/:seriesId/test/:testId" element={<TestDetail />} />
         <Route path="tests/:seriesId/test/:testId/analytics" element={<TestAnalytics />} />
         <Route path="tests/:seriesId/insights" element={<TestSeriesInsights />} />
-        <Route path="images" element={<Images />} />
+        <Route path="library" element={<Library />} />
       </Route>
 
       {/* Fallback */}

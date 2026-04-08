@@ -2,7 +2,7 @@ import { AlertTriangle, X } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import ModalPortal from './ModalPortal.jsx';
 
-const ConfirmDialog = ({ isOpen, title, message, onConfirm, onCancel, confirmText = 'Delete', type = 'danger', requireInput = false, expectedInput = 'CONFIRM' }) => {
+const ConfirmDialog = ({ isOpen, title, message, onConfirm, onCancel, confirmText = 'Delete', type = 'danger', requireInput = false, expectedInput = 'CONFIRM', children }) => {
     const [inputValue, setInputValue] = useState('');
 
     useEffect(() => {
@@ -48,6 +48,8 @@ const ConfirmDialog = ({ isOpen, title, message, onConfirm, onCancel, confirmTex
                         <p className="text-slate-400 text-[14px] leading-relaxed max-w-sm mb-4">
                             {message}
                         </p>
+
+                        {children}
 
                         {requireInput && (
                             <div className="w-full mt-2 space-y-2 text-left animate-in fade-in slide-in-from-bottom-2">

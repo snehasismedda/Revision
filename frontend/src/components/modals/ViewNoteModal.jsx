@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { X, FileText, Link2 as LinkIcon, Pencil, ChevronLeft, ChevronRight, List, Copy, PanelLeftClose, PanelLeftOpen, Plus, ArrowLeft, Wand2, Check, XCircle, Loader2, Sun, Moon, Settings, Type, Palette, Trash2, Edit3, Maximize2, Minimize2, ExternalLink, Hash, Image as ImageIcon, Sparkles, RefreshCw, Type as TypeIcon, Layout } from 'lucide-react';
 import { authApi } from '../../api/index.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 import { formatDate } from '../../utils/dateUtils';
+import toast from 'react-hot-toast';
 
 import ModalPortal from '../ModalPortal.jsx';
 
@@ -437,14 +439,15 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
 
 
 
+    const { user, updatePreferences } = useAuth();
     const [sidebarOpen, setSidebarOpen] = useState(true);
-    const [isFullscreen, setIsFullscreen] = useState(true);
+    const [isFullscreen] = useState(true);
     const [isLightMode, setIsLightMode] = useState(localStorage.getItem('theme') !== 'dark');
-    const [fontSize, setFontSize] = useState(17);
-    const [codeFontSize, setCodeFontSize] = useState(20);
-    const [lineHeight, setLineHeight] = useState(1.6);
-    const [primaryColorLight, setPrimaryColorLight] = useState('#10b981'); // Emerald-500
-    const [primaryColorDark, setPrimaryColorDark] = useState('#34d399');  // Emerald-400
+    const [fontSize, setFontSize] = useState(user?.preferences?.font_size || 17);
+    const [codeFontSize, setCodeFontSize] = useState(user?.preferences?.code_font_size || 20);
+    const [lineHeight, setLineHeight] = useState(Number(user?.preferences?.line_height) || 1.6);
+    const [primaryColorLight, setPrimaryColorLight] = useState(user?.preferences?.primary_color_light || '#10b981'); // Emerald-500
+    const [primaryColorDark, setPrimaryColorDark] = useState(user?.preferences?.primary_color_dark || '#34d399');  // Emerald-400
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isSavingSettings, setIsSavingSettings] = useState(false);
     const [readingProgress, setReadingProgress] = useState(0);
@@ -463,24 +466,16 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
 
     const activePrimaryColor = isLightMode ? primaryColorLight : primaryColorDark;
 
-    // Fetch user preferences on mount
+    // Sync local state if preferences change globally
     useEffect(() => {
-        const fetchPreferences = async () => {
-            try {
-                const data = await authApi.me();
-                if (data.user?.preferences) {
-                    setFontSize(data.user.preferences.font_size || 17);
-                    setCodeFontSize(data.user.preferences.code_font_size || 20);
-                    setLineHeight(Number(data.user.preferences.line_height) || 1.6);
-                    setPrimaryColorLight(data.user.preferences.primary_color_light || '#10b981');
-                    setPrimaryColorDark(data.user.preferences.primary_color_dark || '#34d399');
-                }
-            } catch (err) {
-                console.error('Error fetching preferences:', err);
-            }
-        };
-        fetchPreferences();
-    }, []);
+        if (user?.preferences) {
+            setFontSize(user.preferences.font_size || 17);
+            setCodeFontSize(user.preferences.code_font_size || 20);
+            setLineHeight(Number(user.preferences.line_height) || 1.6);
+            setPrimaryColorLight(user.preferences.primary_color_light || '#10b981');
+            setPrimaryColorDark(user.preferences.primary_color_dark || '#34d399');
+        }
+    }, [user?.preferences]);
 
     const handleUpdateSettings = async (type, val) => {
         let updateBody = {
@@ -499,7 +494,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
 
         setIsSavingSettings(true);
         try {
-            await authApi.updatePreferences(updateBody);
+            await updatePreferences(updateBody);
         } catch (err) {
             console.error('Error saving preferences:', err);
         } finally {
@@ -616,7 +611,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                 </blockquote>
             );
         },
-        code: ({ node, className, children, ...props }) => {
+        code: ({ className, children, ...props }) => {
             // Robust detection for block vs inline code in ReactMarkdown v10
             const isBlock = /language-(\w+)/.exec(className || '') || String(children).includes('\n');
 
@@ -694,7 +689,6 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
         if (!container || headings.length === 0) return;
 
         let rafId = null;
-        let lastScrollTop = container.scrollTop;
 
         const handleScroll = () => {
             if (rafId) return;
@@ -860,29 +854,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
         }
     }, []);
 
-    const handleOpenOriginal = () => {
-        if (!sourceImage) return;
-        try {
-            const [metadata, base64Data] = sourceImage.split(',');
-            const mimeMatch = metadata.match(/:(.*?);/);
-            if (!mimeMatch) throw new Error('Invalid Data URI');
-            const mimeType = mimeMatch[1];
-            const byteCharacters = atob(base64Data);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: mimeType });
-            const blobUrl = URL.createObjectURL(blob);
-            window.open(blobUrl, '_blank');
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-        } catch (error) {
-            console.error('Error opening original image:', error);
-            const newWindow = window.open();
-            newWindow.document.write(`<img src="${sourceImage}" style="max-width: 100%; height: auto;" />`);
-        }
-    };
+    // handleOpenOriginal removed as it was unused
 
     // --- Toolbar Actions ---
     const handleAddToNote = () => {
@@ -1637,17 +1609,27 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                     {isFetchingImage ? (
                                         <div className={`aspect-video flex flex-col items-center justify-center gap-4 ${isLightMode ? 'bg-slate-50' : 'bg-surface-2/30'}`}>
                                             <div className="w-10 h-10 border-4 rounded-full animate-spin" style={{ borderColor: `${activePrimaryColor}33`, borderTopColor: activePrimaryColor }} />
-                                            <span className="text-[11px] font-bold uppercase tracking-widest animate-pulse" style={{ color: activePrimaryColor }}>Loading Source Image...</span>
+                                            <span className="text-[11px] font-bold uppercase tracking-widest animate-pulse" style={{ color: activePrimaryColor }}>Loading Source Resource...</span>
                                         </div>
                                     ) : (
                                         <div className="relative">
-                                            <img
-                                                src={sourceImage}
-                                                alt="Source reference"
-                                                className="w-full max-h-[500px] object-contain mx-auto"
-                                            />
-                                            <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/80 to-transparent flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <span className="text-[10px] font-bold text-white uppercase tracking-widest">Original Source Image</span>
+                                            {note?.file_type && note?.file_type !== 'image' ? (
+                                                <div className="w-full h-[500px] relative">
+                                                    <iframe
+                                                        src={sourceImage}
+                                                        className="w-full h-full border-none bg-white"
+                                                        title="Source Document"
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <img
+                                                    src={sourceImage}
+                                                    alt="Source reference"
+                                                    className="w-full max-h-[500px] object-contain mx-auto"
+                                                />
+                                            )}
+                                            <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/80 to-transparent flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                                <span className="text-[10px] font-bold text-white uppercase tracking-widest">Original Source {note?.file_type !== 'image' ? 'File' : 'Image'}</span>
                                                 <button
                                                     onClick={() => window.open(sourceImage, '_blank')}
                                                     className="text-[10px] font-bold hover:underline cursor-pointer bg-transparent border-none p-0"

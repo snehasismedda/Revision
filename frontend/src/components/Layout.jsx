@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar.jsx';
 
@@ -28,7 +28,23 @@ const Layout = () => {
                         key={pathname}
                         className="fade-in"
                     >
-                        <Outlet />
+                        <Suspense fallback={
+                            <div className="max-w-6xl mx-auto animate-pulse flex flex-col gap-8">
+                                <div className="flex flex-col gap-3">
+                                    <div className="w-16 h-4 bg-surface-2 rounded-lg opacity-40" />
+                                    <div className="w-64 h-10 bg-surface-2 rounded-xl" />
+                                    <div className="w-96 h-5 bg-surface-2 rounded-lg opacity-40" />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {[1, 2, 3].map(i => (
+                                        <div key={i} className="h-40 bg-surface-2/40 rounded-2xl border border-white/5" />
+                                    ))}
+                                </div>
+                                <div className="h-64 bg-surface-2/20 rounded-[2rem] border border-white/5" />
+                            </div>
+                        }>
+                            <Outlet />
+                        </Suspense>
                     </div>
                 </div>
             </main>

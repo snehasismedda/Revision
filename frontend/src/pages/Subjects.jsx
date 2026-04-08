@@ -9,7 +9,7 @@ import { LibraryBig, PlusCircle, Trash2, Edit2, BookOpen, Search, X, Archive } f
 import { useSubjects } from '../context/SubjectContext.jsx';
 
 const Subjects = () => {
-    const { subjects, statsMap, loading, loadSubjects, addSubject, updateSubject, deleteSubject, archiveSubject } = useSubjects();
+    const { subjects, statsMap, loading, isLoaded, loadSubjects, addSubject, updateSubject, deleteSubject, archiveSubject } = useSubjects();
     const [showModal, setShowModal] = useState(false);
     const [editingSubject, setEditingSubject] = useState(null);
     const [searchParams] = useSearchParams();
@@ -159,7 +159,7 @@ const Subjects = () => {
 
 
             {/* Content */}
-            {loading ? (
+            {(loading || !isLoaded) ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {[...Array(3)].map((_, i) => (
                         <div key={i} className="glass p-8 animate-pulse h-[160px] rounded-xl border-white/5" />

@@ -519,12 +519,7 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
 
                             {!isCropping && (
                                 <>
-                                    {(isAnalyzing || isEnhancing || isFormatting) && (
-                                        <div className={`flex items-center gap-2 mr-2 px-3 py-1.5 rounded-lg border ${isLightMode ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-emerald-500/8 border-emerald-500/15 text-emerald-400'}`}>
-                                            <div className={`w-3 h-3 border-2 rounded-full animate-spin ${isLightMode ? 'border-emerald-600/20 border-t-emerald-600' : 'border-emerald-400/30 border-t-emerald-400'}`} />
-                                            <span className="text-[11px] font-semibold">{isAnalyzing ? 'Analyzing...' : isEnhancing ? 'Enhancing...' : 'Formatting...'}</span>
-                                        </div>
-                                    )}
+
 
                                     <button
                                         form="add-note-form"

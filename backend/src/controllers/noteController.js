@@ -20,7 +20,7 @@ export const getNoteImage = async (req, res, next) => {
     }
 };
 
-export const getNotes = async (req, res, next) => {
+export const getAllNotes = async (req, res, next) => {
     try {
         const { subjectId } = req.params;
         const { limit, offset } = req.query;
@@ -31,7 +31,7 @@ export const getNotes = async (req, res, next) => {
             noteModel.getNotesBySubject(subjectId, limitNum, offsetNum),
             noteModel.getNoteCountBySubject(subjectId)
         ]);
-        
+
         res.json({ notes, totalCount: parseInt(totalCount.count) });
     } catch (error) {
         next(error);
@@ -118,7 +118,6 @@ export const deleteNote = async (req, res, next) => {
     }
 };
 
-
 export const updateNote = async (req, res, next) => {
     try {
         const { subjectId, noteId } = req.params;
@@ -135,6 +134,20 @@ export const updateNote = async (req, res, next) => {
 
         await subjectModel.touchSubject(subjectId);
         res.json({ note });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getNotes = async (req, res, next) => {
+    try {
+        const { noteIds } = req.params;
+        const ids = noteIds.split(',').filter(Boolean);
+        const notes = await noteModel.getNotesByIds(ids);
+        if (!notes) {
+            return res.status(404).json({ error: 'Notes not found' });
+        }
+        res.json({ notes });
     } catch (error) {
         next(error);
     }

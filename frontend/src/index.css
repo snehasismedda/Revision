@@ -181,6 +181,58 @@ h6 {
   animation-delay: 250ms;
 }
 
+/* Sleek Body-Loading Animation (Low GPU) */
+@keyframes loading-scan {
+  0% { transform: translateY(-100%); opacity: 0; }
+  20% { opacity: 0.5; }
+  80% { opacity: 0.5; }
+  100% { transform: translateY(100%); opacity: 0; }
+}
+
+@keyframes simple-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.98); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+.note-fetching-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  background: rgba(16, 185, 129, 0.04);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 12px;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.scanning-ray {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40%;
+  background: linear-gradient(180deg, transparent, rgba(16, 185, 129, 0.1), transparent);
+  animation: loading-scan 2s ease-in-out infinite;
+}
+
+.fetching-pill {
+  background: #10b981;
+  color: #052e16;
+  font-size: 9px;
+  font-weight: 900;
+  padding: 3px 10px;
+  border-radius: 99px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  width: fit-content;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+  animation: simple-pulse 1.2s ease-in-out infinite;
+}
+
 /* Removed GPU-heavy continuous animations: pulse-soft, shimmer-sweep, drift */
 
 .mesh-grid {
@@ -289,4 +341,15 @@ sub {
 sup {
   vertical-align: super;
   font-size: smaller;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }

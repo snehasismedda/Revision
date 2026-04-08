@@ -15,6 +15,19 @@ export const SubjectProvider = ({ children }) => {
     const isArchivedLoadedRef = useRef(false);
     const loadingPromiseRef = useRef(null);
 
+    const [selectedSubjectId, setSelectedSubjectId] = useState(() => {
+        return localStorage.getItem('selectedSubjectId') || '';
+    });
+
+    // Persist selected subject
+    useEffect(() => {
+        if (selectedSubjectId) {
+            localStorage.setItem('selectedSubjectId', selectedSubjectId);
+        } else {
+            localStorage.removeItem('selectedSubjectId');
+        }
+    }, [selectedSubjectId]);
+
     // Reset state when user changes/logs out
     useEffect(() => {
         if (!user) {
@@ -23,6 +36,7 @@ export const SubjectProvider = ({ children }) => {
             setIsLoaded(false);
             isLoadedRef.current = false;
             isArchivedLoadedRef.current = false;
+            setSelectedSubjectId('');
         }
     }, [user]);
 
@@ -46,6 +60,12 @@ export const SubjectProvider = ({ children }) => {
                     const existingIds = new Set(prev.map(s => s.id));
                     const newSubs = subs.filter(s => !existingIds.has(s.id));
                     return [...prev, ...newSubs];
+                });
+
+                // If no subject is selected and we have subjects, select the first one
+                setSelectedSubjectId(prev => {
+                    if (!prev && subs.length > 0) return subs[0].id;
+                    return prev;
                 });
 
                 if (queryParam === 'false') {
@@ -96,6 +116,12 @@ export const SubjectProvider = ({ children }) => {
             const { subject } = await subjectsApi.create(subjectData);
             setSubjects(prev => [subject, ...prev]);
             refreshStats([subject.id]);
+            
+            // Auto-select if none selected
+            if (!selectedSubjectId) {
+                setSelectedSubjectId(subject.id);
+            }
+
             toast.success('Subject created successfully!', { id: loadingToast });
             return subject;
         } catch (error) {
@@ -103,7 +129,7 @@ export const SubjectProvider = ({ children }) => {
             toast.error(error.message || 'Failed to create subject', { id: loadingToast });
             throw error;
         }
-    }, [refreshStats]);
+    }, [refreshStats, selectedSubjectId]);
 
     const updateSubject = useCallback(async (id, subjectData) => {
         const loadingToast = toast.loading('Updating subject...');
@@ -129,13 +155,18 @@ export const SubjectProvider = ({ children }) => {
                 delete newMap[id];
                 return newMap;
             });
+            
+            if (selectedSubjectId === id) {
+                setSelectedSubjectId('');
+            }
+
             toast.success(`${name || 'Subject'} deleted`, { id: loadingToast });
         } catch (error) {
             console.error('Failed to delete subject:', error);
             toast.error('Failed to delete subject', { id: loadingToast });
             throw error;
         }
-    }, []);
+    }, [selectedSubjectId]);
 
     const archiveSubject = useCallback(async (id, isArchived) => {
         const action = isArchived ? 'Archiving' : 'Restoring';
@@ -163,7 +194,9 @@ export const SubjectProvider = ({ children }) => {
             updateSubject, 
             deleteSubject,
             archiveSubject,
-            refreshStats
+            refreshStats,
+            selectedSubjectId,
+            setSelectedSubjectId
         }}>
             {children}
         </SubjectContext.Provider>

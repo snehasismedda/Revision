@@ -23,7 +23,7 @@ export const getOverview = async (req, res) => {
             const totalSessions = parseInt(overview?.total_sessions || 0);
             const totalNotes = parseInt(overview?.total_notes || 0);
             const totalSolutions = parseInt(overview?.total_solutions || 0);
-            const totalImages = parseInt(overview?.total_images || 0);
+            const totalFiles = parseInt(overview?.total_files || 0);
 
             const accuracy = totalQuestions > 0
                 ? Math.round((totalCorrect / totalQuestions) * 100 * 10) / 10
@@ -38,7 +38,8 @@ export const getOverview = async (req, res) => {
                 totalSessions,
                 totalNotes,
                 totalSolutions,
-                totalImages,
+                totalFiles,
+                totalImages: totalFiles, // Keep for backward compatibility if used
                 topicsCovered: parseInt(overview?.topics_covered || 0),
                 totalTopics: parseInt(overview?.total_topics || 0),
                 totalRevisionSessions: parseInt(overview?.total_revision_sessions || 0),

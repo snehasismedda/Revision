@@ -13,7 +13,7 @@ import { useTestSeries } from '../context/TestSeriesContext.jsx';
 
 const TestSeriesList = () => {
     const navigate = useNavigate();
-    const { testSeries: series, loading, loadTestSeries: loadSeries, deleteSeries } = useTestSeries();
+    const { testSeries: series, loading, isLoaded, loadTestSeries: loadSeries, deleteSeries } = useTestSeries();
     const [searchQuery, setSearchQuery] = useState('');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingSeries, setEditingSeries] = useState(null);
@@ -104,7 +104,7 @@ const TestSeriesList = () => {
             </div>
 
             {/* Content Grid area */}
-            {loading ? (
+            {(loading || !isLoaded) ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {[1, 2, 3].map(i => (
                         <div key={i} className="glass p-8 animate-pulse h-[160px] rounded-xl border-white/5" />

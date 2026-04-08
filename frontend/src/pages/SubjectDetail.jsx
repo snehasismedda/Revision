@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 
-import { useParams, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
-import { sessionsApi, questionsApi, notesApi, imagesApi, aiApi, revisionApi, solutionsApi, analyticsApi } from '../api/index.js';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { sessionsApi, questionsApi, notesApi, filesApi, aiApi, revisionApi, solutionsApi } from '../api/index.js';
 import { useTopics } from '../context/TopicContext.jsx';
 import { useSubjects } from '../context/SubjectContext.jsx';
 import TopicTree from '../components/TopicTree.jsx';
@@ -16,7 +16,7 @@ import autoTable from 'jspdf-autotable';
 import { marked } from 'marked';
 import { saveAs } from 'file-saver';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, ImageRun, Table, TableRow, TableCell, WidthType, AlignmentType } from 'docx';
-import { ArrowLeft, PlusCircle, BarChart3, Wand2, BookOpen, Activity, ListChecks, FileText, Image as ImageIcon, Trash2, ChevronDown, Pencil, Hash, Search, X, Link2 as LinkIcon, Maximize2, Minimize2, LayoutGrid, List, CheckCircle, Download, ClipboardList, RotateCcw, Clock, RefreshCw, Notebook, MoreHorizontal, MoreVertical } from 'lucide-react';
+import { ArrowLeft, PlusCircle, BarChart3, Wand2, BookOpen, Activity, ListChecks, FileText, Image as ImageIcon, Layers, Trash2, ChevronDown, Pencil, Hash, Search, X, Link2 as LinkIcon, Maximize2, Minimize2, LayoutGrid, List, CheckCircle, Download, ClipboardList, RotateCcw, Clock, RefreshCw, Notebook, MoreHorizontal, MoreVertical, History, Loader2 } from 'lucide-react';
 
 import ManageSyllabusModal from '../components/modals/ManageSyllabusModal.jsx';
 import AddQuestionModal from '../components/modals/AddQuestionModal.jsx';
@@ -26,12 +26,14 @@ import ViewNoteModal from '../components/modals/ViewNoteModal.jsx';
 import CreateSessionModal from '../components/modals/CreateSessionModal.jsx';
 import EditSessionModal from '../components/modals/EditSessionModal.jsx';
 import EditNoteModal from '../components/modals/EditNoteModal.jsx';
-import AddImageModal from '../components/modals/AddImageModal.jsx';
+import AddFileModal from '../components/modals/AddFileModal.jsx';
+import TimeTraveler from '../components/TimeTraveler.jsx';
 import CreateRevisionSessionModal from '../components/modals/CreateRevisionSessionModal.jsx';
 import EditRevisionSessionModal from '../components/modals/EditRevisionSessionModal.jsx';
 import AddSolutionModal from '../components/modals/AddSolutionModal.jsx';
 import ViewSolutionModal from '../components/modals/ViewSolutionModal.jsx';
 import EditSolutionModal from '../components/modals/EditSolutionModal.jsx';
+import FileViewerModal from '../components/modals/FileViewerModal.jsx';
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -69,11 +71,18 @@ const preprocessMarkdown = (text) => {
 const SubjectDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const location = useLocation();
     const [searchParams] = useSearchParams();
 
-    const { subjects, statsMap, isLoaded: subjectsLoaded, loadSubjects, refreshStats } = useSubjects();
-    const { topicsBySubject, loadTopics, deleteTopic } = useTopics();
+    const { subjects, statsMap, isLoaded: subjectsLoaded, loadSubjects, refreshStats, setSelectedSubjectId } = useSubjects();
+
+    // Sync global selected subject when viewing details
+    useEffect(() => {
+        if (id) {
+            setSelectedSubjectId(id);
+        }
+    }, [id, setSelectedSubjectId]);
+
+    const { topicsBySubject, loadTopics } = useTopics();
 
     // Derived from global state
     const topics = topicsBySubject[id] || [];
@@ -83,16 +92,16 @@ const SubjectDetail = () => {
     const [sessions, setSessions] = useState([]);
     const [questions, setQuestions] = useState([]);
     const [notes, setNotes] = useState([]);
-    const [images, setImages] = useState([]);
+    const [files, setFiles] = useState([]);
     const [solutions, setSolutions] = useState([]);
     const [loadedTabs, setLoadedTabs] = useState(new Set());
     const [tabLoading, setTabLoading] = useState(false);
 
-    // Pagination for images
-    const [imagePage, setImagePage] = useState(0);
-    const [loadingMoreImages, setLoadingMoreImages] = useState(false);
-    const [hasMoreImages, setHasMoreImages] = useState(true);
-    const IMAGE_LIMIT = 20;
+    // Pagination for files (Library)
+    const [filePage, setFilePage] = useState(0);
+    const [loadingMoreFiles, setLoadingMoreFiles] = useState(false);
+    const [hasMoreFiles, setHasMoreFiles] = useState(true);
+    const FILE_LIMIT = 20;
 
     // Pagination for notes
     const [notePage, setNotePage] = useState(0);
@@ -104,9 +113,12 @@ const SubjectDetail = () => {
     const [showTopicModal, setShowTopicModal] = useState(false);
     const [showQuestionModal, setShowQuestionModal] = useState(false);
     const [showNoteModal, setShowNoteModal] = useState(false);
-    const [showImageModal, setShowImageModal] = useState(false);
+    const [showFileModal, setShowFileModal] = useState(false);
     const [showSolutionModal, setShowSolutionModal] = useState(false);
+    const [activeFileDropdown, setActiveFileDropdown] = useState(null);
     const [viewingNote, setViewingNote] = useState(null);
+    const [viewingFile, setViewingFile] = useState(null);
+    const [isFileViewerMinimized, setIsFileViewerMinimized] = useState(false);
     const [viewingSolution, setViewingSolution] = useState(null);
     const [editingNote, setEditingNote] = useState(null);
     const [selectedQuestionIdForNote, setSelectedQuestionIdForNote] = useState(null);
@@ -119,24 +131,30 @@ const SubjectDetail = () => {
     const [confirmDeleteSession, setConfirmDeleteSession] = useState({ open: false, session: null });
     const [confirmDeleteQuestion, setConfirmDeleteQuestion] = useState({ open: false, questionId: null });
     const [confirmDeleteNote, setConfirmDeleteNote] = useState({ open: false, note: null });
+    const [confirmDeleteFile, setConfirmDeleteFile] = useState({ open: false, items: [] });
+    const [renameFileData, setRenameFileData] = useState({ open: false, file: null, name: '' });
     const [editingSession, setEditingSession] = useState(null);
     const [editingQuestion, setEditingQuestion] = useState(null);
     const [editingSolution, setEditingSolution] = useState(null);
     const [showEditQuestionModal, setShowEditQuestionModal] = useState(false);
     const [showEditSolutionModal, setShowEditSolutionModal] = useState(false);
     const [fetchingImageId, setFetchingImageId] = useState(null);
+    const [fetchingNoteContentId, setFetchingNoteContentId] = useState(null);
     const [fetchedImages, setFetchedImages] = useState({});
     const [searchQuery, setSearchQuery] = useState('');
     const [noteSearchQuery, setNoteSearchQuery] = useState('');
     const [solutionSearchQuery, setSolutionSearchQuery] = useState('');
     const [selectedNoteTag, setSelectedNoteTag] = useState('');
     const [sessionSearchQuery, setSessionSearchQuery] = useState('');
-    const [imageSearchQuery, setImageSearchQuery] = useState('');
+    const [fileSearchQuery, setFileSearchQuery] = useState('');
     const [topicsDefaultExpanded, setTopicsDefaultExpanded] = useState(true);
     const [treeKey, setTreeKey] = useState(0);
     const [sessionsViewMode, setSessionsViewMode] = useState('grid'); // 'grid' or 'list'
     const [notesViewMode, setNotesViewMode] = useState('grid'); // 'grid' or 'list'
     const [solutionsViewMode, setSolutionsViewMode] = useState('grid');
+    const [libraryViewMode, setLibraryViewMode] = useState('datewise'); // 'datewise' or 'categorywise'
+
+    const [showTimeTraveler, setShowTimeTraveler] = useState(false);
 
     // Revision tracker state
     const [revisionSessions, setRevisionSessions] = useState([]);
@@ -159,6 +177,7 @@ const SubjectDetail = () => {
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedItems, setSelectedItems] = useState(new Set());
     const [showExportMenu, setShowExportMenu] = useState(false);
+
     const [confirmBulkDelete, setConfirmBulkDelete] = useState({ open: false, type: null, count: 0 });
     const [isDownloadingSyllabus, setIsDownloadingSyllabus] = useState(false);
     const [activeNoteDropdown, setActiveNoteDropdown] = useState(null);
@@ -183,10 +202,45 @@ const SubjectDetail = () => {
     useEffect(() => {
         setIsSelectionMode(false);
         setSelectedItems(new Set());
+        setShowExportMenu(false);
     }, [activeTab]);
 
-    const filteredNotes = useMemo(() => {
-        const query = (noteSearchQuery || '').toLowerCase();
+    const ensureNotesContent = async (noteIds) => {
+        if (!noteIds || noteIds.length === 0) return;
+
+        const idsToFetch = noteIds.filter(iid => {
+            const n = notes.find(note => note.id === iid);
+            return !n || !n.content;
+        });
+
+        if (idsToFetch.length === 0) return notes;
+
+        try {
+            const res = await notesApi.getBatch(id, idsToFetch);
+            if (res.notes && Array.isArray(res.notes)) {
+                // Construct updated array immediately for the caller to use (since setNotes is async)
+                const nextNotes = [...notes];
+                res.notes.forEach(newNote => {
+                    const idx = nextNotes.findIndex(nn => nn.id === newNote.id);
+                    if (idx !== -1) {
+                        nextNotes[idx] = { ...nextNotes[idx], ...newNote };
+                    } else {
+                        nextNotes.push(newNote);
+                    }
+                });
+
+                // Still update global state for future use
+                setNotes(nextNotes);
+                return nextNotes;
+            }
+        } catch (error) {
+            console.error('Failed to fetch missing notes content:', error);
+            throw new Error('Some notes could not be fully loaded for export.');
+        }
+        return notes;
+    };
+
+    const parsedNotes = useMemo(() => {
         return notes.map(n => {
             let parsedTags = n.tags || [];
             if (typeof parsedTags === 'string') {
@@ -194,12 +248,17 @@ const SubjectDetail = () => {
             }
             if (!Array.isArray(parsedTags)) parsedTags = [];
             return { ...n, parsedTags };
-        }).filter(n => {
-            const matchesSearch = n.title?.toLowerCase().includes(query) || n.content?.toLowerCase().includes(query);
+        });
+    }, [notes]);
+
+    const filteredNotes = useMemo(() => {
+        const query = (noteSearchQuery || '').toLowerCase();
+        return parsedNotes.filter(n => {
+            const matchesSearch = n.title?.toLowerCase().includes(query) || (n.content && n.content.toLowerCase().includes(query));
             const matchesTag = selectedNoteTag ? n.parsedTags.includes(selectedNoteTag) : true;
             return matchesSearch && matchesTag;
         });
-    }, [notes, noteSearchQuery, selectedNoteTag]);
+    }, [parsedNotes, noteSearchQuery, selectedNoteTag]);
 
     const filteredSessions = useMemo(() => {
         const query = (sessionSearchQuery || '').toLowerCase();
@@ -217,6 +276,154 @@ const SubjectDetail = () => {
             s.content?.toLowerCase().includes(q)
         );
     }, [solutions, solutionSearchQuery]);
+
+    const groupedLibraryItems = useMemo(() => {
+        // Advanced Multi-Scope Filtering Logic
+        const filtered = files.filter(file => {
+            if (!fileSearchQuery) return true;
+
+            const itemDate = new Date(file.created_at);
+            const query = fileSearchQuery.toLowerCase().trim();
+
+            // Handle Structured Queries from TimeTraveler
+            if (query.includes(':') || query.includes('|')) {
+                const criteria = { years: [], months: [], days: [], range: null };
+                const parts = query.split('|');
+                parts.forEach(p => {
+                    const [key, val] = p.split(':');
+                    if (!val) return;
+                    if (key === 'years') criteria.years = val.split(',').map(v => parseInt(v));
+                    if (key === 'months') criteria.months = val.split(',').map(m => m.toLowerCase());
+                    if (key === 'days') criteria.days = val.split(',');
+                    if (key === 'range') {
+                        const [s, e] = val.split(',');
+                        criteria.range = { start: new Date(s), end: new Date(e) };
+                        if (criteria.range.end) criteria.range.end.setHours(23, 59, 59, 999);
+                    }
+                });
+
+                const itemYear = itemDate.getFullYear();
+                const itemMonthLong = itemDate.toLocaleString('default', { month: 'long' }).toLowerCase();
+                const itemMonthShort = itemDate.toLocaleString('default', { month: 'short' }).toLowerCase();
+                const itemDateStr = itemDate.toISOString().split('T')[0];
+
+                const yearMatch = criteria.years.length === 0 || criteria.years.includes(itemYear);
+                const monthMatch = criteria.months.length === 0 || criteria.months.includes(itemMonthLong) || criteria.months.includes(itemMonthShort);
+                const dayMatch = criteria.days.length === 0 || criteria.days.includes(itemDateStr);
+                const rangeMatch = !criteria.range || (itemDate >= criteria.range.start && itemDate <= criteria.range.end);
+
+                return yearMatch && monthMatch && dayMatch && rangeMatch;
+            }
+
+            // Fallback for simple search (legacy or manual)
+            const fullMonth = itemDate.toLocaleString('default', { month: 'long' }).toLowerCase();
+            const shortMonth = itemDate.toLocaleString('default', { month: 'short' }).toLowerCase();
+
+            // 1. TimeTraveler Multi-Filter Format (years:2024|months:january|days:2024-03-15)
+            if (query.includes('years:') || query.includes('months:') || query.includes('days:') || (query.startsWith('range:') && query.includes(','))) {
+                const parts = query.split('|');
+                let matchesAll = true;
+
+                parts.forEach(p => {
+                    const [key, val] = p.split(':');
+                    if (!val) return;
+
+                    if (key === 'years') {
+                        const years = val.split(',').map(v => parseInt(v));
+                        if (!years.includes(itemDate.getFullYear())) matchesAll = false;
+                    }
+                    if (key === 'months') {
+                        const months = val.split(',').map(m => m.trim());
+                        if (!months.includes(fullMonth) && !months.includes(shortMonth)) matchesAll = false;
+                    }
+                    if (key === 'days') {
+                        const days = val.split(',');
+                        // Local date string for comparison
+                        const localDateStr = new Date(itemDate.getTime() - (itemDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+                        if (!days.includes(localDateStr)) matchesAll = false;
+                    }
+                    if (key === 'range') {
+                        const [s, e] = val.split(',');
+                        if (s && e) {
+                            const start = new Date(s);
+                            const end = new Date(e);
+                            end.setHours(23, 59, 59, 999);
+                            if (itemDate < start || itemDate > end) matchesAll = false;
+                        }
+                    }
+                });
+
+                return matchesAll;
+            }
+
+            // 2. Specific Date Check (e.g. "4/8/2026")
+            if (query.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
+                return itemDate.toLocaleDateString() === query;
+            }
+
+            // 3. Month/Year Wise or Fallback Search
+            return query === fullMonth ||
+                query === shortMonth ||
+                query === itemDate.getFullYear().toString() ||
+                fullMonth.includes(query) ||
+                itemDate.toLocaleDateString().includes(query) ||
+                file.file_name?.toLowerCase().includes(query);
+        });
+
+        if (libraryViewMode === 'datewise') {
+            const groups = {};
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const lastWeek = new Date(today);
+            lastWeek.setDate(lastWeek.getDate() - 7);
+
+            filtered.forEach(file => {
+                const date = new Date(file.created_at);
+                date.setHours(0, 0, 0, 0);
+
+                let groupName = '';
+                if (date.getTime() === today.getTime()) groupName = 'Today';
+                else if (date.getTime() === yesterday.getTime()) groupName = 'Yesterday';
+                else if (date.getTime() >= lastWeek.getTime()) groupName = 'Last 7 Days';
+                else groupName = date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+
+                if (!groups[groupName]) groups[groupName] = [];
+                groups[groupName].push(file);
+            });
+
+            return Object.entries(groups).map(([title, items]) => ({
+                title,
+                items,
+                date: new Date(items[0].created_at)
+            })).sort((a, b) => b.date - a.date);
+        } else {
+            // Typewise
+            const groups = {};
+            filtered.forEach(file => {
+                const rawType = (file.file_type || 'file').toLowerCase();
+                let groupName = 'Other';
+
+                if (rawType.match(/image|png|jpg|jpeg|webp|gif/)) groupName = 'Images';
+                else if (rawType === 'pdf') groupName = 'PDFs';
+                else if (rawType.match(/doc|docx|txt|rtf/)) groupName = 'Documents';
+                else if (rawType.match(/xlsx|xls|csv/)) groupName = 'Spreadsheets';
+                else groupName = rawType.charAt(0).toUpperCase() + rawType.slice(1);
+
+                if (!groups[groupName]) groups[groupName] = [];
+                groups[groupName].push(file);
+            });
+
+            return Object.entries(groups).sort((a, b) => {
+                const priority = { 'Images': 1, 'PDFs': 2, 'Documents': 3, 'Spreadsheets': 4 };
+                const aPrio = priority[a[0]] || 99;
+                const bPrio = priority[b[0]] || 99;
+                if (aPrio !== bPrio) return aPrio - bPrio;
+                return a[0].localeCompare(b[0]);
+            }).map(([title, items]) => ({ title, items }));
+        }
+    }, [files, fileSearchQuery, libraryViewMode]);
 
     const handleSelectAll = () => {
         if (activeTab === 'questions') {
@@ -843,7 +1050,8 @@ const SubjectDetail = () => {
             const itemIds = Array.from(selectedItems);
             let items = [];
             if (activeTab === 'notes') {
-                items = itemIds.map(iid => notes.find(n => n.id === iid)).filter(Boolean);
+                const updatedNotes = await ensureNotesContent(itemIds);
+                items = itemIds.map(iid => updatedNotes.find(n => n.id === iid)).filter(Boolean);
             } else {
                 items = itemIds.map(iid => questions.find(q => q.id === iid)).filter(Boolean);
             }
@@ -981,15 +1189,62 @@ const SubjectDetail = () => {
         }
     };
 
+
+
     const handleDownloadWordSelected = async () => {
         if (selectedItems.size === 0) return;
         const loadingToast = toast.loading('Generating Word document...');
 
         try {
             const itemIds = Array.from(selectedItems);
+
+            if (activeTab === 'library') {
+                const zip = new JSZip();
+                const usedNames = new Map();
+
+                selectedItems.forEach(id => {
+                    const f = files.find(file => file.id === id);
+                    if (f && f.data) {
+                        let baseName = f.file_name || 'file';
+                        let ext = '';
+                        const lastDot = baseName.lastIndexOf('.');
+                        if (lastDot !== -1) {
+                            ext = baseName.substring(lastDot);
+                            baseName = baseName.substring(0, lastDot);
+                        } else {
+                            const typeMap = { 'image': '.jpg', 'pdf': '.pdf', 'doc': '.docx', 'xlsx': '.xlsx' };
+                            ext = typeMap[f.file_type] || '';
+                        }
+
+                        let finalName = `${baseName}${ext}`;
+                        if (usedNames.has(finalName)) {
+                            const count = usedNames.get(finalName) + 1;
+                            usedNames.set(finalName, count);
+                            finalName = `${baseName}_${count}${ext}`;
+                        } else {
+                            usedNames.set(finalName, 1);
+                        }
+
+                        const base64Content = f.data.split(',')[1];
+                        zip.file(finalName, base64Content, { base64: true });
+                    }
+                });
+
+                const content = await zip.generateAsync({ type: 'blob' });
+                const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+                const zipFileName = `${subject?.name || 'Library'}_Export_${timestamp}.zip`.replace(/\s+/g, '_');
+                saveAs(content, zipFileName);
+
+                setIsSelectionMode(false);
+                setSelectedItems(new Set());
+                toast.success('Library items exported as Zip!', { id: loadingToast });
+                return;
+            }
+
             let items = [];
             if (activeTab === 'notes') {
-                items = itemIds.map(iid => notes.find(n => n.id === iid)).filter(Boolean);
+                const updatedNotes = await ensureNotesContent(itemIds);
+                items = itemIds.map(iid => updatedNotes.find(n => n.id === iid)).filter(Boolean);
             } else {
                 items = itemIds.map(iid => questions.find(q => q.id === iid)).filter(Boolean);
             }
@@ -1201,9 +1456,58 @@ const SubjectDetail = () => {
 
         try {
             const itemIds = Array.from(selectedItems);
+
+            if (activeTab === 'notes') {
+                await ensureNotesContent(itemIds);
+            }
+
+            if (activeTab === 'library') {
+                const zip = new JSZip();
+                const usedNames = new Map();
+
+                selectedItems.forEach(id => {
+                    const f = files.find(file => file.id === id);
+                    if (f && f.data) {
+                        let baseName = f.file_name || 'file';
+                        let ext = '';
+                        const lastDot = baseName.lastIndexOf('.');
+                        if (lastDot !== -1) {
+                            ext = baseName.substring(lastDot);
+                            baseName = baseName.substring(0, lastDot);
+                        } else {
+                            const typeMap = { 'image': '.jpg', 'pdf': '.pdf', 'doc': '.docx', 'xlsx': '.xlsx' };
+                            ext = typeMap[f.file_type] || '';
+                        }
+
+                        let finalName = `${baseName}${ext}`;
+                        if (usedNames.has(finalName)) {
+                            const count = usedNames.get(finalName) + 1;
+                            usedNames.set(finalName, count);
+                            finalName = `${baseName}_${count}${ext}`;
+                        } else {
+                            usedNames.set(finalName, 1);
+                        }
+
+                        const base64Content = f.data.split(',')[1];
+                        zip.file(finalName, base64Content, { base64: true });
+                    }
+                });
+
+                const content = await zip.generateAsync({ type: 'blob' });
+                const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+                const zipFileName = `${subject?.name || 'Library'}_Export_${timestamp}.zip`.replace(/\s+/g, '_');
+                saveAs(content, zipFileName);
+
+                setIsSelectionMode(false);
+                setSelectedItems(new Set());
+                toast.success('Library items exported as Zip!', { id: loadingToast });
+                return;
+            }
+
             let items = [];
             if (activeTab === 'notes') {
-                items = itemIds.map(iid => notes.find(n => n.id === iid)).filter(Boolean);
+                const updatedNotes = await ensureNotesContent(itemIds);
+                items = itemIds.map(iid => updatedNotes.find(n => n.id === iid)).filter(Boolean);
             } else {
                 items = itemIds.map(iid => questions.find(q => q.id === iid)).filter(Boolean);
             }
@@ -1250,22 +1554,22 @@ const SubjectDetail = () => {
     };
 
     useEffect(() => {
-        if (imagePage === 0) return; // handled by initial load
+        if (filePage === 0) return; // handled by initial load
         const loadMore = async () => {
-            setLoadingMoreImages(true);
+            setLoadingMoreFiles(true);
             try {
-                const res = await imagesApi.listBySubject(id, IMAGE_LIMIT, imagePage * IMAGE_LIMIT);
-                const newImages = res.images || [];
-                setHasMoreImages(newImages.length === IMAGE_LIMIT);
-                setImages(prev => [...prev, ...newImages]);
+                const res = await filesApi.listBySubject(id, FILE_LIMIT, filePage * FILE_LIMIT);
+                const newFiles = res.images || res.files || [];
+                setHasMoreFiles(newFiles.length === FILE_LIMIT);
+                setFiles(prev => [...prev, ...newFiles]);
             } catch {
-                toast.error('Failed to load more images');
+                toast.error('Failed to load more library items');
             } finally {
-                setLoadingMoreImages(false);
+                setLoadingMoreFiles(false);
             }
         };
         loadMore();
-    }, [id, imagePage]);
+    }, [id, filePage]);
 
     useEffect(() => {
         if (notePage === 0) return;
@@ -1293,11 +1597,12 @@ const SubjectDetail = () => {
                 case 'topics':
                     await loadTopics(id);
                     break;
-                case 'sessions':
+                case 'sessions': {
                     const sesRes = await sessionsApi.list(id);
                     setSessions(sesRes.sessions);
                     break;
-                case 'questions':
+                }
+                case 'questions': {
                     // Proactively fetch notes and solutions when questions tab is clicked to ensure icons/badges are accurate
                     const [qsRes, nRes, solRes] = await Promise.all([
                         questionsApi.list(id),
@@ -1312,29 +1617,34 @@ const SubjectDetail = () => {
                     // Mark notes and solutions as loaded so their tabs don't refetch
                     setLoadedTabs(prev => new Set(prev).add('notes').add('solutions'));
                     break;
-                case 'notes':
+                }
+                case 'notes': {
                     const notesRes = await notesApi.list(id, NOTE_LIMIT, 0);
                     const initialNotes = notesRes.notes || [];
                     setNotes(initialNotes);
                     setHasMoreNotes(initialNotes.length === NOTE_LIMIT);
                     setNotePage(0);
                     break;
-                case 'solutions':
+                }
+                case 'solutions': {
                     const solutionsRes = await solutionsApi.list(id);
                     setSolutions(solutionsRes.solutions || []);
                     break;
-                case 'revision':
+                }
+                case 'revision': {
                     const revRes = await revisionApi.listSessions(id).catch(() => ({ sessions: [] }));
                     setRevisionSessions(revRes.sessions || []);
                     break;
-                case 'images':
+                }
+                case 'library': {
                     // We only load page 0 initially when the tab is clicked
-                    const imgRes = await imagesApi.listBySubject(id, IMAGE_LIMIT, 0);
-                    const initialImages = imgRes.images || [];
-                    setImages(initialImages);
-                    setHasMoreImages(initialImages.length === IMAGE_LIMIT);
-                    setImagePage(0);
+                    const fileRes = await filesApi.listBySubject(id, FILE_LIMIT, 0);
+                    const initialFiles = fileRes.images || fileRes.files || [];
+                    setFiles(initialFiles);
+                    setHasMoreFiles(initialFiles.length === FILE_LIMIT);
+                    setFilePage(0);
                     break;
+                }
                 default:
                     break;
             }
@@ -1357,20 +1667,20 @@ const SubjectDetail = () => {
     // Update tab-related counts in overview when items are added/deleted manually, but only if that tab has been loaded
     // Removed redundant stats refresh effect as it's handled in loadBaseData
 
-    const imageObserver = React.useRef();
-    const lastImageElementRef = React.useCallback(node => {
-        if (loading || loadingMoreImages) return;
-        if (imageObserver.current) imageObserver.current.disconnect();
-        imageObserver.current = new IntersectionObserver(entries => {
-            if (entries[0].isIntersecting && hasMoreImages) {
-                setImagePage(prevPage => prevPage + 1);
+    const fileObserver = React.useRef();
+    const lastFileElementRef = React.useCallback(node => {
+        if (loading || loadingMoreFiles) return;
+        if (fileObserver.current) fileObserver.current.disconnect();
+        fileObserver.current = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting && hasMoreFiles) {
+                setFilePage(prevPage => prevPage + 1);
             }
         }, {
             rootMargin: '400px',
             threshold: 0
         });
-        if (node) imageObserver.current.observe(node);
-    }, [loading, loadingMoreImages, hasMoreImages]);
+        if (node) fileObserver.current.observe(node);
+    }, [loading, loadingMoreFiles, hasMoreFiles]);
 
     useEffect(() => {
         const loadBaseData = async () => {
@@ -1430,14 +1740,7 @@ const SubjectDetail = () => {
         }
     }, [loading, searchParams, notes]);
 
-    const handleTopicDeleted = async (topicId) => {
-        try {
-            await deleteTopic(id, topicId);
-            refreshStats([id]);
-        } catch (error) {
-            // Error handled in context
-        }
-    };
+    // handleTopicDeleted removed as it was unused and causing lint errors
 
     const handleQuestionAdded = (newQuestions) => {
         // newQuestions is always an array (may contain 1 or more)
@@ -1545,7 +1848,7 @@ const SubjectDetail = () => {
         }
     };
 
-    const handleImageAdded = (newRes) => {
+    const handleFileAdded = (newRes) => {
         if (newRes.note) {
             setNotes(prev => [newRes.note, ...prev]);
         } else if (newRes.questions) {
@@ -1553,15 +1856,15 @@ const SubjectDetail = () => {
             setQuestions(prev => [...newRes.questions, ...prev]);
         }
 
-        // Refetch images to be thorough
-        const refreshImages = async () => {
-            setImagePage(0);
-            const res = await imagesApi.listBySubject(id, IMAGE_LIMIT, 0);
-            const newImages = res.images || [];
-            setImages(newImages);
-            setHasMoreImages(newImages.length === IMAGE_LIMIT);
+        // Refetch files to be thorough
+        const refreshFiles = async () => {
+            setFilePage(0);
+            const res = await filesApi.listBySubject(id, FILE_LIMIT, 0);
+            const newFiles = res.images || res.files || [];
+            setFiles(newFiles);
+            setHasMoreFiles(newFiles.length === FILE_LIMIT);
         };
-        refreshImages();
+        refreshFiles();
         refreshStats([id]);
     };
 
@@ -1630,6 +1933,63 @@ const SubjectDetail = () => {
         });
     };
 
+    const handleOpenNote = async (note, addToStack = false) => {
+        if (isSelectionMode && !addToStack) {
+            const next = new Set(selectedItems);
+            if (next.has(note.id)) next.delete(note.id);
+            else next.add(note.id);
+            setSelectedItems(next);
+            return;
+        }
+
+        let fullNote = note;
+        if (!note.content) {
+            setFetchingNoteContentId(note.id);
+            try {
+                const res = await notesApi.get(id, note.id);
+                fullNote = res.notes?.[0] || note;
+
+                // Sync with current notes state
+                if (fullNote.content) {
+                    setNotes(prev => prev.map(n => n.id === fullNote.id ? { ...n, content: fullNote.content } : n));
+                }
+            } catch (error) {
+                console.error('Failed to load note content:', error);
+                toast.error('Failed to load note content');
+                return;
+            } finally {
+                setFetchingNoteContentId(null);
+            }
+        }
+
+        if (addToStack && viewingNote) {
+            setNoteStack(prev => [...prev, viewingNote]);
+        }
+        setViewingNote(fullNote);
+        if (fullNote.source_image_id) handleFetchNoteImage(fullNote.id);
+    };
+
+    const handleEditNote = async (note) => {
+        let fullNote = note;
+        if (!note.content) {
+            setFetchingNoteContentId(note.id);
+            try {
+                const res = await notesApi.get(id, note.id);
+                fullNote = res.notes?.[0] || note;
+                if (fullNote.content) {
+                    setNotes(prev => prev.map(n => n.id === fullNote.id ? { ...n, content: fullNote.content } : n));
+                }
+            } catch (error) {
+                console.error('Failed to load note content for editing:', error);
+                toast.error('Failed to load note for editing');
+                return;
+            } finally {
+                setFetchingNoteContentId(null);
+            }
+        }
+        setEditingNote(fullNote);
+    };
+
     const handleFetchNoteImage = async (noteId) => {
         if (fetchedImages[`note-${noteId}`]) return;
         try {
@@ -1682,38 +2042,40 @@ const SubjectDetail = () => {
             }
         }
     };
-    const handlePrevImage = () => {
+    const handlePrevFile = () => {
         if (!viewingNote || !viewingNote.id?.toString().startsWith('img-')) return;
         const currentId = viewingNote.source_image_id;
-        const idx = images.findIndex(img => img.id === currentId);
+        const idx = files.findIndex(img => img.id === currentId);
         if (idx > 0) {
-            const img = images[idx - 1];
+            const img = files[idx - 1];
             const fakeNote = {
-                id: `img - ${img.id} `,
-                title: 'Source Image',
+                id: `img-${img.id}`,
+                title: `${img.file_type ? img.file_type.toUpperCase() : 'Image'} File`,
                 content: 'Original captured material.',
                 source_image_id: img.id,
-                created_at: img.created_at
+                created_at: img.created_at,
+                file_type: img.file_type
             };
-            setFetchedImages(prev => ({ ...prev, [`note - img - ${img.id} `]: img.data }));
+            setFetchedImages(prev => ({ ...prev, [`note-img-${img.id}`]: img.data }));
             setViewingNote(fakeNote);
         }
     };
 
-    const handleNextImage = () => {
+    const handleNextFile = () => {
         if (!viewingNote || !viewingNote.id?.toString().startsWith('img-')) return;
         const currentId = viewingNote.source_image_id;
-        const idx = images.findIndex(img => img.id === currentId);
-        if (idx < images.length - 1) {
-            const img = images[idx + 1];
+        const idx = files.findIndex(img => img.id === currentId);
+        if (idx < files.length - 1) {
+            const img = files[idx + 1];
             const fakeNote = {
-                id: `img - ${img.id} `,
-                title: 'Source Image',
+                id: `img-${img.id}`,
+                title: `${img.file_type ? img.file_type.toUpperCase() : 'Image'} File`,
                 content: 'Original captured material.',
                 source_image_id: img.id,
-                created_at: img.created_at
+                created_at: img.created_at,
+                file_type: img.file_type
             };
-            setFetchedImages(prev => ({ ...prev, [`note - img - ${img.id} `]: img.data }));
+            setFetchedImages(prev => ({ ...prev, [`note-img-${img.id}`]: img.data }));
             setViewingNote(fakeNote);
         }
     };
@@ -1725,11 +2087,7 @@ const SubjectDetail = () => {
 
         const idx = filtered.findIndex(n => n.id === viewingNote.id);
         if (idx > 0) {
-            const nextNote = filtered[idx - 1];
-            setViewingNote(nextNote);
-            if (nextNote.source_image_id) {
-                handleFetchNoteImage(nextNote.id);
-            }
+            handleOpenNote(filtered[idx - 1]);
         }
     };
 
@@ -1740,11 +2098,7 @@ const SubjectDetail = () => {
 
         const idx = filtered.findIndex(n => n.id === viewingNote.id);
         if (idx < filtered.length - 1) {
-            const nextNote = filtered[idx + 1];
-            setViewingNote(nextNote);
-            if (nextNote.source_image_id) {
-                handleFetchNoteImage(nextNote.id);
-            }
+            handleOpenNote(filtered[idx + 1]);
         }
     };
 
@@ -1785,6 +2139,19 @@ const SubjectDetail = () => {
             toast.error(`Failed to delete ${typeLabel}`, { id: loadingToast });
         } finally {
             setConfirmDeleteNote({ open: false, note: null });
+        }
+    };
+
+    const handleRenameFile = async () => {
+        if (!renameFileData.file || !renameFileData.name.trim()) return;
+        const loadingToast = toast.loading('Renaming file...');
+        try {
+            await filesApi.update(id, renameFileData.file.id, { fileName: renameFileData.name.trim() });
+            setFiles(prev => prev.map(f => f.id === renameFileData.file.id ? { ...f, file_name: renameFileData.name.trim() } : f));
+            toast.success("File renamed", { id: loadingToast });
+            setRenameFileData({ open: false, file: null, name: '' });
+        } catch (error) {
+            toast.error(error.message || "Failed to rename file", { id: loadingToast });
         }
     };
 
@@ -2007,59 +2374,69 @@ const SubjectDetail = () => {
                 expectedInput="CONFIRM"
             />
 
-            <ManageSyllabusModal
-                isOpen={showTopicModal}
-                onClose={() => setShowTopicModal(false)}
-                subjectId={id}
-                topics={topics}
-            />
+            {showTopicModal && (
+                <ManageSyllabusModal
+                    isOpen={true}
+                    onClose={() => setShowTopicModal(false)}
+                    subjectId={id}
+                    topics={topics}
+                />
+            )}
 
-            <AddQuestionModal
-                isOpen={showQuestionModal}
-                onClose={() => setShowQuestionModal(false)}
-                subjectId={id}
-                onQuestionAdded={handleQuestionAdded}
-                topics={topics}
-            />
+            {showQuestionModal && (
+                <AddQuestionModal
+                    isOpen={true}
+                    onClose={() => setShowQuestionModal(false)}
+                    subjectId={id}
+                    onQuestionAdded={handleQuestionAdded}
+                    topics={topics}
+                />
+            )}
 
-            <AddImageModal
-                isOpen={showImageModal}
-                onClose={() => setShowImageModal(false)}
-                subjectId={id}
-                onImageSaved={handleImageAdded}
-            />
+            {showFileModal && (
+                <AddFileModal
+                    isOpen={true}
+                    onClose={() => setShowFileModal(false)}
+                    subjectId={id}
+                    onFileSaved={handleFileAdded}
+                />
+            )}
 
-            <AddNoteModal
-                isOpen={showNoteModal || !!addToNoteData}
-                onClose={() => {
-                    setShowNoteModal(false);
-                    setSelectedQuestionIdForNote(null);
-                    setAddToNoteData(null);
-                }}
-                subjectId={id}
-                onNoteAdded={(newNote) => {
-                    handleNoteAdded(newNote);
-                    // If this was a child note from "Add to Note", open it with back-nav
-                    if (addToNoteData) {
-                        if (viewingNote) {
-                            setNoteStack(prev => [...prev, viewingNote]);
-                        }
-                        setViewingNote(newNote);
+            {(showNoteModal || !!addToNoteData) && (
+                <AddNoteModal
+                    isOpen={true}
+                    onClose={() => {
+                        setShowNoteModal(false);
+                        setSelectedQuestionIdForNote(null);
                         setAddToNoteData(null);
-                    }
-                }}
-                questionId={selectedQuestionIdForNote}
-                initialTitle={addToNoteData ? `Note: ${addToNoteData.selectedText.substring(0, 60)}${addToNoteData.selectedText.length > 60 ? '...' : ''} ` : ''}
-                initialContent={addToNoteData ? `> ${addToNoteData.selectedText.replace(/\n/g, '\n> ')} \n\n` : ''}
-                parentNoteId={addToNoteData?.parentNoteId || null}
-            />
+                    }}
+                    subjectId={id}
+                    onNoteAdded={(newNote) => {
+                        handleNoteAdded(newNote);
+                        // If this was a child note from "Add to Note", open it with back-nav
+                        if (addToNoteData) {
+                            if (viewingNote) {
+                                setNoteStack(prev => [...prev, viewingNote]);
+                            }
+                            setViewingNote(newNote);
+                            setAddToNoteData(null);
+                        }
+                    }}
+                    questionId={selectedQuestionIdForNote}
+                    initialTitle={addToNoteData ? `Note: ${addToNoteData.selectedText.substring(0, 60)}${addToNoteData.selectedText.length > 60 ? '...' : ''} ` : ''}
+                    initialContent={addToNoteData ? `> ${addToNoteData.selectedText.replace(/\n/g, '\n> ')} \n\n` : ''}
+                    parentNoteId={addToNoteData?.parentNoteId || null}
+                />
+            )}
 
-            <CreateSessionModal
-                isOpen={showSessionModal}
-                onClose={() => setShowSessionModal(false)}
-                subjectId={id}
-                onSessionCreated={handleSessionCreated}
-            />
+            {showSessionModal && (
+                <CreateSessionModal
+                    isOpen={true}
+                    onClose={() => setShowSessionModal(false)}
+                    subjectId={id}
+                    onSessionCreated={handleSessionCreated}
+                />
+            )}
 
             <EditSessionModal
                 isOpen={!!editingSession}
@@ -2077,86 +2454,84 @@ const SubjectDetail = () => {
                 }}
             />
 
-            <ViewNoteModal
-                isOpen={!!viewingNote && !editingNote}
-                onClose={() => {
-                    if (noteStack.length > 0) {
-                        // Pop the parent note from the stack
-                        const parentNote = noteStack[noteStack.length - 1];
-                        setNoteStack(prev => prev.slice(0, -1));
-                        setViewingNote(parentNote);
-                    } else {
-                        setViewingNote(null);
-                    }
-                }}
-                note={viewingNote}
-                onNavigateToQuestion={navigateToQuestion}
-                sourceImage={viewingNote ? fetchedImages[`note - ${viewingNote.id} `] : null}
-                isFetchingImage={fetchingImageId === (viewingNote ? `note - ${viewingNote.id} ` : null)}
-                onEdit={setEditingNote}
-                onPrev={viewingNote?.id?.toString().startsWith('img-') ? handlePrevImage : handlePrevNote}
-                onNext={viewingNote?.id?.toString().startsWith('img-') ? handleNextImage : handleNextNote}
-                onAddToNote={(selectedText) => {
-                    setAddToNoteData({
-                        selectedText,
-                        parentNoteId: viewingNote?.id || null,
-                    });
-                }}
-                parentNoteTitle={noteStack.length > 0 ? noteStack[noteStack.length - 1]?.title : null}
-                childNotes={viewingNote ? notes.filter(n => n.parent_note_id === viewingNote.id) : []}
-                onOpenChildNote={(childNote) => {
-                    if (viewingNote) {
-                        setNoteStack(prev => [...prev, viewingNote]);
-                    }
-                    setViewingNote(childNote);
-                }}
-                onUpdateNoteContent={async (noteId, newContent) => {
-                    try {
-                        const existingNote = notes.find(n => n.id === noteId) || viewingNote;
-                        await notesApi.update(id, noteId, { title: existingNote?.title || '', content: newContent });
-                        // Update local state
-                        setNotes(prev => prev.map(n => n.id === noteId ? { ...n, content: newContent } : n));
-                        if (viewingNote?.id === noteId) {
-                            setViewingNote(prev => ({ ...prev, content: newContent }));
+            {(!!viewingNote && !editingNote) && (
+                <ViewNoteModal
+                    isOpen={true}
+                    onClose={() => {
+                        if (noteStack.length > 0) {
+                            // Pop the parent note from the stack
+                            const parentNote = noteStack[noteStack.length - 1];
+                            setNoteStack(prev => prev.slice(0, -1));
+                            setViewingNote(parentNote);
+                        } else {
+                            setViewingNote(null);
                         }
-                        toast.success('Note updated');
-                    } catch {
-                        toast.error('Failed to update note');
-                    }
-                }}
-                onAIEditSection={async (selectedText, instruction, onChunk) => {
-                    try {
-                        const fullContent = viewingNote?.content || '';
-                        const selectionIndex = fullContent.indexOf(selectedText);
-                        const BUFFER = 500;
-                        let contentBefore = '';
-                        let contentAfter = '';
-                        if (selectionIndex >= 0) {
-                            const beforeStart = Math.max(0, selectionIndex - BUFFER);
-                            contentBefore = fullContent.substring(beforeStart, selectionIndex);
-                            const afterEnd = Math.min(fullContent.length, selectionIndex + selectedText.length + BUFFER);
-                            contentAfter = fullContent.substring(selectionIndex + selectedText.length, afterEnd);
-                        }
-
-                        // Use streaming API
-                        await aiApi.editSectionStream({
+                    }}
+                    note={viewingNote}
+                    onNavigateToQuestion={navigateToQuestion}
+                    sourceImage={viewingNote ? fetchedImages[`note-${viewingNote.id}`] : null}
+                    isFetchingImage={fetchingImageId === (viewingNote ? `note-${viewingNote.id}` : null)}
+                    onEdit={setEditingNote}
+                    onPrev={viewingNote?.id?.toString().startsWith('img-') ? handlePrevFile : handlePrevNote}
+                    onNext={viewingNote?.id?.toString().startsWith('img-') ? handleNextFile : handleNextNote}
+                    onAddToNote={(selectedText) => {
+                        setAddToNoteData({
                             selectedText,
-                            instruction,
-                            noteTitle: viewingNote?.title || '',
-                            contentBefore,
-                            contentAfter,
-                        }, onChunk);
-                    } catch (error) {
-                        toast.error('AI edit failed');
-                        throw error;
-                    }
-                }}
-                allNotes={filteredNotes}
-                onNavigateToNote={(n) => {
-                    setViewingNote(n);
-                    if (n.source_image_id) handleFetchNoteImage(n.id);
-                }}
-            />
+                            parentNoteId: viewingNote?.id || null,
+                        });
+                    }}
+                    parentNoteTitle={noteStack.length > 0 ? noteStack[noteStack.length - 1]?.title : null}
+                    childNotes={viewingNote ? notes.filter(n => n.parent_note_id === viewingNote.id) : []}
+                    onOpenChildNote={(childNote) => {
+                        handleOpenNote(childNote, true);
+                    }}
+                    onUpdateNoteContent={async (noteId, newContent) => {
+                        try {
+                            const existingNote = notes.find(n => n.id === noteId) || viewingNote;
+                            await notesApi.update(id, noteId, { title: existingNote?.title || '', content: newContent });
+                            // Update local state
+                            setNotes(prev => prev.map(n => n.id === noteId ? { ...n, content: newContent } : n));
+                            if (viewingNote?.id === noteId) {
+                                setViewingNote(prev => ({ ...prev, content: newContent }));
+                            }
+                            toast.success('Note updated');
+                        } catch {
+                            toast.error('Failed to update note');
+                        }
+                    }}
+                    onAIEditSection={async (selectedText, instruction, onChunk) => {
+                        try {
+                            const fullContent = viewingNote?.content || '';
+                            const selectionIndex = fullContent.indexOf(selectedText);
+                            const BUFFER = 500;
+                            let contentBefore = '';
+                            let contentAfter = '';
+                            if (selectionIndex >= 0) {
+                                const beforeStart = Math.max(0, selectionIndex - BUFFER);
+                                contentBefore = fullContent.substring(beforeStart, selectionIndex);
+                                const afterEnd = Math.min(fullContent.length, selectionIndex + selectedText.length + BUFFER);
+                                contentAfter = fullContent.substring(selectionIndex + selectedText.length, afterEnd);
+                            }
+
+                            // Use streaming API
+                            await aiApi.editSectionStream({
+                                selectedText,
+                                instruction,
+                                noteTitle: viewingNote?.title || '',
+                                contentBefore,
+                                contentAfter,
+                            }, onChunk);
+                        } catch (error) {
+                            toast.error('AI edit failed');
+                            throw error;
+                        }
+                    }}
+                    allNotes={filteredNotes}
+                    onNavigateToNote={(n) => {
+                        handleOpenNote(n);
+                    }}
+                />
+            )}
 
             <EditNoteModal
                 isOpen={!!editingNote}
@@ -2235,7 +2610,7 @@ const SubjectDetail = () => {
                     {/* Segmented Tabs */}
                     <div className="flex gap-1 p-1 bg-black/20 rounded-xl border border-white/[0.06] overflow-x-auto no-scrollbar max-w-full" >
                         {
-                            ['topics', 'sessions', 'questions', 'notes', 'solutions', 'revision', 'images'].map((tab) => {
+                            ['topics', 'sessions', 'questions', 'notes', 'solutions', 'revision', 'library'].map((tab) => {
                                 let count;
                                 switch (tab) {
                                     case 'topics': count = overview?.totalTopics ?? topics.length; break;
@@ -2243,7 +2618,7 @@ const SubjectDetail = () => {
                                     case 'questions': count = overview?.availableQuestions ?? questions.length; break;
                                     case 'notes': count = overview?.totalNotes ?? notes.length; break;
                                     case 'solutions': count = overview?.totalSolutions ?? solutions.length; break;
-                                    case 'images': count = overview?.totalImages ?? images.length; break;
+                                    case 'library': count = overview?.total_files ?? overview?.totalFiles ?? files?.length ?? 0; break;
                                     case 'revision': count = overview?.totalRevisionSessions ?? revisionSessions.length; break;
                                 }
                                 return (
@@ -2286,212 +2661,45 @@ const SubjectDetail = () => {
 
                         {
                             activeTab === 'questions' && (
-                                <>
-                                    {isSelectionMode ? (
-                                        <div className="flex items-center h-[44px] bg-[#121214]/60 border border-white/[0.04] rounded-full px-1.5 shadow-[0_8px_30px_rgb(0,0,0,0.4)] transition-all animate-in fade-in zoom-in-95 duration-300">
-                                            <div className="flex items-center pl-3 pr-2">
-                                                <div className="w-5 h-5 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center text-[11px] font-bold mr-2">
-                                                    {selectedItems.size}
-                                                </div>
-                                                <span className="text-[13px] text-slate-300 font-medium hidden sm:inline">selected</span>
-                                            </div>
-
-                                            <div className="w-px h-5 bg-white/[0.08] mx-1"></div>
-
-                                            <button
-                                                onClick={handleSelectAll}
-                                                className="text-[12px] font-medium text-slate-300 hover:text-white px-3 py-1.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
-                                            >
-                                                {selectedItems.size > 0 && selectedItems.size === groupedQuestions.flatMap(g => g.questions).length ? 'Clear' : 'All'}
-                                            </button>
-
-                                            <div className="w-px h-5 bg-white/[0.08] mx-1"></div>
-
-                                            <div className="flex items-center gap-1 px-1 relative">
-                                                <button
-                                                    onClick={() => setShowExportMenu(!showExportMenu)}
-                                                    disabled={selectedItems.size === 0}
-                                                    title="More Options"
-                                                    className={`flex items-center justify-center w-8 h-8 rounded-full transition-all cursor-pointer ${showExportMenu ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
-                                                >
-                                                    <MoreHorizontal className="w-5 h-5" />
-                                                </button>
-
-                                                {/* Export Dropdown */}
-                                                {showExportMenu && selectedItems.size > 0 && (
-                                                    <div className="absolute top-full right-0 mt-2 w-48 bg-[#121214]/90 border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 z-50">
-                                                        <div className="p-1 space-y-0.5">
-                                                            <button
-                                                                onClick={() => { handleDownloadSelected(); setShowExportMenu(false); }}
-                                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium text-slate-300 hover:text-white hover:bg-indigo-500/20 rounded-xl transition-colors cursor-pointer group"
-                                                            >
-                                                                <FileText className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform" />
-                                                                Download as PDF
-                                                            </button>
-                                                            <button
-                                                                onClick={() => { handleDownloadWordSelected(); setShowExportMenu(false); }}
-                                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium text-slate-300 hover:text-white hover:bg-sky-500/20 rounded-xl transition-colors cursor-pointer group"
-                                                            >
-                                                                <FileText className="w-4 h-4 text-sky-400 group-hover:scale-110 transition-transform" />
-                                                                Download as Word
-                                                            </button>
-                                                            <button
-                                                                onClick={() => { handleDownloadMarkdownSelected(); setShowExportMenu(false); }}
-                                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium text-slate-300 hover:text-white hover:bg-fuchsia-500/20 rounded-xl transition-colors cursor-pointer group"
-                                                            >
-                                                                <FileText className="w-4 h-4 text-fuchsia-400 group-hover:scale-110 transition-transform" />
-                                                                Download as MD
-                                                            </button>
-
-                                                            <div className="h-px bg-white/10 my-1 mx-2"></div>
-                                                            <button
-                                                                onClick={() => {
-                                                                    setConfirmBulkDelete({ open: true, type: 'questions', count: selectedItems.size });
-                                                                    setShowExportMenu(false);
-                                                                }}
-                                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium text-red-400 hover:text-white hover:bg-red-500/20 rounded-xl transition-colors cursor-pointer group"
-                                                            >
-                                                                <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                                                                Delete Selected
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div className="w-px h-5 bg-white/[0.08] mx-1"></div>
-
-                                            <button
-                                                onClick={() => { setIsSelectionMode(false); setSelectedItems(new Set()); setShowExportMenu(false); }}
-                                                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-red-500/20 hover:text-red-400 transition-colors cursor-pointer"
-                                                title="Cancel"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <button
-                                                onClick={() => setShowQuestionModal(true)}
-                                                className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
-                                            >
-                                                <PlusCircle className="w-4 h-4" strokeWidth={2} />
-                                                <span>Add Question</span>
-                                            </button>
-                                        </>
-                                    )}
-                                </>
+                                <button
+                                    onClick={() => setShowQuestionModal(true)}
+                                    className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
+                                >
+                                    <PlusCircle className="w-4 h-4" strokeWidth={2} />
+                                    <span>Add Question</span>
+                                </button>
                             )
                         }
 
                         {
                             activeTab === 'notes' && (
-                                <>
-                                    {isSelectionMode ? (
-                                        <div className="flex items-center h-[44px] bg-[#121214]/60 border border-white/[0.04] rounded-full px-1.5 shadow-[0_8px_30px_rgb(0,0,0,0.4)] transition-all animate-in fade-in zoom-in-95 duration-300">
-                                            <div className="flex items-center pl-3 pr-2">
-                                                <div className="w-5 h-5 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center text-[11px] font-bold mr-2">
-                                                    {selectedItems.size}
-                                                </div>
-                                                <span className="text-[13px] text-slate-300 font-medium hidden sm:inline">selected</span>
-                                            </div>
-
-                                            <div className="w-px h-5 bg-white/[0.08] mx-1"></div>
-
-                                            <button
-                                                onClick={handleSelectAll}
-                                                className="text-[12px] font-medium text-slate-300 hover:text-white px-3 py-1.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
-                                            >
-                                                {selectedItems.size > 0 && selectedItems.size === filteredNotes.length ? 'Clear' : 'All'}
-                                            </button>
-
-                                            <div className="w-px h-5 bg-white/[0.08] mx-1"></div>
-
-                                            <div className="flex items-center gap-1 px-1 relative">
-                                                <button
-                                                    onClick={() => setShowExportMenu(!showExportMenu)}
-                                                    disabled={selectedItems.size === 0}
-                                                    title="More Options"
-                                                    className={`flex items-center justify-center w-8 h-8 rounded-full transition-all cursor-pointer ${showExportMenu ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
-                                                >
-                                                    <MoreHorizontal className="w-5 h-5" />
-                                                </button>
-
-                                                {/* Export Dropdown */}
-                                                {showExportMenu && selectedItems.size > 0 && (
-                                                    <div className="absolute top-full right-0 mt-2 w-48 bg-[#121214]/90 border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 z-50">
-                                                        <div className="p-1 space-y-0.5">
-                                                            <button
-                                                                onClick={() => { handleDownloadSelected(); setShowExportMenu(false); }}
-                                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium text-slate-300 hover:text-white hover:bg-indigo-500/20 rounded-xl transition-colors cursor-pointer group"
-                                                            >
-                                                                <FileText className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform" />
-                                                                Download as PDF
-                                                            </button>
-                                                            <button
-                                                                onClick={() => { handleDownloadWordSelected(); setShowExportMenu(false); }}
-                                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium text-slate-300 hover:text-white hover:bg-sky-500/20 rounded-xl transition-colors cursor-pointer group"
-                                                            >
-                                                                <FileText className="w-4 h-4 text-sky-400 group-hover:scale-110 transition-transform" />
-                                                                Download as Word
-                                                            </button>
-                                                            <button
-                                                                onClick={() => { handleDownloadMarkdownSelected(); setShowExportMenu(false); }}
-                                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium text-slate-300 hover:text-white hover:bg-fuchsia-500/20 rounded-xl transition-colors cursor-pointer group"
-                                                            >
-                                                                <FileText className="w-4 h-4 text-fuchsia-400 group-hover:scale-110 transition-transform" />
-                                                                Download as MD
-                                                            </button>
-
-                                                            <div className="h-px bg-white/10 my-1 mx-2"></div>
-                                                            <button
-                                                                onClick={() => {
-                                                                    setConfirmBulkDelete({ open: true, type: 'notes', count: selectedItems.size });
-                                                                    setShowExportMenu(false);
-                                                                }}
-                                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium text-red-400 hover:text-white hover:bg-red-500/20 rounded-xl transition-colors cursor-pointer group"
-                                                            >
-                                                                <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                                                                Delete Selected
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div className="w-px h-5 bg-white/[0.08] mx-1"></div>
-
-                                            <button
-                                                onClick={() => { setIsSelectionMode(false); setSelectedItems(new Set()); setShowExportMenu(false); }}
-                                                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-red-500/20 hover:text-red-400 transition-colors cursor-pointer"
-                                                title="Cancel"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <button
-                                                onClick={() => setShowNoteModal(true)}
-                                                className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
-                                            >
-                                                <PlusCircle className="w-4 h-4" strokeWidth={2} />
-                                                <span>Add Note</span>
-                                            </button>
-                                        </>
-                                    )}
-                                </>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setNotesViewMode(notesViewMode === 'grid' ? 'list' : 'grid')}
+                                        className="bg-white/[0.03] text-slate-400 border border-white/[0.08] hover:bg-white/[0.08] hover:text-white p-2.5 rounded-lg transition-all shadow-sm cursor-pointer"
+                                        title={`Switch to ${notesViewMode === 'grid' ? 'List' : 'Grid'} View`}
+                                    >
+                                        {notesViewMode === 'grid' ? <List className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
+                                    </button>
+                                    <button
+                                        onClick={() => setShowNoteModal(true)}
+                                        className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
+                                    >
+                                        <PlusCircle className="w-4 h-4" strokeWidth={2} />
+                                        <span>Add Note</span>
+                                    </button>
+                                </div>
                             )
                         }
 
                         {
-                            activeTab === 'images' && (
+                            activeTab === 'library' && (
                                 <button
-                                    onClick={() => setShowImageModal(true)}
+                                    onClick={() => setShowFileModal(true)}
                                     className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
                                 >
                                     <PlusCircle className="w-4 h-4" strokeWidth={2} />
-                                    <span>Add Image</span>
+                                    <span>Add File</span>
                                 </button>
                             )
                         }
@@ -2710,24 +2918,124 @@ const SubjectDetail = () => {
                                     <ListChecks className="w-6 h-6 text-indigo-400" />
                                     <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Question Bank</h3>
                                 </div>
-                                <div className="relative group w-full sm:min-w-[300px] sm:w-auto">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
-                                    <input
-                                        type="text"
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        placeholder="Search content or tags..."
-                                        className="w-full sm:w-[300px] bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
-                                    />
-                                    {searchQuery && (
+                                {isSelectionMode ? (
+                                    <div className="flex items-center h-[50px] bg-[#1a1a1e] border border-white/[0.12] rounded-2xl px-2 shadow-[0_12px_40px_rgba(0,0,0,0.8)] transition-all animate-in fade-in zoom-in-95 duration-300 w-full sm:w-auto relative z-[999]">
+                                        <div className="flex items-center pl-3 pr-2 border-r border-white/[0.08] mr-2">
+                                            <div className="w-6 h-6 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center text-[12px] font-bold mr-2">
+                                                {selectedItems.size}
+                                            </div>
+                                            <span className="text-[13px] text-slate-300 font-medium hidden sm:inline">selected</span>
+                                        </div>
+
                                         <button
-                                            onClick={() => setSearchQuery('')}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                            onClick={handleSelectAll}
+                                            className="text-[12px] font-medium text-slate-300 hover:text-white px-4 py-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+                                        >
+                                            {selectedItems.size > 0 && selectedItems.size === groupedQuestions.flatMap(g => g.questions).length ? 'Clear' : 'Select All'}
+                                        </button>
+
+                                        <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
+
+                                        <div className="flex items-center gap-1 relative">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setShowExportMenu(!showExportMenu); }}
+                                                disabled={selectedItems.size === 0}
+                                                className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all cursor-pointer ${showExportMenu ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
+                                            >
+                                                <Download className="w-4 h-4" />
+                                                <span className="text-[12px] font-medium hidden md:inline">Export</span>
+                                                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${showExportMenu ? 'rotate-180' : ''}`} />
+                                            </button>
+
+                                            {showExportMenu && selectedItems.size > 0 && (
+                                                <div
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="absolute top-full right-0 mt-3 w-60 bg-[#1e1e22] border border-white/15 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in slide-in-from-top-3 z-[1000] backdrop-blur-2xl transition-all p-2 space-y-1 block"
+                                                >
+                                                    <div className="px-3 py-2 border-b border-white/5 mb-1.5 leading-none">
+                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Select Export Format</span>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => { handleDownloadSelected(); setShowExportMenu(false); }}
+                                                        className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
+                                                    >
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
+                                                                <FileText className="w-4 h-4 text-indigo-400" />
+                                                            </div>
+                                                            <span>PDF Document</span>
+                                                        </div>
+                                                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => { handleDownloadWordSelected(); setShowExportMenu(false); }}
+                                                        className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
+                                                    >
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
+                                                                <FileText className="w-4 h-4 text-emerald-400" />
+                                                            </div>
+                                                            <span>Word Document</span>
+                                                        </div>
+                                                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => { handleDownloadMarkdownSelected(); setShowExportMenu(false); }}
+                                                        className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
+                                                    >
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center group-hover:bg-orange-500/20 transition-colors">
+                                                                <FileText className="w-4 h-4 text-orange-400" />
+                                                            </div>
+                                                            <span>Markdown File</span>
+                                                        </div>
+                                                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <button
+                                            onClick={() => {
+                                                setConfirmBulkDelete({ open: true, type: 'questions', count: selectedItems.size });
+                                            }}
+                                            disabled={selectedItems.size === 0}
+                                            className="flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:text-white hover:bg-rose-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                            <span className="text-[12px] font-medium hidden md:inline">Delete</span>
+                                        </button>
+
+                                        <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
+
+                                        <button
+                                            onClick={() => { setIsSelectionMode(false); setSelectedItems(new Set()); }}
+                                            className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
+                                            title="Cancel Selection"
                                         >
                                             <X className="w-4 h-4" />
                                         </button>
-                                    )}
-                                </div>
+                                    </div>
+                                ) : (
+                                    <div className="relative group w-full sm:min-w-[300px] sm:w-auto">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                                        <input
+                                            type="text"
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            placeholder="Search content or tags..."
+                                            className="w-full sm:w-[300px] bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                                        />
+                                        {searchQuery && (
+                                            <button
+                                                onClick={() => setSearchQuery('')}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-1 gap-6 items-start">
@@ -3251,64 +3559,165 @@ const SubjectDetail = () => {
                                     <FileText className="w-6 h-6 text-indigo-400" />
                                     <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Notes</h3>
                                 </div>
-                                <div className="flex flex-col sm:flex-row sm:items-center items-stretch gap-3 w-full sm:w-auto">
-                                    <div className="relative group flex-1 sm:min-w-[280px]">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
-                                        <input
-                                            type="text"
-                                            value={noteSearchQuery}
-                                            onChange={(e) => setNoteSearchQuery(e.target.value)}
-                                            placeholder="Search notes..."
-                                            className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
-                                        />
-                                        {noteSearchQuery && (
-                                            <button
-                                                onClick={() => setNoteSearchQuery('')}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {allNoteTags.length > 0 && (
-                                            <div className="flex-1">
-                                                <select
-                                                    value={selectedNoteTag}
-                                                    onChange={(e) => setSelectedNoteTag(e.target.value)}
-                                                    className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-200 rounded-xl px-4 py-2 text-[13px] focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all appearance-none cursor-pointer pr-10 hover:border-white/[0.15]"
-                                                    style={{
-                                                        backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(148, 163, 184, 1)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                                                        backgroundRepeat: 'no-repeat',
-                                                        backgroundPosition: 'right 0.75rem center',
-                                                        backgroundSize: '1em'
-                                                    }}
-                                                >
-                                                    <option value="">All Tags</option>
-                                                    {allNoteTags.map(tag => (
-                                                        <option key={tag} value={tag}>{tag}</option>
-                                                    ))}
-                                                </select>
+                                {isSelectionMode ? (
+                                    <div className="flex items-center h-[50px] bg-[#1a1a1e] border border-white/[0.12] rounded-2xl px-2 shadow-[0_12px_40px_rgba(0,0,0,0.8)] transition-all animate-in fade-in zoom-in-95 duration-300 w-full sm:w-auto relative z-[999]">
+                                        <div className="flex items-center pl-3 pr-2 border-r border-white/[0.08] mr-2">
+                                            <div className="w-6 h-6 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center text-[12px] font-bold mr-2">
+                                                {selectedItems.size}
                                             </div>
-                                        )}
-                                        <div className="flex bg-surface-2/50 p-1 rounded-xl border border-white/[0.06] shrink-0">
+                                            <span className="text-[13px] text-slate-300 font-medium hidden sm:inline">selected</span>
+                                        </div>
+
+                                        <button
+                                            onClick={handleSelectAll}
+                                            className="text-[12px] font-medium text-slate-300 hover:text-white px-4 py-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+                                        >
+                                            {selectedItems.size > 0 && selectedItems.size === filteredNotes.length ? 'Clear' : 'Select All'}
+                                        </button>
+
+                                        <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
+
+                                        <div className="flex items-center gap-1 relative">
                                             <button
-                                                onClick={() => setNotesViewMode('grid')}
-                                                className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
-                                                title="Grid View"
+                                                onClick={(e) => { e.stopPropagation(); setShowExportMenu(!showExportMenu); }}
+                                                disabled={selectedItems.size === 0}
+                                                className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all cursor-pointer ${showExportMenu ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
                                             >
-                                                <LayoutGrid className="w-4 h-4" />
+                                                <Download className="w-4 h-4" />
+                                                <span className="text-[12px] font-medium hidden md:inline">Export</span>
+                                                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${showExportMenu ? 'rotate-180' : ''}`} />
                                             </button>
-                                            <button
-                                                onClick={() => setNotesViewMode('list')}
-                                                className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
-                                                title="List View"
-                                            >
-                                                <List className="w-4 h-4" />
-                                            </button>
+
+                                            {showExportMenu && selectedItems.size > 0 && (
+                                                <div
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="absolute top-full right-0 mt-3 w-60 bg-[#1e1e22] border border-white/15 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in slide-in-from-top-3 z-[1000] backdrop-blur-2xl transition-all p-2 space-y-1 block"
+                                                >
+                                                    <div className="px-3 py-2 border-b border-white/5 mb-1.5 leading-none">
+                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Select Export Format</span>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => { handleDownloadSelected(); setShowExportMenu(false); }}
+                                                        className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
+                                                    >
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
+                                                                <FileText className="w-4 h-4 text-indigo-400" />
+                                                            </div>
+                                                            <span>PDF Document</span>
+                                                        </div>
+                                                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => { handleDownloadWordSelected(); setShowExportMenu(false); }}
+                                                        className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
+                                                    >
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
+                                                                <FileText className="w-4 h-4 text-emerald-400" />
+                                                            </div>
+                                                            <span>Word Document</span>
+                                                        </div>
+                                                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => { handleDownloadMarkdownSelected(); setShowExportMenu(false); }}
+                                                        className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
+                                                    >
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center group-hover:bg-orange-500/20 transition-colors">
+                                                                <FileText className="w-4 h-4 text-orange-400" />
+                                                            </div>
+                                                            <span>Markdown File</span>
+                                                        </div>
+                                                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <button
+                                            onClick={() => {
+                                                setConfirmBulkDelete({ open: true, type: 'notes', count: selectedItems.size });
+                                                setShowExportMenu(false);
+                                            }}
+                                            disabled={selectedItems.size === 0}
+                                            className="flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:text-white hover:bg-rose-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                            <span className="text-[12px] font-medium hidden md:inline">Delete</span>
+                                        </button>
+
+                                        <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
+
+                                        <button
+                                            onClick={() => { setIsSelectionMode(false); setSelectedItems(new Set()); setShowExportMenu(false); }}
+                                            className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
+                                            title="Cancel Selection"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col sm:flex-row sm:items-center items-stretch gap-3 w-full sm:w-auto">
+                                        <div className="relative group flex-1 sm:min-w-[280px]">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                                            <input
+                                                type="text"
+                                                value={noteSearchQuery}
+                                                onChange={(e) => setNoteSearchQuery(e.target.value)}
+                                                placeholder="Search notes..."
+                                                className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                                            />
+                                            {noteSearchQuery && (
+                                                <button
+                                                    onClick={() => setNoteSearchQuery('')}
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {allNoteTags.length > 0 && (
+                                                <div className="flex-1">
+                                                    <select
+                                                        value={selectedNoteTag}
+                                                        onChange={(e) => setSelectedNoteTag(e.target.value)}
+                                                        className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-200 rounded-xl px-4 py-2 text-[13px] focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all appearance-none cursor-pointer pr-10 hover:border-white/[0.15]"
+                                                        style={{
+                                                            backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(148, 163, 184, 1)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                                                            backgroundRepeat: 'no-repeat',
+                                                            backgroundPosition: 'right 0.75rem center',
+                                                            backgroundSize: '1em'
+                                                        }}
+                                                    >
+                                                        <option value="">All Tags</option>
+                                                        {allNoteTags.map(tag => (
+                                                            <option key={tag} value={tag}>{tag}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            )}
+                                            <div className="flex bg-surface-2/50 p-1 rounded-xl border border-white/[0.06] shrink-0">
+                                                <button
+                                                    onClick={() => setNotesViewMode('grid')}
+                                                    className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                                    title="Grid View"
+                                                >
+                                                    <LayoutGrid className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => setNotesViewMode('list')}
+                                                    className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                                    title="List View"
+                                                >
+                                                    <List className="w-4 h-4" />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
 
 
@@ -3352,21 +3761,17 @@ const SubjectDetail = () => {
                                                 <div
                                                     key={note.id}
                                                     id={`note-${note.id}`}
-                                                    className={`glass-panel rounded-xl border transition-all flex group relative overflow-visible ${highlightedNoteId == note.id ? 'ring-4 ring-emerald-500 scale-[1.05] shadow-[0_0_40px_rgba(16,185,129,0.5)] z-[100] border-emerald-400 opacity-100' : ''} ${notesViewMode === 'list' ? 'items-center py-3 pr-5 pl-1' : 'flex-col p-5'} ${activeNoteDropdown === note.id ? 'border-emerald-500/40 shadow-xl' : ''} ${isSelectionMode ? (selectedItems.has(note.id) ? 'border-indigo-400 bg-indigo-500/10 cursor-pointer shadow-[0_0_15px_rgba(99,102,241,0.2)]' : 'border-white/[0.06] hover:border-white/[0.1] cursor-pointer') : 'border-white/[0.06] hover:border-emerald-500/30 hover:bg-white/[0.02] cursor-pointer'}`}
-                                                    onClick={() => {
-                                                        if (isSelectionMode) {
-                                                            const next = new Set(selectedItems);
-                                                            if (next.has(note.id)) next.delete(note.id);
-                                                            else next.add(note.id);
-                                                            setSelectedItems(next);
-                                                        } else {
-                                                            setViewingNote(note);
-                                                            if (note.source_image_id) {
-                                                                handleFetchNoteImage(note.id);
-                                                            }
-                                                        }
-                                                    }}
+                                                    className={`glass-panel rounded-2xl border transition-all flex group relative ${highlightedNoteId == note.id ? 'ring-4 ring-emerald-500 scale-[1.02] shadow-[0_0_40px_rgba(16,185,129,0.5)] z-[100] border-emerald-400 opacity-100' : ''} ${notesViewMode === 'list' ? 'items-center py-4 px-6 gap-6' : 'flex-col p-6'} ${activeNoteDropdown === note.id ? 'border-emerald-500/40 shadow-xl' : ''} ${isSelectionMode ? (selectedItems.has(note.id) ? 'border-indigo-400 bg-indigo-500/10 cursor-pointer shadow-[0_0_15px_rgba(99,102,241,0.2)]' : 'border-white/[0.06] hover:border-white/[0.1] cursor-pointer') : 'border-white/[0.06] hover:border-emerald-500/30 hover:bg-white/[0.015] cursor-pointer'}`}
+                                                    onClick={() => handleOpenNote(note)}
                                                 >
+                                                    {fetchingNoteContentId === note.id && (
+                                                        <div className="note-fetching-overlay">
+                                                            <div className="scanning-ray" />
+                                                            <div className="fetching-pill">
+                                                                Opening...
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                     {isSelectionMode && (
                                                         <div className="absolute top-3 right-3 z-30">
                                                             <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(note.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-500 bg-surface-3/50'}`}>
@@ -3375,93 +3780,67 @@ const SubjectDetail = () => {
                                                         </div>
                                                     )}
                                                     {/* List mode progress line/indicator */}
-                                                    {notesViewMode === 'list' && (
-                                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500/40" />
-                                                    )}
-
-                                                    {/* Optional background glow */}
-
-                                                    <div className={`flex flex-1 min-w-0 ${notesViewMode === 'list' ? 'items-center px-4 gap-6' : 'flex-col'}`}>
-                                                        {/* Title Section */}
-                                                        <div className={`flex items-start gap-3 relative z-10 ${notesViewMode === 'list' ? 'w-1/3 shrink-0' : 'mb-4'}`}>
-                                                            <div className={`rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0 ${notesViewMode === 'list' ? 'p-1.5' : 'p-2.5'}`}>
-                                                                <FileText className={`${notesViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
+                                                    <div className={`flex flex-1 min-w-0 ${notesViewMode === 'list' ? 'items-center gap-6' : 'flex-col'}`}>
+                                                        {/* Title & Icon Section */}
+                                                        <div className={`flex items-start gap-4 relative z-10 ${notesViewMode === 'list' ? 'w-1/2 shrink-0' : 'mb-5'}`}>
+                                                            <div className={`rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 text-emerald-400 border border-emerald-500/20 shrink-0 shadow-lg ${notesViewMode === 'list' ? 'p-2' : 'p-3.5'}`}>
+                                                                <FileText className={`${notesViewMode === 'list' ? 'w-5 h-5' : 'w-6 h-6'}`} />
                                                             </div>
-                                                            <div className="min-w-0">
-                                                                <h4 className={`font-heading font-bold text-white tracking-tight break-words truncate group-hover:text-emerald-400 transition-colors ${notesViewMode === 'list' ? 'text-[14px]' : 'text-[15px]'}`}>
-                                                                    {note.title}
-                                                                </h4>
-                                                                <div className="flex items-center gap-2 mt-1">
-                                                                    <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap">
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                                                    <span className="text-[10px] text-slate-500 font-bold tracking-wider uppercase opacity-80">
                                                                         {new Date(note.created_at).toLocaleDateString(undefined, {
                                                                             day: 'numeric',
                                                                             month: 'short',
-                                                                            year: notesViewMode === 'grid' ? 'numeric' : undefined
+                                                                            year: 'numeric'
                                                                         })}
                                                                     </span>
-                                                                    {notesViewMode === 'list' && note.question_id && (
-                                                                        <>
-                                                                            <div className="w-1 h-1 rounded-full bg-slate-700" />
-                                                                            <span className="text-[10px] text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">Question Link</span>
-                                                                        </>
+                                                                    {note.question_id && (
+                                                                        <span className="text-[9px] text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded-full border border-indigo-500/20 font-black uppercase tracking-widest">
+                                                                            Linked
+                                                                        </span>
+                                                                    )}
+                                                                    {note.source_image_id && (
+                                                                        <span className="text-[9px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full border border-emerald-500/20 font-black uppercase tracking-widest flex items-center gap-1">
+                                                                            <ImageIcon className="w-2.5 h-2.5" />
+                                                                            Media
+                                                                        </span>
                                                                     )}
                                                                 </div>
-                                                                {notesViewMode === 'list' && (() => {
+                                                                <h4 className={`font-heading font-bold text-white tracking-tight break-words group-hover:text-emerald-400 transition-colors ${notesViewMode === 'list' ? 'text-[16px]' : 'text-[18px]'}`}>
+                                                                    {note.title}
+                                                                </h4>
+
+                                                                {notesViewMode === 'grid' && (() => {
                                                                     const nTags = Array.isArray(note.tags) ? note.tags : (note.parsedTags || []);
                                                                     if (!nTags || nTags.length === 0) return null;
                                                                     return (
-                                                                        <div className="flex flex-wrap gap-1.5 mt-1">
-                                                                            {nTags.map((tag, idx) => (
-                                                                                <span key={idx} className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider">
+                                                                        <div className="flex flex-wrap gap-1.5 mt-4">
+                                                                            {nTags.slice(0, 3).map((tag, idx) => (
+                                                                                <span key={idx} className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-white/[0.03] text-slate-400 border border-white/[0.06] uppercase tracking-wider">
                                                                                     {tag}
                                                                                 </span>
                                                                             ))}
+                                                                            {nTags.length > 3 && (
+                                                                                <span className="text-[9px] font-bold text-slate-600 px-1">+{nTags.length - 3}</span>
+                                                                            )}
                                                                         </div>
                                                                     );
                                                                 })()}
                                                             </div>
                                                         </div>
 
-                                                        {/* Content Section */}
-                                                        {notesViewMode === 'grid' ? (
-                                                            <div className="text-sm text-slate-300 leading-relaxed mb-4 relative z-10 overflow-hidden max-h-[140px] pointer-events-none [mask-image:linear-gradient(to_bottom,black_60%,transparent)]">
-                                                                <div className="prose prose-sm prose-invert max-w-none prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mt-0 prose-p:mb-2 prose-headings:font-bold prose-headings:text-white prose-headings:m-0 prose-headings:mb-1.5 prose-h1:text-[15px] prose-h2:text-[14px] prose-h3:text-[13px] prose-a:text-indigo-400 prose-code:text-slate-300 prose-code:bg-white/[0.06] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
-                                                                    <ReactMarkdown
-                                                                        remarkPlugins={[remarkGfm, remarkMath]}
-                                                                        rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
-                                                                    >
-                                                                        {preprocessMarkdown(note.content || '')}
-                                                                    </ReactMarkdown>
-                                                                </div>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex-1 min-w-0 relative z-10 hidden md:block">
-                                                                <p className="text-[12px] text-slate-400 truncate opacity-70 group-hover:opacity-100 transition-opacity">
-                                                                    {note.content?.substring(0, 200).replace(/[#*`\n]/g, ' ')}...
-                                                                </p>
-                                                            </div>
-                                                        )}
-
-                                                        {/* Source Image Link Section */}
-                                                        {note.source_image_id && (
-                                                            <div className={`relative z-10 shrink-0 ${notesViewMode === 'list' ? 'mb-0' : 'mb-6'}`}>
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        handleFetchNoteImage(note.id);
-                                                                        setViewingNote(note);
-                                                                    }}
-                                                                    disabled={fetchingImageId === `note-${note.id}`}
-                                                                    className={`flex items-center gap-2 rounded-xl font-bold bg-white/[0.04] text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all border border-white/[0.08] disabled:opacity-50 cursor-pointer ${notesViewMode === 'list' ? 'p-2' : 'px-4 py-2 text-[12px]'}`}
-                                                                    title="View Source Image"
-                                                                >
-                                                                    {fetchingImageId === `note-${note.id}` ? (
-                                                                        <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
-                                                                    ) : (
-                                                                        <ImageIcon className={`${notesViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
-                                                                    )}
-                                                                    {notesViewMode === 'grid' && <span>Source Image</span>}
-                                                                </button>
+                                                        {/* Secondary Indicators (List Mode Only) */}
+                                                        {notesViewMode === 'list' && (
+                                                            <div className="flex items-center gap-3 ml-auto mr-8">
+                                                                {(() => {
+                                                                    const nTags = Array.isArray(note.tags) ? note.tags : (note.parsedTags || []);
+                                                                    return nTags.slice(0, 2).map((tag, idx) => (
+                                                                        <span key={idx} className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-white/[0.03] text-slate-500 border border-white/[0.06] uppercase tracking-wider">
+                                                                            {tag}
+                                                                        </span>
+                                                                    ));
+                                                                })()}
                                                             </div>
                                                         )}
                                                     </div>
@@ -3545,7 +3924,7 @@ const SubjectDetail = () => {
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
                                                                                 setActiveNoteDropdown(null);
-                                                                                setEditingNote(note);
+                                                                                handleEditNote(note);
                                                                             }}
                                                                             className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
                                                                         >
@@ -4040,128 +4419,355 @@ const SubjectDetail = () => {
                         );
                     })()}
 
-                    {activeTab === 'images' && (
+                    {activeTab === 'library' && (
                         <div className="fade-in pb-12 px-1">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                            {/* Header for Library */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
                                 <div className="flex items-center gap-2">
-                                    <ImageIcon className="w-6 h-6 text-indigo-400" />
-                                    <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Image Gallery</h3>
+                                    <Layers className="w-6 h-6 text-indigo-400" />
+                                    <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Resource Library</h3>
                                 </div>
-                                <div className="relative group min-w-[300px]">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
-                                    <input
-                                        type="text"
-                                        value={imageSearchQuery}
-                                        onChange={(e) => setImageSearchQuery(e.target.value)}
-                                        placeholder="Search by date..."
-                                        className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
-                                    />
-                                    {imageSearchQuery && (
+                                {isSelectionMode ? (
+                                    <div className="flex items-center h-[50px] bg-[#121214]/80 border border-white/[0.08] rounded-2xl px-2 shadow-[0_8px_30px_rgb(0,0,0,0.6)] transition-all animate-in fade-in zoom-in-95 duration-300 w-full sm:w-auto">
+                                        <div className="flex items-center pl-3 pr-2">
+                                            <div className="w-6 h-6 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center text-[12px] font-bold mr-2">
+                                                {selectedItems.size}
+                                            </div>
+                                            <span className="text-[13px] text-slate-300 font-medium hidden sm:inline">selected</span>
+                                        </div>
+
+                                        <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
+
                                         <button
-                                            onClick={() => setImageSearchQuery('')}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                            onClick={() => {
+                                                if (selectedItems.size === files.length) setSelectedItems(new Set());
+                                                else setSelectedItems(new Set(files.map(f => f.id)));
+                                            }}
+                                            className="text-[12px] font-medium text-slate-300 hover:text-white px-4 py-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+                                        >
+                                            {selectedItems.size > 0 && selectedItems.size === files.length ? 'Clear' : 'Select All'}
+                                        </button>
+
+                                        <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
+
+                                        <button
+                                            onClick={async () => {
+                                                const loadingToast = toast.loading('Creating Zip...');
+                                                try {
+                                                    const zip = new JSZip();
+                                                    const usedNames = new Map();
+
+                                                    selectedItems.forEach(id => {
+                                                        const f = files.find(file => file.id === id);
+                                                        if (f && f.data) {
+                                                            let baseName = f.file_name || 'file';
+                                                            let ext = '';
+                                                            const lastDot = baseName.lastIndexOf('.');
+                                                            if (lastDot !== -1) {
+                                                                ext = baseName.substring(lastDot);
+                                                                baseName = baseName.substring(0, lastDot);
+                                                            } else {
+                                                                const typeMap = { 'image': '.jpg', 'pdf': '.pdf', 'doc': '.docx', 'xlsx': '.xlsx' };
+                                                                ext = typeMap[f.file_type] || '';
+                                                            }
+
+                                                            let finalName = `${baseName}${ext}`;
+                                                            if (usedNames.has(finalName)) {
+                                                                const count = usedNames.get(finalName) + 1;
+                                                                usedNames.set(finalName, count);
+                                                                finalName = `${baseName}_${count}${ext}`;
+                                                            } else {
+                                                                usedNames.set(finalName, 1);
+                                                            }
+
+                                                            const base64Content = f.data.split(',')[1];
+                                                            zip.file(finalName, base64Content, { base64: true });
+                                                        }
+                                                    });
+
+                                                    const content = await zip.generateAsync({ type: 'blob' });
+                                                    const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+                                                    const zipFileName = `${subject?.name || 'Library'}_Export_${timestamp}.zip`.replace(/\s+/g, '_');
+                                                    saveAs(content, zipFileName);
+
+                                                    setIsSelectionMode(false);
+                                                    setSelectedItems(new Set());
+                                                    toast.success('Zip downloaded!', { id: loadingToast });
+                                                } catch (err) {
+                                                    console.error('Zip download error:', err);
+                                                    toast.error('Failed to create Zip', { id: loadingToast });
+                                                }
+                                            }}
+                                            disabled={selectedItems.size === 0}
+                                            className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all cursor-pointer ${selectedItems.size === 0 ? 'text-slate-600 cursor-not-allowed opacity-50' : 'text-emerald-400 hover:text-white hover:bg-emerald-500/20'}`}
+                                        >
+                                            <Download className="w-4 h-4" />
+                                            <span className="text-[12px] font-medium hidden md:inline">Download</span>
+                                        </button>
+
+                                        <button
+                                            onClick={() => {
+                                                setConfirmDeleteFile({ open: true, items: Array.from(selectedItems).map(id => files.find(f => f.id === id)).filter(Boolean) });
+                                            }}
+                                            disabled={selectedItems.size === 0}
+                                            className="flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:text-white hover:bg-rose-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                            <span className="text-[12px] font-medium hidden md:inline">Delete</span>
+                                        </button>
+
+                                        <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
+
+                                        <button
+                                            onClick={() => {
+                                                setIsSelectionMode(false);
+                                                setSelectedItems(new Set());
+                                            }}
+                                            className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
+                                            title="Cancel Selection"
                                         >
                                             <X className="w-4 h-4" />
                                         </button>
-                                    )}
-                                </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center bg-white/[0.03] p-1 rounded-xl border border-white/[0.06] shrink-0">
+                                        <div className="flex items-center bg-white/[0.02] rounded-lg p-0.5">
+                                            <div className="relative group">
+                                                <button
+                                                    onClick={() => setLibraryViewMode('categorywise')}
+                                                    className={`p-1.5 rounded-lg transition-all ${libraryViewMode === 'categorywise' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
+                                                    title="Type View"
+                                                >
+                                                    <LayoutGrid className="w-3.5 h-3.5" />
+                                                </button>
+                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#121214] border border-white/10 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 uppercase tracking-widest shadow-xl">
+                                                    Type
+                                                </div>
+                                            </div>
+                                            <div className="relative group">
+                                                <button
+                                                    onClick={() => setLibraryViewMode('datewise')}
+                                                    className={`p-1.5 rounded-lg transition-all ${libraryViewMode === 'datewise' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
+                                                    title="Timeline View"
+                                                >
+                                                    <Clock className="w-3.5 h-3.5" />
+                                                </button>
+                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#121214] border border-white/10 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 uppercase tracking-widest shadow-xl">
+                                                    Timeline
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="w-px h-4 bg-white/10 mx-1" />
+
+                                        <div className="flex items-center gap-0 shrink-0">
+                                            <button
+                                                onClick={() => setShowTimeTraveler(true)}
+                                                className={`px-3 py-1.5 ${fileSearchQuery ? 'rounded-l-lg' : 'rounded-lg'} text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 border ${fileSearchQuery ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30 border-r-indigo-500/10 hover:bg-indigo-500/30' : 'text-slate-500 hover:text-white hover:bg-white/[0.05] border-transparent'}`}
+                                            >
+                                                <History className="w-3.5 h-3.5" />
+                                                <span className="hidden sm:inline">Filter</span>
+                                            </button>
+                                            {fileSearchQuery && (
+                                                <button
+                                                    onClick={() => setFileSearchQuery('')}
+                                                    className="h-[28px] px-2 flex items-center justify-center rounded-r-lg bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 border border-indigo-500/30 border-l-0 hover:border-rose-500/30 transition-colors"
+                                                    title="Clear Filters"
+                                                >
+                                                    <X className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
-                            {images.length === 0 ? (
-                                <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                    <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 rotate-3">
-                                        <ImageIcon className="w-10 h-10 text-indigo-500/70" />
+                            {files.length === 0 ? (
+                                <div className="glass-panel rounded-xl p-16 text-center border-dashed border-primary/20 w-full relative overflow-hidden group">
+                                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+                                    <div className="w-20 h-20 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-6 border border-primary/20 pulse-ring">
+                                        <Layers className="w-10 h-10 text-primary" strokeWidth={1.5} />
                                     </div>
-                                    <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No images yet</h3>
-                                    <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
-                                        Upload diagrams, textbook snippets, or handwritten notes. They'll be saved here for easy reference and AI analysis.
+                                    <h3 className="text-2xl font-heading font-bold text-white mb-3 tracking-tight">No resources yet</h3>
+                                    <p className="text-slate-400 text-sm max-w-sm mx-auto mb-8 leading-relaxed">
+                                        Upload documents, diagrams, textbook snippets, or handwritten notes. They'll be saved here for easy reference.
                                     </p>
                                     <button
-                                        onClick={() => setShowImageModal(true)}
-                                        className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
+                                        onClick={() => setShowFileModal(true)}
+                                        className="btn-primary flex items-center gap-2 mx-auto px-6 py-3 rounded-xl text-sm font-semibold cursor-pointer"
                                     >
                                         <PlusCircle className="w-4 h-4" />
-                                        <span>Upload Your First Image</span>
+                                        <span>Upload Your First File</span>
                                     </button>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
-                                    {images
-                                        .filter(img =>
-                                            new Date(img.created_at).toLocaleDateString().includes(imageSearchQuery)
-                                        )
-                                        .map((img, index, arr) => {
-                                            const isLast = index === arr.length - 1;
-                                            return (
-                                                <div
-                                                    key={img.id}
-                                                    ref={isLast ? lastImageElementRef : null}
-                                                    style={{ animationDelay: `${(index % 10) * 0.05}s` }}
-                                                    className="group relative aspect-square rounded-2xl overflow-hidden bg-surface-2 border border-white/[0.06] hover:border-indigo-500/50 transition-all cursor-pointer shadow-lg hover:shadow-indigo-500/20 active:scale-[0.98] fade-in"
-                                                >
-                                                    {/* Source Indicator Button */}
-                                                    {(img.linked_question_id || img.linked_note_id) && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                if (img.linked_question_id) {
-                                                                    navigateToQuestion(img.linked_question_id);
-                                                                } else if (img.linked_note_id) {
-                                                                    const note = notes.find(n => n.id === img.linked_note_id);
-                                                                    if (note) {
-                                                                        setViewingNote(note);
-                                                                        if (note.source_image_id) handleFetchNoteImage(note.id);
-                                                                    }
-                                                                }
-                                                            }}
-                                                            className="absolute top-3 right-3 p-2 bg-black/60 rounded-xl text-indigo-400 border border-white/[0.08] opacity-0 group-hover:opacity-100 transition-all shadow-2xl z-20 hover:scale-110 active:scale-95 hover:bg-indigo-500/20"
-                                                            title="View Linked Content"
-                                                        >
-                                                            <LinkIcon className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    )}
-
-                                                    <img
-                                                        src={img.data}
-                                                        alt="Subject material"
-                                                        className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700"
-                                                        loading="lazy"
-                                                    />
-                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-4">
-                                                        <div className="flex items-center justify-between mb-2">
-                                                            <p className="text-[11px] font-bold text-white/70 flex items-center gap-1.5">
-                                                                <Activity className="w-3 h-3 text-indigo-400" />
-                                                                {new Date(img.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                                            </p>
-                                                            {img.linked_question_id && <span className="text-[9px] font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">Question</span>}
-                                                            {img.linked_note_id && <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">Note</span>}
-                                                        </div>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                const fakeNote = {
-                                                                    id: `img-${img.id}`,
-                                                                    title: 'Source Image',
-                                                                    content: 'Original captured material.',
-                                                                    source_image_id: img.id,
-                                                                    created_at: img.created_at
-                                                                };
-                                                                setFetchedImages(prev => ({ ...prev, [`note-img-${img.id}`]: img.data }));
-                                                                setViewingNote(fakeNote);
-                                                            }}
-                                                            className="w-full py-2 bg-white text-black text-[12px] font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 transition-colors shadow-lg active:scale-95"
-                                                        >
-                                                            <Maximize2 className="w-3.5 h-3.5" />
-                                                            View Full
-                                                        </button>
-                                                    </div>
+                                <div className="space-y-12">
+                                    {groupedLibraryItems.map((group, gIdx) => (
+                                        <div key={group.title} className="relative">
+                                            <div className="sticky top-0 z-30 pt-4 pb-6 bg-surface mb-2">
+                                                <div className="flex items-center gap-4">
+                                                    <h2 className="text-xl font-heading font-bold text-white tracking-tight flex items-center gap-3">
+                                                        {group.title}
+                                                        <span className="text-[11px] font-bold text-slate-500 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">{group.items.length}</span>
+                                                    </h2>
+                                                    <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
                                                 </div>
-                                            );
-                                        })}
+                                            </div>
+
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                                                {group.items.map((file, index) => {
+                                                    const isGlobalLast = gIdx === groupedLibraryItems.length - 1 && index === group.items.length - 1;
+                                                    const hasLink = file.linked_question_id || file.linked_note_id;
+
+                                                    return (
+                                                        <div
+                                                            key={file.id}
+                                                            ref={isGlobalLast ? lastFileElementRef : null}
+                                                            className={`group relative aspect-square rounded-xl bg-surface-2 transition-all duration-300 cursor-pointer shadow-lg active:scale-[0.98] fade-in border ${isSelectionMode
+                                                                ? (selectedItems.has(file.id) ? 'border-indigo-500 ring-2 ring-indigo-500/50 bg-indigo-500/10 scale-95 opacity-90' : 'border-white/[0.04] scale-100 opacity-100')
+                                                                : (activeFileDropdown === file.id ? 'border-primary/40 shadow-xl' : 'border-white/[0.04] hover:border-primary/40 hover:shadow-primary/5')
+                                                                }`}
+                                                            onClick={() => {
+                                                                if (isSelectionMode) {
+                                                                    const newSelected = new Set(selectedItems);
+                                                                    if (newSelected.has(file.id)) newSelected.delete(file.id);
+                                                                    else newSelected.add(file.id);
+                                                                    setSelectedItems(newSelected);
+                                                                    return;
+                                                                }
+                                                                if (activeFileDropdown === file.id) setActiveFileDropdown(null);
+                                                                else setViewingFile(file);
+                                                            }}
+                                                            style={{ animationDelay: `${(index % 10) * 0.05}s` }}
+                                                        >
+                                                            <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none">
+                                                                {file.file_type === 'image' || !file.file_type ? (
+                                                                    <img
+                                                                        src={file.data}
+                                                                        alt={file.file_name}
+                                                                        className="w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
+                                                                        loading="lazy"
+                                                                    />
+                                                                ) : (
+                                                                    <div className="w-full h-full flex flex-col items-center justify-center bg-surface-3 opacity-90 group-hover:opacity-100 transition-all duration-500 text-slate-300">
+                                                                        <FileText className="w-12 h-12 mb-2 text-primary" />
+                                                                        <span className="text-xs uppercase font-bold text-slate-400">{file.file_type} File</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Indicators */}
+                                                            {hasLink && (
+                                                                <div className="absolute top-2 left-2 flex gap-1 z-20">
+                                                                    {file.linked_question_id && (
+                                                                        <div className="p-1.5 rounded-lg bg-indigo-500/80 text-white border border-white/10 shadow-lg" title="Linked to Question">
+                                                                            <Activity className="w-3 h-3" />
+                                                                        </div>
+                                                                    )}
+                                                                    {file.linked_note_id && (
+                                                                        <div className="p-1.5 rounded-lg bg-emerald-500/80 text-white border border-white/10 shadow-lg" title="Linked to Note">
+                                                                            <FileText className="w-3 h-3" />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+
+                                                            {/* Selection Indicator */}
+                                                            {isSelectionMode && (
+                                                                <div className="absolute top-3 right-3 z-30">
+                                                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(file.id) ? 'bg-indigo-500 border-indigo-500' : 'border-white/30 bg-black/40 backdrop-blur-sm'}`}>
+                                                                        {selectedItems.has(file.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Standard Identical Overlay from Library.jsx */}
+                                                            <div className={`absolute inset-0 rounded-xl bg-gradient-to-t from-black/90 via-black/20 to-transparent transition-all duration-300 flex flex-col justify-end p-4 ${isSelectionMode || activeFileDropdown === file.id ? 'opacity-100 bg-black/30' : 'opacity-0 group-hover:opacity-100'}`}>
+                                                                <div className="flex items-center justify-between mb-1.5 relative">
+                                                                    <div className="text-[10px] font-bold text-primary uppercase tracking-wider">
+                                                                        {subject?.name}
+                                                                    </div>
+
+                                                                    {!isSelectionMode && hasLink && (
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                if (file.linked_question_id) navigateToQuestion(file.linked_question_id);
+                                                                                else if (file.linked_note_id) {
+                                                                                    const note = notes.find(n => n.id === file.linked_note_id);
+                                                                                    if (note) {
+                                                                                        setViewingNote(note);
+                                                                                        if (note.source_image_id) handleFetchNoteImage(note.id);
+                                                                                    }
+                                                                                }
+                                                                            }}
+                                                                            className="p-1 px-[5px] bg-primary/20 hover:bg-primary text-white rounded-lg border border-primary/30 transition-all cursor-pointer"
+                                                                            title="View Linked Content"
+                                                                        >
+                                                                            <LinkIcon className="w-3 h-3" />
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+
+                                                                <div className="flex items-center justify-between gap-2">
+                                                                    <p className="text-[11px] font-semibold text-white truncate flex-1">
+                                                                        {file.file_name || new Date(file.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                                    </p>
+
+                                                                    {!isSelectionMode && (
+                                                                        <div className="relative shrink-0" onClick={e => e.stopPropagation()}>
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setActiveFileDropdown(activeFileDropdown === file.id ? null : file.id);
+                                                                                }}
+                                                                                className={`p-1 flex items-center justify-center rounded-lg border transition-all cursor-pointer ${activeFileDropdown === file.id ? 'bg-primary border-primary text-white' : 'bg-black/40 hover:bg-black/60 text-white/80 border-white/10 backdrop-blur-sm'}`}
+                                                                                title="More Options"
+                                                                            >
+                                                                                <MoreVertical className="w-3.5 h-3.5" />
+                                                                            </button>
+                                                                            {activeFileDropdown === file.id && (
+                                                                                <div className="absolute right-0 bottom-full mb-2 w-36 bg-[#121214]/95 border border-white/10 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.6)] py-1.5 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200 z-50 backdrop-blur-xl" onClick={e => e.stopPropagation()}>
+                                                                                    <button
+                                                                                        onClick={() => { setIsSelectionMode(true); setSelectedItems(new Set([file.id])); setActiveFileDropdown(null); }}
+                                                                                        className="w-full flex items-center justify-start gap-2.5 px-3.5 py-2 text-[12px] font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+                                                                                    >
+                                                                                        <CheckCircle className="w-3.5 h-3.5 text-indigo-400" /> Select
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            setActiveFileDropdown(null);
+                                                                                            setRenameFileData({ open: true, file, name: file.file_name || '' });
+                                                                                        }}
+                                                                                        className="w-full flex items-center justify-start gap-2.5 px-3.5 py-2 text-[12px] font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+                                                                                    >
+                                                                                        <Pencil className="w-3.5 h-3.5 text-emerald-400" /> Rename
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            setActiveFileDropdown(null);
+                                                                                            setConfirmDeleteFile({ open: true, items: [file] });
+                                                                                        }}
+                                                                                        className="w-full flex items-center justify-start gap-2.5 px-3.5 py-2 text-[12px] font-medium text-slate-300 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
+                                                                                    >
+                                                                                        <Trash2 className="w-3.5 h-3.5 text-rose-500" /> Delete
+                                                                                    </button>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             )}
 
-                            {loadingMoreImages && (
+                            {loadingMoreFiles && (
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5 mt-5">
                                     {[...Array(5)].map((_, i) => (
                                         <div key={`skeleton-${i}`} className="aspect-square rounded-2xl bg-surface-2/40 border border-white/[0.04] animate-pulse overflow-hidden">
@@ -4171,8 +4777,7 @@ const SubjectDetail = () => {
                                 </div>
                             )}
                         </div>
-                    )
-                    }
+                    )}
                 </>
             )}
 
@@ -4201,6 +4806,34 @@ const SubjectDetail = () => {
                 danger
             />
 
+            <ConfirmDialog
+                isOpen={confirmDeleteFile.open}
+                title={`Delete ${confirmDeleteFile.items.length > 1 ? `${confirmDeleteFile.items.length} Files` : 'File'}`}
+                message={`Are you sure you want to delete ${confirmDeleteFile.items.length > 1 ? 'these files' : 'this file'}? This action cannot be undone.`}
+                onConfirm={async () => {
+                    try {
+                        for (const file of confirmDeleteFile.items) {
+                            await filesApi.delete(id, file.id);
+                        }
+                        const deletedIds = new Set(confirmDeleteFile.items.map(f => f.id));
+                        setFiles(prev => prev.filter(f => !deletedIds.has(f.id)));
+                        setSelectedItems(prev => {
+                            const next = new Set(prev);
+                            deletedIds.forEach(id => next.delete(id));
+                            return next;
+                        });
+                        if (selectedItems.size === confirmDeleteFile.items.length) setIsSelectionMode(false);
+                        setConfirmDeleteFile({ open: false, items: [] });
+                        toast.success("File(s) deleted");
+                    } catch {
+                        toast.error("Failed to delete files");
+                    }
+                }}
+                onCancel={() => setConfirmDeleteFile({ open: false, items: [] })}
+                confirmText="Delete"
+                danger
+            />
+
             <AddSolutionModal
                 isOpen={showSolutionModal}
                 onClose={() => {
@@ -4212,14 +4845,59 @@ const SubjectDetail = () => {
                 onSolutionAdded={handleSolutionAdded}
             />
 
-            <ViewSolutionModal
-                isOpen={!!viewingSolution}
-                onClose={() => setViewingSolution(null)}
-                solution={viewingSolution}
-                sourceImage={viewingSolution ? fetchedImages[`solution-${viewingSolution.id}`] : null}
-                isFetchingImage={fetchingImageId === (viewingSolution ? `solution-${viewingSolution.id}` : null)}
-                onEdit={handleOpenEditSolution}
-            />
+            {viewingSolution && (
+                <ViewSolutionModal
+                    isOpen={true}
+                    onClose={() => setViewingSolution(null)}
+                    solution={viewingSolution}
+                    sourceImage={viewingSolution ? fetchedImages[`solution-${viewingSolution.id}`] : null}
+                    isFetchingImage={fetchingImageId === (viewingSolution ? `solution-${viewingSolution.id}` : null)}
+                    onEdit={handleOpenEditSolution}
+                />
+            )}
+
+            {viewingFile && (
+                <FileViewerModal
+                    key={viewingFile.id}
+                    isOpen={true}
+                    onClose={() => {
+                        setViewingFile(null);
+                        setIsFileViewerMinimized(false);
+                    }}
+                    file={viewingFile}
+                    allFiles={files}
+                    onPrev={() => {
+                        const idx = (files || []).findIndex(f => f.id === viewingFile.id);
+                        if (idx > 0) setViewingFile(files[idx - 1]);
+                    }}
+                    onNext={() => {
+                        const idx = (files || []).findIndex(f => f.id === viewingFile.id);
+                        if (idx >= 0 && idx < (files || []).length - 1) setViewingFile(files[idx + 1]);
+                    }}
+                    onSelect={(file) => setViewingFile(file)}
+                    isMinimized={isFileViewerMinimized}
+                    onMinimize={setIsFileViewerMinimized}
+                    onDelete={async (deletedFile) => {
+                        await filesApi.delete(deletedFile.subject_id, deletedFile.id);
+                        setFiles(prev => (prev || []).filter(f => f.id !== deletedFile.id));
+                        setViewingFile(null);
+                        setIsFileViewerMinimized(false);
+                        toast.success("File deleted successfully");
+                    }}
+                    onNavigateToLinkedContent={(file) => {
+                        if (file.linked_question_id) {
+                            navigateToQuestion(file.linked_question_id);
+                        } else if (file.linked_note_id) {
+                            const note = notes.find(n => n.id === file.linked_note_id);
+                            if (note) {
+                                setViewingNote(note);
+                                if (note.source_image_id) handleFetchNoteImage(note.id);
+                            }
+                        }
+                    }}
+                />
+            )}
+
 
             <EditSolutionModal
                 isOpen={showEditSolutionModal}
@@ -4231,7 +4909,37 @@ const SubjectDetail = () => {
                 solution={editingSolution}
                 onSolutionUpdated={handleEditSolutionUpdated}
             />
-        </div >
+
+            <TimeTraveler
+                isOpen={showTimeTraveler}
+                onClose={() => setShowTimeTraveler(false)}
+                onApply={(val) => setFileSearchQuery(val)}
+            />
+
+            <ConfirmDialog
+                isOpen={renameFileData.open}
+                title="Rename File"
+                message="Enter a new identity for this material."
+                confirmText="Save Name"
+                type="primary"
+                onConfirm={handleRenameFile}
+                onCancel={() => setRenameFileData({ open: false, file: null, name: '' })}
+            >
+                <div className="w-full mt-4">
+                    <input
+                        autoFocus
+                        type="text"
+                        value={renameFileData.name}
+                        onChange={(e) => setRenameFileData(prev => ({ ...prev, name: e.target.value }))}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleRenameFile();
+                        }}
+                        className="w-full bg-white/[0.03] border border-white/[0.1] rounded-xl px-4 py-3.5 text-white text-[14px] focus:outline-none focus:border-primary/50 transition-all"
+                        placeholder="e.g. Biology Session 1"
+                    />
+                </div>
+            </ConfirmDialog>
+        </div>
     );
 };
 

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { LayoutDashboard, LibraryBig, LogOut, Activity, ChevronLeft, ChevronRight, Settings, Image as ImageIcon, Target } from 'lucide-react';
+import { LayoutDashboard, LibraryBig, LogOut, Activity, ChevronLeft, ChevronRight, Settings, Layers, Target } from 'lucide-react';
+
 import EditProfileModal from './modals/EditProfileModal.jsx';
 
 
@@ -9,7 +10,7 @@ const navItems = [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/subjects', label: 'Subjects', icon: LibraryBig },
     { to: '/tests', label: 'Tests', icon: Target },
-    { to: '/images', label: 'Images', icon: ImageIcon },
+    { to: '/library', label: 'Library', icon: Layers },
 ];
 
 const Sidebar = () => {
@@ -76,7 +77,7 @@ const Sidebar = () => {
             </div>
 
             {/* Logo Section */}
-            <div className={`pt-7 pb-6 transition-all duration-300 z-10 ${isCollapsed ? 'px-3' : 'px-4'}`}>
+            <div className={`pt-7 pb-4 transition-all duration-300 z-10 ${isCollapsed ? 'px-3' : 'px-4'}`}>
                 <div
                     className={`rounded-2xl relative overflow-hidden transition-all duration-500
                         ${isCollapsed ? 'p-2' : 'p-3.5'}`}
@@ -164,7 +165,7 @@ const Sidebar = () => {
                         boxShadow: '0 8px 32px -4px rgba(0,0,0,0.5)',
                     }}
                 >
-                    <div className="flex items-center relative z-10 ${isCollapsed ? 'justify-center' : 'gap-3'}">
+                    <div className={`flex items-center relative z-10 ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
                         <div className="relative">
                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-heading font-bold text-white overflow-hidden bg-gradient-to-tr from-primary to-indigo-500 shadow-lg shadow-primary/30`}>
                                 {user?.profile_picture ? (

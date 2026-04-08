@@ -41,8 +41,17 @@ export const AuthProvider = ({ children }) => {
         return data.user;
     };
 
+    const updatePreferences = async (preferences) => {
+        const data = await authApi.updatePreferences(preferences);
+        setUser(prev => ({
+            ...prev,
+            preferences: data.preferences
+        }));
+        return data.preferences;
+    };
+
     return (
-        <AuthContext.Provider value={{ user, loading, login, register, logout, updateProfile, forgotPassword }}>
+        <AuthContext.Provider value={{ user, loading, login, register, logout, updateProfile, forgotPassword, updatePreferences }}>
             {children}
         </AuthContext.Provider>
     );

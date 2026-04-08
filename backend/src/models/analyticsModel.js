@@ -54,8 +54,8 @@ export const getSubjectsOverview = async (subjectIds) => {
         .groupBy('subject_id')
         .select('subject_id', db.raw('COUNT(*) as count'));
 
-    // 8. Image counts
-    const images = await db('revision.source_images')
+    // 8. File counts
+    const files = await db('revision.files')
         .whereIn('subject_id', subjectIds)
         .where('is_deleted', false)
         .groupBy('subject_id')
@@ -70,7 +70,7 @@ export const getSubjectsOverview = async (subjectIds) => {
         const t = tpc.find(a => a.subject_id == id);
         const n = notes.find(a => a.subject_id == id);
         const sl = solutions.find(a => a.subject_id == id);
-        const img = images.find(a => a.subject_id == id);
+        const fl = files.find(a => a.subject_id == id);
 
         // Session count remains specific due to OR/EXISTS logic which is tricky to batch perfectly with GROUP BY
         const accurateSessCount = await db('revision.sessions as s')
@@ -100,7 +100,7 @@ export const getSubjectsOverview = async (subjectIds) => {
             total_revision_sessions: parseInt(rs?.count || 0),
             total_notes: parseInt(n?.count || 0),
             total_solutions: parseInt(sl?.count || 0),
-            total_images: parseInt(img?.count || 0),
+            total_files: parseInt(fl?.count || 0),
         };
     }
 

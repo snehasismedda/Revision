@@ -1,54 +1,58 @@
 import * as noteModel from '../models/noteModel.js';
 import * as questionModel from '../models/questionModel.js';
-import * as sourceImageModel from '../models/sourceImageModel.js';
+import * as sourceImageModel from '../models/sourceImageModel.js'; // Using the alias inside sourceImageModel
 import * as topicModel from '../models/topicModel.js';
 import { ollama, models } from '../config/ollama.js';
 import { noteAnalysisPrompt } from '../system_prompts/index.js';
 import { parseQuestionToRichText } from '../services/ai_service/response/questionParser.js';
 
-export const getAllImages = async (req, res) => {
+export const getAllFiles = async (req, res) => {
     try {
-        const { limit, offset } = req.query;
-        const images = await sourceImageModel.getAllSourceImagesByUser(
+        const { limit, offset, type } = req.query;
+        const files = await sourceImageModel.getAllSourceImagesByUser(
             req.user.id,
             limit ? parseInt(limit, 10) : undefined,
-            offset ? parseInt(offset, 10) : undefined
+            offset ? parseInt(offset, 10) : undefined,
+            type
         );
-        res.status(200).json({ images });
+        res.status(200).json({ files });
     } catch (error) {
-        console.error('[getAllImages]', error);
-        res.status(500).json({ error: 'Failed to fetch images' });
+        console.error('[getAllFiles]', error);
+        res.status(500).json({ error: 'Failed to fetch files' });
     }
 };
 
-export const getImagesBySubject = async (req, res) => {
+export const getFilesBySubject = async (req, res) => {
     try {
         const { id: subjectId } = req.params;
-        const { limit, offset } = req.query;
-        const images = await sourceImageModel.getSourceImagesBySubject(
+        const { limit, offset, type } = req.query;
+        const files = await sourceImageModel.getSourceImagesBySubject(
             subjectId,
             limit ? parseInt(limit, 10) : undefined,
-            offset ? parseInt(offset, 10) : undefined
+            offset ? parseInt(offset, 10) : undefined,
+            type
         );
-        res.status(200).json({ images });
+        res.status(200).json({ files });
     } catch (error) {
-        console.error('[getImagesBySubject]', error);
-        res.status(500).json({ error: 'Failed to fetch subject images' });
+        console.error('[getFilesBySubject]', error);
+        res.status(500).json({ error: 'Failed to fetch subject files' });
     }
 };
 
-export const saveImageAs = async (req, res) => {
-    const { content, type, subjectId, skipAI } = req.body;
+export const saveFileAs = async (req, res) => {
+    const { content, type, fileType, fileName, subjectId, skipAI } = req.body; // type here is content type ('question', 'note'). fileType is 'image', 'pdf', etc.
     if (!content || !type || !subjectId) {
         return res.status(400).json({ error: 'content, type, and subjectId are required' });
     }
 
     try {
-        // 1. Create source image
-        const savedImage = await sourceImageModel.createSourceImage(subjectId, content);
-        const sourceImageId = savedImage.id;
+        // 1. Create file 
+        const savedFile = await sourceImageModel.createFile(subjectId, content, fileType || 'image', fileName);
+        const sourceImageId = savedFile.id;
 
-        if (type === 'question') {
+        if (type === 'file') {
+            return res.status(201).json({ file: savedFile });
+        } else if (type === 'question') {
             if (skipAI) {
                 const results = await questionModel.createQuestions({
                     subject_id: subjectId,
@@ -118,7 +122,31 @@ export const saveImageAs = async (req, res) => {
             res.status(400).json({ error: 'invalid type' });
         }
     } catch (error) {
-        console.error('[saveImageAs]', error);
-        res.status(500).json({ error: 'Failed to process image' });
+        console.error('[saveFileAs]', error);
+        res.status(500).json({ error: 'Failed to process file' });
+    }
+};
+
+export const deleteFile = async (req, res) => {
+    try {
+        const { subjectId, id } = req.params;
+        await sourceImageModel.softDeleteSourceImage(id, subjectId);
+        res.status(200).json({ success: true });
+    } catch (error) {
+        console.error('[deleteFile]', error);
+        res.status(500).json({ error: 'Failed to delete file' });
+    }
+};
+
+export const updateFile = async (req, res) => {
+    try {
+        const { subjectId, id } = req.params;
+        const { fileName } = req.body;
+        const [updatedFile] = await sourceImageModel.updateFileName(id, subjectId, fileName);
+        if (!updatedFile) return res.status(404).json({ error: 'File not found' });
+        res.status(200).json({ file: updatedFile });
+    } catch (error) {
+        console.error('[updateFile]', error);
+        res.status(500).json({ error: 'Failed to update file' });
     }
 };

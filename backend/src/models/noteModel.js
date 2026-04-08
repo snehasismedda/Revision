@@ -1,18 +1,22 @@
 import db from '../knex/db.js';
 
-export const getNotesBySubject = async (subjectId, limit, offset) => {
+export const getNotesBySubject = async (subjectId, limit, offset, includeContent = false) => {
     let query = db('revision.notes')
         .where({ subject_id: subjectId, is_deleted: false })
         .orderBy('created_at', 'desc');
-    
+
+    if (!includeContent) {
+        query = query.select('id', 'subject_id', 'question_id', 'parent_note_id', 'source_image_id', 'title', 'tags', 'created_at', 'updated_at');
+    }
+
     if (limit !== undefined) {
         query = query.limit(limit);
     }
-    
+
     if (offset !== undefined) {
         query = query.offset(offset);
     }
-    
+
     return await query;
 };
 
@@ -75,7 +79,7 @@ export const getUniqueTagsBySubject = async (subjectId) => {
     const notes = await db('revision.notes')
         .where({ subject_id: subjectId, is_deleted: false })
         .select('tags');
-    
+
     const tagSet = new Set();
     notes.forEach(note => {
         const noteTags = note.tags || [];
@@ -98,8 +102,8 @@ export const softDeleteNotesByQuestion = async (data) => {
         .update({ is_deleted: true, deleted_at: db.fn.now() });
 };
 
-export const getNoteById = async (id, subjectId) => {
+export const getNotesByIds = async (ids) => {
     return await db('revision.notes')
-        .where({ id, subject_id: subjectId, is_deleted: false })
-        .first();
+        .whereIn('id', ids)
+        .select('*');
 };
