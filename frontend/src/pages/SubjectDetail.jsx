@@ -19,6 +19,8 @@ import { marked } from 'marked';
 import { saveAs } from 'file-saver';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, ImageRun, Table, TableRow, TableCell, WidthType, AlignmentType } from 'docx';
 import { ArrowLeft, PlusCircle, BarChart3, Wand2, BookOpen, Activity, ListChecks, FileText, Image as ImageIcon, Layers, Trash2, ChevronDown, Pencil, Hash, Search, X, Link2 as LinkIcon, Maximize2, Minimize2, LayoutGrid, List, CheckCircle, Download, ClipboardList, RotateCcw, Clock, RefreshCw, Notebook, MoreHorizontal, MoreVertical, History, Loader2 } from 'lucide-react';
+import FileExplorer from '../components/FileExplorer.jsx';
+import { foldersApi } from '../api/index.js';
 
 import ManageSyllabusModal from '../components/modals/ManageSyllabusModal.jsx';
 import AddQuestionModal from '../components/modals/AddQuestionModal.jsx';
@@ -95,7 +97,9 @@ const SubjectDetail = () => {
     const [questions, setQuestions] = useState([]);
     const [notes, setNotes] = useState([]);
     const [files, setFiles] = useState([]);
+    const [folders, setFolders] = useState([]);
     const [solutions, setSolutions] = useState([]);
+    const [uploadFolderId, setUploadFolderId] = useState(null);
     const [loadedTabs, setLoadedTabs] = useState(new Set());
     const [tabLoading, setTabLoading] = useState(false);
 
@@ -199,9 +203,9 @@ const SubjectDetail = () => {
 
     const handleNextFile = useCallback(async () => {
         if (!hasMoreFiles && fileIndex >= files.length - 1) return;
-        
+
         const nextIndex = fileIndex + 1;
-        
+
         if (nextIndex >= files.length) {
             // Should we load more?
             if (hasMoreFiles) {
@@ -1728,10 +1732,14 @@ const SubjectDetail = () => {
                     break;
                 }
                 case 'library': {
-                    // We only load page 0 initially when the tab is clicked
-                    const fileRes = await filesApi.listBySubject(id, FILE_LIMIT, 0, null, true);
+                    // Load files and folders for the subject
+                    const [fileRes, folderRes] = await Promise.all([
+                        filesApi.listBySubject(id, FILE_LIMIT, 0, null, true),
+                        foldersApi.list(id)
+                    ]);
                     const initialFiles = fileRes.images || fileRes.files || [];
                     setFiles(initialFiles);
+                    setFolders(folderRes.folders || []);
                     setHasMoreFiles(initialFiles.length === FILE_LIMIT);
                     setFilePage(0);
                     break;
@@ -2140,7 +2148,7 @@ const SubjectDetail = () => {
     };
 
     const handleEditSolutionUpdated = (updated) => {
-            setSolutions(prev => prev.map(s => s.id === updated.id ? updated : s));
+        setSolutions(prev => prev.map(s => s.id === updated.id ? updated : s));
 
         // Clear old image cache for this solution so it reloads if viewing/next time
         setFetchedImages(prev => {
@@ -4808,10 +4816,10 @@ const SubjectDetail = () => {
                                                                     <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-surface-3 to-surface-2 transition-all duration-500 text-slate-300">
                                                                         <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                                                                             {file.file_type === 'pdf' ? <FileText className="w-7 h-7 text-rose-400" /> :
-                                                                             file.file_type === 'xlsx' ? <Layers className="w-7 h-7 text-emerald-400" /> :
-                                                                             file.file_type === 'doc' ? <FileText className="w-7 h-7 text-blue-400" /> :
-                                                                             file.file_type === 'html' ? <FileText className="w-7 h-7 text-orange-400" /> :
-                                                                             <ImageIcon className="w-7 h-7 text-indigo-400" />}
+                                                                                file.file_type === 'xlsx' ? <Layers className="w-7 h-7 text-emerald-400" /> :
+                                                                                    file.file_type === 'doc' ? <FileText className="w-7 h-7 text-blue-400" /> :
+                                                                                        file.file_type === 'html' ? <FileText className="w-7 h-7 text-orange-400" /> :
+                                                                                            <ImageIcon className="w-7 h-7 text-indigo-400" />}
                                                                         </div>
                                                                         <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">{file.file_type || 'Image'}</span>
                                                                     </div>
@@ -4860,7 +4868,7 @@ const SubjectDetail = () => {
                                                                                         const note = notes.find(n => n.id === file.linked_note_id);
                                                                                         if (note) {
                                                                                             setViewingNote(note);
-                                                                                            
+
                                                                                         }
                                                                                     }
                                                                                 }}
@@ -5097,6 +5105,7 @@ const SubjectDetail = () => {
                 message="Enter a new identity for this material."
                 confirmText="Save Name"
                 type="primary"
+                icon={Pencil}
                 onConfirm={handleRenameFile}
                 onCancel={() => setRenameFileData({ open: false, file: null, name: '' })}
             >

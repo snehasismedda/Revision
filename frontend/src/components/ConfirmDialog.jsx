@@ -1,8 +1,8 @@
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle, X, Info } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import ModalPortal from './ModalPortal.jsx';
 
-const ConfirmDialog = ({ isOpen, title, message, onConfirm, onCancel, confirmText = 'Delete', type = 'danger', requireInput = false, expectedInput = 'CONFIRM', children }) => {
+const ConfirmDialog = ({ isOpen, title, message, onConfirm, onCancel, confirmText = 'Delete', type = 'danger', icon: Icon, requireInput = false, expectedInput = 'CONFIRM', children }) => {
     const [inputValue, setInputValue] = useState('');
 
     useEffect(() => {
@@ -41,7 +41,7 @@ const ConfirmDialog = ({ isOpen, title, message, onConfirm, onCancel, confirmTex
                     <div className="px-7 py-8 flex flex-col items-center text-center">
                         <div className={`w-14 h-14 rounded-xl flex items-center justify-center mb-6 ${type === 'danger' ? 'bg-red-500/10 text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.15)]' : 'bg-primary/10 text-primary shadow-[0_0_20px_rgba(139,92,246,0.15)]'
                             }`}>
-                            <AlertTriangle className="w-7 h-7" />
+                            {Icon ? <Icon className="w-7 h-7" /> : (type === 'danger' ? <AlertTriangle className="w-7 h-7" /> : <Info className="w-7 h-7" />)}
                         </div>
 
                         <h3 className="text-xl font-heading font-semibold text-white mb-2 tracking-tight">{title}</h3>

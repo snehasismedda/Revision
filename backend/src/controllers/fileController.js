@@ -39,13 +39,14 @@ export const getFileById = async (req, res) => {
 export const getFilesBySubject = async (req, res) => {
     try {
         const { id: subjectId } = req.params;
-        const { limit, offset, type, metadataOnly } = req.query;
+        const { limit, offset, type, metadataOnly, folderId } = req.query;
         const files = await fileModel.getFilesBySubject(
             subjectId,
             limit ? parseInt(limit, 10) : undefined,
             offset ? parseInt(offset, 10) : undefined,
             type,
-            metadataOnly === 'true'
+            metadataOnly === 'true',
+            folderId
         );
         res.status(200).json({ files });
     } catch (error) {
@@ -57,13 +58,14 @@ export const getFilesBySubject = async (req, res) => {
 export const getFilesByTestSeries = async (req, res) => {
     try {
         const { id: seriesId } = req.params;
-        const { limit, offset, type, metadataOnly } = req.query;
+        const { limit, offset, type, metadataOnly, folderId } = req.query;
         const files = await fileModel.getFilesByTestSeries(
             seriesId,
             limit ? parseInt(limit, 10) : undefined,
             offset ? parseInt(offset, 10) : undefined,
             type,
-            metadataOnly === 'true'
+            metadataOnly === 'true',
+            folderId
         );
         res.status(200).json({ files });
     } catch (error) {
@@ -86,6 +88,7 @@ export const saveFileAs = async (req, res) => {
         const savedFile = await fileModel.createFile({
             subjectId,
             testSeriesId: seriesId,
+            folderId: req.body.folderId,
             data: content,
             fileType: fileType || 'image',
             fileName,
@@ -181,6 +184,7 @@ export const saveFileAs = async (req, res) => {
 export const deleteFile = async (req, res) => {
     try {
         const { id, subjectId, seriesId } = req.params;
+        console.log(`[deleteFile] Attempting soft delete for file: ${id}, subjectId: ${subjectId}, seriesId: ${seriesId}`);
         await fileModel.softDeleteFile(id, subjectId, seriesId);
         res.status(200).json({ success: true });
     } catch (error) {
@@ -192,8 +196,8 @@ export const deleteFile = async (req, res) => {
 export const updateFile = async (req, res) => {
     try {
         const { id, subjectId, seriesId } = req.params;
-        const { fileName } = req.body;
-        const [updatedFile] = await fileModel.updateFileName(id, subjectId, seriesId, fileName);
+        const { fileName, folderId } = req.body;
+        const [updatedFile] = await fileModel.updateFileName(id, subjectId, seriesId, fileName, folderId);
         if (!updatedFile) return res.status(404).json({ error: 'File not found' });
         res.status(200).json({ file: updatedFile });
     } catch (error) {

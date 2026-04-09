@@ -1,9 +1,10 @@
 import db from '../knex/db.js';
 
-export const createFile = async ({ subjectId, testSeriesId, data, fileType = 'image', fileName = null, thumbnail = null, referenceId = null }) => {
+export const createFile = async ({ subjectId, testSeriesId, data, fileType = 'image', fileName = null, thumbnail = null, referenceId = null, folderId = null }) => {
     const insertData = {
         subject_id: subjectId || null,
         test_series_id: testSeriesId || null,
+        folder_id: folderId || null,
         data,
         file_type: fileType,
         file_name: fileName,
@@ -37,7 +38,7 @@ export const getAllFilesByUser = async (userId, limit, offset, fileType = null, 
 
     if (metadataOnly) {
         query = query.select(
-            'f.id', 'f.subject_id', 'f.file_type', 'f.file_name', 'f.thumbnail', 'f.created_at', 'f.is_deleted', 'f.deleted_at', 'f.reference_id',
+            'f.id', 'f.subject_id', 'f.folder_id', 'f.file_type', 'f.file_name', 'f.thumbnail', 'f.created_at', 'f.is_deleted', 'f.deleted_at', 'f.reference_id',
             's.name as subject_name',
             db.raw('(SELECT id FROM revision.questions q WHERE q.source_image_id = f.id AND q.is_deleted = false LIMIT 1) as linked_question_id'),
             db.raw('(SELECT id FROM revision.notes n WHERE f.id = ANY(n.source_image_ids) AND n.is_deleted = false LIMIT 1) as linked_note_id'),
@@ -62,7 +63,7 @@ export const getAllFilesByUser = async (userId, limit, offset, fileType = null, 
     return await query;
 };
 
-export const getFilesBySubject = async (subjectId, limit, offset, fileType = null, metadataOnly = false) => {
+export const getFilesBySubject = async (subjectId, limit, offset, fileType = null, metadataOnly = false, folderId = undefined) => {
     let query = db('revision.files as f')
         .join('revision.subjects as s', 'f.subject_id', 's.id')
         .where('f.subject_id', subjectId)
@@ -71,7 +72,7 @@ export const getFilesBySubject = async (subjectId, limit, offset, fileType = nul
 
     if (metadataOnly) {
         query = query.select(
-            'f.id', 'f.subject_id', 'f.test_series_id', 'f.file_type', 'f.file_name', 'f.thumbnail', 'f.created_at', 'f.is_deleted', 'f.deleted_at', 'f.reference_id',
+            'f.id', 'f.subject_id', 'f.test_series_id', 'f.folder_id', 'f.file_type', 'f.file_name', 'f.thumbnail', 'f.created_at', 'f.is_deleted', 'f.deleted_at', 'f.reference_id',
             's.name as subject_name',
             db.raw('(SELECT id FROM revision.questions q WHERE q.source_image_id = f.id AND q.is_deleted = false LIMIT 1) as linked_question_id'),
             db.raw('(SELECT id FROM revision.notes n WHERE f.id = ANY(n.source_image_ids) AND n.is_deleted = false LIMIT 1) as linked_note_id'),
@@ -87,6 +88,14 @@ export const getFilesBySubject = async (subjectId, limit, offset, fileType = nul
         );
     }
 
+    if (folderId !== undefined) {
+        if (folderId === 'null' || folderId === null) {
+            query.whereNull('f.folder_id');
+        } else {
+            query.where({ 'f.folder_id': folderId });
+        }
+    }
+
     query = query.orderBy('f.created_at', 'desc');
 
     if (fileType) query = query.where('f.file_type', fileType);
@@ -96,7 +105,7 @@ export const getFilesBySubject = async (subjectId, limit, offset, fileType = nul
     return await query;
 };
 
-export const getFilesByTestSeries = async (testSeriesId, limit, offset, fileType = null, metadataOnly = false) => {
+export const getFilesByTestSeries = async (testSeriesId, limit, offset, fileType = null, metadataOnly = false, folderId = undefined) => {
     let query = db('revision.files as f')
         .join('revision.test_series as ts', 'f.test_series_id', 'ts.id')
         .where('f.test_series_id', testSeriesId)
@@ -105,7 +114,7 @@ export const getFilesByTestSeries = async (testSeriesId, limit, offset, fileType
 
     if (metadataOnly) {
         query = query.select(
-            'f.id', 'f.subject_id', 'f.test_series_id', 'f.file_type', 'f.file_name', 'f.thumbnail', 'f.created_at', 'f.is_deleted', 'f.deleted_at', 'f.reference_id',
+            'f.id', 'f.subject_id', 'f.test_series_id', 'f.folder_id', 'f.file_type', 'f.file_name', 'f.thumbnail', 'f.created_at', 'f.is_deleted', 'f.deleted_at', 'f.reference_id',
             'ts.name as series_name',
             db.raw('false as is_linked') // Test series files might not be linked to questions/notes in the same way yet
         );
@@ -115,6 +124,14 @@ export const getFilesByTestSeries = async (testSeriesId, limit, offset, fileType
             'ts.name as series_name',
             db.raw('false as is_linked')
         );
+    }
+
+    if (folderId !== undefined) {
+        if (folderId === 'null' || folderId === null) {
+            query.whereNull('f.folder_id');
+        } else {
+            query.where({ 'f.folder_id': folderId });
+        }
     }
 
     query = query.orderBy('f.created_at', 'desc');
@@ -145,13 +162,38 @@ export const softDeleteFile = async (ids, subjectId, testSeriesId) => {
     return await query.update({ is_deleted: true, deleted_at: db.fn.now() });
 };
 
-export const updateFileName = async (id, subjectId, testSeriesId, fileName) => {
+export const updateFileName = async (id, subjectId, testSeriesId, fileName, folderId) => {
     const query = db('revision.files')
         .where({ id, is_deleted: false });
 
     if (subjectId) query.where({ subject_id: subjectId });
     if (testSeriesId) query.where({ test_series_id: testSeriesId });
 
-    return await query.update({ file_name: fileName })
-        .returning('*');
+    const updateData = {};
+    if (fileName !== undefined) updateData.file_name = fileName;
+    if (folderId !== undefined) updateData.folder_id = folderId;
+
+    if (Object.keys(updateData).length === 0) return await query.returning('*');
+
+    return await query.update(updateData).returning('*');
 };
+
+export const softDeleteFilesByFolderId = async (folderId, subjectId, testSeriesId) => {
+     const query = db('revision.files')
+        .where('folder_id', folderId);
+
+    if (subjectId) query.where({ subject_id: subjectId });
+    if (testSeriesId) query.where({ test_series_id: testSeriesId });
+
+    return await query.update({ is_deleted: true, deleted_at: db.fn.now() });
+}
+
+export const setFileFolder = async (newFolderId, oldFolderId, subjectId, testSeriesId) => {
+    const query = db('revision.files')
+        .where({ folder_id: oldFolderId, is_deleted: false });
+
+    if (subjectId) query.where({ subject_id: subjectId });
+    if (testSeriesId) query.where({ test_series_id: testSeriesId });
+
+    return await query.update({ folder_id: newFolderId });
+}

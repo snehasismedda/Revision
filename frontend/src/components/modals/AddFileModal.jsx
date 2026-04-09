@@ -5,8 +5,7 @@ import toast from 'react-hot-toast';
 import { X, PlusCircle, Wand2, FileText, Image as ImageIcon, Trash2, Save, Scissors, Check, RotateCw, ZoomIn, ZoomOut, Camera, RefreshCcw, FlipHorizontal, ChevronDown, Sparkles, Table, UploadCloud, Loader2, Hash, Layers } from 'lucide-react';
 import ModalPortal from '../ModalPortal.jsx';
 import ImageCropper from '../common/ImageCropper.jsx';
-
-const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId, seriesId, isLibrary = false }) => {
+const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId, seriesId, isLibrary = false, folders = [], initialFolderId = null }) => {
     // Top-level workflow
     const [workflowPath, setWorkflowPath] = useState(seriesId ? 'unified' : 'image'); // 'image', 'document', or 'unified'
 
@@ -20,6 +19,7 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId, seriesId, isLib
     const [fileType, setFileType] = useState('image'); // 'image', 'pdf', 'doc', 'xlsx'
     const [fileName, setFileName] = useState('');
     const [originalFileName, setOriginalFileName] = useState('');
+    const [selectedFolderId, setSelectedFolderId] = useState(initialFolderId || '');
     const [selectedSubjectId, setSelectedSubjectId] = useState('');
     const [subjects, setSubjects] = useState([]);
     const [title, setTitle] = useState('');
@@ -284,6 +284,7 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId, seriesId, isLib
                 type: actualSaveType,
                 fileType: fileType,
                 fileName: fileName || originalFileName || 'Untitled',
+                folderId: selectedFolderId || null,
                 subjectId: seriesId ? null : (selectedSubjectId || subjectId),
                 seriesId: seriesId || null,
                 skipAI: workflowPath === 'document' ? true : !analyzeWithAI
@@ -423,6 +424,36 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId, seriesId, isLib
                                     placeholder={originalFileName || "Enter file name..."}
                                 />
                             </div>
+
+                            {/* Folder Dropdown - Show if folders available */}
+                            {folders.length > 0 && (
+                                <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
+                                    <label className="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">
+                                        <Layers className="w-3 h-3" /> Target Folder
+                                    </label>
+                                    <div className="relative group">
+                                        <select
+                                            value={selectedFolderId || ''}
+                                            onChange={(e) => setSelectedFolderId(e.target.value)}
+                                            className="w-full bg-white/[0.03] border border-white/[0.06] text-white rounded-xl px-4 py-3 text-[13px] focus:outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20 transition-all font-medium appearance-none cursor-pointer"
+                                            style={{
+                                                backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(148, 163, 184, 1)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                                                backgroundRepeat: 'no-repeat',
+                                                backgroundPosition: 'right 1rem center',
+                                                backgroundSize: '1.2em'
+                                            }}
+                                        >
+                                            <option value="" className="bg-surface-2 text-white">Root (No Folder)</option>
+                                            {folders.map(f => (
+                                                <option key={f.id} value={f.id} className="bg-surface-2 text-white">{f.name}</option>
+                                            ))}
+                                        </select>
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500 group-hover:text-primary transition-colors">
+                                            <ChevronDown size={14} />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Workflow Specifics */}
                             {workflowPath === 'unified' ? (

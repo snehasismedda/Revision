@@ -5,14 +5,16 @@ import ConfirmDialog from '../components/ConfirmDialog';
 
 import * as testSeriesApi from '../api/testSeriesApi';
 import * as testsApi from '../api/testsApi';
-import { filesApi } from '../api/index';
+import { filesApi, foldersApi } from '../api/index';
 import { useTestSeries } from '../context/TestSeriesContext.jsx';
 import { useTopics } from '../context/TopicContext.jsx';
 import { useQuickView } from '../context/QuickViewContext.jsx';
 import { useFiles } from '../context/FileContext.jsx';
+import { useFolders } from '../context/FolderContext.jsx';
 import CreateTestModal from '../components/modals/CreateTestModal';
 import AddFileModal from '../components/modals/AddFileModal';
 import FileViewerModal from '../components/modals/FileViewerModal';
+import FileExplorer from '../components/FileExplorer.jsx';
 import TimeTraveler from '../components/TimeTraveler';
 import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
@@ -74,21 +76,30 @@ const TestSeriesDetail = () => {
 
     // Library State
     const [files, setFiles] = useState([]);
+    const { 
+        folders, 
+        fetchFolders, 
+        fetchFolderContents,
+        setFolders, 
+        addFolderToList, 
+        updateFolderInList, 
+        removeFolderFromList 
+    } = useFolders();
     const [filePage, setFilePage] = useState(0);
     const [hasMoreFiles, setHasMoreFiles] = useState(true);
     const [loadingFiles, setLoadingFiles] = useState(false);
+    const [uploadFolderId, setUploadFolderId] = useState(null);
     const [showFileModal, setShowFileModal] = useState(false);
     const [fileSearchQuery, setFileSearchQuery] = useState('');
     const [libraryViewMode, setLibraryViewMode] = useState('categorywise'); // categorywise, datewise
     const [showTimeTraveler, setShowTimeTraveler] = useState(false);
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedItems, setSelectedItems] = useState(new Set());
-    const [activeFileDropdown, setActiveFileDropdown] = useState(null);
-    const [confirmDeleteFile, setConfirmDeleteFile] = useState({ open: false, items: [] });
+    const [loadedTabs, setLoadedTabs] = useState(new Set());
+    const [currentFolderId, setCurrentFolderId] = useState(null);
     const { openItem, minimize: globalMinimize } = useQuickView();
     const { getFileData, clearFileCacheMany } = useFiles();
     const [viewingFile, setViewingFile] = useState(null);
-    const [confirmRenameFile, setConfirmRenameFile] = useState({ open: false, file: null, newName: '' });
 
     const observer = useRef();
     const lastFileElementRef = useCallback(node => {
@@ -106,7 +117,9 @@ const TestSeriesDetail = () => {
 
 
     const loadData = useCallback(async (force = false) => {
-        if (seriesId) await loadSeriesDetail(seriesId, force);
+        if (seriesId) {
+            await loadSeriesDetail(seriesId, force);
+        }
     }, [seriesId, loadSeriesDetail]);
 
     useEffect(() => {
@@ -120,27 +133,37 @@ const TestSeriesDetail = () => {
         }
     }, [series?.subjects, loadTopics]);
 
-    // Fetch Files
-    const loadFiles = useCallback(async (page = 0, query = '', force = false) => {
+    // Fetch Library Contents (Consolidated)
+    const loadLibrary = useCallback(async (page = 0, folderId = null) => {
         if (!seriesId) return;
         setLoadingFiles(true);
         try {
-            const res = await filesApi.listByTestSeries(seriesId, 20, page * 20, null, true);
-            if (page === 0) setFiles(res.files);
-            else setFiles(prev => [...prev, ...res.files]);
-            setHasMoreFiles(res.files.length === 20);
+            const res = await fetchFolderContents(seriesId, 'series', folderId, 20, page * 20);
+            if (page === 0) setFiles(res.files || []);
+            else setFiles(prev => [...prev, ...(res.files || [])]);
+            setHasMoreFiles((res.files || []).length === 20);
         } catch (err) {
             toast.error("Failed to load library");
         } finally {
             setLoadingFiles(false);
         }
-    }, [seriesId]);
+    }, [seriesId, fetchFolderContents]);
+
+    const loadFiles = loadLibrary; 
+
 
     useEffect(() => {
         if (activeTab === 'library') {
-            loadFiles(filePage, fileSearchQuery);
+            const isFirstLoad = !loadedTabs.has('library');
+            if (isFirstLoad) {
+                // Initial load: Fetch root only (folderId: null)
+                loadLibrary(0, null);
+                setLoadedTabs(prev => new Set(prev).add('library'));
+            } else if (filePage > 0) {
+                loadLibrary(filePage, currentFolderId);
+            }
         }
-    }, [activeTab, filePage, fileSearchQuery, loadFiles]);
+    }, [activeTab, filePage, loadLibrary, seriesId, loadedTabs, currentFolderId]);
 
     const handleFileSaved = (newFile) => {
         setFiles(prev => [newFile.file, ...prev]);
@@ -162,20 +185,6 @@ const TestSeriesDetail = () => {
         if (idx > 0) setViewingFile(files[idx - 1]);
     };
 
-
-    const handleRenameFile = async () => {
-        if (!confirmRenameFile.file || !confirmRenameFile.newName) return;
-        const loadingToast = toast.loading('Renaming...');
-        try {
-            await filesApi.update(confirmRenameFile.file.id, { fileName: confirmRenameFile.newName }, null, seriesId);
-            setFiles(prev => prev.map(f => f.id === confirmRenameFile.file.id ? { ...f, file_name: confirmRenameFile.newName } : f));
-            toast.success('Renamed successfully', { id: loadingToast });
-        } catch (err) {
-            toast.error('Failed to rename', { id: loadingToast });
-        } finally {
-            setConfirmRenameFile({ open: false, file: null, newName: '' });
-        }
-    };
 
     const groupedLibraryItems = useMemo(() => {
         // Advanced Multi-Scope Filtering Logic
@@ -564,303 +573,35 @@ const TestSeriesDetail = () => {
             )}
 
             {activeTab === 'library' && (
-                <div className="fade-in pb-12 px-1">
-                    {/* Header for Library */}
-                    <div className="flex items-center justify-between mb-8 border-b border-white/[0.08] pb-4">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/10 shadow-lg shadow-indigo-500/5">
-                                <Layers className="w-5 h-5 text-indigo-400" />
-                            </div>
-                            <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Resource Vault</h3>
-                        </div>
-
-                        {!isSelectionMode && (
-                            <div className="flex items-center gap-4">
-                                <div className="flex items-center bg-white/[0.03] p-1 rounded-xl border border-white/[0.06] shrink-0">
-                                    <div className="flex items-center bg-white/[0.02] rounded-lg p-0.5">
-                                        <button
-                                            onClick={() => setLibraryViewMode('categorywise')}
-                                            className={`p-1.5 rounded-lg transition-all cursor-pointer ${libraryViewMode === 'categorywise' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
-                                            title="Category View"
-                                        >
-                                            <LayoutGrid className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
-                                            onClick={() => setLibraryViewMode('datewise')}
-                                            className={`p-1.5 rounded-lg transition-all cursor-pointer ${libraryViewMode === 'datewise' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
-                                            title="Date View"
-                                        >
-                                            <Clock className="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
-                                    <div className="w-px h-4 bg-white/10 mx-1.5" />
-                                    <button
-                                        onClick={() => setShowTimeTraveler(true)}
-                                        className="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 border border-transparent text-slate-500 hover:text-white hover:bg-white/[0.05] cursor-pointer"
-                                    >
-                                        <History className="w-3.5 h-3.5" />
-                                        <span className="hidden lg:inline">Filter</span>
-                                    </button>
-                                </div>
-
-                                <button
-                                    onClick={() => setShowFileModal(true)}
-                                    className="flex items-center gap-2 text-[12px] font-bold px-5 py-2.5 rounded-xl transition-all cursor-pointer border border-indigo-500/20 bg-indigo-500/10 text-indigo-400 hover:text-white hover:bg-indigo-500/20 group shadow-lg shadow-indigo-500/5 backdrop-blur-sm"
-                                >
-                                    <Plus className="w-4 h-4" strokeWidth={2.5} />
-                                    <span>Upload Material</span>
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
-                    {isSelectionMode && (
-                        <div className="mb-8 flex justify-center">
-                            <div className="flex items-center h-[54px] bg-[#121214]/90 border border-white/[0.08] rounded-2xl px-2 shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all animate-in fade-in zoom-in-95 duration-300 backdrop-blur-xl">
-                                <div className="flex items-center pl-4 pr-3">
-                                    <div className="w-7 h-7 bg-indigo-500 text-white rounded-full flex items-center justify-center text-[13px] font-black shadow-lg mr-3">
-                                        {selectedItems.size}
-                                    </div>
-                                    <span className="text-[14px] text-slate-300 font-bold hidden sm:inline uppercase tracking-widest">Selected</span>
-                                </div>
-                                <div className="w-px h-8 bg-white/[0.1] mx-2"></div>
-                                <button
-                                    onClick={() => {
-                                        if (selectedItems.size === files.length) setSelectedItems(new Set());
-                                        else setSelectedItems(new Set(files.map(f => f.id)));
-                                    }}
-                                    className="text-[12px] font-bold text-slate-300 hover:text-white px-5 py-2.5 rounded-xl hover:bg-white/10 transition-all cursor-pointer uppercase tracking-widest"
-                                >
-                                    {selectedItems.size > 0 && selectedItems.size === files.length ? 'Deselect All' : 'Select All'}
-                                </button>
-                                <div className="w-px h-8 bg-white/[0.1] mx-2"></div>
-                                <div className="flex items-center gap-2 px-2">
-                                    <button
-                                        onClick={async () => {
-                                            const loadingToast = toast.loading('Creating Zip...');
-                                            try {
-                                                const zip = new JSZip();
-                                                const usedNames = new Map();
-                                                for (const fileId of selectedItems) {
-                                                    try {
-                                                        const f = await getFileData(null, fileId, seriesId);
-                                                        if (f && f.data) {
-                                                            let baseName = f.file_name || 'file';
-                                                            let ext = '';
-                                                            const lastDot = baseName.lastIndexOf('.');
-                                                            if (lastDot !== -1) {
-                                                                ext = baseName.substring(lastDot);
-                                                                baseName = baseName.substring(0, lastDot);
-                                                            } else {
-                                                                const typeMap = { 'image': '.jpg', 'pdf': '.pdf', 'doc': '.docx', 'xlsx': '.xlsx', 'html': '.html', 'csv': '.csv' };
-                                                                ext = typeMap[f.file_type] || '';
-                                                            }
-                                                            let finalName = `${baseName}${ext}`;
-                                                            if (usedNames.has(finalName)) {
-                                                                const count = usedNames.get(finalName) + 1;
-                                                                usedNames.set(finalName, count);
-                                                                finalName = `${baseName}_${count}${ext}`;
-                                                            } else {
-                                                                usedNames.set(finalName, 1);
-                                                            }
-                                                            const base64Content = f.data.includes(',') ? f.data.split(',')[1] : f.data;
-                                                            zip.file(finalName, base64Content, { base64: true });
-                                                        }
-                                                    } catch (err) { console.error(err); }
-                                                }
-                                                const content = await zip.generateAsync({ type: 'blob' });
-                                                const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
-                                                const zipFileName = `${series?.name || 'Library'}_Export_${timestamp}.zip`.replace(/\s+/g, '_');
-                                                saveAs(content, zipFileName);
-                                                setIsSelectionMode(false);
-                                                setSelectedItems(new Set());
-                                                toast.success('Zip downloaded!', { id: loadingToast });
-                                            } catch (err) {
-                                                toast.error('Failed to create Zip', { id: loadingToast });
-                                            }
-                                        }}
-                                        disabled={selectedItems.size === 0}
-                                        className="h-10 px-4 flex items-center gap-2 rounded-xl text-[12px] font-bold bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                                    >
-                                        <Download className="w-4 h-4" />
-                                        <span>Download</span>
-                                    </button>
-                                    <button
-                                        onClick={() => setConfirmDeleteFile({ open: true, items: Array.from(selectedItems).map(id => files.find(f => f.id === id)).filter(Boolean) })}
-                                        disabled={selectedItems.size === 0}
-                                        className="h-10 px-4 flex items-center gap-2 rounded-xl text-[12px] font-bold bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                        <span>Delete</span>
-                                    </button>
-                                </div>
-                                <div className="w-px h-8 bg-white/[0.1] mx-2"></div>
-                                <button
-                                    onClick={() => { setIsSelectionMode(false); setSelectedItems(new Set()); }}
-                                    className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-500 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
-                                    title="Cancel Selection"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {files.length === 0 && !loadingFiles ? (
-                        <div className="glass-panel rounded-xl p-16 text-center border-dashed border-indigo-400/20 w-full relative overflow-hidden group">
-                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-                            <div className="w-20 h-20 mx-auto bg-indigo-500/10 rounded-full flex items-center justify-center mb-6 border border-indigo-500/20 pulse-ring">
-                                <Layers className="w-10 h-10 text-indigo-400" strokeWidth={1.5} />
-                            </div>
-                            <h3 className="text-2xl font-heading font-bold text-white mb-3 tracking-tight">No resources yet</h3>
-                            <p className="text-slate-400 text-sm max-w-sm mx-auto mb-8 leading-relaxed">
-                                Upload test papers, diagrams, or additional materials for this series.
-                            </p>
-                            <button
-                                onClick={() => setShowFileModal(true)}
-                                className="btn-primary flex items-center gap-2 mx-auto px-6 py-3 rounded-xl text-sm font-semibold cursor-pointer"
-                            >
-                                <PlusCircle className="w-4 h-4" />
-                                <span>Upload Your First File</span>
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="space-y-12">
-                            {groupedLibraryItems.map((group, gIdx) => (
-                                <div key={group.title} className="relative">
-                                    <div className="sticky top-0 z-30 py-6">
-                                        <div className="flex items-center gap-4">
-                                            <div className="flex items-center gap-3 px-4 py-2 bg-[#0a0a0c] border border-white/10 rounded-2xl shadow-2xl">
-                                                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                                                <h2 className="text-[13px] font-black uppercase tracking-[0.2em] text-white">
-                                                    {group.title}
-                                                </h2>
-                                                <div className="w-px h-3 bg-white/10 mx-1" />
-                                                <span className="text-[11px] font-mono font-bold text-slate-500">{group.items.length.toString().padStart(2, '0')}</span>
-                                            </div>
-                                            <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                                        {group.items.map((file, index) => {
-                                            const isGlobalLast = gIdx === groupedLibraryItems.length - 1 && index === group.items.length - 1;
-                                            return (
-                                                <div
-                                                    key={file.id}
-                                                    ref={isGlobalLast ? lastFileElementRef : null}
-                                                    className={`group relative aspect-square rounded-xl bg-surface-2 transition-all duration-300 cursor-pointer shadow-lg active:scale-[0.98] border ${isSelectionMode
-                                                        ? (selectedItems.has(file.id) ? 'border-indigo-500 ring-2 ring-indigo-500/50 bg-indigo-500/10 scale-95 opacity-90' : 'border-white/[0.04]')
-                                                        : (activeFileDropdown === file.id ? 'border-primary/40 shadow-xl z-[40]' : 'border-white/[0.04] hover:border-primary/40')
-                                                        }`}
-                                                    onClick={() => isSelectionMode ? (setSelectedItems(prev => {
-                                                        const n = new Set(prev);
-                                                        if (n.has(file.id)) n.delete(file.id);
-                                                        else n.add(file.id);
-                                                        return n;
-                                                    })) : handleFileClick(file)}
-                                                >
-                                                    <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none">
-                                                        {file.thumbnail ? (
-                                                            <img src={file.thumbnail} alt={file.file_name} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-all" loading="lazy" />
-                                                        ) : (file.file_type === 'image') ? (
-                                                            <div className="w-full h-full bg-surface-3 flex items-center justify-center"><ImageIcon className="w-8 h-8 text-white/10" /></div>
-                                                        ) : (
-                                                            <div className="w-full h-full bg-surface-3 flex items-center justify-center flex-col gap-2">
-                                                                <div className={`p-4 rounded-xl shadow-lg ${file.file_type === 'pdf' ? 'bg-red-500/20 text-red-500' : file.file_type === 'xlsx' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-500'}`}>
-                                                                    {file.file_type === 'xlsx' ? <Table size={24} /> : <FileText size={24} />}
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    {/* Selection Indicator */}
-                                                    {isSelectionMode && (
-                                                        <div className="absolute top-3 right-3 z-30">
-                                                            <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(file.id) ? 'bg-indigo-500 border-indigo-500' : 'border-white/30 bg-black/40 backdrop-blur-sm'}`}>
-                                                                {selectedItems.has(file.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
-                                                            </div>
-                                                        </div>
-                                                    )}
-
-                                                    {/* File Type Badge */}
-                                                    <div className="absolute top-3 left-3 z-20">
-                                                        <div className={`px-1.5 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest border backdrop-blur-md shadow-2xl
-                                                            ${file.file_type === 'pdf' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' :
-                                                                file.file_type === 'xlsx' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
-                                                                    file.file_type === 'html' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
-                                                                        'bg-indigo-500/20 text-indigo-400 border-indigo-500/30'}`}>
-                                                            {file.file_type || 'IMG'}
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-4 z-10 transition-all group-hover:bg-black/20">
-                                                        <div className="flex items-center justify-between mb-1.5 relative">
-                                                            <div className="flex items-center gap-1.5">
-                                                                <div className="w-1 h-3 rounded-full bg-pink-500" />
-                                                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                                                    {series?.name}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="flex items-center justify-between gap-2">
-                                                            <p className="text-[11px] font-semibold text-white truncate flex-1 leading-tight mb-0.5">
-                                                                {file.file_name || new Date(file.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                                            </p>
-
-                                                            {!isSelectionMode && (
-                                                                <div className={`relative shrink-0 transition-opacity ${activeFileDropdown === file.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} onClick={e => e.stopPropagation()}>
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            setActiveFileDropdown(activeFileDropdown === file.id ? null : file.id);
-                                                                        }}
-                                                                        className={`p-1 flex items-center justify-center rounded-lg border transition-all cursor-pointer ${activeFileDropdown === file.id ? 'bg-primary border-primary text-white' : 'bg-black/40 hover:bg-black/60 text-white/80 border-white/10 backdrop-blur-sm'}`}
-                                                                        title="More Options"
-                                                                    >
-                                                                        <MoreVertical className="w-3.5 h-3.5" />
-                                                                    </button>
-                                                                    {activeFileDropdown === file.id && (
-                                                                        <div className="absolute right-0 top-full mt-2 w-36 bg-[#121214]/95 border border-white/10 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.6)] py-1.5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50 backdrop-blur-xl" onClick={e => e.stopPropagation()}>
-                                                                            <button
-                                                                                onClick={() => { setIsSelectionMode(true); setSelectedItems(new Set([file.id])); setActiveFileDropdown(null); }}
-                                                                                className="w-full flex items-center justify-start gap-2.5 px-3.5 py-2 text-[12px] font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
-                                                                            >
-                                                                                <CheckCircle className="w-3.5 h-3.5 text-indigo-400" /> Select
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() => {
-                                                                                    setActiveFileDropdown(null);
-                                                                                    setConfirmRenameFile({ open: true, file, newName: file.file_name || '' });
-                                                                                }}
-                                                                                className="w-full flex items-center justify-start gap-2.5 px-3.5 py-2 text-[12px] font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
-                                                                            >
-                                                                                <Pencil className="w-3.5 h-3.5 text-emerald-400" /> Rename
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() => {
-                                                                                    setActiveFileDropdown(null);
-                                                                                    setConfirmDeleteFile({ open: true, items: [file] });
-                                                                                }}
-                                                                                className={`w-full flex items-center justify-start gap-2.5 px-3.5 py-2 text-[12px] font-medium transition-all text-slate-300 hover:text-rose-400 hover:bg-rose-500/10 cursor-pointer`}
-                                                                            >
-                                                                                <Trash2 className={`w-3.5 h-3.5 text-rose-500`} /> Delete
-                                                                            </button>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                <div className="fade-in pb-12">
+                    <FileExplorer 
+                        files={files}
+                        folders={folders}
+                        scopeId={seriesId}
+                        scopeType="series"
+                        onFilesChange={setFiles}
+                        onFoldersChange={setFolders}
+                        onFileUpload={(fId) => {
+                            setUploadFolderId(fId);
+                            setShowFileModal(true);
+                        }}
+                        onNavigate={(folderId) => {
+                            setCurrentFolderId(folderId);
+                            setFilePage(0);
+                            loadLibrary(0, folderId);
+                        }}
+                        isSelectionMode={isSelectionMode}
+                        onSelectionModeChange={setIsSelectionMode}
+                        selectedIds={selectedItems}
+                        onSelectionChange={setSelectedItems}
+                        onFileClick={setViewingFile}
+                        foldersApi={foldersApi}
+                        filesApi={filesApi}
+                    />
                 </div>
             )}
+
+
 
             {/* Modals & Dialogs */}
             <CreateTestModal
@@ -891,6 +632,9 @@ const TestSeriesDetail = () => {
                 onClose={() => setShowFileModal(false)}
                 seriesId={seriesId}
                 onFileSaved={handleFileSaved}
+                folders={folders}
+                initialFolderId={uploadFolderId}
+                isLibrary={true}
             />
 
             {viewingFile && (
@@ -926,54 +670,6 @@ const TestSeriesDetail = () => {
                 />
             )}
 
-
-            <ConfirmDialog
-                isOpen={confirmDeleteFile.open}
-                title={`Delete ${confirmDeleteFile.items.length > 1 ? `${confirmDeleteFile.items.length} Files` : 'File'}`}
-                message={`Are you sure you want to delete ${confirmDeleteFile.items.length > 1 ? 'these files' : 'this file'}? This action cannot be undone.`}
-                onConfirm={async () => {
-                    try {
-                        for (const file of confirmDeleteFile.items) {
-                            await filesApi.delete(file.id, null, seriesId);
-                        }
-                        const deletedIds = new Set(confirmDeleteFile.items.map(f => f.id));
-                        setFiles(prev => prev.filter(f => !deletedIds.has(f.id)));
-                        clearFileCacheMany([...deletedIds]);
-                        setSelectedItems(prev => {
-                            const next = new Set(prev);
-                            deletedIds.forEach(id => next.delete(id));
-                            return next;
-                        });
-                        if (selectedItems.size === confirmDeleteFile.items.length) setIsSelectionMode(false);
-                        setConfirmDeleteFile({ open: false, items: [] });
-                        toast.success("File(s) deleted");
-                    } catch {
-                        toast.error("Failed to delete files");
-                    }
-                }}
-                onCancel={() => setConfirmDeleteFile({ open: false, items: [] })}
-                confirmText="Delete"
-                danger
-            />
-
-            <ConfirmDialog
-                isOpen={confirmRenameFile.open}
-                title="Rename File"
-                onConfirm={handleRenameFile}
-                onCancel={() => setConfirmRenameFile({ open: false, file: null, newName: '' })}
-                confirmText="Rename"
-            >
-                <div className="mt-4">
-                    <input
-                        autoFocus
-                        type="text"
-                        value={confirmRenameFile.newName}
-                        onChange={(e) => setConfirmRenameFile(prev => ({ ...prev, newName: e.target.value }))}
-                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary/50"
-                        onKeyDown={(e) => e.key === 'Enter' && handleRenameFile()}
-                    />
-                </div>
-            </ConfirmDialog>
 
             {showTimeTraveler && (
                 <TimeTraveler

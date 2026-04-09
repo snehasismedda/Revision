@@ -16,6 +16,13 @@ export const TestSeriesProvider = ({ children }) => {
     const loadingPromiseRef = useRef(null);
     const detailingPromisesRef = useRef({}); // seriesId -> promise
 
+    const seriesDetailsRef = useRef({});
+    
+    // Sync ref with state
+    useEffect(() => {
+        seriesDetailsRef.current = seriesDetails;
+    }, [seriesDetails]);
+
     // Reset when user logs out
     useEffect(() => {
         if (!user) {
@@ -23,6 +30,7 @@ export const TestSeriesProvider = ({ children }) => {
             setSeriesDetails({});
             setIsLoaded(false);
             isLoadedRef.current = false;
+            seriesDetailsRef.current = {};
         }
     }, [user]);
 
@@ -51,7 +59,7 @@ export const TestSeriesProvider = ({ children }) => {
     }, []);
 
     const loadSeriesDetail = useCallback(async (seriesId, force = false) => {
-        if (seriesDetails[seriesId] && !force) return;
+        if (seriesDetailsRef.current[seriesId] && !force) return seriesDetailsRef.current[seriesId];
         if (detailingPromisesRef.current[seriesId] && !force) return detailingPromisesRef.current[seriesId];
 
         const load = async () => {
@@ -74,7 +82,7 @@ export const TestSeriesProvider = ({ children }) => {
 
         detailingPromisesRef.current[seriesId] = load();
         return detailingPromisesRef.current[seriesId];
-    }, [seriesDetails]);
+    }, []);
 
     const addSeries = useCallback(async (seriesData) => {
         const loadingToast = toast.loading('Creating test series...');

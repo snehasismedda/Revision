@@ -182,17 +182,26 @@ const TestDetail = () => {
         }
     };
 
-    // Initialize from context if available, then fetch results
+    // Sync from context when available
     useEffect(() => {
         if (cachedTest && cachedSeries) {
-            setTestData({
+            setTestData(prev => ({
                 ...cachedTest,
                 series_name: cachedSeries.series.name,
-                results: testData?.results || [] // Preserve results if already loaded
-            });
+                results: prev?.results || [] 
+            }));
+
+            // Pre-load topics for subjects in this series
+            if (cachedTest.subjects) {
+                cachedTest.subjects.forEach(sub => loadTopics(sub.id));
+            }
         }
+    }, [cachedTest, cachedSeries?.series?.name, loadTopics]);
+
+    // Initial load and specific data fetch
+    useEffect(() => {
         loadData();
-    }, [testId, cachedTest, cachedSeries?.series?.name]);
+    }, [testId, seriesId]);
 
     const handleAddQuestion = () => {
         const defaultSubjectId = testData?.subjects?.[0]?.id || "";

@@ -235,21 +235,23 @@ export const filesApi = {
         const qs = q.length ? '?' + q.join('&') : '';
         return request(`/files${qs}`);
     },
-    listBySubject: (subjectId, limit, offset, type, metadataOnly = false) => {
+    listBySubject: (subjectId, limit, offset, type, metadataOnly = false, folderId = undefined) => {
         let q = [];
         if (limit != null) { q.push(`limit=${limit}`); }
         if (offset != null) { q.push(`offset=${offset}`); }
         if (type != null) { q.push(`type=${type}`); }
         if (metadataOnly) { q.push(`metadataOnly=true`); }
+        if (folderId !== undefined) { q.push(`folderId=${folderId === null ? 'null' : folderId}`); }
         const qs = q.length ? '?' + q.join('&') : '';
         return request(`/files/subject/${subjectId}${qs}`);
     },
-    listByTestSeries: (seriesId, limit, offset, type, metadataOnly = false) => {
+    listByTestSeries: (seriesId, limit, offset, type, metadataOnly = false, folderId = undefined) => {
         let q = [];
         if (limit != null) { q.push(`limit=${limit}`); }
         if (offset != null) { q.push(`offset=${offset}`); }
         if (type != null) { q.push(`type=${type}`); }
         if (metadataOnly) { q.push(`metadataOnly=true`); }
+        if (folderId !== undefined) { q.push(`folderId=${folderId === null ? 'null' : folderId}`); }
         const qs = q.length ? '?' + q.join('&') : '';
         return request(`/files/test-series/${seriesId}${qs}`);
     },
@@ -266,4 +268,27 @@ export const filesApi = {
         const path = subjectId ? `/files/subject/${subjectId}/${id}` : `/files/test-series/${seriesId}/${id}`;
         return request(path, { method: 'PUT', body });
     },
+};
+
+// Folders
+export const foldersApi = {
+    list: (subjectId, testSeriesId, parentId = undefined) => {
+        let q = [];
+        if (subjectId) q.push(`subjectId=${subjectId}`);
+        if (testSeriesId) q.push(`testSeriesId=${testSeriesId}`);
+        if (parentId !== undefined) q.push(`parentId=${parentId === null ? 'null' : parentId}`);
+        return request(`/folders?${q.join('&')}`);
+    },
+    getContents: (subjectId, testSeriesId, folderId = null, limit = 20, offset = 0) => {
+        let q = [];
+        if (subjectId) q.push(`subjectId=${subjectId}`);
+        if (testSeriesId) q.push(`testSeriesId=${testSeriesId}`);
+        if (folderId !== undefined) q.push(`folderId=${folderId === null ? 'null' : folderId}`);
+        if (limit != null) q.push(`limit=${limit}`);
+        if (offset != null) q.push(`offset=${offset}`);
+        return request(`/folders/contents?${q.join('&')}`);
+    },
+    create: (body) => request('/folders', { method: 'POST', body }),
+    rename: (id, body) => request(`/folders/${id}`, { method: 'PUT', body }),
+    delete: (id, body) => request(`/folders/${id}`, { method: 'DELETE', body }), // body takes { deleteFiles: boolean, subjectId, testSeriesId }
 };

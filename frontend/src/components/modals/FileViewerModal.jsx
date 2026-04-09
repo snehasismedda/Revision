@@ -246,10 +246,10 @@ const FileViewerModal = ({
                             <div className={`flex items-center text-[11px] mt-0.5
                                     ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
                                 <span className="uppercase tracking-wider">{renderType}</span>
-                                {file?.subject_name && (
+                                {(file?.subject_name || file?.series_name) && (
                                     <>
                                         <span className="mx-2 opacity-30">•</span>
-                                        <span className="truncate">{file.subject_name}</span>
+                                        <span className="truncate">{file.subject_name || file.series_name}</span>
                                     </>
                                 )}
                             </div>
@@ -325,11 +325,11 @@ const FileViewerModal = ({
 
                                         {/* Files Dropdown - ViewNoteModal Style */}
                                         {isFileListOpen && (
-                                            <div
-                                                ref={listRef}
-                                                className={`absolute top-full right-0 mt-2 w-80 max-h-[480px] rounded-xl shadow-2xl border overflow-hidden flex flex-col z-[100] animate-in fade-in slide-in-from-top-2 duration-200
-                                                        ${isLightMode ? 'bg-white border-slate-200 shadow-slate-300/40' : 'bg-[#13131f] border-white/10 shadow-black/70'}`}
-                                            >
+                                                <div
+                                                    ref={listRef}
+                                                    className={`absolute top-full right-0 mt-3 w-[340px] max-h-[520px] rounded-2xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] border overflow-hidden flex flex-col z-[100] animate-in fade-in slide-in-from-top-3 duration-300 backdrop-blur-2xl
+                                                            ${isLightMode ? 'bg-white/95 border-slate-200/60' : 'bg-[#13131f]/95 border-white/10'}`}
+                                                >
                                                 {/* Header */}
                                                 <div className={`flex items-center justify-between px-4 py-3 border-b shrink-0 ${isLightMode ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
                                                     <div className="flex items-center gap-2 text-indigo-500">
@@ -360,37 +360,57 @@ const FileViewerModal = ({
                                                 {/* List */}
                                                 <div className="flex-1 overflow-y-auto custom-scrollbar p-1.5 space-y-0.5 min-h-[100px]">
                                                     {allFiles
-                                                        .filter(f => (f.file_name || '').toLowerCase().includes(fileListSearch.toLowerCase()) || (f.subject_name || '').toLowerCase().includes(fileListSearch.toLowerCase()))
+                                                        .filter(f => (f.file_name || '').toLowerCase().includes(fileListSearch.toLowerCase()) || (f.subject_name || f.series_name || '').toLowerCase().includes(fileListSearch.toLowerCase()))
                                                         .map((f, i) => {
                                                             const isActive = f.id === file.id;
+                                                            const fType = f.file_type?.toLowerCase();
                                                             return (
                                                                 <button
                                                                     key={f.id}
                                                                     onClick={() => {
-                                                                        if (onSelect) {
-                                                                            onSelect(f);
-                                                                        }
+                                                                        if (onSelect) onSelect(f);
                                                                         setIsFileListOpen(false);
                                                                         setFileListSearch('');
                                                                     }}
-                                                                    className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 transition-all cursor-pointer group
-                                                                            ${isActive
-                                                                            ? (isLightMode ? 'bg-indigo-50 text-indigo-600 border-l-[3px] border-indigo-500 pl-[9px]' : 'bg-indigo-500/10 text-indigo-400 border-l-[3px] border-indigo-500 pl-[9px]')
-                                                                            : (isLightMode ? 'hover:bg-slate-50 text-slate-700 border-l-[3px] border-transparent pl-[9px]' : 'hover:bg-white/5 text-slate-300 border-l-[3px] border-transparent pl-[9px]')}`}
+                                                                    className={`w-full text-left px-3 py-3 rounded-xl flex items-center gap-4 transition-all duration-300 cursor-pointer group relative overflow-hidden
+                                                                        ${isActive
+                                                                            ? (isLightMode ? 'bg-indigo-50/80 shadow-sm shadow-indigo-100/50' : 'bg-indigo-500/10 border-white/5 shadow-inner')
+                                                                            : (isLightMode ? 'hover:bg-slate-50' : 'hover:bg-white/[0.04]')}`}
                                                                 >
-                                                                    <span className={`text-[10px] font-black w-5 shrink-0 text-center tabular-nums 
-                                                                            ${isActive ? 'text-indigo-500' : (isLightMode ? 'text-slate-400' : 'text-slate-600')}`}>
-                                                                        {i + 1}
-                                                                    </span>
+                                                                    {/* Active Indicator Bar */}
+                                                                    {isActive && (
+                                                                        <div className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-indigo-500 rounded-r-full shadow-[0_0_10px_rgba(99,102,241,0.5)]" />
+                                                                    )}
+
+                                                                    {/* File Icon */}
+                                                                    <div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110
+                                                                        ${isActive 
+                                                                            ? (isLightMode ? 'bg-white shadow-sm text-indigo-500' : 'bg-indigo-500/20 text-indigo-400') 
+                                                                            : (isLightMode ? 'bg-slate-100 text-slate-400' : 'bg-white/5 text-slate-500')}`}
+                                                                    >
+                                                                        {fType === 'pdf' ? <FileText size={18} /> :
+                                                                         fType === 'xlsx' || fType === 'csv' ? <TableIcon size={18} /> :
+                                                                         fType === 'image' ? <ImageIcon size={18} /> : <FileText size={18} />}
+                                                                    </div>
+
                                                                     <div className="min-w-0 flex-1">
-                                                                        <div className={`text-[12px] font-semibold truncate leading-tight ${isActive ? 'font-bold' : ''}`}>
+                                                                        <div className={`text-[13px] font-bold truncate leading-tight transition-colors
+                                                                            ${isActive ? (isLightMode ? 'text-indigo-700' : 'text-indigo-300') : (isLightMode ? 'text-slate-700' : 'text-slate-200')}`}>
                                                                             {f.file_name || (f.created_at ? new Date(f.created_at).toLocaleDateString() : 'Document')}
                                                                         </div>
-                                                                        <div className="text-[10px] opacity-50 truncate mt-0.5">
-                                                                            {f.subject_name || 'No Subject'} • {f.file_type || 'File'}
+                                                                        <div className={`text-[11px] font-medium transition-colors mt-0.5 flex items-center gap-1.5 opacity-60
+                                                                            ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                                                            <span className="truncate">{f.subject_name || f.series_name || (f.test_series_id ? 'Test Material' : 'Resource')}</span>
+                                                                            <span className="w-1 h-1 rounded-full bg-current opacity-30" />
+                                                                            <span className="uppercase tracking-tighter text-[9px] font-black">{f.file_type || 'File'}</span>
                                                                         </div>
                                                                     </div>
-                                                                    {isActive && <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />}
+
+                                                                    {isActive && (
+                                                                        <div className="shrink-0 scale-in duration-300">
+                                                                            <div className="w-2 h-2 rounded-full bg-indigo-500" />
+                                                                        </div>
+                                                                    )}
                                                                 </button>
                                                             );
                                                         })}

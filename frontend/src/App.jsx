@@ -6,6 +6,7 @@ import { TestSeriesProvider } from './context/TestSeriesContext.jsx';
 import { TopicProvider } from './context/TopicContext.jsx';
 import { AnalyticsProvider } from './context/AnalyticsContext.jsx';
 import { FileProvider } from './context/FileContext.jsx';
+import { FolderProvider } from './context/FolderContext.jsx';
 import Layout from './components/Layout.jsx';
 
 // Lazy load pages
@@ -104,9 +105,11 @@ const App = () => (
                     },
                   }}
                 />
-                <AppRoutes />
-                <GlobalQuickViewModal />
-                <QuickViewBar />
+                <FolderProvider>
+                  <AppRoutes />
+                  <GlobalQuickViewModal />
+                  <QuickViewBar />
+                </FolderProvider>
               </FileProvider>
             </AnalyticsProvider>
             </TopicProvider>
