@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { X, FileText, Link2 as LinkIcon, Pencil, ChevronLeft, ChevronRight, List, Copy, PanelLeftClose, PanelLeftOpen, Plus, ArrowLeft, Wand2, Check, XCircle, Loader2, Sun, Moon, Settings, Type, Palette, Trash2, Edit3, Maximize2, Minimize2, ExternalLink, Hash, Image as ImageIcon, Sparkles, RefreshCw, Type as TypeIcon, Layout } from 'lucide-react';
-import { authApi } from '../../api/index.js';
+import { authApi, notesApi } from '../../api/index.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { formatDate } from '../../utils/dateUtils';
 import toast from 'react-hot-toast';
@@ -435,12 +435,12 @@ const TableEditPanel = ({ editOriginalText, editText, setEditText, editPosition,
 };
 
 
-const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImage, isFetchingImage, onEdit, onPrev, onNext, onAddToNote, parentNoteTitle, onUpdateNoteContent, onAIEditSection, childNotes, onOpenChildNote, allNotes = [], onNavigateToNote }) => {
-
-
+const ViewNoteModal = ({ isOpen, onClose, note, subjectId, onNavigateToQuestion, sourceImage, isFetchingImage, onEdit, onPrev, onNext, onAddToNote, parentNoteTitle, onUpdateNoteContent, onAIEditSection, childNotes, onOpenChildNote, allNotes = [], onNavigateToNote }) => {
 
     const { user, updatePreferences } = useAuth();
     const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [noteImages, setNoteImages] = useState([]);
+    const [loadingImages, setLoadingImages] = useState(false);
     const [isFullscreen] = useState(true);
     const [isLightMode, setIsLightMode] = useState(localStorage.getItem('theme') !== 'dark');
     const [fontSize, setFontSize] = useState(user?.preferences?.font_size || 17);
@@ -501,6 +501,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
             setIsSavingSettings(false);
         }
     };
+
     const [activeHeadingId, setActiveHeadingId] = useState(null);
     const [headings, setHeadings] = useState([]);
     const contentRef = useRef(null);
@@ -527,7 +528,60 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
         if (action) action();
     }, [editMode]);
 
-    const processedContent = useMemo(() => preprocessMarkdown(note?.content || ''), [note?.content]);
+    const lastFetchedNoteIdRef = useRef(null);
+
+    useEffect(() => {
+        if (isOpen && note?.id && (subjectId || note?.subject_id)) {
+            // Prevent double-fetching if this note's images were just loaded
+            if (lastFetchedNoteIdRef.current === note.id) return;
+            
+            const fetchImages = async () => {
+                setLoadingImages(true);
+                lastFetchedNoteIdRef.current = note.id;
+                try {
+                    const data = await notesApi.getImages(subjectId || note.subject_id, note.id);
+                    setNoteImages(data.images || []);
+                } catch (err) {
+                    console.error('Failed to fetch note images:', err);
+                    lastFetchedNoteIdRef.current = null; // Reset on error to allow retry
+                } finally {
+                    setLoadingImages(false);
+                }
+            };
+            fetchImages();
+        } else if (!isOpen) {
+            setNoteImages([]);
+            lastFetchedNoteIdRef.current = null;
+        }
+    }, [isOpen, note?.id, subjectId, note?.subject_id]);
+
+    const processedContent = useMemo(() => {
+        const rawText = note?.content || '';
+        let text = rawText;
+        
+        // 1. Replace image placeholders [[IMG_N | params]] with standard markdown image tags
+        if (noteImages && noteImages.length > 0) {
+            noteImages.forEach(img => {
+                const ref = img.referenceId;
+                const data = img.data;
+                if (ref && data) {
+                    // Match [[IMG_XXXX]] or [[IMG_XXXX | right | small]]
+                    const regex = new RegExp(`\\[\\[\\s*${ref}\\s*(?:\\|\\s*([^\\]]+))?\\s*\\]\\]`, 'gi');
+                    
+                    text = text.replace(regex, (match, params) => {
+                        // Encode parameters into the alt text: "IMG_XXXX:right:small"
+                        const encodedAlt = params 
+                            ? `${ref}:${params.trim().replace(/\s*\|\s*/g, ':')}`
+                            : ref;
+                        return `\n\n![${encodedAlt}](${data})\n\n`;
+                    });
+                }
+            });
+        }
+        
+        // 2. Run standard markdown preprocessing
+        return preprocessMarkdown(text);
+    }, [note?.content, noteImages]);
     const hasHeadings = headings.length > 0;
     const hasLinkedNotes = childNotes && childNotes.length > 0;
 
@@ -562,14 +616,78 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
         thead: ({ ...props }) => <thead className={`${isLightMode ? 'bg-slate-50' : 'bg-white/5'}`} {...props} />,
         th: ({ ...props }) => <th className="px-4 py-3 font-bold uppercase tracking-wider text-[11px] border-b border-white/5" {...props} />,
         td: ({ ...props }) => <td className="px-4 py-3 border-b border-white/5 text-[13px]" {...props} />,
-        img: ({ ...props }) => (
-            <div className="my-8 group relative flex flex-col items-center">
-                <img className="max-w-full h-auto rounded-2xl shadow-lg ring-1 ring-black/5 transition-transform duration-500 group-hover:scale-[1.01]" {...props} />
-                {props.alt && props.alt !== 'Source reference' && (
-                    <span className="mt-3 text-[11px] font-medium opacity-50 italic">{props.alt}</span>
-                )}
-            </div>
-        ),
+        img: ({ ...props }) => {
+            const altParts = (props.alt || '').split(':');
+            const refId = altParts[0];
+            const params = altParts.slice(1).map(p => p.toLowerCase().trim());
+            
+            const handleImageClick = (e) => {
+                e.preventDefault();
+                const src = props.src;
+                if (!src) return;
+                
+                // For data URIs, convert to blob to avoid browser URL length limits or security blocks
+                if (src.startsWith('data:')) {
+                    const byteString = atob(src.split(',')[1]);
+                    const mimeString = src.split(',')[0].split(':')[1].split(';')[0];
+                    const ab = new ArrayBuffer(byteString.length);
+                    const ia = new Uint8Array(ab);
+                    for (let i = 0; i < byteString.length; i++) {
+                        ia[i] = byteString.charCodeAt(i);
+                    }
+                    const blob = new Blob([ab], { type: mimeString });
+                    const blobUrl = URL.createObjectURL(blob);
+                    window.open(blobUrl, '_blank');
+                    // Optional: revoke after a while to save memory
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+                } else {
+                    window.open(src, '_blank');
+                }
+            };
+
+            // Layout Logic
+            const isRight = params.includes('right');
+            const isLeft = params.includes('left');
+            const isSmall = params.includes('small');
+            const isLarge = params.includes('large');
+            const isFull = params.includes('full');
+
+            let widthClass = 'max-w-[85%]';
+            if (isSmall) widthClass = 'max-w-[320px]';
+            if (isLarge) widthClass = 'max-w-[95%]';
+            if (isFull) widthClass = 'max-w-full';
+
+            let alignClass = 'mx-auto';
+            if (isRight) alignClass = 'ml-auto mr-0 sm:-mr-4';
+            if (isLeft) alignClass = 'mr-auto ml-0 sm:-ml-4';
+
+            return (
+                <div className={`my-8 group relative flex flex-col ${alignClass} ${widthClass}`}>
+                    <div className={`relative rounded-2xl overflow-hidden border-2 transition-all duration-300 cursor-zoom-in ${isLightMode ? 'border-slate-200 shadow-sm bg-white hover:border-slate-400' : 'border-white/10 shadow-lg bg-black/20 hover:border-white/30'}`}
+                         onClick={handleImageClick}>
+                        
+                        <img 
+                            className="w-full h-auto block" 
+                            {...props} 
+                        />
+
+                        {/* Lean Overlay */}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300 flex items-center justify-center pointer-events-none">
+                            <div className={`p-2.5 rounded-xl opacity-0 transition-opacity duration-300 ${isLightMode ? 'bg-white shadow-md border border-slate-200' : 'bg-slate-900 border border-white/10 shadow-xl'}`}>
+                                <ExternalLink className={`w-4 h-4 ${isLightMode ? 'text-slate-600' : 'text-slate-400'}`} />
+                            </div>
+                        </div>
+
+                        {/* Solid ID Badge */}
+                        <div className={`absolute bottom-4 ${isRight ? 'left-4' : 'right-4'} z-20`}>
+                            <div className={`px-3 py-1.5 rounded-lg border shadow-sm transition-all duration-300 ${isLightMode ? 'bg-white border-slate-200 text-slate-900' : 'bg-slate-900 border-white/20 text-white'}`}>
+                                <span className="text-[9px] font-black uppercase tracking-[0.2em]">{refId}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        },
         blockquote: ({ children, ...props }) => {
             const rawText = extractText(children);
             const alertMatch = rawText.match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/i);
@@ -1671,6 +1789,7 @@ const ViewNoteModal = ({ isOpen, onClose, note, onNavigateToQuestion, sourceImag
                                     remarkPlugins={markdownPlugins}
                                     rehypePlugins={markdownRehypePlugins}
                                     components={markdownComponents}
+                                    urlTransform={(url) => url}
                                 >
                                     {processedContent}
                                 </ReactMarkdown>

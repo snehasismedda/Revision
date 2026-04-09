@@ -110,6 +110,20 @@ export const SubjectProvider = ({ children }) => {
         }
     }, []);
 
+    const updateLocalStats = useCallback((subjectId, key, delta) => {
+        setStatsMap(prev => {
+            const subjectStats = prev[subjectId];
+            if (!subjectStats) return prev;
+            return {
+                ...prev,
+                [subjectId]: {
+                    ...subjectStats,
+                    [key]: Math.max(0, (parseInt(subjectStats[key]) || 0) + delta)
+                }
+            };
+        });
+    }, []);
+
     const addSubject = useCallback(async (subjectData) => {
         const loadingToast = toast.loading('Creating subject...');
         try {
@@ -195,6 +209,7 @@ export const SubjectProvider = ({ children }) => {
             deleteSubject,
             archiveSubject,
             refreshStats,
+            updateLocalStats,
             selectedSubjectId,
             setSelectedSubjectId
         }}>

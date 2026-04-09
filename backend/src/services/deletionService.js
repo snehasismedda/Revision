@@ -80,11 +80,14 @@ export const deleteNotesCascade = async (noteIds, subjectId) => {
         const notes = await db('revision.notes')
             .whereIn('id', idList)
             .where('subject_id', subjectId)
-            .select('source_image_id');
+            .select('source_image_ids');
 
-        const sourceImageIds = notes
-            .map(n => n.source_image_id)
-            .filter(id => id !== null);
+        const sourceImageIds = [];
+        notes.forEach(n => {
+            if (n.source_image_ids && Array.isArray(n.source_image_ids)) {
+                sourceImageIds.push(...n.source_image_ids);
+            }
+        });
 
         if (sourceImageIds.length > 0) {
             await sourceImageModel.softDeleteSourceImage(sourceImageIds, subjectId);
@@ -138,10 +141,12 @@ export const deleteQuestionsCascade = async (questionIds, subjectId) => {
         const notes = await db('revision.notes')
             .whereIn('question_id', idList)
             .where('is_deleted', false)
-            .select('source_image_id');
+            .select('source_image_ids');
         
         notes.forEach(note => {
-            if (note.source_image_id) sourceImageIds.push(note.source_image_id);
+            if (note.source_image_ids && Array.isArray(note.source_image_ids)) {
+                sourceImageIds.push(...note.source_image_ids);
+            }
         });
 
         // 2. Find images for all solutions related to these questions

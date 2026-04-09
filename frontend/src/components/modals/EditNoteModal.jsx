@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { notesApi, aiApi } from '../../api/index.js';
 import toast from 'react-hot-toast';
-import { X, Save, FileText, Image as ImageIcon, Camera, RefreshCcw, ChevronDown, Scissors, Wand2, Sparkles, Tag, Type, LayoutGrid, Trash2, Sun, Moon } from 'lucide-react';
+import { X, Save, FileText, Image as ImageIcon, Camera, RefreshCcw, RefreshCw, ChevronDown, Scissors, Wand2, Sparkles, Tag, Type, LayoutGrid, Trash2, Sun, Moon, Plus } from 'lucide-react';
 import ModalPortal from '../ModalPortal.jsx';
 import ImageCropper from '../common/ImageCropper.jsx';
 
@@ -16,9 +16,12 @@ const EditNoteModal = ({ isOpen, onClose, subjectId, note, onNoteUpdated }) => {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isEnhancing, setIsEnhancing] = useState(false);
     const [isFormatting, setIsFormatting] = useState(false);
-    const [noteImage, setNoteImage] = useState('');
+    const [embeddedImages, setEmbeddedImages] = useState([]); // [{ referenceId, data, id? }]
+    const [loadingImages, setLoadingImages] = useState(false);
     const [availableTags, setAvailableTags] = useState([]);
     const [isLightMode, setIsLightMode] = useState(localStorage.getItem('theme') !== 'dark');
+
+    const textareaRef = useRef(null);
 
     const toggleTheme = () => {
         const newMode = !isLightMode;
@@ -55,17 +58,23 @@ const EditNoteModal = ({ isOpen, onClose, subjectId, note, onNoteUpdated }) => {
             }
             setTags(Array.isArray(t) ? t : []);
             
-            if (note.sourceImageContent) {
-                setNoteImage(note.sourceImageContent);
-                setMainType('image');
-            } else {
-                setNoteImage('');
-                setMainType('text');
-            }
+            const loadImages = async () => {
+                setLoadingImages(true);
+                try {
+                    const data = await notesApi.getImages(subjectId, note.id);
+                    setEmbeddedImages(data.images || []);
+                } catch (err) {
+                    console.error('Failed to load note images:', err);
+                } finally {
+                    setLoadingImages(false);
+                }
+            };
+            loadImages();
 
             fetchAvailableTags();
         } else {
             stopCamera();
+            setEmbeddedImages([]);
         }
     }, [isOpen, note, subjectId]);
 
@@ -139,16 +148,6 @@ const EditNoteModal = ({ isOpen, onClose, subjectId, note, onNoteUpdated }) => {
         setMainType(type);
     };
 
-    const handleImageMethodChange = (method) => {
-        if (method !== 'camera') {
-            stopCamera();
-        } else {
-            getCameras();
-            startCamera(selectedCameraId);
-        }
-        setImageMethod(method);
-    };
-
     const takePhoto = () => {
         if (!videoRef.current || videoRef.current.videoWidth === 0) {
             return toast.error("Camera is not ready");
@@ -163,28 +162,6 @@ const EditNoteModal = ({ isOpen, onClose, subjectId, note, onNoteUpdated }) => {
         stopCamera();
         setImageToCrop(dataUrl);
         setIsCropping(true);
-    };
-
-    const handleApplyCrop = (croppedImage) => {
-        setNoteImage(croppedImage);
-        setMainType('image');
-        setIsCropping(false);
-        setImageToCrop(null);
-    };
-
-    const handleAnalyzeImage = async (image) => {
-        if (!image) return;
-        setIsAnalyzing(true);
-        try {
-            const result = await aiApi.parseNote({ content: image, type: 'image' });
-            if (result.title) setTitle(result.title);
-            if (result.content) setContent(result.content);
-            toast.success('AI analysis complete');
-        } catch (error) {
-            toast.error('AI analysis failed');
-        } finally {
-            setIsAnalyzing(false);
-        }
     };
 
     const handleEnhance = async () => {
@@ -234,6 +211,51 @@ const EditNoteModal = ({ isOpen, onClose, subjectId, note, onNoteUpdated }) => {
         }
     };
 
+    const handleImageMethodChange = (method) => {
+        if (method !== 'camera') {
+            stopCamera();
+        } else {
+            getCameras();
+            startCamera(selectedCameraId);
+        }
+        setImageMethod(method);
+    };
+
+    const insertReferenceId = (refId) => {
+        const placeholder = `[[${refId}]]`;
+        if (textareaRef.current) {
+            const start = textareaRef.current.selectionStart;
+            const end = textareaRef.current.selectionEnd;
+            const text = content;
+            const newContent = text.substring(0, start) + placeholder + text.substring(end);
+            setContent(newContent);
+
+            // Set cursor after the inserted text
+            setTimeout(() => {
+                textareaRef.current.selectionStart = textareaRef.current.selectionEnd = start + placeholder.length;
+                textareaRef.current.focus();
+            }, 0);
+        } else {
+            setContent(prev => prev + placeholder);
+        }
+    };
+
+    const handleApplyCrop = (croppedImage) => {
+        const randomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const refId = `IMG_${randomId}`;
+        setEmbeddedImages([...embeddedImages, { referenceId: refId, data: croppedImage }]);
+        setIsCropping(false);
+        setImageToCrop(null);
+        toast.success(`Image added as [[${refId}]]`);
+        // Auto insert
+        insertReferenceId(refId);
+    };
+
+    const handleRemoveImage = (refId) => {
+        setEmbeddedImages(prev => prev.filter(img => img.referenceId !== refId));
+        toast.success(`Removed [[${refId}]]`);
+    };
+
     const handleUpdate = async (e) => {
         e.preventDefault();
         if (!title.trim() || !content.trim()) {
@@ -248,11 +270,16 @@ const EditNoteModal = ({ isOpen, onClose, subjectId, note, onNoteUpdated }) => {
                 finalTags.push(trimmedTag);
             }
 
+            // Separate new images (base64) from existing images (have IDs)
+            const newImagesToUpload = embeddedImages.filter(img => !img.id);
+            const existingImageIds = embeddedImages.filter(img => img.id).map(img => img.id);
+
             const payload = {
                 title: title.trim(),
                 content: content.trim(),
                 tags: finalTags,
-                sourceImageContent: mainType === 'image' ? noteImage : null
+                sourceImageIds: existingImageIds,
+                images: newImagesToUpload // [{ referenceId, data }]
             };
 
             const { note: updated } = await notesApi.update(subjectId, note.id, payload);
@@ -269,8 +296,7 @@ const EditNoteModal = ({ isOpen, onClose, subjectId, note, onNoteUpdated }) => {
     const handleCloseRequest = () => {
         const isChanged = title !== (note?.title || '') || 
                           content !== (note?.content || '') || 
-                          (mainType === 'image' && noteImage !== (note?.sourceImageContent || '')) ||
-                          (mainType === 'text' && note?.sourceImageContent);
+                          embeddedImages.some(img => !img.id);
         
         if (isChanged) {
             if (!window.confirm("You have unsaved changes. Are you sure you want to discard them?")) return;
@@ -352,10 +378,6 @@ const EditNoteModal = ({ isOpen, onClose, subjectId, note, onNoteUpdated }) => {
                                         <div className="w-8 h-8 border-[1.5px] border-emerald-500/40 rounded-full" />
                                     </button>
                                 </div>
-                                <div className="absolute top-3 left-3 w-5 h-5 border-t-2 border-l-2 border-white/20 rounded-tl-md" />
-                                <div className="absolute top-3 right-3 w-5 h-5 border-t-2 border-r-2 border-white/20 rounded-tr-md" />
-                                <div className="absolute bottom-3 left-3 w-5 h-5 border-b-2 border-l-2 border-white/20 rounded-bl-md" />
-                                <div className="absolute bottom-3 right-3 w-5 h-5 border-b-2 border-r-2 border-white/20 rounded-br-md" />
                             </>
                         ) : (
                             <div className="flex flex-col items-center text-center px-6 py-8">
@@ -376,44 +398,29 @@ const EditNoteModal = ({ isOpen, onClose, subjectId, note, onNoteUpdated }) => {
                 </div>
             ) : (
                 <div className="space-y-3">
-                    {noteImage ? (
-                        <div className={`rounded-xl border overflow-hidden ${isLightMode ? 'bg-white border-slate-200' : 'border-white/[0.06] bg-[#0e0e16]'}`}>
-                            <div className="p-3">
-                                <img
-                                    src={noteImage}
-                                    alt="Note preview"
-                                    className="w-full h-auto max-h-[280px] object-contain rounded-lg"
-                                    style={{ background: isLightMode ? '#f8fafc' : 'repeating-conic-gradient(rgba(255,255,255,0.03) 0% 25%, transparent 0% 50%) 50% / 16px 16px' }}
-                                />
-                            </div>
-                            <div className="flex items-center gap-2 px-3 pb-3">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setImageToCrop(noteImage);
-                                        setIsCropping(true);
-                                    }}
-                                    className={`flex-1 text-[11px] font-semibold flex items-center justify-center gap-1.5 py-2 rounded-lg border transition-all cursor-pointer ${isLightMode ? 'text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100' : 'text-emerald-400 bg-emerald-500/8 border-emerald-500/10 hover:bg-emerald-500/15'}`}
-                                >
-                                    <Scissors className="w-3 h-3" /> Crop
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setNoteImage('')}
-                                    className={`flex-1 text-[11px] font-semibold flex items-center justify-center gap-1.5 py-2 rounded-lg border transition-all cursor-pointer ${isLightMode ? 'text-red-700 bg-red-50 border-red-200 hover:bg-red-100' : 'text-red-400 bg-red-500/6 border-red-500/8 hover:bg-red-500/12'}`}
-                                >
-                                    <Trash2 className="w-3 h-3" /> Remove
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <div
-                            className={`relative rounded-xl border border-dashed transition-all cursor-pointer group overflow-hidden ${isLightMode ? 'bg-white border-slate-300 hover:border-emerald-500/40 hover:bg-emerald-50/20' : 'border-white/[0.08] hover:border-emerald-500/25'}`}
-                            onDragOver={e => { e.preventDefault(); }}
-                            onDrop={e => {
-                                e.preventDefault();
-                                const file = e.dataTransfer.files[0];
-                                if (file?.type.startsWith('image/')) {
+                    <div
+                        className={`relative rounded-xl border border-dashed transition-all cursor-pointer group overflow-hidden ${isLightMode ? 'bg-white border-slate-300 hover:border-emerald-500/40 hover:bg-emerald-50/20' : 'border-white/[0.08] hover:border-emerald-500/25'}`}
+                        onDragOver={e => { e.preventDefault(); }}
+                        onDrop={e => {
+                            e.preventDefault();
+                            const file = e.dataTransfer.files[0];
+                            if (file?.type.startsWith('image/')) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                    setImageToCrop(reader.result);
+                                    setIsCropping(true);
+                                };
+                                reader.readAsDataURL(file);
+                            }
+                        }}
+                    >
+                        <input
+                            type="file"
+                            accept="image/*"
+                            className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                            onChange={e => {
+                                const file = e.target.files?.[0];
+                                if (file) {
                                     const reader = new FileReader();
                                     reader.onloadend = () => {
                                         setImageToCrop(reader.result);
@@ -422,48 +429,60 @@ const EditNoteModal = ({ isOpen, onClose, subjectId, note, onNoteUpdated }) => {
                                     reader.readAsDataURL(file);
                                 }
                             }}
-                        >
-                            <input
-                                type="file"
-                                accept="image/*"
-                                className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                                onChange={e => {
-                                    const file = e.target.files?.[0];
-                                    if (file) {
-                                        const reader = new FileReader();
-                                        reader.onloadend = () => {
-                                            setImageToCrop(reader.result);
-                                            setIsCropping(true);
-                                        };
-                                        reader.readAsDataURL(file);
-                                    }
-                                }}
-                            />
-                            <div className="py-10 px-6 flex flex-col items-center text-center">
-                                <div className={`w-12 h-12 rounded-xl border flex items-center justify-center mb-3.5 transition-all ${isLightMode ? 'bg-slate-50 border-slate-200 text-slate-400 group-hover:text-emerald-500 group-hover:bg-emerald-50 group-hover:border-emerald-200' : 'bg-white/[0.04] border-white/[0.06] text-slate-600 group-hover:text-emerald-400 group-hover:border-emerald-500/20 group-hover:bg-emerald-500/8'}`}>
-                                    <ImageIcon className="w-5 h-5" />
-                                </div>
-                                <p className={`text-[13px] font-medium mb-1 ${isLightMode ? 'text-slate-900' : 'text-slate-400'}`}>Drop image here</p>
-                                <p className={`text-[11px] ${isLightMode ? 'text-slate-500' : 'text-slate-700'}`}>or click to browse files</p>
+                        />
+                        <div className="py-10 px-6 flex flex-col items-center text-center">
+                            <div className={`w-12 h-12 rounded-xl border flex items-center justify-center mb-3.5 transition-all ${isLightMode ? 'bg-slate-50 border-slate-200 text-slate-400 group-hover:text-emerald-500 group-hover:bg-emerald-50 group-hover:border-emerald-200' : 'bg-white/[0.04] border-white/[0.06] text-slate-600 group-hover:text-emerald-400 group-hover:border-emerald-500/20 group-hover:bg-emerald-500/8'}`}>
+                                <ImageIcon className="w-5 h-5" />
                             </div>
+                            <p className={`text-[13px] font-medium mb-1 ${isLightMode ? 'text-slate-900' : 'text-slate-400'}`}>Drop image here</p>
+                            <p className={`text-[11px] ${isLightMode ? 'text-slate-500' : 'text-slate-700'}`}>or click to browse files</p>
                         </div>
-                    )}
+                    </div>
+                </div>
+            )}
 
-                    {noteImage && !isAnalyzing && (
-                        <button
-                            type="button"
-                            onClick={() => handleAnalyzeImage(noteImage)}
-                            className={`w-full text-[12px] font-bold flex items-center justify-center gap-2 py-3 rounded-xl border transition-all cursor-pointer ${isLightMode ? 'bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 shadow-lg shadow-emerald-500/10' : 'text-emerald-400 bg-emerald-500/6 border-emerald-500/12 hover:bg-emerald-500/12 hover:border-emerald-500/20'}`}
-                        >
-                            <Wand2 className="w-3.5 h-3.5" /> Extract text with AI
-                        </button>
-                    )}
-                    {isAnalyzing && (
-                        <div className={`flex items-center justify-center gap-2.5 py-3 rounded-xl border ${isLightMode ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-emerald-500/5 border border-emerald-500/10 text-emerald-400'}`}>
-                            <div className={`w-3.5 h-3.5 border-2 rounded-full animate-spin ${isLightMode ? 'border-emerald-400/20 border-t-emerald-600' : 'border-emerald-400/25 border-t-emerald-400'}`} />
-                            <span className="text-[11px] font-semibold">Analyzing image...</span>
-                        </div>
-                    )}
+            {/* Embedded Images List */}
+            {embeddedImages.length > 0 && (
+                <div className="space-y-2.5">
+                    <label className={`text-[10px] font-extrabold uppercase tracking-[0.2em] block ${isLightMode ? 'text-slate-400' : 'text-slate-500'}`}>Captured Clips ({embeddedImages.length})</label>
+                    <div className="grid grid-cols-2 gap-2.5">
+                        {embeddedImages.map(img => (
+                            <div key={img.referenceId} className={`group relative aspect-video rounded-xl overflow-hidden border ${isLightMode ? 'border-slate-200 bg-white' : 'border-white/[0.06] bg-black/20'}`}>
+                                <img src={img.data} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt={img.referenceId} />
+                                <div className="absolute inset-x-0 bottom-0 p-1.5 bg-black/60 translate-y-full group-hover:translate-y-0 transition-transform flex items-center justify-between">
+                                    <span className="text-[9px] font-black text-white truncate">{img.referenceId}</span>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => insertReferenceId(img.referenceId)}
+                                            className="p-1 rounded bg-white/10 hover:bg-emerald-500 text-white transition-colors"
+                                            title="Insert into text"
+                                        >
+                                            <Plus className="w-2.5 h-2.5" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveImage(img.referenceId)}
+                                            className="p-1 rounded bg-white/10 hover:bg-rose-500 text-white transition-colors"
+                                            title="Remove image"
+                                        >
+                                            <Trash2 className="w-2.5 h-2.5" />
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/40 backdrop-blur-md border border-white/10 opacity-60 group-hover:opacity-100 transition-opacity">
+                                    <span className="text-[8px] font-black text-white/80 tracking-tighter">[[{img.referenceId}]]</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {loadingImages && (
+                <div className="flex items-center justify-center py-4 gap-2">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-500" />
+                    <span className="text-[10px] font-bold text-emerald-500/60 uppercase tracking-widest">Loading images...</span>
                 </div>
             )}
         </div>
@@ -539,23 +558,10 @@ const EditNoteModal = ({ isOpen, onClose, subjectId, note, onNoteUpdated }) => {
                             {/* Left Sidebar */}
                             <div className={`w-full lg:w-[380px] xl:w-[420px] shrink-0 border-b lg:border-b-0 lg:border-r flex flex-col overflow-hidden ${isLightMode ? 'bg-[#f1f4f9] border-slate-200' : 'bg-[#1e1e2d] border-white/[0.04]'}`}>
                                 <div className="flex-1 overflow-y-auto custom-scrollbar p-5 sm:p-6 space-y-6">
-                                    {/* Type Selector */}
+                                    {/* Images Section */}
                                     <div>
-                                        <label className={`text-[10px] font-extrabold uppercase tracking-[0.2em] mb-2.5 block ${isLightMode ? 'text-slate-400' : 'text-slate-500'}`}>Note Type</label>
-                                        <div className={`flex p-1 rounded-xl border ${isLightMode ? 'bg-slate-200/50 border-slate-300/50' : 'bg-white/[0.025] border-white/[0.05]'}`}>
-                                            <button
-                                                onClick={() => handleMainTypeChange('text')}
-                                                className={`flex-1 py-2 text-[12px] font-semibold rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer ${mainType === 'text' ? (isLightMode ? 'bg-white text-emerald-600 shadow-sm border border-slate-200' : 'bg-emerald-500/12 text-emerald-400 border border-emerald-500/20 shadow-sm') : 'text-slate-500 hover:text-slate-700'}`}
-                                            >
-                                                <Type className="w-3.5 h-3.5" /> Text
-                                            </button>
-                                            <button
-                                                onClick={() => handleMainTypeChange('image')}
-                                                className={`flex-1 py-2 text-[12px] font-semibold rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer ${mainType === 'image' ? (isLightMode ? 'bg-white text-emerald-600 shadow-sm border border-slate-200' : 'bg-emerald-500/12 text-emerald-400 border border-emerald-500/20 shadow-sm') : 'text-slate-500 hover:text-slate-700'}`}
-                                            >
-                                                <ImageIcon className="w-3.5 h-3.5" /> Image
-                                            </button>
-                                        </div>
+                                        <label className={`text-[10px] font-extrabold uppercase tracking-[0.2em] mb-2.5 block ${isLightMode ? 'text-slate-400' : 'text-slate-500'}`}>Visual Content</label>
+                                        {renderImagePanel()}
                                     </div>
 
                                     {/* Title */}
@@ -605,40 +611,7 @@ const EditNoteModal = ({ isOpen, onClose, subjectId, note, onNoteUpdated }) => {
                                             className={`w-full border rounded-xl px-4 py-3 text-[13px] focus:outline-none focus:ring-1 transition-all ${isLightMode ? 'bg-white border-slate-200 text-slate-900 focus:border-emerald-500/40 focus:ring-emerald-500/10 placeholder:text-slate-400' : 'bg-white/[0.03] border-white/[0.06] text-slate-100 focus:border-emerald-500/30 focus:ring-emerald-500/10 placeholder:text-slate-700'}`}
                                             placeholder="Add tag + Enter"
                                         />
-                                        {availableTags.length > 0 && (
-                                            <div className="mt-3">
-                                                <div className={`text-[9px] font-bold uppercase tracking-[0.15em] mb-2 ${isLightMode ? 'text-slate-400' : 'text-slate-700'}`}>Suggestions</div>
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    {availableTags
-                                                        .filter(tag => !tags.includes(tag))
-                                                        .filter(tag => !tagInput || tag.toLowerCase().includes(tagInput.toLowerCase()))
-                                                        .slice(0, 10)
-                                                        .map(tag => (
-                                                            <button
-                                                                key={tag}
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    if (!tags.includes(tag)) setTags([...tags, tag]);
-                                                                    setTagInput('');
-                                                                }}
-                                                                className={`px-2 py-1 text-[10px] font-semibold transition-all border rounded-md cursor-pointer ${isLightMode ? 'text-slate-600 bg-slate-200/50 hover:bg-emerald-500/10 hover:text-emerald-600 border-slate-300/40 hover:border-emerald-500/20' : 'text-slate-500 hover:text-emerald-400 bg-white/[0.03] hover:bg-emerald-500/8 border-white/[0.04] hover:border-emerald-500/15'}`}
-                                                            >
-                                                                + {tag}
-                                                            </button>
-                                                        ))}
-                                                </div>
-                                            </div>
-                                        )}
                                     </div>
-
-                                    {mainType === 'image' && (
-                                        <div className={`pt-2 border-t ${isLightMode ? 'border-slate-200' : 'border-white/[0.04]'}`}>
-                                            <label className={`text-[10px] font-extrabold uppercase tracking-[0.2em] mb-3 flex items-center gap-1.5 ${isLightMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                                <ImageIcon className="w-3 h-3" /> Source Image
-                                            </label>
-                                            {renderImagePanel()}
-                                        </div>
-                                    )}
                                 </div>
                             </div>
 
@@ -648,7 +621,7 @@ const EditNoteModal = ({ isOpen, onClose, subjectId, note, onNoteUpdated }) => {
                                     <div className="flex items-center gap-2">
                                         <FileText className={`w-3.5 h-3.5 ${isLightMode ? 'text-slate-400' : 'text-slate-600'}`} />
                                         <span className={`text-[11px] font-bold uppercase tracking-[0.15em] ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>Content</span>
-                                        <span className={`text-[10px] ml-1 ${isLightMode ? 'text-slate-400' : 'text-slate-700'}`}>— Markdown supported</span>
+                                        <span className={`text-[10px] ml-1 ${isLightMode ? 'text-slate-400' : 'text-slate-700'}`}>— Use [[IMG_XXXX | right | small]] for layout</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <button
@@ -675,6 +648,7 @@ const EditNoteModal = ({ isOpen, onClose, subjectId, note, onNoteUpdated }) => {
                                 <div className="flex-1 overflow-hidden">
                                     <form id="edit-note-form" onSubmit={handleUpdate} className="h-full flex flex-col">
                                         <textarea
+                                            ref={textareaRef}
                                             value={content}
                                             onChange={(e) => setContent(e.target.value)}
                                             className={`w-full flex-1 px-5 sm:px-8 py-6 text-[15px] focus:outline-none resize-none font-mono leading-[1.8] placeholder:text-slate-400 placeholder:leading-[1.8] ${isLightMode ? 'bg-white text-slate-800' : 'bg-[#1c1c28] text-slate-200'}`}
@@ -706,7 +680,7 @@ const EditNoteModal = ({ isOpen, onClose, subjectId, note, onNoteUpdated }) => {
                             onCropComplete={handleApplyCrop}
                             onCancel={() => {
                                 setIsCropping(false);
-                                if (!noteImage) setImageToCrop(null);
+                                setImageToCrop(null);
                             }}
                             title="Crop Note Image"
                             subtitle="Select the area you want to save as a note"

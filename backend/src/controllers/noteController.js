@@ -4,17 +4,23 @@ import * as sourceImageModel from '../models/sourceImageModel.js';
 import { generateNoteFromQuestion } from '../services/ai_service/response/noteGenerator.js';
 import * as deletionService from '../services/deletionService.js';
 import * as subjectModel from '../models/subjectModel.js';
+import db from '../knex/db.js';
 
-export const getNoteImage = async (req, res, next) => {
+export const getNoteImages = async (req, res, next) => {
     try {
         const { subjectId, noteId } = req.params;
-        const note = await noteModel.getNotesBySubject(subjectId).then(notes => notes.find(n => n.id === noteId));
-        if (!note || !note.source_image_id) return res.status(404).json({ error: 'Image not found' });
+        const notes = await noteModel.getNotesBySubject(subjectId, undefined, 0, false);
+        const note = notes.find(n => String(n.id) === String(noteId));
+        
+        if (!note || !note.source_image_ids || note.source_image_ids.length === 0) {
+            return res.json({ images: [] });
+        }
 
-        const sourceImg = await sourceImageModel.getSourceImageById(note.source_image_id, subjectId);
-        if (!sourceImg) return res.status(404).json({ error: 'Image content not found' });
+        const images = await db('revision.files')
+            .whereIn('id', note.source_image_ids)
+            .where({ subject_id: subjectId, is_deleted: false });
 
-        res.json({ content: sourceImg.data });
+        res.json({ images: images.map(img => ({ id: img.id, referenceId: img.reference_id, data: img.data })) });
     } catch (error) {
         next(error);
     }
@@ -41,16 +47,11 @@ export const getAllNotes = async (req, res, next) => {
 export const createNote = async (req, res, next) => {
     try {
         const { subjectId } = req.params;
-        const { questionId, title, content, sourceImageId: existingSourceImageId, sourceImageContent, parentNoteId, tags } = req.body;
+        const { questionId, title, content, sourceImageIds: existingSourceImageIds, images, parentNoteId, tags } = req.body;
 
         let finalContent = content;
         let finalTitle = title;
-        let sourceImageId = existingSourceImageId;
-
-        if (sourceImageContent && !sourceImageId) {
-            const savedImage = await sourceImageModel.createSourceImage(subjectId, sourceImageContent);
-            sourceImageId = savedImage.id;
-        }
+        let sourceImageIds = existingSourceImageIds || [];
 
         if (questionId && !content) {
             const question = await questionModel.getQuestionById(questionId, subjectId);
@@ -62,7 +63,6 @@ export const createNote = async (req, res, next) => {
 
             if (!promptText && question.formatted_content) {
                 if (typeof question.formatted_content === 'object') {
-                    // Try to join all questions if it's our new raw AI JSON structure
                     if (Array.isArray(question.formatted_content.questions)) {
                         promptText = question.formatted_content.questions.map(q => q.question).join('\n\n');
                     } else {
@@ -87,7 +87,18 @@ export const createNote = async (req, res, next) => {
             return res.status(400).json({ error: 'Title and content are required' });
         }
 
-        const note = await noteModel.createNote(subjectId, questionId, finalTitle, finalContent, sourceImageId, parentNoteId, tags);
+        // Handle multiple image uploads bundled with the note
+        // Moved here to ensure finalTitle is available (especially for AI generation)
+        if (images && Array.isArray(images) && images.length > 0) {
+            const uploadPromises = images.map(img => 
+                sourceImageModel.createSourceImage(subjectId, img.data, 'image', `${finalTitle}_${img.referenceId}`, img.referenceId)
+            );
+            const savedImages = await Promise.all(uploadPromises);
+            const newImageIds = savedImages.map(img => img.id);
+            sourceImageIds = [...sourceImageIds, ...newImageIds];
+        }
+
+        const note = await noteModel.createNote(subjectId, questionId, finalTitle, finalContent, sourceImageIds, parentNoteId, tags);
 
         await subjectModel.touchSubject(subjectId);
 
@@ -121,13 +132,31 @@ export const deleteNote = async (req, res, next) => {
 export const updateNote = async (req, res, next) => {
     try {
         const { subjectId, noteId } = req.params;
-        const { title, content, tags } = req.body;
+        const { title, content, tags, sourceImageIds: existingSourceImageIds, images } = req.body;
 
         if (!title || !content) {
             return res.status(400).json({ error: 'Title and content are required' });
         }
 
-        const note = await noteModel.updateNote(noteId, subjectId, { title, content, tags });
+        let sourceImageIds = existingSourceImageIds || [];
+
+        // Handle multiple image uploads bundled with the update
+        if (images && Array.isArray(images) && images.length > 0) {
+            const uploadPromises = images.map(img => 
+                sourceImageModel.createSourceImage(subjectId, img.data, 'image', `${title}_${img.referenceId}`, img.referenceId)
+            );
+            const savedImages = await Promise.all(uploadPromises);
+            const newImageIds = savedImages.map(img => img.id);
+            sourceImageIds = [...sourceImageIds, ...newImageIds];
+        }
+
+        const note = await noteModel.updateNote(noteId, subjectId, { 
+            title, 
+            content, 
+            tags, 
+            source_image_ids: sourceImageIds 
+        });
+        
         if (!note) {
             return res.status(404).json({ error: 'Note not found' });
         }

@@ -6,7 +6,7 @@ export const getNotesBySubject = async (subjectId, limit, offset, includeContent
         .orderBy('created_at', 'desc');
 
     if (!includeContent) {
-        query = query.select('id', 'subject_id', 'question_id', 'parent_note_id', 'source_image_id', 'title', 'tags', 'created_at', 'updated_at');
+        query = query.select('id', 'subject_id', 'question_id', 'parent_note_id', 'source_image_ids', 'title', 'tags', 'created_at', 'updated_at');
     }
 
     if (limit !== undefined) {
@@ -33,11 +33,11 @@ export const getNotesByQuestion = async (questionId) => {
         .orderBy('created_at', 'desc');
 };
 
-export const createNote = async (subjectId, questionId, title, content, sourceImageId, parentNoteId, tags = []) => {
+export const createNote = async (subjectId, questionId, title, content, sourceImageIds = [], parentNoteId, tags = []) => {
     const [note] = await db('revision.notes').insert({
         subject_id: subjectId,
         question_id: questionId || null,
-        source_image_id: sourceImageId || null,
+        source_image_ids: sourceImageIds || [],
         parent_note_id: parentNoteId || null,
         title,
         content,
@@ -66,6 +66,10 @@ export const updateNote = async (noteId, subjectId, data) => {
 
     if (data.tags !== undefined) {
         updateData.tags = JSON.stringify(data.tags || []);
+    }
+
+    if (data.source_image_ids !== undefined) {
+        updateData.source_image_ids = data.source_image_ids || [];
     }
 
     const [updated] = await db('revision.notes')

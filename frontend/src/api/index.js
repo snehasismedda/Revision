@@ -198,7 +198,7 @@ export const notesApi = {
     create: (subjectId, body) => request(`/subjects/${subjectId}/notes`, { method: 'POST', body }),
     update: (subjectId, noteId, body) => request(`/subjects/${subjectId}/notes/${noteId}`, { method: 'PUT', body }),
     delete: (subjectId, noteId) => request(`/subjects/${subjectId}/notes/${noteId}`, { method: 'DELETE' }),
-    getImage: (subjectId, noteId) => request(`/subjects/${subjectId}/notes/${noteId}/image`),
+    getImages: (subjectId, noteId) => request(`/subjects/${subjectId}/notes/${noteId}/images`),
 };
 
 // Revision Tracker

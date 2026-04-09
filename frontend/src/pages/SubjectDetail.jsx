@@ -73,7 +73,7 @@ const SubjectDetail = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
 
-    const { subjects, statsMap, isLoaded: subjectsLoaded, loadSubjects, refreshStats, setSelectedSubjectId } = useSubjects();
+    const { subjects, statsMap, isLoaded: subjectsLoaded, loadSubjects, refreshStats, updateLocalStats, setSelectedSubjectId } = useSubjects();
 
     // Sync global selected subject when viewing details
     useEffect(() => {
@@ -1517,7 +1517,10 @@ const SubjectDetail = () => {
             if (items.length === 1) {
                 // Download single MD file
                 const item = items[0];
-                const content = item.content || '';
+                let content = item.content || '';
+                if (activeTab === 'notes') {
+                    content = await replaceNoteImagePlaceholders(item);
+                }
                 const title = item.title ? sanitizeForPDF(item.title) : `${itemType}`;
                 const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
                 const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
@@ -1529,11 +1532,15 @@ const SubjectDetail = () => {
                 const folderName = `${subject?.name || 'Export'}_${activeTab}`;
                 const folder = zip.folder(folderName);
 
-                items.forEach((item, index) => {
-                    const content = item.content || '';
+                // Use for...of to handle await
+                for (const [index, item] of items.entries()) {
+                    let content = item.content || '';
+                    if (activeTab === 'notes') {
+                        content = await replaceNoteImagePlaceholders(item);
+                    }
                     const title = item.title ? sanitizeForPDF(item.title) : `${itemType}_${index + 1}`;
                     folder.file(`${title}.md`.replace(/\s+/g, '_'), content);
-                });
+                }
 
                 const content = await zip.generateAsync({ type: 'blob' });
                 const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
@@ -1755,7 +1762,7 @@ const SubjectDetail = () => {
 
     const handleNoteAdded = (newNote) => {
         setNotes((prev) => [newNote, ...prev]);
-        refreshStats([id]);
+        updateLocalStats(id, 'noteCount', 1);
     };
 
     const handleNoteUpdated = (updatedNote) => {
@@ -1966,7 +1973,6 @@ const SubjectDetail = () => {
             setNoteStack(prev => [...prev, viewingNote]);
         }
         setViewingNote(fullNote);
-        if (fullNote.source_image_id) handleFetchNoteImage(fullNote.id);
     };
 
     const handleEditNote = async (note) => {
@@ -1988,6 +1994,24 @@ const SubjectDetail = () => {
             }
         }
         setEditingNote(fullNote);
+    };
+
+    const replaceNoteImagePlaceholders = async (note) => {
+        let content = note.content || '';
+        try {
+            const res = await notesApi.getImages(id, note.id);
+            const images = res.images || [];
+            if (images.length > 0) {
+                images.forEach(img => {
+                    const placeholder = `[[${img.referenceId}]]`;
+                    const imgTag = `\n\n![${img.referenceId}](${img.data})\n\n`;
+                    content = content.split(placeholder).join(imgTag);
+                });
+            }
+        } catch (err) {
+            console.error('Failed to fetch images for export:', err);
+        }
+        return content;
     };
 
     const handleFetchNoteImage = async (noteId) => {
@@ -2134,7 +2158,7 @@ const SubjectDetail = () => {
                 setNotes((prev) => prev.filter((n) => n.id !== item.id));
             }
             toast.success(`${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} deleted`, { id: loadingToast });
-            refreshStats([id]);
+            updateLocalStats(id, isSolution ? 'solutionCount' : 'noteCount', -1);
         } catch {
             toast.error(`Failed to delete ${typeLabel}`, { id: loadingToast });
         } finally {
@@ -2211,7 +2235,7 @@ const SubjectDetail = () => {
             const res = await notesApi.create(id, { questionId });
             setNotes((prev) => [res.note, ...prev]);
             toast.success('AI Note generated!', { id: loadingToast });
-            refreshStats([id]);
+            updateLocalStats(id, 'noteCount', 1);
         } catch (error) {
             toast.error(error.message || 'Failed to generate AI note', { id: loadingToast });
         } finally {
@@ -2468,6 +2492,7 @@ const SubjectDetail = () => {
                         }
                     }}
                     note={viewingNote}
+                    subjectId={id}
                     onNavigateToQuestion={navigateToQuestion}
                     sourceImage={viewingNote ? fetchedImages[`note-${viewingNote.id}`] : null}
                     isFetchingImage={fetchingImageId === (viewingNote ? `note-${viewingNote.id}` : null)}
@@ -4509,8 +4534,9 @@ const SubjectDetail = () => {
                                             onClick={() => {
                                                 setConfirmDeleteFile({ open: true, items: Array.from(selectedItems).map(id => files.find(f => f.id === id)).filter(Boolean) });
                                             }}
-                                            disabled={selectedItems.size === 0}
-                                            className="flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:text-white hover:bg-rose-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                            disabled={selectedItems.size === 0 || Array.from(selectedItems).some(id => files.find(f => f.id === id)?.is_linked)}
+                                            className="flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:text-white hover:bg-rose-500/20 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                                            title={Array.from(selectedItems).some(id => files.find(f => f.id === id)?.is_linked) ? "Some selected files are linked to notes/questions" : ""}
                                         >
                                             <Trash2 className="w-4 h-4" />
                                             <span className="text-[12px] font-medium hidden md:inline">Delete</span>
@@ -4697,7 +4723,7 @@ const SubjectDetail = () => {
                                                                                     const note = notes.find(n => n.id === file.linked_note_id);
                                                                                     if (note) {
                                                                                         setViewingNote(note);
-                                                                                        if (note.source_image_id) handleFetchNoteImage(note.id);
+                                                                                        
                                                                                     }
                                                                                 }
                                                                             }}
@@ -4745,12 +4771,15 @@ const SubjectDetail = () => {
                                                                                     </button>
                                                                                     <button
                                                                                         onClick={() => {
+                                                                                            if (file.is_linked) return;
                                                                                             setActiveFileDropdown(null);
                                                                                             setConfirmDeleteFile({ open: true, items: [file] });
                                                                                         }}
-                                                                                        className="w-full flex items-center justify-start gap-2.5 px-3.5 py-2 text-[12px] font-medium text-slate-300 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
+                                                                                        disabled={file.is_linked}
+                                                                                        className={`w-full flex items-center justify-start gap-2.5 px-3.5 py-2 text-[12px] font-medium transition-all ${file.is_linked ? 'text-slate-600 cursor-not-allowed grayscale' : 'text-slate-300 hover:text-rose-400 hover:bg-rose-500/10 cursor-pointer'}`}
+                                                                                        title={file.is_linked ? "This file is linked to a note or question" : "Delete File"}
                                                                                     >
-                                                                                        <Trash2 className="w-3.5 h-3.5 text-rose-500" /> Delete
+                                                                                        <Trash2 className={`w-3.5 h-3.5 ${file.is_linked ? 'text-slate-700' : 'text-rose-500'}`} /> {file.is_linked ? 'In Use' : 'Delete'}
                                                                                     </button>
                                                                                 </div>
                                                                             )}

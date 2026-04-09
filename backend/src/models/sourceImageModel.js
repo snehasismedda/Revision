@@ -1,20 +1,24 @@
 import db from '../knex/db.js';
 
-export const createFile = async (subjectId, data, fileType = 'image', fileName = null) => {
+export const createFile = async (subjectId, data, fileType = 'image', fileName = null, referenceId = null) => {
+    const insertData = {
+        subject_id: subjectId,
+        data,
+        file_type: fileType,
+        file_name: fileName,
+    };
+    if (referenceId) {
+        insertData.reference_id = referenceId;
+    }
     const [file] = await db('revision.files')
-        .insert({
-            subject_id: subjectId,
-            data,
-            file_type: fileType,
-            file_name: fileName,
-        })
+        .insert(insertData)
         .returning('*');
     return file;
 };
 
 // Keep backward-compat alias
-export const createSourceImage = (subjectId, data, fileType = 'image', fileName = null) =>
-    createFile(subjectId, data, fileType, fileName);
+export const createSourceImage = (subjectId, data, fileType = 'image', fileName = null, referenceId = null) =>
+    createFile(subjectId, data, fileType, fileName, referenceId);
 
 export const getSourceImageById = async (id, subjectId) => {
     return await db('revision.files')
@@ -32,7 +36,8 @@ export const getAllSourceImagesByUser = async (userId, limit, offset, fileType =
             'si.*',
             's.name as subject_name',
             db.raw('(SELECT id FROM revision.questions q WHERE q.source_image_id = si.id AND q.is_deleted = false LIMIT 1) as linked_question_id'),
-            db.raw('(SELECT id FROM revision.notes n WHERE n.source_image_id = si.id AND n.is_deleted = false LIMIT 1) as linked_note_id')
+            db.raw('(SELECT id FROM revision.notes n WHERE si.id = ANY(n.source_image_ids) AND n.is_deleted = false LIMIT 1) as linked_note_id'),
+            db.raw('(EXISTS(SELECT 1 FROM revision.questions q WHERE q.source_image_id = si.id AND q.is_deleted = false) OR EXISTS(SELECT 1 FROM revision.notes n WHERE si.id = ANY(n.source_image_ids) AND n.is_deleted = false)) as is_linked')
         )
         .orderBy('si.created_at', 'desc');
 
@@ -53,7 +58,8 @@ export const getSourceImagesBySubject = async (subjectId, limit, offset, fileTyp
             'si.*',
             's.name as subject_name',
             db.raw('(SELECT id FROM revision.questions q WHERE q.source_image_id = si.id AND q.is_deleted = false LIMIT 1) as linked_question_id'),
-            db.raw('(SELECT id FROM revision.notes n WHERE n.source_image_id = si.id AND n.is_deleted = false LIMIT 1) as linked_note_id')
+            db.raw('(SELECT id FROM revision.notes n WHERE si.id = ANY(n.source_image_ids) AND n.is_deleted = false LIMIT 1) as linked_note_id'),
+            db.raw('(EXISTS(SELECT 1 FROM revision.questions q WHERE q.source_image_id = si.id AND q.is_deleted = false) OR EXISTS(SELECT 1 FROM revision.notes n WHERE si.id = ANY(n.source_image_ids) AND n.is_deleted = false)) as is_linked')
         )
         .orderBy('si.created_at', 'desc');
 
