@@ -4,7 +4,7 @@ import * as entryModel from '../models/entryModel.js';
 import * as questionModel from '../models/questionModel.js';
 import * as noteModel from '../models/noteModel.js';
 import * as solutionModel from '../models/solutionModel.js';
-import * as sourceImageModel from '../models/sourceImageModel.js';
+import * as fileModel from '../models/fileModel.js';
 import db from '../knex/db.js';
 
 export const deleteSubjectCascade = async (subjectId) => {
@@ -23,7 +23,7 @@ export const deleteSubjectCascade = async (subjectId) => {
         await questionModel.softDeleteQuestionsBySubject({ subjectId });
         await noteModel.softDeleteNotesBySubject({ subjectId });
         await solutionModel.softDeleteSolutionsBySubject({ subjectId });
-        await sourceImageModel.softDeleteSourceImagesBySubject({ subjectId });
+        await fileModel.softDeleteFilesBySubject({ subjectId });
     } catch (error) {
         console.error(`[deletionService] ❌ Failed to cascade delete subject ${subjectId}:`, error.message);
         throw error;
@@ -90,7 +90,7 @@ export const deleteNotesCascade = async (noteIds, subjectId) => {
         });
 
         if (sourceImageIds.length > 0) {
-            await sourceImageModel.softDeleteSourceImage(sourceImageIds, subjectId);
+            await fileModel.softDeleteFile(sourceImageIds, subjectId);
         }
     } catch (error) {
         console.error(`[deletionService] ❌ Failed to bulk cascade delete notes:`, error.message);
@@ -118,7 +118,7 @@ export const deleteSolutionsCascade = async (solutionIds, subjectId) => {
             .filter(id => id !== null);
 
         if (sourceImageIds.length > 0) {
-            await sourceImageModel.softDeleteSourceImage(sourceImageIds, subjectId);
+            await fileModel.softDeleteFile(sourceImageIds, subjectId);
         }
     } catch (error) {
         console.error(`[deletionService] ❌ Failed to bulk cascade delete solutions:`, error.message);
@@ -172,7 +172,7 @@ export const deleteQuestionsCascade = async (questionIds, subjectId) => {
         // Bulk delete images
         const uniqueImageIds = [...new Set(sourceImageIds)];
         if (uniqueImageIds.length > 0) {
-            await sourceImageModel.softDeleteSourceImage(uniqueImageIds, subjectId);
+            await fileModel.softDeleteFile(uniqueImageIds, subjectId);
         }
 
         // 4. Soft-delete the related records (notes and solutions)

@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { sessionsApi, questionsApi, notesApi, filesApi, aiApi, revisionApi, solutionsApi } from '../api/index.js';
 import { useTopics } from '../context/TopicContext.jsx';
 import { useSubjects } from '../context/SubjectContext.jsx';
+import { useFiles } from '../context/FileContext.jsx';
 import TopicTree from '../components/TopicTree.jsx';
 import SessionCard from '../components/SessionCard.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
@@ -166,6 +167,8 @@ const SubjectDetail = () => {
     const [confirmDeleteRevisionSession, setConfirmDeleteRevisionSession] = useState({ open: false, sessionId: null });
 
 
+    const { getFileData } = useFiles();
+
     // Toggle state for grouped questions
     const [expandedGroups, setExpandedGroups] = useState({});
 
@@ -177,6 +180,65 @@ const SubjectDetail = () => {
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedItems, setSelectedItems] = useState(new Set());
     const [showExportMenu, setShowExportMenu] = useState(false);
+    const [fileIndex, setFileIndex] = useState(-1);
+
+    useEffect(() => {
+        if (viewingFile) {
+            const idx = files.findIndex(f => f.id === viewingFile.id);
+            setFileIndex(idx);
+        } else {
+            setFileIndex(-1);
+        }
+    }, [viewingFile, files]);
+
+    const handleFileClick = useCallback(async (file) => {
+        try {
+            if (!file.data) {
+                const toastId = toast.loading('Fetching file data...');
+                const fullFile = await getFileData(file.subject_id || id, file.id);
+                toast.dismiss(toastId);
+                setViewingFile(fullFile);
+            } else {
+                setViewingFile(file);
+            }
+        } catch (err) {
+            console.error('Failed to open file:', err);
+        }
+    }, [id, getFileData]);
+
+    const handleNextFile = useCallback(async () => {
+        if (!hasMoreFiles && fileIndex >= files.length - 1) return;
+        
+        const nextIndex = fileIndex + 1;
+        
+        if (nextIndex >= files.length) {
+            // Should we load more?
+            if (hasMoreFiles) {
+                try {
+                    const nextPage = filePage + 1;
+                    const res = await filesApi.listBySubject(id, FILE_LIMIT, nextPage * FILE_LIMIT, null, true);
+                    const newFiles = res.images || res.files || [];
+                    if (newFiles.length > 0) {
+                        setFiles(prev => [...prev, ...newFiles]);
+                        setFilePage(nextPage);
+                        setHasMoreFiles(newFiles.length === FILE_LIMIT);
+                        handleFileClick(newFiles[0]);
+                    }
+                } catch (err) {
+                    console.error('Failed to load more files:', err);
+                }
+            }
+            return;
+        }
+
+        handleFileClick(files[nextIndex]);
+    }, [id, files, fileIndex, filePage, hasMoreFiles, handleFileClick]);
+
+    const handlePrevFile = useCallback(() => {
+        if (fileIndex > 0) {
+            handleFileClick(files[fileIndex - 1]);
+        }
+    }, [fileIndex, files, handleFileClick]);
 
     const [confirmBulkDelete, setConfirmBulkDelete] = useState({ open: false, type: null, count: 0 });
     const [isDownloadingSyllabus, setIsDownloadingSyllabus] = useState(false);
@@ -466,6 +528,8 @@ const SubjectDetail = () => {
             setIsSelectionMode(false);
             setConfirmBulkDelete({ open: false, type: null, count: 0 });
             toast.success(`Deleted ${itemsToDelete.length} ${isNotes ? 'note(s)' : 'question(s)'}`, { id: loadingToast });
+            updateLocalStats(id, isNotes ? 'totalNotes' : 'availableQuestions', -itemsToDelete.length);
+            refreshStats([id]);
         } catch (err) {
             console.error(err);
             toast.error('Failed to delete some items', { id: loadingToast });
@@ -1565,7 +1629,7 @@ const SubjectDetail = () => {
         const loadMore = async () => {
             setLoadingMoreFiles(true);
             try {
-                const res = await filesApi.listBySubject(id, FILE_LIMIT, filePage * FILE_LIMIT);
+                const res = await filesApi.listBySubject(id, FILE_LIMIT, filePage * FILE_LIMIT, null, true);
                 const newFiles = res.images || res.files || [];
                 setHasMoreFiles(newFiles.length === FILE_LIMIT);
                 setFiles(prev => [...prev, ...newFiles]);
@@ -1645,7 +1709,7 @@ const SubjectDetail = () => {
                 }
                 case 'library': {
                     // We only load page 0 initially when the tab is clicked
-                    const fileRes = await filesApi.listBySubject(id, FILE_LIMIT, 0);
+                    const fileRes = await filesApi.listBySubject(id, FILE_LIMIT, 0, null, true);
                     const initialFiles = fileRes.images || fileRes.files || [];
                     setFiles(initialFiles);
                     setHasMoreFiles(initialFiles.length === FILE_LIMIT);
@@ -1762,7 +1826,7 @@ const SubjectDetail = () => {
 
     const handleNoteAdded = (newNote) => {
         setNotes((prev) => [newNote, ...prev]);
-        updateLocalStats(id, 'noteCount', 1);
+        updateLocalStats(id, 'totalNotes', 1);
     };
 
     const handleNoteUpdated = (updatedNote) => {
@@ -1773,6 +1837,7 @@ const SubjectDetail = () => {
 
     const handleSolutionAdded = (newSolution) => {
         setSolutions((prev) => [newSolution, ...prev]);
+        updateLocalStats(id, 'totalSolutions', 1);
     };
 
     const handleRevisionToggle = async (sessionId, topicId, currentStatus) => {
@@ -1824,6 +1889,8 @@ const SubjectDetail = () => {
             await revisionApi.createSession(id, data.name, data.topicIds);
             const loadRes = await revisionApi.listSessions(id); // Reload to get full nested data
             setRevisionSessions(loadRes.sessions || []);
+            updateLocalStats(id, 'totalRevisionSessions', 1);
+            refreshStats([id]);
             setShowCreateRevisionSession(false);
             toast.success('Revision session created');
         } catch (err) {
@@ -1849,6 +1916,7 @@ const SubjectDetail = () => {
             setRevisionSessions(prev => prev.filter(s => s.id !== sessionId));
             setConfirmDeleteRevisionSession({ open: false, sessionId: null });
             toast.success('Revision session deleted');
+            updateLocalStats(id, 'totalRevisionSessions', -1);
             refreshStats([id]);
         } catch {
             toast.error('Failed to delete session');
@@ -1866,7 +1934,7 @@ const SubjectDetail = () => {
         // Refetch files to be thorough
         const refreshFiles = async () => {
             setFilePage(0);
-            const res = await filesApi.listBySubject(id, FILE_LIMIT, 0);
+            const res = await filesApi.listBySubject(id, FILE_LIMIT, 0, null, true);
             const newFiles = res.images || res.files || [];
             setFiles(newFiles);
             setHasMoreFiles(newFiles.length === FILE_LIMIT);
@@ -1877,6 +1945,7 @@ const SubjectDetail = () => {
 
     const handleSessionCreated = (newSession) => {
         setSessions((prev) => [newSession, ...prev]);
+        updateLocalStats(id, 'totalSessions', 1);
         refreshStats([id]);
         navigate(`/subjects/${id}/sessions/${newSession.id}`);
     };
@@ -1890,6 +1959,7 @@ const SubjectDetail = () => {
             await sessionsApi.delete(id, session.id);
             setSessions((prev) => prev.filter((s) => s.id !== session.id));
             toast.success(`Session deleted`, { id: loadingToast });
+            updateLocalStats(id, 'totalSessions', -1);
             refreshStats([id]);
         } catch {
             toast.error('Failed to delete session', { id: loadingToast });
@@ -2050,7 +2120,7 @@ const SubjectDetail = () => {
     };
 
     const handleEditSolutionUpdated = (updated) => {
-        setSolutions(prev => prev.map(s => s.id === updated.id ? updated : s));
+            setSolutions(prev => prev.map(s => s.id === updated.id ? updated : s));
 
         // Clear old image cache for this solution so it reloads if viewing/next time
         setFetchedImages(prev => {
@@ -2064,43 +2134,6 @@ const SubjectDetail = () => {
             if (updated.source_image_id) {
                 handleFetchSolutionImage(updated.id);
             }
-        }
-    };
-    const handlePrevFile = () => {
-        if (!viewingNote || !viewingNote.id?.toString().startsWith('img-')) return;
-        const currentId = viewingNote.source_image_id;
-        const idx = files.findIndex(img => img.id === currentId);
-        if (idx > 0) {
-            const img = files[idx - 1];
-            const fakeNote = {
-                id: `img-${img.id}`,
-                title: `${img.file_type ? img.file_type.toUpperCase() : 'Image'} File`,
-                content: 'Original captured material.',
-                source_image_id: img.id,
-                created_at: img.created_at,
-                file_type: img.file_type
-            };
-            setFetchedImages(prev => ({ ...prev, [`note-img-${img.id}`]: img.data }));
-            setViewingNote(fakeNote);
-        }
-    };
-
-    const handleNextFile = () => {
-        if (!viewingNote || !viewingNote.id?.toString().startsWith('img-')) return;
-        const currentId = viewingNote.source_image_id;
-        const idx = files.findIndex(img => img.id === currentId);
-        if (idx < files.length - 1) {
-            const img = files[idx + 1];
-            const fakeNote = {
-                id: `img-${img.id}`,
-                title: `${img.file_type ? img.file_type.toUpperCase() : 'Image'} File`,
-                content: 'Original captured material.',
-                source_image_id: img.id,
-                created_at: img.created_at,
-                file_type: img.file_type
-            };
-            setFetchedImages(prev => ({ ...prev, [`note-img-${img.id}`]: img.data }));
-            setViewingNote(fakeNote);
         }
     };
 
@@ -2134,6 +2167,7 @@ const SubjectDetail = () => {
             await questionsApi.delete(id, questionId);
             setQuestions((prev) => prev.filter((q) => q.id !== questionId));
             toast.success('Question deleted', { id: loadingToast });
+            updateLocalStats(id, 'availableQuestions', -1);
             refreshStats([id]);
         } catch {
             toast.error('Failed to delete', { id: loadingToast });
@@ -2158,7 +2192,7 @@ const SubjectDetail = () => {
                 setNotes((prev) => prev.filter((n) => n.id !== item.id));
             }
             toast.success(`${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} deleted`, { id: loadingToast });
-            updateLocalStats(id, isSolution ? 'solutionCount' : 'noteCount', -1);
+            updateLocalStats(id, isSolution ? 'totalSolutions' : 'totalNotes', -1);
         } catch {
             toast.error(`Failed to delete ${typeLabel}`, { id: loadingToast });
         } finally {
@@ -2235,7 +2269,7 @@ const SubjectDetail = () => {
             const res = await notesApi.create(id, { questionId });
             setNotes((prev) => [res.note, ...prev]);
             toast.success('AI Note generated!', { id: loadingToast });
-            updateLocalStats(id, 'noteCount', 1);
+            updateLocalStats(id, 'totalNotes', 1);
         } catch (error) {
             toast.error(error.message || 'Failed to generate AI note', { id: loadingToast });
         } finally {
@@ -4662,12 +4696,19 @@ const SubjectDetail = () => {
                                                                     return;
                                                                 }
                                                                 if (activeFileDropdown === file.id) setActiveFileDropdown(null);
-                                                                else setViewingFile(file);
+                                                                else handleFileClick(file);
                                                             }}
                                                             style={{ animationDelay: `${(index % 10) * 0.05}s` }}
                                                         >
                                                             <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none">
-                                                                {file.file_type === 'image' || !file.file_type ? (
+                                                                {file.thumbnail ? (
+                                                                    <img
+                                                                        src={file.thumbnail}
+                                                                        alt={file.file_name}
+                                                                        className="w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
+                                                                        loading="lazy"
+                                                                    />
+                                                                ) : file.data ? (
                                                                     <img
                                                                         src={file.data}
                                                                         alt={file.file_name}
@@ -4675,9 +4716,14 @@ const SubjectDetail = () => {
                                                                         loading="lazy"
                                                                     />
                                                                 ) : (
-                                                                    <div className="w-full h-full flex flex-col items-center justify-center bg-surface-3 opacity-90 group-hover:opacity-100 transition-all duration-500 text-slate-300">
-                                                                        <FileText className="w-12 h-12 mb-2 text-primary" />
-                                                                        <span className="text-xs uppercase font-bold text-slate-400">{file.file_type} File</span>
+                                                                    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-surface-3 to-surface-2 transition-all duration-500 text-slate-300">
+                                                                        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                                                            {file.file_type === 'pdf' ? <FileText className="w-7 h-7 text-rose-400" /> :
+                                                                             file.file_type === 'xlsx' ? <Layers className="w-7 h-7 text-emerald-400" /> :
+                                                                             file.file_type === 'doc' ? <FileText className="w-7 h-7 text-blue-400" /> :
+                                                                             <ImageIcon className="w-7 h-7 text-indigo-400" />}
+                                                                        </div>
+                                                                        <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">{file.file_type || 'Image'}</span>
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -4708,40 +4754,42 @@ const SubjectDetail = () => {
                                                             )}
 
                                                             {/* Standard Identical Overlay from Library.jsx */}
-                                                            <div className={`absolute inset-0 rounded-xl bg-gradient-to-t from-black/90 via-black/20 to-transparent transition-all duration-300 flex flex-col justify-end p-4 ${isSelectionMode || activeFileDropdown === file.id ? 'opacity-100 bg-black/30' : 'opacity-0 group-hover:opacity-100'}`}>
+                                                            <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-4 z-10 transition-all group-hover:bg-black/20">
                                                                 <div className="flex items-center justify-between mb-1.5 relative">
                                                                     <div className="text-[10px] font-bold text-primary uppercase tracking-wider">
                                                                         {subject?.name}
                                                                     </div>
 
-                                                                    {!isSelectionMode && hasLink && (
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                if (file.linked_question_id) navigateToQuestion(file.linked_question_id);
-                                                                                else if (file.linked_note_id) {
-                                                                                    const note = notes.find(n => n.id === file.linked_note_id);
-                                                                                    if (note) {
-                                                                                        setViewingNote(note);
-                                                                                        
+                                                                    <div className={`flex items-center gap-1 transition-opacity ${activeFileDropdown === file.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                                                                        {!isSelectionMode && hasLink && (
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    if (file.linked_question_id) navigateToQuestion(file.linked_question_id);
+                                                                                    else if (file.linked_note_id) {
+                                                                                        const note = notes.find(n => n.id === file.linked_note_id);
+                                                                                        if (note) {
+                                                                                            setViewingNote(note);
+                                                                                            
+                                                                                        }
                                                                                     }
-                                                                                }
-                                                                            }}
-                                                                            className="p-1 px-[5px] bg-primary/20 hover:bg-primary text-white rounded-lg border border-primary/30 transition-all cursor-pointer"
-                                                                            title="View Linked Content"
-                                                                        >
-                                                                            <LinkIcon className="w-3 h-3" />
-                                                                        </button>
-                                                                    )}
+                                                                                }}
+                                                                                className="p-1 px-[5px] bg-primary/20 hover:bg-primary text-white rounded-lg border border-primary/30 transition-all cursor-pointer"
+                                                                                title="View Linked Content"
+                                                                            >
+                                                                                <LinkIcon className="w-3 h-3" />
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
 
                                                                 <div className="flex items-center justify-between gap-2">
-                                                                    <p className="text-[11px] font-semibold text-white truncate flex-1">
+                                                                    <p className="text-[11px] font-semibold text-white truncate flex-1 leading-tight mb-0.5">
                                                                         {file.file_name || new Date(file.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                                                                     </p>
 
                                                                     {!isSelectionMode && (
-                                                                        <div className="relative shrink-0" onClick={e => e.stopPropagation()}>
+                                                                        <div className={`relative shrink-0 transition-opacity ${activeFileDropdown === file.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} onClick={e => e.stopPropagation()}>
                                                                             <button
                                                                                 onClick={(e) => {
                                                                                     e.stopPropagation();
@@ -4753,7 +4801,7 @@ const SubjectDetail = () => {
                                                                                 <MoreVertical className="w-3.5 h-3.5" />
                                                                             </button>
                                                                             {activeFileDropdown === file.id && (
-                                                                                <div className="absolute right-0 bottom-full mb-2 w-36 bg-[#121214]/95 border border-white/10 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.6)] py-1.5 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200 z-50 backdrop-blur-xl" onClick={e => e.stopPropagation()}>
+                                                                                <div className="absolute right-0 top-full mt-2 w-36 bg-[#121214]/95 border border-white/10 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.6)] py-1.5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50 backdrop-blur-xl" onClick={e => e.stopPropagation()}>
                                                                                     <button
                                                                                         onClick={() => { setIsSelectionMode(true); setSelectedItems(new Set([file.id])); setActiveFileDropdown(null); }}
                                                                                         className="w-full flex items-center justify-start gap-2.5 px-3.5 py-2 text-[12px] font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
@@ -4854,6 +4902,8 @@ const SubjectDetail = () => {
                         if (selectedItems.size === confirmDeleteFile.items.length) setIsSelectionMode(false);
                         setConfirmDeleteFile({ open: false, items: [] });
                         toast.success("File(s) deleted");
+                        updateLocalStats(id, 'totalFiles', -deletedIds.size);
+                        refreshStats([id]);
                     } catch {
                         toast.error("Failed to delete files");
                     }
@@ -4895,15 +4945,9 @@ const SubjectDetail = () => {
                     }}
                     file={viewingFile}
                     allFiles={files}
-                    onPrev={() => {
-                        const idx = (files || []).findIndex(f => f.id === viewingFile.id);
-                        if (idx > 0) setViewingFile(files[idx - 1]);
-                    }}
-                    onNext={() => {
-                        const idx = (files || []).findIndex(f => f.id === viewingFile.id);
-                        if (idx >= 0 && idx < (files || []).length - 1) setViewingFile(files[idx + 1]);
-                    }}
-                    onSelect={(file) => setViewingFile(file)}
+                    onPrev={handlePrevFile}
+                    onNext={handleNextFile}
+                    onSelect={handleFileClick}
                     isMinimized={isFileViewerMinimized}
                     onMinimize={setIsFileViewerMinimized}
                     onDelete={async (deletedFile) => {
@@ -4912,6 +4956,8 @@ const SubjectDetail = () => {
                         setViewingFile(null);
                         setIsFileViewerMinimized(false);
                         toast.success("File deleted successfully");
+                        updateLocalStats(deletedFile.subject_id, 'totalFiles', -1);
+                        refreshStats([deletedFile.subject_id]);
                     }}
                     onNavigateToLinkedContent={(file) => {
                         if (file.linked_question_id) {

@@ -1,19 +1,21 @@
 import * as noteModel from '../models/noteModel.js';
 import * as questionModel from '../models/questionModel.js';
-import * as sourceImageModel from '../models/sourceImageModel.js'; // Using the alias inside sourceImageModel
+import * as fileModel from '../models/fileModel.js';
 import * as topicModel from '../models/topicModel.js';
 import { ollama, models } from '../config/ollama.js';
 import { noteAnalysisPrompt } from '../system_prompts/index.js';
 import { parseQuestionToRichText } from '../services/ai_service/response/questionParser.js';
+import { generateThumbnail } from '../utils/thumbnailGenerator.js';
 
 export const getAllFiles = async (req, res) => {
     try {
-        const { limit, offset, type } = req.query;
-        const files = await sourceImageModel.getAllSourceImagesByUser(
+        const { limit, offset, type, metadataOnly } = req.query;
+        const files = await fileModel.getAllFilesByUser(
             req.user.id,
             limit ? parseInt(limit, 10) : undefined,
             offset ? parseInt(offset, 10) : undefined,
-            type
+            type,
+            metadataOnly === 'true'
         );
         res.status(200).json({ files });
     } catch (error) {
@@ -22,15 +24,28 @@ export const getAllFiles = async (req, res) => {
     }
 };
 
+export const getFileById = async (req, res) => {
+    try {
+        const { subjectId, id } = req.params;
+        const file = await fileModel.getFileById(id, subjectId);
+        if (!file) return res.status(404).json({ error: 'File not found' });
+        res.status(200).json({ file });
+    } catch (error) {
+        console.error('[getFileById]', error);
+        res.status(500).json({ error: 'Failed to fetch file' });
+    }
+};
+
 export const getFilesBySubject = async (req, res) => {
     try {
         const { id: subjectId } = req.params;
-        const { limit, offset, type } = req.query;
-        const files = await sourceImageModel.getSourceImagesBySubject(
+        const { limit, offset, type, metadataOnly } = req.query;
+        const files = await fileModel.getFilesBySubject(
             subjectId,
             limit ? parseInt(limit, 10) : undefined,
             offset ? parseInt(offset, 10) : undefined,
-            type
+            type,
+            metadataOnly === 'true'
         );
         res.status(200).json({ files });
     } catch (error) {
@@ -46,8 +61,11 @@ export const saveFileAs = async (req, res) => {
     }
 
     try {
+        // Generate thumbnail
+        const thumbnail = await generateThumbnail(content, fileType || 'image');
+
         // 1. Create file 
-        const savedFile = await sourceImageModel.createFile(subjectId, content, fileType || 'image', fileName);
+        const savedFile = await fileModel.createFile(subjectId, content, fileType || 'image', fileName, thumbnail);
         const sourceImageId = savedFile.id;
 
         if (type === 'file') {
@@ -130,7 +148,7 @@ export const saveFileAs = async (req, res) => {
 export const deleteFile = async (req, res) => {
     try {
         const { subjectId, id } = req.params;
-        await sourceImageModel.softDeleteSourceImage(id, subjectId);
+        await fileModel.softDeleteFile(id, subjectId);
         res.status(200).json({ success: true });
     } catch (error) {
         console.error('[deleteFile]', error);
@@ -142,7 +160,7 @@ export const updateFile = async (req, res) => {
     try {
         const { subjectId, id } = req.params;
         const { fileName } = req.body;
-        const [updatedFile] = await sourceImageModel.updateFileName(id, subjectId, fileName);
+        const [updatedFile] = await fileModel.updateFileName(id, subjectId, fileName);
         if (!updatedFile) return res.status(404).json({ error: 'File not found' });
         res.status(200).json({ file: updatedFile });
     } catch (error) {

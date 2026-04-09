@@ -364,7 +364,7 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId }) => {
                     </div>
 
                     {/* Body */}
-                    <div className="px-7 pb-6 overflow-y-auto custom-scrollbar">
+                    <form id="add-file-form" onSubmit={handleSaveFile} className="px-7 pb-6 overflow-y-auto custom-scrollbar">
                         <div className="space-y-6">
                             {/* File Name Input - Minimal */}
                             <div className="relative group">
@@ -580,7 +580,7 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId }) => {
                                 </div>
                             )}
                         </div>
-                    </div>
+                    </form>
 
                     {/* Footer - minimal */}
                     <div className="px-7 py-5 bg-white/[0.01] border-t border-white/[0.04] shrink-0 flex items-center justify-between">

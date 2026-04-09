@@ -5,6 +5,7 @@ import { SubjectProvider } from './context/SubjectContext.jsx';
 import { TestSeriesProvider } from './context/TestSeriesContext.jsx';
 import { TopicProvider } from './context/TopicContext.jsx';
 import { AnalyticsProvider } from './context/AnalyticsContext.jsx';
+import { FileProvider } from './context/FileContext.jsx';
 import Layout from './components/Layout.jsx';
 
 // Lazy load pages
@@ -83,7 +84,8 @@ const App = () => (
         <TestSeriesProvider>
           <TopicProvider>
             <AnalyticsProvider>
-              <Toaster
+              <FileProvider>
+                <Toaster
                 position="top-right"
                 toastOptions={{
                   duration: 4000,
@@ -99,7 +101,8 @@ const App = () => (
                 }}
               />
               <AppRoutes />
-            </AnalyticsProvider>
+            </FileProvider>
+          </AnalyticsProvider>
           </TopicProvider>
         </TestSeriesProvider>
       </SubjectProvider>

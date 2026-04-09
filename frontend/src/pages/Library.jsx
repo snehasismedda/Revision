@@ -3,7 +3,8 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { filesApi } from '../api/index.js';
 import { useSubjects } from '../context/SubjectContext.jsx';
-import { Clock, LayoutGrid, Layers, PlusCircle, Search, X, History, Activity, Maximize2, Link as LinkIcon, ChevronDown, FileText, MoreHorizontal, MoreVertical, CheckCircle, Pencil, Trash2, Download } from 'lucide-react';
+import { useFiles } from '../context/FileContext.jsx';
+import { Clock, LayoutGrid, Layers, PlusCircle, Search, X, History, Activity, Maximize2, Link as LinkIcon, ChevronDown, FileText, MoreHorizontal, MoreVertical, CheckCircle, Pencil, Trash2, Download, ExternalLink, Image as ImageIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AddFileModal from '../components/modals/AddFileModal.jsx';
 import TimeTraveler from '../components/TimeTraveler.jsx';
@@ -28,6 +29,7 @@ const Library = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedFile, setSelectedFile] = useState(null);
     const [showTimeTraveler, setShowTimeTraveler] = useState(false);
+    const { getFileData } = useFiles();
     const [isFileViewerMinimized, setIsFileViewerMinimized] = useState(false);
 
     // Context Action States
@@ -39,7 +41,11 @@ const Library = () => {
     const [editingFileName, setEditingFileName] = useState('');
 
     useEffect(() => {
-        const handleClickOutside = () => setActiveFileDropdown(null);
+        const handleClickOutside = (e) => {
+            if (!e.target.closest('.dropdown-trigger') && !e.target.closest('.dropdown-menu')) {
+                setActiveFileDropdown(null);
+            }
+        };
         document.addEventListener('click', handleClickOutside);
         return () => document.removeEventListener('click', handleClickOutside);
     }, []);
@@ -88,12 +94,18 @@ const Library = () => {
             for (const file of selectedFilesList) {
                 const folderName = file.subject_name || 'Uncategorized';
 
-                let content = file.data;
-                if (file.data.startsWith('http')) {
-                    const response = await fetch(file.data);
+                let fileWithData = file;
+                if (!file.data) {
+                    toast.loading(`Fetching data for ${file.file_name || file.id}...`, { id: toastId });
+                    fileWithData = await getFileData(file.subject_id, file.id);
+                }
+
+                let content = fileWithData.data;
+                if (content.startsWith('http')) {
+                    const response = await fetch(content);
                     content = await response.blob();
-                } else if (file.data.startsWith('data:')) {
-                    content = file.data.split(',')[1];
+                } else if (content.startsWith('data:')) {
+                    content = content.split(',')[1];
                 }
 
                 const ext = file.file_type || 'jpg';
@@ -114,6 +126,21 @@ const Library = () => {
         } catch (error) {
             console.error('Download error:', error);
             toast.error('Failed to create zip file', { id: toastId });
+        }
+    };
+
+    const handleFileClick = async (file) => {
+        try {
+            if (!file.data) {
+                const toastId = toast.loading('Fetching file content...');
+                const fullFile = await getFileData(file.subject_id, file.id);
+                toast.dismiss(toastId);
+                setSelectedFile(fullFile);
+            } else {
+                setSelectedFile(file);
+            }
+        } catch (err) {
+            console.error('Failed to open file:', err);
         }
     };
 
@@ -153,7 +180,7 @@ const Library = () => {
         else setLoadingMore(true);
 
         try {
-            const res = await filesApi.list(LIMIT, page * LIMIT);
+            const res = await filesApi.list(LIMIT, page * LIMIT, null, true);
             const newFiles = res.files || [];
 
             setHasMore(newFiles.length === LIMIT);
@@ -338,17 +365,26 @@ const Library = () => {
         ? groupFilesByDate(filteredFiles)
         : groupFilesByType(filteredFiles);
 
-    const handlePrev = useCallback(() => {
+    const handlePrev = useCallback(async () => {
         if (!selectedFile) return;
         const idx = filteredFiles.findIndex(f => f.id === selectedFile.id);
-        if (idx > 0) setSelectedFile(filteredFiles[idx - 1]);
+        if (idx > 0) handleFileClick(filteredFiles[idx - 1]);
     }, [selectedFile, filteredFiles]);
 
-    const handleNext = useCallback(() => {
+    const handleNext = useCallback(async () => {
         if (!selectedFile) return;
-        const idx = filteredFiles.findIndex(f => f.id === selectedFile.id);
-        if (idx < filteredFiles.length - 1) setSelectedFile(filteredFiles[idx + 1]);
-    }, [selectedFile, filteredFiles]);
+        const idx = files.findIndex(f => f.id === selectedFile.id);
+        
+        if (idx === files.length - 1 && hasMore) {
+            setPage(prev => prev + 1);
+            // The useEffect for page will trigger loadImages(false)
+            // But we need to wait for it or trigger it here to open the next file immediately
+            toast.loading('Loading more files...', { duration: 1000 });
+            return;
+        }
+
+        if (idx < files.length - 1) handleFileClick(files[idx + 1]);
+    }, [selectedFile, files, hasMore, handleFileClick]);
 
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -582,29 +618,41 @@ const Library = () => {
                                             ref={isLastElement ? lastImageElementRef : null}
                                             className={`group relative aspect-square rounded-xl bg-surface-2 transition-all duration-300 cursor-pointer shadow-lg active:scale-[0.98] fade-in border ${isSelectionMode
                                                     ? (selectedItems.has(file.id) ? 'border-indigo-500 ring-2 ring-indigo-500/50 bg-indigo-500/10 scale-95 opacity-90' : 'border-white/[0.04] scale-100 opacity-100')
-                                                    : (activeFileDropdown === file.id ? 'border-primary/40 shadow-xl' : 'border-white/[0.04] hover:border-primary/40 hover:shadow-primary/5')
+                                                    : (activeFileDropdown === file.id ? 'border-primary/40 shadow-xl z-[40]' : 'border-white/[0.04] hover:border-primary/40 hover:shadow-primary/5')
                                                 }`}
                                             onClick={() => {
                                                 if (isSelectionMode) {
                                                     toggleSelection(file.id);
                                                     return;
                                                 }
-                                                setSelectedFile(file);
+                                                handleFileClick(file);
                                             }}
                                             style={{ animationDelay: `${(groupFiles.indexOf(file) % 10) * 0.05}s` }}
                                         >
                                             <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none">
-                                                {file.file_type === 'image' || !file.file_type ? (
+                                                {file.thumbnail ? (
+                                                    <img
+                                                        src={file.thumbnail}
+                                                        alt={file.file_name || file.subject_name}
+                                                        className="w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
+                                                        loading="lazy"
+                                                    />
+                                                ) : file.data ? (
                                                     <img
                                                         src={file.data}
-                                                        alt={file.subject_name}
+                                                        alt={file.file_name || file.subject_name}
                                                         className="w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
                                                         loading="lazy"
                                                     />
                                                 ) : (
-                                                    <div className="w-full h-full flex flex-col items-center justify-center bg-surface-3 opacity-90 group-hover:opacity-100 transition-all duration-500 text-slate-300">
-                                                        <FileText className="w-12 h-12 mb-2 text-primary" />
-                                                        <span className="text-xs uppercase font-bold text-slate-400">{file.file_type} File</span>
+                                                    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-surface-3 to-surface-2 transition-all duration-500 text-slate-300">
+                                                        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                                            {file.file_type === 'pdf' ? <FileText className="w-7 h-7 text-rose-400" /> :
+                                                             file.file_type === 'xlsx' ? <Layers className="w-7 h-7 text-emerald-400" /> :
+                                                             file.file_type === 'doc' ? <FileText className="w-7 h-7 text-blue-400" /> :
+                                                             <ImageIcon className="w-7 h-7 text-indigo-400" />}
+                                                        </div>
+                                                        <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">{file.file_type || 'Image'}</span>
                                                     </div>
                                                 )}
                                             </div>
@@ -634,7 +682,8 @@ const Library = () => {
                                                 </div>
                                             )}
 
-                                            <div className={`absolute inset-0 rounded-xl bg-gradient-to-t from-black/90 via-black/20 to-transparent transition-all duration-300 flex flex-col justify-end p-4 ${isSelectionMode || activeFileDropdown === file.id ? 'opacity-100 bg-black/30' : 'opacity-0 group-hover:opacity-100'}`}>
+                                            {/* Persistent Info Overlay */}
+                                            <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-4 z-10 transition-colors group-hover:bg-black/20">
                                                 <div className="flex items-center justify-between mb-1.5 relative">
                                                     <button
                                                         onClick={(e) => {
@@ -646,30 +695,38 @@ const Library = () => {
                                                         {file.subject_name}
                                                     </button>
 
-                                                    {!isSelectionMode && hasLink && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                const tab = file.linked_question_id ? 'questions' : 'notes';
-                                                                const contentId = file.linked_question_id || file.linked_note_id;
-                                                                navigate(`/subjects/${file.subject_id}?tab=${tab}&id=${contentId}`);
-                                                            }}
-                                                            className="p-1 px-[5px] bg-primary/20 hover:bg-primary text-white rounded-lg border border-primary/30 transition-all cursor-pointer"
-                                                            title={file.linked_question_id ? "View Question" : "View Note"}
-                                                        >
-                                                            <LinkIcon className="w-3 h-3" />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <p className="text-[11px] font-semibold text-white truncate flex-1">
-                                                        {file.file_name || formatDate(file.created_at, { day: 'numeric', month: 'short' })}
-                                                    </p>
-                                                    {!isSelectionMode && (
-                                                        <div className="relative shrink-0" onClick={e => e.stopPropagation()}>
+                                                    <div className={`flex items-center gap-1 transition-opacity ${activeFileDropdown === file.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                                                        {!isSelectionMode && hasLink && (
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
+                                                                    const tab = file.linked_question_id ? 'questions' : 'notes';
+                                                                    const contentId = file.linked_question_id || file.linked_note_id;
+                                                                    navigate(`/subjects/${file.subject_id}?tab=${tab}&id=${contentId}`);
+                                                                }}
+                                                                className="p-1 px-[5px] bg-primary/20 hover:bg-primary text-white rounded-lg border border-primary/30 transition-all cursor-pointer"
+                                                                title={file.linked_question_id ? "View Question" : "View Note"}
+                                                            >
+                                                                <LinkIcon className="w-3 h-3" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <p className="text-[11px] font-semibold text-white truncate flex-1 leading-tight mb-0.5">
+                                                        {file.file_name || formatDate(file.created_at, { day: 'numeric', month: 'short' })}
+                                                    </p>
+                                                    {!isSelectionMode && (
+                                                        <div 
+                                                            className={`relative shrink-0 transition-opacity dropdown-trigger ${activeFileDropdown === file.id ? 'opacity-100 z-50' : 'opacity-0 group-hover:opacity-100 z-20'}`} 
+                                                            onClick={e => e.stopPropagation()}
+                                                        >
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    // Use native stopImmediatePropagation to prevent document listener from firing
+                                                                    e.nativeEvent.stopImmediatePropagation();
                                                                     setActiveFileDropdown(activeFileDropdown === file.id ? null : file.id);
                                                                 }}
                                                                 className={`p-1 flex items-center justify-center rounded-lg border transition-all cursor-pointer ${activeFileDropdown === file.id ? 'bg-primary border-primary text-white' : 'bg-black/40 hover:bg-black/60 text-white/80 border-white/10 backdrop-blur-sm'}`}
@@ -678,7 +735,7 @@ const Library = () => {
                                                                 <MoreVertical className="w-3.5 h-3.5" />
                                                             </button>
                                                             {activeFileDropdown === file.id && (
-                                                                <div className="absolute right-0 bottom-full mb-1.5 w-36 bg-[#121214]/95 border border-white/10 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.6)] py-1.5 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200 z-50 backdrop-blur-xl" onClick={e => e.stopPropagation()}>
+                                                                <div className="absolute right-0 top-full mt-1.5 w-40 bg-[#121214]/98 border border-white/10 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.7)] py-2 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[100] backdrop-blur-xl dropdown-menu" onClick={e => e.stopPropagation()}>
                                                                     <button
                                                                         onClick={() => { setIsSelectionMode(true); setSelectedItems(new Set([file.id])); setActiveFileDropdown(null); }}
                                                                         className="w-full flex items-center justify-start gap-2.5 px-3.5 py-2 text-[12px] font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
@@ -749,7 +806,7 @@ const Library = () => {
                     allFiles={filteredFiles}
                     onPrev={handlePrev}
                     onNext={handleNext}
-                    onSelect={(file) => setSelectedFile(file)}
+                    onSelect={handleFileClick}
                     isMinimized={isFileViewerMinimized}
                     onMinimize={setIsFileViewerMinimized}
                     onDelete={async (deletedFile) => {

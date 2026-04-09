@@ -1,5 +1,5 @@
 import * as solutionModel from '../models/solutionModel.js';
-import * as sourceImageModel from '../models/sourceImageModel.js';
+import * as fileModel from '../models/fileModel.js';
 import * as deletionService from '../services/deletionService.js';
 import * as subjectModel from '../models/subjectModel.js';
 
@@ -9,10 +9,10 @@ export const getSolutionImage = async (req, res, next) => {
         const solution = await solutionModel.getSolutionsBySubject(subjectId).then(solutions => solutions.find(s => s.id == solutionId));
         if (!solution || !solution.source_image_id) return res.status(404).json({ error: 'Image not found' });
 
-        const sourceImg = await sourceImageModel.getSourceImageById(solution.source_image_id, subjectId);
-        if (!sourceImg) return res.status(404).json({ error: 'Image content not found' });
+        const file = await fileModel.getFileById(solution.source_image_id, subjectId);
+        if (!file) return res.status(404).json({ error: 'Image content not found' });
 
-        res.json({ content: sourceImg.data });
+        res.json({ content: file.data });
     } catch (error) {
         next(error);
     }
@@ -38,7 +38,7 @@ export const createSolution = async (req, res, next) => {
         let sourceImageId = existingSourceImageId;
 
         if (sourceImageContent && !sourceImageId) {
-            const savedImage = await sourceImageModel.createSourceImage(subjectId, sourceImageContent);
+            const savedImage = await fileModel.createFile(subjectId, sourceImageContent);
             sourceImageId = savedImage.id;
         }
 
@@ -83,7 +83,7 @@ export const updateSolution = async (req, res, next) => {
         };
 
         if (sourceImageContent) {
-            const savedImage = await sourceImageModel.createSourceImage(subjectId, sourceImageContent);
+            const savedImage = await fileModel.createFile(subjectId, sourceImageContent);
             updateData.source_image_id = savedImage.id;
         }
 

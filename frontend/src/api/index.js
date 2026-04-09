@@ -226,22 +226,25 @@ export const solutionsApi = {
 
 // Files
 export const filesApi = {
-    list: (limit, offset, type) => {
+    list: (limit, offset, type, metadataOnly = false) => {
         let q = [];
         if (limit != null) q.push(`limit=${limit}`);
         if (offset != null) q.push(`offset=${offset}`);
         if (type != null) q.push(`type=${type}`);
+        if (metadataOnly) q.push(`metadataOnly=true`);
         const qs = q.length ? '?' + q.join('&') : '';
         return request(`/files${qs}`);
     },
-    listBySubject: (subjectId, limit, offset, type) => {
+    listBySubject: (subjectId, limit, offset, type, metadataOnly = false) => {
         let q = [];
         if (limit != null) q.push(`limit=${limit}`);
         if (offset != null) q.push(`offset=${offset}`);
         if (type != null) q.push(`type=${type}`);
+        if (metadataOnly) q.push(`metadataOnly=true`);
         const qs = q.length ? '?' + q.join('&') : '';
         return request(`/files/subject/${subjectId}${qs}`);
     },
+    getById: (subjectId, id) => request(`/files/subject/${subjectId}/${id}`),
     saveAs: (body) => request('/files/save-as', { method: 'POST', body }),
     delete: (subjectId, fileId) => request(`/files/subject/${subjectId}/${fileId}`, { method: 'DELETE' }),
     update: (subjectId, fileId, body) => request(`/files/subject/${subjectId}/${fileId}`, { method: 'PUT', body }),

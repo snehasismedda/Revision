@@ -1,6 +1,6 @@
 import * as noteModel from '../models/noteModel.js';
 import * as questionModel from '../models/questionModel.js';
-import * as sourceImageModel from '../models/sourceImageModel.js';
+import * as fileModel from '../models/fileModel.js';
 import { generateNoteFromQuestion } from '../services/ai_service/response/noteGenerator.js';
 import * as deletionService from '../services/deletionService.js';
 import * as subjectModel from '../models/subjectModel.js';
@@ -91,7 +91,7 @@ export const createNote = async (req, res, next) => {
         // Moved here to ensure finalTitle is available (especially for AI generation)
         if (images && Array.isArray(images) && images.length > 0) {
             const uploadPromises = images.map(img => 
-                sourceImageModel.createSourceImage(subjectId, img.data, 'image', `${finalTitle}_${img.referenceId}`, img.referenceId)
+                fileModel.createFile(subjectId, img.data, 'image', `${finalTitle}_${img.referenceId}`, null, img.referenceId)
             );
             const savedImages = await Promise.all(uploadPromises);
             const newImageIds = savedImages.map(img => img.id);
@@ -143,7 +143,7 @@ export const updateNote = async (req, res, next) => {
         // Handle multiple image uploads bundled with the update
         if (images && Array.isArray(images) && images.length > 0) {
             const uploadPromises = images.map(img => 
-                sourceImageModel.createSourceImage(subjectId, img.data, 'image', `${title}_${img.referenceId}`, img.referenceId)
+                fileModel.createFile(subjectId, img.data, 'image', `${title}_${img.referenceId}`, null, img.referenceId)
             );
             const savedImages = await Promise.all(uploadPromises);
             const newImageIds = savedImages.map(img => img.id);

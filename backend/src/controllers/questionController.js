@@ -1,6 +1,6 @@
 import * as questionModel from '../models/questionModel.js';
 import * as topicModel from '../models/topicModel.js';
-import * as sourceImageModel from '../models/sourceImageModel.js';
+import * as fileModel from '../models/fileModel.js';
 import * as deletionService from '../services/deletionService.js';
 import * as subjectModel from '../models/subjectModel.js';
 import { parseQuestionToRichText } from '../services/ai_service/response/questionParser.js';
@@ -25,8 +25,8 @@ export const getQuestionImage = async (req, res, next) => {
             const question = await questionModel.getQuestionById(questionId, subjectId);
 
             if (question?.source_image_id) {
-                const sourceImg = await sourceImageModel.getSourceImageById(question.source_image_id, subjectId);
-                if (sourceImg) image = { content: sourceImg.data };
+                const file = await fileModel.getFileById(question.source_image_id, subjectId);
+                if (file) image = { content: file.data };
             } else if (question?.parent_id) {
                 image = await questionModel.getQuestionImage(question.parent_id, subjectId);
             }
@@ -57,7 +57,7 @@ export const createQuestion = async (req, res, next) => {
         if (skipAI) {
             let sourceImageId = null;
             if (typeValue === 'image') {
-                const savedImage = await sourceImageModel.createSourceImage(subjectId, content);
+                const savedImage = await fileModel.createFile(subjectId, content);
                 sourceImageId = savedImage.id;
             }
 
@@ -82,7 +82,7 @@ export const createQuestion = async (req, res, next) => {
 
         let sourceImageId = null;
         if (typeValue === 'image') {
-            const savedImage = await sourceImageModel.createSourceImage(subjectId, content);
+            const savedImage = await fileModel.createFile(subjectId, content);
             sourceImageId = savedImage.id;
         }
 
