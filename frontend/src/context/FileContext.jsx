@@ -26,7 +26,7 @@ export const FileProvider = ({ children }) => {
         cacheRef.current = fileCache;
     }, [fileCache]);
 
-    const getFileData = useCallback(async (subjectId, fileId) => {
+    const getFileData = useCallback(async (subjectId, fileId, seriesId) => {
         const now = Date.now();
         
         // 1. Check if valid cache exists (using Ref for stability)
@@ -42,7 +42,7 @@ export const FileProvider = ({ children }) => {
 
         const fetchPromise = (async () => {
             try {
-                const res = await filesApi.getById(subjectId, fileId);
+                const res = await filesApi.getById(fileId, subjectId, seriesId);
                 const fullFile = res.file;
                 const size = estimateSize(fullFile);
 

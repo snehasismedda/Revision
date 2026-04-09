@@ -56,7 +56,19 @@ const FileViewerModal = ({
         // If data is missing (partial file from list), fetch the full file
         if (!fileToProcess.data) {
             try {
-                const fullFile = await getFileData(fileToProcess.subject_id, fileToProcess.id);
+                // Pass subject_id OR test_series_id — getFileData(subjectId, fileId, seriesId)
+                const fullFile = await getFileData(
+                    fileToProcess.subject_id || null,
+                    fileToProcess.id,
+                    fileToProcess.test_series_id || null
+                );
+                if (!fullFile) {
+                    if (mountedRef.current) {
+                        setError('File not found or could not be loaded.');
+                        setLoading(false);
+                    }
+                    return;
+                }
                 if (mountedRef.current) {
                     fileToProcess = fullFile;
                 }
@@ -103,7 +115,7 @@ const FileViewerModal = ({
         } finally {
             if (mountedRef.current) setLoading(false);
         }
-    }, []);
+    }, [getFileData]);
 
     useEffect(() => {
         const handleClickOutside = (event) => {

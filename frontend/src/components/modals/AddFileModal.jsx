@@ -6,9 +6,9 @@ import { X, PlusCircle, Wand2, FileText, Image as ImageIcon, Trash2, Save, Sciss
 import ModalPortal from '../ModalPortal.jsx';
 import ImageCropper from '../common/ImageCropper.jsx';
 
-const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId, isLibrary = false }) => {
+const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId, seriesId, isLibrary = false }) => {
     // Top-level workflow
-    const [workflowPath, setWorkflowPath] = useState('image'); // 'image' or 'document'
+    const [workflowPath, setWorkflowPath] = useState(seriesId ? 'unified' : 'image'); // 'image', 'document', or 'unified'
 
     // Sub-states for Image Workflow
     const [useCamera, setUseCamera] = useState(false);
@@ -42,27 +42,33 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId, isLibrary = fal
 
     useEffect(() => {
         if (isOpen) {
-            loadSubjects();
+            if (!seriesId) {
+                loadSubjects();
+            }
             const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
             // Conditional state updates to avoid redundant renders
             if (isMobile && !useCamera) {
                 setUseCamera(true);
                 getCameras();
-                setWorkflowPath('image');
+                setWorkflowPath(seriesId ? 'unified' : 'image');
             } else if (!isMobile && useCamera) {
                 setUseCamera(false);
                 stopCamera();
             }
 
-            const targetSubjectId = subjectId || globalSelectedSubjectId;
-            if (targetSubjectId && selectedSubjectId !== targetSubjectId) {
-                setSelectedSubjectId(targetSubjectId);
+            if (!seriesId) {
+                const targetSubjectId = subjectId || globalSelectedSubjectId;
+                if (targetSubjectId && selectedSubjectId !== targetSubjectId) {
+                    setSelectedSubjectId(targetSubjectId);
+                }
+            } else {
+                setSelectedSubjectId('');
             }
         } else {
             stopCamera();
         }
-    }, [isOpen, subjectId, globalSelectedSubjectId]);
+    }, [isOpen, subjectId, globalSelectedSubjectId, seriesId]);
 
     const handleFileSelection = (file) => {
         if (!file) return;
@@ -90,11 +96,11 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId, isLibrary = fal
             detectedType = 'html';
         }
 
-        // Validate workflow vs detected type
-        if (workflowPath === 'image' && detectedType !== 'image') {
+        // Validate workflow vs detected type (only for non-unified)
+        if (!seriesId && workflowPath === 'image' && detectedType !== 'image') {
             return toast.error("Please select an image file for this workflow.");
         }
-        if (workflowPath === 'document' && detectedType === 'image') {
+        if (!seriesId && workflowPath === 'document' && detectedType === 'image') {
             return toast.error("Images should be uploaded via the Image/Photo workflow.");
         }
 
@@ -267,10 +273,10 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId, isLibrary = fal
     const handleSaveFile = async (e) => {
         e.preventDefault();
         if (!newImage) return toast.error('Please select a file');
-        if (!selectedSubjectId) return toast.error('Please select a subject');
+        if (!selectedSubjectId && !seriesId) return toast.error('Please select a subject');
 
         setIsSaving(true);
-        const actualSaveType = workflowPath === 'document' ? 'file' : saveType;
+        const actualSaveType = (workflowPath === 'document' || workflowPath === 'unified') ? 'file' : saveType;
         const loadingToast = toast.loading(`Processing...`);
         try {
             const payload = {
@@ -278,7 +284,8 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId, isLibrary = fal
                 type: actualSaveType,
                 fileType: fileType,
                 fileName: fileName || originalFileName || 'Untitled',
-                subjectId: selectedSubjectId,
+                subjectId: seriesId ? null : (selectedSubjectId || subjectId),
+                seriesId: seriesId || null,
                 skipAI: workflowPath === 'document' ? true : !analyzeWithAI
             };
 
@@ -306,7 +313,7 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId, isLibrary = fal
         setContent('');
         setFileName('');
         setOriginalFileName('');
-        setWorkflowPath('image');
+        setWorkflowPath(seriesId ? 'unified' : 'image');
         setUseCamera(false);
         setIsCropping(false);
         setImageToCrop(null);
@@ -319,7 +326,7 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId, isLibrary = fal
         <ModalPortal>
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop fade-in" onClick={handleModalClose}>
                 <div
-                    className="w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+                    className="w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
                     style={{ background: 'rgba(22, 22, 34, 0.95)', border: '1px solid rgba(255,255,255,0.08)' }}
                     onClick={e => e.stopPropagation()}
                 >
@@ -342,34 +349,36 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId, isLibrary = fal
                         </button>
                     </div>
 
-                    {/* Workflow Segmented Control */}
-                    <div className="px-7 pt-6 shrink-0">
-                        <div className="flex p-1 bg-white/[0.02] rounded-xl border border-white/[0.05] mb-6">
-                            {[
-                                { id: 'image', label: 'Image / Photo', icon: <ImageIcon className="w-3.5 h-3.5" /> },
-                                { id: 'document', label: 'Document', icon: <FileText className="w-3.5 h-3.5" /> }
-                            ].map(btn => (
-                                <button
-                                    key={btn.id}
-                                    type="button"
-                                    onClick={() => handleWorkflowChange(btn.id)}
-                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[12px] font-bold transition-all cursor-pointer
-                                        ${workflowPath === btn.id 
-                                            ? 'bg-white/10 text-white shadow-sm ring-1 ring-white/10' 
-                                            : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.02]'}`}
-                                >
-                                    {btn.icon}
-                                    {btn.label}
-                                </button>
-                            ))}
+                    {/* Workflow Segmented Control - Hide if Test Series */}
+                    {!seriesId && (
+                        <div className="px-7 pt-6 shrink-0">
+                            <div className="flex p-1 bg-white/[0.02] rounded-xl border border-white/[0.05]">
+                                {[
+                                    { id: 'image', label: 'Image / Photo', icon: <ImageIcon className="w-3.5 h-3.5" /> },
+                                    { id: 'document', label: 'Document', icon: <FileText className="w-3.5 h-3.5" /> }
+                                ].map(btn => (
+                                    <button
+                                        key={btn.id}
+                                        type="button"
+                                        onClick={() => handleWorkflowChange(btn.id)}
+                                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[12px] font-bold transition-all cursor-pointer
+                                            ${workflowPath === btn.id 
+                                                ? 'bg-white/10 text-white shadow-sm ring-1 ring-white/10' 
+                                                : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.02]'}`}
+                                    >
+                                        {btn.icon}
+                                        {btn.label}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Body */}
-                    <form id="add-file-form" onSubmit={handleSaveFile} className="px-7 pb-6 overflow-y-auto custom-scrollbar">
+                    <form id="add-file-form" onSubmit={handleSaveFile} className="px-7 pt-6 pb-6 overflow-y-auto custom-scrollbar">
                         <div className="space-y-6">
                             {/* Subject Selection - Show only in global Library */}
-                            {isLibrary && (
+                            {(isLibrary && !seriesId) && (
                                 <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
                                     <label className="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">
                                         <Layers className="w-3 h-3" /> Target Subject
@@ -416,7 +425,99 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId, isLibrary = fal
                             </div>
 
                             {/* Workflow Specifics */}
-                            {workflowPath === 'image' ? (
+                            {workflowPath === 'unified' ? (
+                                <div className="flex flex-col gap-3 animate-in slide-in-from-bottom-2 duration-300">
+                                    {!newImage && navigator.mediaDevices && navigator.mediaDevices.getUserMedia && (
+                                        <div className="flex items-center justify-end px-1">
+                                            <button
+                                                type="button"
+                                                onClick={toggleCamera}
+                                                className={`toggle-camera flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border z-20
+                                                    ${useCamera 
+                                                        ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' 
+                                                        : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/5'}`}
+                                            >
+                                                {useCamera ? <X size={12} /> : <Camera size={12} />}
+                                                {useCamera ? 'EXIT CAMERA' : 'USE CAMERA'}
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {useCamera ? (
+                                        <div className="relative aspect-video bg-black rounded-2xl overflow-hidden border border-white/[0.08] shadow-2xl flex items-center justify-center group animate-in zoom-in-95 duration-300">
+                                            {isCameraLoading ? (
+                                                <div className="flex flex-col items-center gap-3">
+                                                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                                                    <span className="text-[10px] text-primary font-bold tracking-[0.2em]">INITIALIZING...</span>
+                                                </div>
+                                            ) : cameraStream && (
+                                                <>
+                                                    <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex flex-col items-center justify-end pb-6">
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={takePhoto} 
+                                                            className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-2xl border-[5px] border-white/20 active:scale-90 transition-transform cursor-pointer"
+                                                        >
+                                                            <div className="w-12 h-12 rounded-full border-2 border-slate-200" />
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div
+                                            className={`relative border-2 border-dashed rounded-2xl transition-all cursor-pointer group flex flex-col items-center justify-center
+                                                ${newImage ? 'p-4 border-white/10' : 'p-12 border-white/10 hover:border-primary/40 hover:bg-white/[0.01]'}`}
+                                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                            onDrop={(e) => {
+                                                e.preventDefault(); e.stopPropagation();
+                                                if (e.dataTransfer.files?.[0]) handleFileSelection(e.dataTransfer.files[0]);
+                                            }}
+                                        >
+                                            <input
+                                                type="file"
+                                                accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.html,.htm,image/*"
+                                                className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                                                onChange={(e) => e.target.files?.[0] && handleFileSelection(e.target.files[0])}
+                                            />
+                                            {newImage ? (
+                                                <div className="flex items-center gap-4 w-full p-4 bg-white/[0.02] rounded-xl border border-white/5 relative group/preview">
+                                                    {fileType === 'image' ? (
+                                                        <img src={newImage} alt="Preview" className="h-[60px] w-[60px] object-cover rounded-lg shadow-sm" />
+                                                    ) : (
+                                                        <div className={`p-4 rounded-xl shadow-lg ${
+                                                            fileType === 'pdf' ? 'bg-red-500/20 text-red-500' :
+                                                            fileType === 'xlsx' ? 'bg-emerald-500/20 text-emerald-400' : 
+                                                            fileType === 'html' ? 'bg-orange-500/20 text-orange-500' : 'bg-blue-500/20 text-blue-500'
+                                                        }`}>
+                                                            {fileType === 'xlsx' ? <Table size={24} /> : <FileText size={24} />}
+                                                        </div>
+                                                    )}
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-[13px] font-bold text-white truncate">{fileName || originalFileName}</p>
+                                                        <p className="text-[10px] text-slate-500 uppercase tracking-widest font-black flex items-center gap-1 mt-1">
+                                                            <Check size={10} className="text-emerald-500" /> FILE READY
+                                                        </p>
+                                                    </div>
+                                                    <button type="button" onClick={(e) => { e.stopPropagation(); setNewImage(''); setFileName(''); }} className="p-2 text-slate-500 hover:text-rose-400 transition-colors cursor-pointer"><Trash2 size={16} /></button>
+                                                </div>
+                                            ) : (
+                                                <div className="text-center">
+                                                    <div className="w-14 h-14 rounded-2xl bg-white/[0.03] text-slate-400 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 group-hover:text-primary transition-all shadow-inner">
+                                                        <UploadCloud size={28} />
+                                                    </div>
+                                                    <p className="text-[14px] font-bold text-slate-200">Select or Drag File</p>
+                                                    <div className="flex items-center justify-center gap-3 mt-2">
+                                                        <span className="text-[10px] font-black text-slate-600 border border-white/5 px-1.5 py-0.5 rounded">ALL FILES</span>
+                                                        <span className="text-[10px] font-black text-slate-600 border border-white/5 px-1.5 py-0.5 rounded">IMAGES</span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : workflowPath === 'image' ? (
                                 <div className="space-y-6">
                                     {/* Action Type Selection */}
                                     <div className="grid grid-cols-2 gap-3 p-1 bg-white/[0.02] rounded-xl border border-white/[0.05]">
@@ -578,7 +679,7 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId, isLibrary = fal
                                     >
                                         <input
                                             type="file"
-                                            accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.html,.htm"
+                                            accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.html,.htm,image/*"
                                             className="absolute inset-0 opacity-0 cursor-pointer z-10"
                                             onChange={(e) => e.target.files?.[0] && handleFileSelection(e.target.files[0])}
                                         />
@@ -604,12 +705,12 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId, isLibrary = fal
                                                 <div className="w-14 h-14 rounded-2xl bg-white/[0.03] text-slate-400 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 group-hover:text-blue-500 transition-all shadow-inner">
                                                     <UploadCloud size={28} />
                                                 </div>
-                                                <p className="text-[14px] font-bold text-slate-200">Select Document</p>
+                                                <p className="text-[14px] font-bold text-slate-200">Select File</p>
                                                 <div className="flex items-center justify-center gap-3 mt-2">
                                                     <span className="text-[10px] font-black text-slate-600 border border-white/5 px-1.5 py-0.5 rounded">PDF</span>
                                                     <span className="text-[10px] font-black text-slate-600 border border-white/5 px-1.5 py-0.5 rounded">DOCX</span>
+                                                    <span className="text-[10px] font-black text-slate-600 border border-white/5 px-1.5 py-0.5 rounded">IMAGE</span>
                                                     <span className="text-[10px] font-black text-slate-600 border border-white/5 px-1.5 py-0.5 rounded">XLSX</span>
-                                                    <span className="text-[10px] font-black text-slate-600 border border-white/5 px-1.5 py-0.5 rounded">HTML</span>
                                                 </div>
                                             </div>
                                         )}
@@ -646,13 +747,13 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId, isLibrary = fal
                             <button
                                 form="add-file-form"
                                 type="submit"
-                                disabled={isSaving || !newImage || !selectedSubjectId}
+                                disabled={isSaving || !newImage || (!selectedSubjectId && !seriesId)}
                                 className={`px-7 py-2.5 rounded-xl text-[13px] font-bold transition-all cursor-pointer disabled:opacity-30 shadow-xl shadow-black/20 flex items-center gap-2 min-w-[140px] justify-center active:scale-95
-                                    ${workflowPath === 'document' ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-primary text-white hover:bg-primary-dark'}`}
+                                    ${(workflowPath === 'document' || workflowPath === 'unified') ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-primary text-white hover:bg-primary-dark'}`}
                             >
                                 {isSaving ? <Loader2 size={16} className="animate-spin" /> : (
                                     <>
-                                        <span>{workflowPath === 'document' ? 'Upload' : 'Save Material'}</span>
+                                        <span>{(workflowPath === 'document' || workflowPath === 'unified') ? 'Upload' : 'Save Material'}</span>
                                         <Save size={16} />
                                     </>
                                 )}

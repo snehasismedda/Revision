@@ -1,13 +1,21 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Target, ArrowLeft, Plus, Calendar, Activity, TrendingUp, TrendingDown, BookOpen, Trash2, Edit2, ChevronRight, ChevronDown, X, Brain, CheckCircle2, BarChart3, Notebook, BarChart2 } from 'lucide-react';
+import { Target, ArrowLeft, Plus, Calendar, Activity, TrendingUp, TrendingDown, BookOpen, Trash2, Edit2, ChevronRight, ChevronDown, X, Brain, CheckCircle2, BarChart3, Notebook, BarChart2, Search, History, Clock, LayoutGrid, List, FileText, Image as ImageIcon, MoreVertical, Download, CheckCircle, Pencil, Layers, Save, Trash, FileDown, Eye, Maximize2, PlusCircle, RefreshCw, Filter, Link as LinkIcon, Table } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 
 import * as testSeriesApi from '../api/testSeriesApi';
 import * as testsApi from '../api/testsApi';
+import { filesApi } from '../api/index';
 import { useTestSeries } from '../context/TestSeriesContext.jsx';
 import { useTopics } from '../context/TopicContext.jsx';
+import { useQuickView } from '../context/QuickViewContext.jsx';
+import { useFiles } from '../context/FileContext.jsx';
 import CreateTestModal from '../components/modals/CreateTestModal';
+import AddFileModal from '../components/modals/AddFileModal';
+import FileViewerModal from '../components/modals/FileViewerModal';
+import TimeTraveler from '../components/TimeTraveler';
+import { saveAs } from 'file-saver';
+import JSZip from 'jszip';
 import toast from 'react-hot-toast';
 
 import {
@@ -50,18 +58,49 @@ const TestSeriesDetail = () => {
 
     const { seriesDetails, detailLoading, loadSeriesDetail, updateTestsInSeries } = useTestSeries();
     const { loadTopics } = useTopics();
-    
+
     // Derived from global state
     const cached = seriesDetails[seriesId];
     const series = cached?.series || null;
     const tests = cached?.tests || [];
     const loading = detailLoading[seriesId] && !series;
 
+    const [activeTab, setActiveTab] = useState('tests');
+
     const [isCreateTestModalOpen, setIsCreateTestModalOpen] = useState(false);
-    const [isInsightsOpen, setIsInsightsOpen] = useState(false);
     const [editingTest, setEditingTest] = useState(null);
     const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
     const [testToDelete, setTestToDelete] = useState(null);
+
+    // Library State
+    const [files, setFiles] = useState([]);
+    const [filePage, setFilePage] = useState(0);
+    const [hasMoreFiles, setHasMoreFiles] = useState(true);
+    const [loadingFiles, setLoadingFiles] = useState(false);
+    const [showFileModal, setShowFileModal] = useState(false);
+    const [fileSearchQuery, setFileSearchQuery] = useState('');
+    const [libraryViewMode, setLibraryViewMode] = useState('categorywise'); // categorywise, datewise
+    const [showTimeTraveler, setShowTimeTraveler] = useState(false);
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [selectedItems, setSelectedItems] = useState(new Set());
+    const [activeFileDropdown, setActiveFileDropdown] = useState(null);
+    const [confirmDeleteFile, setConfirmDeleteFile] = useState({ open: false, items: [] });
+    const { openItem, minimize: globalMinimize } = useQuickView();
+    const { getFileData, clearFileCacheMany } = useFiles();
+    const [viewingFile, setViewingFile] = useState(null);
+    const [confirmRenameFile, setConfirmRenameFile] = useState({ open: false, file: null, newName: '' });
+
+    const observer = useRef();
+    const lastFileElementRef = useCallback(node => {
+        if (loadingFiles) return;
+        if (observer.current) observer.current.disconnect();
+        observer.current = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting && hasMoreFiles) {
+                setFilePage(prev => prev + 1);
+            }
+        });
+        if (node) observer.current.observe(node);
+    }, [loadingFiles, hasMoreFiles]);
 
 
 
@@ -80,6 +119,212 @@ const TestSeriesDetail = () => {
             series.subjects.forEach(sub => loadTopics(sub.id));
         }
     }, [series?.subjects, loadTopics]);
+
+    // Fetch Files
+    const loadFiles = useCallback(async (page = 0, query = '', force = false) => {
+        if (!seriesId) return;
+        setLoadingFiles(true);
+        try {
+            const res = await filesApi.listByTestSeries(seriesId, 20, page * 20, null, true);
+            if (page === 0) setFiles(res.files);
+            else setFiles(prev => [...prev, ...res.files]);
+            setHasMoreFiles(res.files.length === 20);
+        } catch (err) {
+            toast.error("Failed to load library");
+        } finally {
+            setLoadingFiles(false);
+        }
+    }, [seriesId]);
+
+    useEffect(() => {
+        if (activeTab === 'library') {
+            loadFiles(filePage, fileSearchQuery);
+        }
+    }, [activeTab, filePage, fileSearchQuery, loadFiles]);
+
+    const handleFileSaved = (newFile) => {
+        setFiles(prev => [newFile.file, ...prev]);
+    };
+
+    const handleFileClick = (file) => {
+        setViewingFile(file);
+    };
+
+    const handleNextFile = () => {
+        if (!viewingFile) return;
+        const idx = files.findIndex(f => f.id === viewingFile.id);
+        if (idx < files.length - 1) setViewingFile(files[idx + 1]);
+    };
+
+    const handlePrevFile = () => {
+        if (!viewingFile) return;
+        const idx = files.findIndex(f => f.id === viewingFile.id);
+        if (idx > 0) setViewingFile(files[idx - 1]);
+    };
+
+
+    const handleRenameFile = async () => {
+        if (!confirmRenameFile.file || !confirmRenameFile.newName) return;
+        const loadingToast = toast.loading('Renaming...');
+        try {
+            await filesApi.update(confirmRenameFile.file.id, { fileName: confirmRenameFile.newName }, null, seriesId);
+            setFiles(prev => prev.map(f => f.id === confirmRenameFile.file.id ? { ...f, file_name: confirmRenameFile.newName } : f));
+            toast.success('Renamed successfully', { id: loadingToast });
+        } catch (err) {
+            toast.error('Failed to rename', { id: loadingToast });
+        } finally {
+            setConfirmRenameFile({ open: false, file: null, newName: '' });
+        }
+    };
+
+    const groupedLibraryItems = useMemo(() => {
+        // Advanced Multi-Scope Filtering Logic
+        const filtered = files.filter(file => {
+            if (!fileSearchQuery) return true;
+
+            const itemDate = new Date(file.created_at);
+            const query = fileSearchQuery.toLowerCase().trim();
+
+            // Handle Structured Queries from TimeTraveler
+            if (query.includes(':') || query.includes('|')) {
+                const criteria = { years: [], months: [], days: [], range: null };
+                const parts = query.split('|');
+                parts.forEach(p => {
+                    const [key, val] = p.split(':');
+                    if (!val) return;
+                    if (key === 'years') criteria.years = val.split(',').map(v => parseInt(v));
+                    if (key === 'months') criteria.months = val.split(',').map(m => m.toLowerCase());
+                    if (key === 'days') criteria.days = val.split(',');
+                    if (key === 'range') {
+                        const [s, e] = val.split(',');
+                        criteria.range = { start: new Date(s), end: new Date(e) };
+                        if (criteria.range.end) criteria.range.end.setHours(23, 59, 59, 999);
+                    }
+                });
+
+                const itemYear = itemDate.getFullYear();
+                const itemMonthLong = itemDate.toLocaleString('default', { month: 'long' }).toLowerCase();
+                const itemMonthShort = itemDate.toLocaleString('default', { month: 'short' }).toLowerCase();
+                const itemDateStr = itemDate.toISOString().split('T')[0];
+
+                const yearMatch = criteria.years.length === 0 || criteria.years.includes(itemYear);
+                const monthMatch = criteria.months.length === 0 || criteria.months.includes(itemMonthLong) || criteria.months.includes(itemMonthShort);
+                const dayMatch = criteria.days.length === 0 || criteria.days.includes(itemDateStr);
+                const rangeMatch = !criteria.range || (itemDate >= criteria.range.start && itemDate <= criteria.range.end);
+
+                return yearMatch && monthMatch && dayMatch && rangeMatch;
+            }
+
+            // Fallback for simple search (legacy or manual)
+            const fullMonth = itemDate.toLocaleString('default', { month: 'long' }).toLowerCase();
+            const shortMonth = itemDate.toLocaleString('default', { month: 'short' }).toLowerCase();
+
+            // 1. TimeTraveler Multi-Filter Format (years:2024|months:january|days:2024-03-15)
+            if (query.includes('years:') || query.includes('months:') || query.includes('days:') || (query.startsWith('range:') && query.includes(','))) {
+                const parts = query.split('|');
+                let matchesAll = true;
+
+                parts.forEach(p => {
+                    const [key, val] = p.split(':');
+                    if (!val) return;
+
+                    if (key === 'years') {
+                        const years = val.split(',').map(v => parseInt(v));
+                        if (!years.includes(itemDate.getFullYear())) matchesAll = false;
+                    }
+                    if (key === 'months') {
+                        const months = val.split(',').map(m => m.trim());
+                        if (!months.includes(fullMonth) && !months.includes(shortMonth)) matchesAll = false;
+                    }
+                    if (key === 'days') {
+                        const days = val.split(',');
+                        // Local date string for comparison
+                        const localDateStr = new Date(itemDate.getTime() - (itemDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+                        if (!days.includes(localDateStr)) matchesAll = false;
+                    }
+                    if (key === 'range') {
+                        const [s, e] = val.split(',');
+                        if (s && e) {
+                            const start = new Date(s);
+                            const end = new Date(e);
+                            end.setHours(23, 59, 59, 999);
+                            if (itemDate < start || itemDate > end) matchesAll = false;
+                        }
+                    }
+                });
+
+                return matchesAll;
+            }
+
+            // 2. Specific Date Check (e.g. "4/8/2026")
+            if (query.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
+                return itemDate.toLocaleDateString() === query;
+            }
+
+            // 3. Month/Year Wise or Fallback Search
+            return query === fullMonth ||
+                query === shortMonth ||
+                query === itemDate.getFullYear().toString() ||
+                fullMonth.includes(query) ||
+                itemDate.toLocaleDateString().includes(query) ||
+                file.file_name?.toLowerCase().includes(query);
+        });
+
+        if (libraryViewMode === 'datewise') {
+            const groups = {};
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const lastWeek = new Date(today);
+            lastWeek.setDate(lastWeek.getDate() - 7);
+
+            filtered.forEach(file => {
+                const date = new Date(file.created_at);
+                date.setHours(0, 0, 0, 0);
+
+                let groupName = '';
+                if (date.getTime() === today.getTime()) groupName = 'Today';
+                else if (date.getTime() === yesterday.getTime()) groupName = 'Yesterday';
+                else if (date.getTime() >= lastWeek.getTime()) groupName = 'Last 7 Days';
+                else groupName = date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+
+                if (!groups[groupName]) groups[groupName] = [];
+                groups[groupName].push(file);
+            });
+
+            return Object.entries(groups).map(([title, items]) => ({
+                title,
+                items,
+                date: new Date(items[0].created_at)
+            })).sort((a, b) => b.date - a.date);
+        } else {
+            // Typewise
+            const groups = {};
+            filtered.forEach(file => {
+                const rawType = (file.file_type || 'file').toLowerCase();
+                let groupName = 'Other';
+
+                if (rawType.match(/image|png|jpg|jpeg|webp|gif/)) groupName = 'Images';
+                else if (rawType === 'pdf') groupName = 'PDFs';
+                else if (rawType.match(/doc|docx|txt|rtf/)) groupName = 'Documents';
+                else if (rawType.match(/xlsx|xls|csv/)) groupName = 'Spreadsheets';
+                else groupName = rawType.charAt(0).toUpperCase() + rawType.slice(1);
+
+                if (!groups[groupName]) groups[groupName] = [];
+                groups[groupName].push(file);
+            });
+
+            return Object.entries(groups).sort((a, b) => {
+                const priority = { 'Images': 1, 'PDFs': 2, 'Documents': 3, 'Spreadsheets': 4 };
+                const aPrio = priority[a[0]] || 99;
+                const bPrio = priority[b[0]] || 99;
+                if (aPrio !== bPrio) return aPrio - bPrio;
+                return a[0].localeCompare(b[0]);
+            }).map(([title, items]) => ({ title, items }));
+        }
+    }, [files, fileSearchQuery, libraryViewMode]);
+
 
     const handleDeleteTest = async (e, testId) => {
         e.stopPropagation();
@@ -141,7 +386,7 @@ const TestSeriesDetail = () => {
             <div className="relative mb-6">
                 {/* Background ambient effect */}
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-5xl h-24 bg-pink-500/5 blur-[70px] -z-10 rounded-full opacity-60" />
-                
+
                 <div className="flex items-center justify-between gap-6 py-2 px-1">
                     {/* Left: Back */}
                     <div className="flex-1 flex justify-start">
@@ -186,112 +431,436 @@ const TestSeriesDetail = () => {
             {/* Divider and section Heading */}
             <div className="h-px bg-gradient-to-r from-white/[0.08] via-white/[0.06] to-transparent mb-4" />
 
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2.5">
-                    <div className="p-1.5 rounded-lg bg-pink-500/10 border border-pink-500/20">
-                        <Notebook className="w-4 h-4 text-pink-400" />
-                    </div>
-                    <h2 className="text-[20px] font-heading font-bold text-white tracking-tight">All Tests</h2>
-                </div>
+            <div className="flex items-center gap-6 mb-8 mt-4 border-b border-white/[0.04]">
                 <button
-                    onClick={() => setIsCreateTestModalOpen(true)}
-                    className="flex items-center gap-2 text-[12px] font-bold px-4 py-2 rounded-lg transition-all cursor-pointer border border-pink-500/20 bg-pink-500/10 text-pink-400 hover:text-white hover:bg-pink-500/20 group shadow-lg shadow-pink-500/5 backdrop-blur-sm"
+                    onClick={() => setActiveTab('tests')}
+                    className={`pb-4 px-2 text-[15px] font-bold transition-all relative cursor-pointer ${activeTab === 'tests' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
                 >
-                    <Plus className="w-3.5 h-3.5 text-pink-400 group-hover:rotate-90 transition-transform" strokeWidth={2.5} />
-                    <span>Add Test</span>
+                    <div className="flex items-center gap-2">
+                        <Notebook className="w-4 h-4" />
+                        <span>Tests</span>
+                        <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded-full border border-white/5">{tests.length}</span>
+                    </div>
+                    {activeTab === 'tests' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-pink-500 rounded-t-full shadow-[0_-4px_12px_rgba(236,72,153,0.5)] fade-in" />}
+                </button>
+                <button
+                    onClick={() => setActiveTab('library')}
+                    className={`pb-4 px-2 text-[15px] font-bold transition-all relative cursor-pointer ${activeTab === 'library' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'}`}
+                >
+                    <div className="flex items-center gap-2">
+                        <Layers className="w-4 h-4" />
+                        <span>Library</span>
+                    </div>
+                    {activeTab === 'library' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-500 rounded-t-full shadow-[0_-4px_12px_rgba(99,102,241,0.5)] fade-in" />}
                 </button>
             </div>
 
-            {/* Tests Section */}
-            <div>
-                {tests.length === 0 ? (
-                    <div className="glass-panel rounded-xl p-16 text-center border-dashed border-pink-500/20 max-w-xl mx-auto relative overflow-hidden group">
-                        <div className="absolute inset-0 bg-gradient-to-br from-pink-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-                        <div className="w-20 h-20 mx-auto bg-pink-500/10 rounded-full flex items-center justify-center mb-6 border border-pink-500/20 pulse-ring">
-                            <Calendar className="w-10 h-10 text-pink-400" strokeWidth={1.5} />
+            {activeTab === 'tests' && (
+                <div className="fade-in">
+                    <div className="flex items-center justify-between mb-8 border-b border-white/[0.08] pb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-xl bg-pink-500/10 border border-pink-500/10 shadow-lg shadow-pink-500/5">
+                                <Notebook className="w-5 h-5 text-pink-400" />
+                            </div>
+                            <h2 className="text-[20px] font-heading font-bold text-white tracking-tight">All Tests</h2>
                         </div>
-                        <h3 className="text-2xl font-heading font-bold text-white mb-3 tracking-tight">No tests yet</h3>
-                        <p className="text-slate-400 text-sm max-w-sm mx-auto mb-8 leading-relaxed">
-                            Schedule your first test to start tracking scores against the subjects in this series.
-                        </p>
                         <button
                             onClick={() => setIsCreateTestModalOpen(true)}
-                            className="btn-primary-pink flex items-center gap-2 mx-auto px-6 py-3 rounded-xl text-sm font-semibold cursor-pointer bg-pink-500/10 text-pink-400 border border-pink-500/20 hover:bg-pink-500/20"
+                            className="flex items-center gap-2 text-[12px] font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer border border-pink-500/20 bg-pink-500/10 text-pink-400 hover:text-white hover:bg-pink-500/20 group shadow-lg shadow-pink-500/5"
                         >
-                            <Plus className="w-4 h-4" />
-                            <span>Add First Test</span>
+                            <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
+                            <span>Create Test</span>
                         </button>
                     </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                        {tests.map(test => (
-                            <div
-                                key={test.id}
-                                onClick={() => navigate(`/tests/${seriesId}/test/${test.id}/analytics`)}
-                                className="glass-card glass p-6 cursor-pointer group flex flex-col justify-between transition-all hover:border-pink-500/30 min-h-[160px] relative active:scale-[0.99]"
-                            >
-                                {/* Top: Info + Actions */}
-                                <div className="flex items-start justify-between gap-3 mb-4">
-                                    <div className="flex-1 min-w-0">
-                                        <h2 className="text-[17px] font-heading font-semibold text-slate-100 transition-colors truncate tracking-tight leading-tight mb-2">
-                                            {test.name.toUpperCase()}
-                                        </h2>
-                                        <div className="flex items-center gap-3">
-                                            <div className="flex items-center gap-1.5">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-pink-500/60 shadow-[0_0_8px_rgba(236,72,153,0.4)]" />
-                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                                                    {test.subjects?.length || 0} Subjects
-                                                </span>
+
+                    {/* Tests Content */}
+                    <div>
+                        {tests.length === 0 ? (
+                            <div className="glass-panel rounded-xl p-16 text-center border-dashed border-pink-500/20 max-w-xl mx-auto relative overflow-hidden group">
+                                <div className="absolute inset-0 bg-gradient-to-br from-pink-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+                                <div className="w-20 h-20 mx-auto bg-pink-500/10 rounded-full flex items-center justify-center mb-6 border border-pink-500/20 pulse-ring">
+                                    <Calendar className="w-10 h-10 text-pink-400" strokeWidth={1.5} />
+                                </div>
+                                <h3 className="text-2xl font-heading font-bold text-white mb-3 tracking-tight">No tests yet</h3>
+                                <p className="text-slate-400 text-sm max-w-sm mx-auto mb-8 leading-relaxed">
+                                    Schedule your first test to start tracking scores against the subjects in this series.
+                                </p>
+                                <button
+                                    onClick={() => setIsCreateTestModalOpen(true)}
+                                    className="btn-primary-pink flex items-center gap-2 mx-auto px-6 py-3 rounded-xl text-sm font-semibold cursor-pointer bg-pink-500/10 text-pink-400 border border-pink-500/20 hover:bg-pink-500/20"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    <span>Add First Test</span>
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pb-12">
+                                {tests.map(test => (
+                                    <div
+                                        key={test.id}
+                                        onClick={() => navigate(`/tests/${seriesId}/test/${test.id}/analytics`)}
+                                        className="glass-card glass p-6 cursor-pointer group flex flex-col justify-between transition-all hover:border-pink-500/30 min-h-[160px] relative active:scale-[0.99]"
+                                    >
+                                        <div className="flex items-start justify-between gap-3 mb-4">
+                                            <div className="flex-1 min-w-0">
+                                                <h2 className="text-[17px] font-heading font-semibold text-slate-100 transition-colors truncate tracking-tight leading-tight mb-2">
+                                                    {test.name.toUpperCase()}
+                                                </h2>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-pink-500/60 shadow-[0_0_8px_rgba(236,72,153,0.4)]" />
+                                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                                            {test.subjects?.length || 0} Subjects
+                                                        </span>
+                                                    </div>
+                                                    <div className="h-3 w-px bg-white/10" />
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Calendar className="w-3 h-3 text-slate-600" />
+                                                        <span className="text-[10px] font-bold text-slate-600">
+                                                            {new Date(test.test_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="h-3 w-px bg-white/10" />
-                                            <div className="flex items-center gap-1.5">
-                                                <Calendar className="w-3 h-3 text-slate-600" />
-                                                <span className="text-[10px] font-bold text-slate-600">
-                                                    {new Date(test.test_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                                </span>
+                                            <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                                                <button
+                                                    onClick={(e) => handleEditTest(e, test)}
+                                                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-500 hover:text-pink-400 transition-colors"
+                                                    title="Edit Test"
+                                                >
+                                                    <Edit2 className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => handleDeleteTest(e, test.id)}
+                                                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-500 hover:text-red-400 transition-colors"
+                                                    title="Delete Test"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
                                             </div>
                                         </div>
+                                        <div className="mt-auto pt-4 border-t border-white/[0.06] flex items-center gap-3">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); navigate(`/tests/${seriesId}/test/${test.id}`); }}
+                                                className="flex-1 h-10 px-3 rounded-lg bg-pink-500/10 hover:bg-pink-500 text-pink-400 hover:text-white border border-pink-500/10 flex items-center justify-center gap-2 text-[11px] font-bold uppercase tracking-widest transition-all"
+                                            >
+                                                <Plus className="w-3.5 h-3.5" />
+                                                Add Scores
+                                            </button>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); navigate(`/tests/${seriesId}/test/${test.id}/analytics`); }}
+                                                className="flex-1 h-10 px-3 rounded-lg bg-indigo-500/10 hover:bg-indigo-500 text-indigo-400 hover:text-white border border-indigo-500/10 flex items-center justify-center gap-2 text-[11px] font-bold uppercase tracking-widest transition-all"
+                                            >
+                                                <BarChart3 className="w-3.5 h-3.5" />
+                                                Analytics
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'library' && (
+                <div className="fade-in pb-12 px-1">
+                    {/* Header for Library */}
+                    <div className="flex items-center justify-between mb-8 border-b border-white/[0.08] pb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/10 shadow-lg shadow-indigo-500/5">
+                                <Layers className="w-5 h-5 text-indigo-400" />
+                            </div>
+                            <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Resource Vault</h3>
+                        </div>
+
+                        {!isSelectionMode && (
+                            <div className="flex items-center gap-4">
+                                <div className="flex items-center bg-white/[0.03] p-1 rounded-xl border border-white/[0.06] shrink-0">
+                                    <div className="flex items-center bg-white/[0.02] rounded-lg p-0.5">
                                         <button
-                                            onClick={(e) => handleEditTest(e, test)}
-                                            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-500 hover:text-pink-400 transition-colors"
-                                            title="Edit Test"
+                                            onClick={() => setLibraryViewMode('categorywise')}
+                                            className={`p-1.5 rounded-lg transition-all cursor-pointer ${libraryViewMode === 'categorywise' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
+                                            title="Category View"
                                         >
-                                            <Edit2 className="w-3.5 h-3.5" />
+                                            <LayoutGrid className="w-3.5 h-3.5" />
                                         </button>
                                         <button
-                                            onClick={(e) => handleDeleteTest(e, test.id)}
-                                            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-500 hover:text-red-400 transition-colors"
-                                            title="Delete Test"
+                                            onClick={() => setLibraryViewMode('datewise')}
+                                            className={`p-1.5 rounded-lg transition-all cursor-pointer ${libraryViewMode === 'datewise' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
+                                            title="Date View"
                                         >
-                                            <Trash2 className="w-3.5 h-3.5" />
+                                            <Clock className="w-3.5 h-3.5" />
                                         </button>
                                     </div>
+                                    <div className="w-px h-4 bg-white/10 mx-1.5" />
+                                    <button
+                                        onClick={() => setShowTimeTraveler(true)}
+                                        className="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 border border-transparent text-slate-500 hover:text-white hover:bg-white/[0.05] cursor-pointer"
+                                    >
+                                        <History className="w-3.5 h-3.5" />
+                                        <span className="hidden lg:inline">Filter</span>
+                                    </button>
                                 </div>
 
-                                {/* Footer: Score Actions & Analytics */}
-                                <div className="mt-auto pt-4 border-t border-white/[0.06] flex items-center gap-3">
+                                <button
+                                    onClick={() => setShowFileModal(true)}
+                                    className="flex items-center gap-2 text-[12px] font-bold px-5 py-2.5 rounded-xl transition-all cursor-pointer border border-indigo-500/20 bg-indigo-500/10 text-indigo-400 hover:text-white hover:bg-indigo-500/20 group shadow-lg shadow-indigo-500/5 backdrop-blur-sm"
+                                >
+                                    <Plus className="w-4 h-4" strokeWidth={2.5} />
+                                    <span>Upload Material</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {isSelectionMode && (
+                        <div className="mb-8 flex justify-center">
+                            <div className="flex items-center h-[54px] bg-[#121214]/90 border border-white/[0.08] rounded-2xl px-2 shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all animate-in fade-in zoom-in-95 duration-300 backdrop-blur-xl">
+                                <div className="flex items-center pl-4 pr-3">
+                                    <div className="w-7 h-7 bg-indigo-500 text-white rounded-full flex items-center justify-center text-[13px] font-black shadow-lg mr-3">
+                                        {selectedItems.size}
+                                    </div>
+                                    <span className="text-[14px] text-slate-300 font-bold hidden sm:inline uppercase tracking-widest">Selected</span>
+                                </div>
+                                <div className="w-px h-8 bg-white/[0.1] mx-2"></div>
+                                <button
+                                    onClick={() => {
+                                        if (selectedItems.size === files.length) setSelectedItems(new Set());
+                                        else setSelectedItems(new Set(files.map(f => f.id)));
+                                    }}
+                                    className="text-[12px] font-bold text-slate-300 hover:text-white px-5 py-2.5 rounded-xl hover:bg-white/10 transition-all cursor-pointer uppercase tracking-widest"
+                                >
+                                    {selectedItems.size > 0 && selectedItems.size === files.length ? 'Deselect All' : 'Select All'}
+                                </button>
+                                <div className="w-px h-8 bg-white/[0.1] mx-2"></div>
+                                <div className="flex items-center gap-2 px-2">
                                     <button
-                                        onClick={(e) => { e.stopPropagation(); navigate(`/tests/${seriesId}/test/${test.id}`); }}
-                                        className="flex-1 h-10 px-3 rounded-lg bg-pink-500/10 hover:bg-pink-500 text-pink-400 hover:text-white border border-pink-500/10 flex items-center justify-center gap-2 text-[11px] font-bold uppercase tracking-widest transition-all"
+                                        onClick={async () => {
+                                            const loadingToast = toast.loading('Creating Zip...');
+                                            try {
+                                                const zip = new JSZip();
+                                                const usedNames = new Map();
+                                                for (const fileId of selectedItems) {
+                                                    try {
+                                                        const f = await getFileData(null, fileId, seriesId);
+                                                        if (f && f.data) {
+                                                            let baseName = f.file_name || 'file';
+                                                            let ext = '';
+                                                            const lastDot = baseName.lastIndexOf('.');
+                                                            if (lastDot !== -1) {
+                                                                ext = baseName.substring(lastDot);
+                                                                baseName = baseName.substring(0, lastDot);
+                                                            } else {
+                                                                const typeMap = { 'image': '.jpg', 'pdf': '.pdf', 'doc': '.docx', 'xlsx': '.xlsx', 'html': '.html', 'csv': '.csv' };
+                                                                ext = typeMap[f.file_type] || '';
+                                                            }
+                                                            let finalName = `${baseName}${ext}`;
+                                                            if (usedNames.has(finalName)) {
+                                                                const count = usedNames.get(finalName) + 1;
+                                                                usedNames.set(finalName, count);
+                                                                finalName = `${baseName}_${count}${ext}`;
+                                                            } else {
+                                                                usedNames.set(finalName, 1);
+                                                            }
+                                                            const base64Content = f.data.includes(',') ? f.data.split(',')[1] : f.data;
+                                                            zip.file(finalName, base64Content, { base64: true });
+                                                        }
+                                                    } catch (err) { console.error(err); }
+                                                }
+                                                const content = await zip.generateAsync({ type: 'blob' });
+                                                const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+                                                const zipFileName = `${series?.name || 'Library'}_Export_${timestamp}.zip`.replace(/\s+/g, '_');
+                                                saveAs(content, zipFileName);
+                                                setIsSelectionMode(false);
+                                                setSelectedItems(new Set());
+                                                toast.success('Zip downloaded!', { id: loadingToast });
+                                            } catch (err) {
+                                                toast.error('Failed to create Zip', { id: loadingToast });
+                                            }
+                                        }}
+                                        disabled={selectedItems.size === 0}
+                                        className="h-10 px-4 flex items-center gap-2 rounded-xl text-[12px] font-bold bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                                     >
-                                        <Plus className="w-3.5 h-3.5" />
-                                        Add Scores
+                                        <Download className="w-4 h-4" />
+                                        <span>Download</span>
                                     </button>
                                     <button
-                                        onClick={(e) => { e.stopPropagation(); navigate(`/tests/${seriesId}/test/${test.id}/analytics`); }}
-                                        className="flex-1 h-10 px-3 rounded-lg bg-indigo-500/10 hover:bg-indigo-500 text-indigo-400 hover:text-white border border-indigo-500/10 flex items-center justify-center gap-2 text-[11px] font-bold uppercase tracking-widest transition-all"
+                                        onClick={() => setConfirmDeleteFile({ open: true, items: Array.from(selectedItems).map(id => files.find(f => f.id === id)).filter(Boolean) })}
+                                        disabled={selectedItems.size === 0}
+                                        className="h-10 px-4 flex items-center gap-2 rounded-xl text-[12px] font-bold bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                                     >
-                                        <BarChart3 className="w-3.5 h-3.5" />
-                                        Analytics
+                                        <Trash2 className="w-4 h-4" />
+                                        <span>Delete</span>
                                     </button>
                                 </div>
+                                <div className="w-px h-8 bg-white/[0.1] mx-2"></div>
+                                <button
+                                    onClick={() => { setIsSelectionMode(false); setSelectedItems(new Set()); }}
+                                    className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-500 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+                                    title="Cancel Selection"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
                             </div>
-                        ))}
-                    </div>
-                )}
-            </div>
+                        </div>
+                    )}
+
+                    {files.length === 0 && !loadingFiles ? (
+                        <div className="glass-panel rounded-xl p-16 text-center border-dashed border-indigo-400/20 w-full relative overflow-hidden group">
+                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+                            <div className="w-20 h-20 mx-auto bg-indigo-500/10 rounded-full flex items-center justify-center mb-6 border border-indigo-500/20 pulse-ring">
+                                <Layers className="w-10 h-10 text-indigo-400" strokeWidth={1.5} />
+                            </div>
+                            <h3 className="text-2xl font-heading font-bold text-white mb-3 tracking-tight">No resources yet</h3>
+                            <p className="text-slate-400 text-sm max-w-sm mx-auto mb-8 leading-relaxed">
+                                Upload test papers, diagrams, or additional materials for this series.
+                            </p>
+                            <button
+                                onClick={() => setShowFileModal(true)}
+                                className="btn-primary flex items-center gap-2 mx-auto px-6 py-3 rounded-xl text-sm font-semibold cursor-pointer"
+                            >
+                                <PlusCircle className="w-4 h-4" />
+                                <span>Upload Your First File</span>
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="space-y-12">
+                            {groupedLibraryItems.map((group, gIdx) => (
+                                <div key={group.title} className="relative">
+                                    <div className="sticky top-0 z-30 py-6">
+                                        <div className="flex items-center gap-4">
+                                            <div className="flex items-center gap-3 px-4 py-2 bg-[#0a0a0c] border border-white/10 rounded-2xl shadow-2xl">
+                                                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                                                <h2 className="text-[13px] font-black uppercase tracking-[0.2em] text-white">
+                                                    {group.title}
+                                                </h2>
+                                                <div className="w-px h-3 bg-white/10 mx-1" />
+                                                <span className="text-[11px] font-mono font-bold text-slate-500">{group.items.length.toString().padStart(2, '0')}</span>
+                                            </div>
+                                            <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                                        {group.items.map((file, index) => {
+                                            const isGlobalLast = gIdx === groupedLibraryItems.length - 1 && index === group.items.length - 1;
+                                            return (
+                                                <div
+                                                    key={file.id}
+                                                    ref={isGlobalLast ? lastFileElementRef : null}
+                                                    className={`group relative aspect-square rounded-xl bg-surface-2 transition-all duration-300 cursor-pointer shadow-lg active:scale-[0.98] border ${isSelectionMode
+                                                        ? (selectedItems.has(file.id) ? 'border-indigo-500 ring-2 ring-indigo-500/50 bg-indigo-500/10 scale-95 opacity-90' : 'border-white/[0.04]')
+                                                        : (activeFileDropdown === file.id ? 'border-primary/40 shadow-xl z-[40]' : 'border-white/[0.04] hover:border-primary/40')
+                                                        }`}
+                                                    onClick={() => isSelectionMode ? (setSelectedItems(prev => {
+                                                        const n = new Set(prev);
+                                                        if (n.has(file.id)) n.delete(file.id);
+                                                        else n.add(file.id);
+                                                        return n;
+                                                    })) : handleFileClick(file)}
+                                                >
+                                                    <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none">
+                                                        {file.thumbnail ? (
+                                                            <img src={file.thumbnail} alt={file.file_name} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-all" loading="lazy" />
+                                                        ) : (file.file_type === 'image') ? (
+                                                            <div className="w-full h-full bg-surface-3 flex items-center justify-center"><ImageIcon className="w-8 h-8 text-white/10" /></div>
+                                                        ) : (
+                                                            <div className="w-full h-full bg-surface-3 flex items-center justify-center flex-col gap-2">
+                                                                <div className={`p-4 rounded-xl shadow-lg ${file.file_type === 'pdf' ? 'bg-red-500/20 text-red-500' : file.file_type === 'xlsx' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-500'}`}>
+                                                                    {file.file_type === 'xlsx' ? <Table size={24} /> : <FileText size={24} />}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {/* Selection Indicator */}
+                                                    {isSelectionMode && (
+                                                        <div className="absolute top-3 right-3 z-30">
+                                                            <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(file.id) ? 'bg-indigo-500 border-indigo-500' : 'border-white/30 bg-black/40 backdrop-blur-sm'}`}>
+                                                                {selectedItems.has(file.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* File Type Badge */}
+                                                    <div className="absolute top-3 left-3 z-20">
+                                                        <div className={`px-1.5 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest border backdrop-blur-md shadow-2xl
+                                                            ${file.file_type === 'pdf' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' :
+                                                                file.file_type === 'xlsx' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
+                                                                    file.file_type === 'html' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
+                                                                        'bg-indigo-500/20 text-indigo-400 border-indigo-500/30'}`}>
+                                                            {file.file_type || 'IMG'}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-4 z-10 transition-all group-hover:bg-black/20">
+                                                        <div className="flex items-center justify-between mb-1.5 relative">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <div className="w-1 h-3 rounded-full bg-pink-500" />
+                                                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                                                    {series?.name}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <p className="text-[11px] font-semibold text-white truncate flex-1 leading-tight mb-0.5">
+                                                                {file.file_name || new Date(file.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                            </p>
+
+                                                            {!isSelectionMode && (
+                                                                <div className={`relative shrink-0 transition-opacity ${activeFileDropdown === file.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} onClick={e => e.stopPropagation()}>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setActiveFileDropdown(activeFileDropdown === file.id ? null : file.id);
+                                                                        }}
+                                                                        className={`p-1 flex items-center justify-center rounded-lg border transition-all cursor-pointer ${activeFileDropdown === file.id ? 'bg-primary border-primary text-white' : 'bg-black/40 hover:bg-black/60 text-white/80 border-white/10 backdrop-blur-sm'}`}
+                                                                        title="More Options"
+                                                                    >
+                                                                        <MoreVertical className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                    {activeFileDropdown === file.id && (
+                                                                        <div className="absolute right-0 top-full mt-2 w-36 bg-[#121214]/95 border border-white/10 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.6)] py-1.5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50 backdrop-blur-xl" onClick={e => e.stopPropagation()}>
+                                                                            <button
+                                                                                onClick={() => { setIsSelectionMode(true); setSelectedItems(new Set([file.id])); setActiveFileDropdown(null); }}
+                                                                                className="w-full flex items-center justify-start gap-2.5 px-3.5 py-2 text-[12px] font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+                                                                            >
+                                                                                <CheckCircle className="w-3.5 h-3.5 text-indigo-400" /> Select
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    setActiveFileDropdown(null);
+                                                                                    setConfirmRenameFile({ open: true, file, newName: file.file_name || '' });
+                                                                                }}
+                                                                                className="w-full flex items-center justify-start gap-2.5 px-3.5 py-2 text-[12px] font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+                                                                            >
+                                                                                <Pencil className="w-3.5 h-3.5 text-emerald-400" /> Rename
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    setActiveFileDropdown(null);
+                                                                                    setConfirmDeleteFile({ open: true, items: [file] });
+                                                                                }}
+                                                                                className={`w-full flex items-center justify-start gap-2.5 px-3.5 py-2 text-[12px] font-medium transition-all text-slate-300 hover:text-rose-400 hover:bg-rose-500/10 cursor-pointer`}
+                                                                            >
+                                                                                <Trash2 className={`w-3.5 h-3.5 text-rose-500`} /> Delete
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Modals & Dialogs */}
             <CreateTestModal
@@ -316,6 +885,103 @@ const TestSeriesDetail = () => {
                 }}
                 confirmText="Delete Test"
             />
+
+            <AddFileModal
+                isOpen={showFileModal}
+                onClose={() => setShowFileModal(false)}
+                seriesId={seriesId}
+                onFileSaved={handleFileSaved}
+            />
+
+            {viewingFile && (
+                <FileViewerModal
+                    isOpen={!!viewingFile}
+                    onClose={() => setViewingFile(null)}
+                    onMinimize={() => {
+                        globalMinimize({
+                            type: 'file',
+                            id: viewingFile.id,
+                            data: viewingFile,
+                            title: viewingFile.file_name || 'Untitled File',
+                            typeLabel: viewingFile.file_type?.toUpperCase() || 'FILE',
+                            props: {
+                                onNext: handleNextFile,
+                                onPrev: handlePrevFile
+                            }
+                        });
+                        setViewingFile(null);
+                    }}
+                    file={viewingFile}
+                    allFiles={files}
+                    onPrev={handlePrevFile}
+                    onNext={handleNextFile}
+                    onSelect={handleFileClick}
+                    onDelete={async (deletedFile) => {
+                        await filesApi.delete(deletedFile.id, null, seriesId);
+                        setFiles(prev => (prev || []).filter(f => f.id !== deletedFile.id));
+                        clearFileCacheMany([deletedFile.id]);
+                        setViewingFile(null);
+                        toast.success("File deleted successfully");
+                    }}
+                />
+            )}
+
+
+            <ConfirmDialog
+                isOpen={confirmDeleteFile.open}
+                title={`Delete ${confirmDeleteFile.items.length > 1 ? `${confirmDeleteFile.items.length} Files` : 'File'}`}
+                message={`Are you sure you want to delete ${confirmDeleteFile.items.length > 1 ? 'these files' : 'this file'}? This action cannot be undone.`}
+                onConfirm={async () => {
+                    try {
+                        for (const file of confirmDeleteFile.items) {
+                            await filesApi.delete(file.id, null, seriesId);
+                        }
+                        const deletedIds = new Set(confirmDeleteFile.items.map(f => f.id));
+                        setFiles(prev => prev.filter(f => !deletedIds.has(f.id)));
+                        clearFileCacheMany([...deletedIds]);
+                        setSelectedItems(prev => {
+                            const next = new Set(prev);
+                            deletedIds.forEach(id => next.delete(id));
+                            return next;
+                        });
+                        if (selectedItems.size === confirmDeleteFile.items.length) setIsSelectionMode(false);
+                        setConfirmDeleteFile({ open: false, items: [] });
+                        toast.success("File(s) deleted");
+                    } catch {
+                        toast.error("Failed to delete files");
+                    }
+                }}
+                onCancel={() => setConfirmDeleteFile({ open: false, items: [] })}
+                confirmText="Delete"
+                danger
+            />
+
+            <ConfirmDialog
+                isOpen={confirmRenameFile.open}
+                title="Rename File"
+                onConfirm={handleRenameFile}
+                onCancel={() => setConfirmRenameFile({ open: false, file: null, newName: '' })}
+                confirmText="Rename"
+            >
+                <div className="mt-4">
+                    <input
+                        autoFocus
+                        type="text"
+                        value={confirmRenameFile.newName}
+                        onChange={(e) => setConfirmRenameFile(prev => ({ ...prev, newName: e.target.value }))}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary/50"
+                        onKeyDown={(e) => e.key === 'Enter' && handleRenameFile()}
+                    />
+                </div>
+            </ConfirmDialog>
+
+            {showTimeTraveler && (
+                <TimeTraveler
+                    isOpen={showTimeTraveler}
+                    onClose={() => setShowTimeTraveler(false)}
+                    onApply={(val) => setFileSearchQuery(val)}
+                />
+            )}
         </div>
     );
 };
