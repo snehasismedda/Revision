@@ -120,10 +120,14 @@ export const deleteNote = async (req, res, next) => {
         }
 
         await noteModel.softDeleteNotes(ids, subjectId);
-        await deletionService.deleteNotesCascade(ids, subjectId);
+        const cascadeResult = await deletionService.deleteNotesCascade(ids, subjectId);
 
 
-        res.json({ message: 'Notes deleted successfully', deletedCount: ids.length });
+        res.json({ 
+            message: 'Notes deleted successfully', 
+            deletedCount: ids.length,
+            cascade: cascadeResult
+        });
     } catch (error) {
         next(error);
     }

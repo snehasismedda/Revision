@@ -129,12 +129,20 @@ export const saveFileAs = async (req, res) => {
             }
         } else if (type === 'note') {
             const { title: manualTitle, noteContent: manualContent } = req.body;
+            let finalTitle = manualTitle || 'New Image Note';
+            let finalContent = manualContent || 'No description provided.';
 
-            // Use manual input or defaults - DO NOT use AI here as per user request
-            const title = manualTitle || 'New Image Note';
-            const noteContent = manualContent || 'No description provided.';
+            if (!skipAI) {
+                try {
+                    const res = await aiApi.parseNote({ content, type: 'image' });
+                    if (res.title) finalTitle = res.title;
+                    if (res.content) finalContent = res.content;
+                } catch (err) {
+                    console.error('AI Note Parsing failed, falling back to manual:', err);
+                }
+            }
 
-            const note = await noteModel.createNote(subjectId, null, title, noteContent, sourceImageId);
+            const note = await noteModel.createNote(subjectId, null, finalTitle, finalContent, [sourceImageId]);
             res.status(201).json({ note });
         } else {
             res.status(400).json({ error: 'invalid type' });

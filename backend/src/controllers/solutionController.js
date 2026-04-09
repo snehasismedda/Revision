@@ -63,9 +63,13 @@ export const deleteSolution = async (req, res, next) => {
         }
 
         await solutionModel.softDeleteSolutions(ids, subjectId);
-        await deletionService.deleteSolutionsCascade(ids, subjectId);
+        const cascadeResult = await deletionService.deleteSolutionsCascade(ids, subjectId);
         
-        res.json({ message: 'Solutions deleted successfully', deletedCount: ids.length });
+        res.json({ 
+            message: 'Solutions deleted successfully', 
+            deletedCount: ids.length,
+            cascade: cascadeResult
+        });
     } catch (error) {
         next(error);
     }

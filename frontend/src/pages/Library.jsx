@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { filesApi } from '../api/index.js';
 import { useSubjects } from '../context/SubjectContext.jsx';
 import { useFiles } from '../context/FileContext.jsx';
+import { useQuickView } from '../context/QuickViewContext.jsx';
 import { Clock, LayoutGrid, Layers, PlusCircle, Search, X, History, Activity, Maximize2, Link as LinkIcon, ChevronDown, FileText, MoreHorizontal, MoreVertical, CheckCircle, Pencil, Trash2, Download, ExternalLink, Image as ImageIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AddFileModal from '../components/modals/AddFileModal.jsx';
@@ -27,10 +28,9 @@ const Library = () => {
     const [viewMode, setViewMode] = useState('type'); // 'type' or 'timeline'
     const { subjects, loadSubjects } = useSubjects();
     const [showAddModal, setShowAddModal] = useState(false);
-    const [selectedFile, setSelectedFile] = useState(null);
-    const [showTimeTraveler, setShowTimeTraveler] = useState(false);
     const { getFileData } = useFiles();
-    const [isFileViewerMinimized, setIsFileViewerMinimized] = useState(false);
+    const { openItem } = useQuickView();
+    const [showTimeTraveler, setShowTimeTraveler] = useState(false);
 
     // Context Action States
     const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -129,19 +129,33 @@ const Library = () => {
         }
     };
 
-    const handleFileClick = async (file) => {
-        try {
-            if (!file.data) {
-                const toastId = toast.loading('Fetching file content...');
-                const fullFile = await getFileData(file.subject_id, file.id);
-                toast.dismiss(toastId);
-                setSelectedFile(fullFile);
-            } else {
-                setSelectedFile(file);
+    const handleFileClick = (file) => {
+        const idx = filteredFiles.findIndex(f => f.id === file.id);
+        
+        openItem({
+            type: 'file',
+            id: file.id,
+            data: file,
+            title: file.file_name || 'Untitled File',
+            typeLabel: file.file_type?.toUpperCase() || 'FILE',
+            props: {
+                allFiles: filteredFiles,
+                onNext: () => {
+                    const currentIdx = filteredFiles.findIndex(f => f.id === file.id);
+                    if (currentIdx < filteredFiles.length - 1) {
+                        handleFileClick(filteredFiles[currentIdx + 1]);
+                    } else if (hasMore) {
+                        setPage(prev => prev + 1);
+                    }
+                },
+                onPrev: () => {
+                    const currentIdx = filteredFiles.findIndex(f => f.id === file.id);
+                    if (currentIdx > 0) {
+                        handleFileClick(filteredFiles[currentIdx - 1]);
+                    }
+                }
             }
-        } catch (err) {
-            console.error('Failed to open file:', err);
-        }
+        });
     };
 
     const handleRenameSubmit = async (e) => {
@@ -365,37 +379,7 @@ const Library = () => {
         ? groupFilesByDate(filteredFiles)
         : groupFilesByType(filteredFiles);
 
-    const handlePrev = useCallback(async () => {
-        if (!selectedFile) return;
-        const idx = filteredFiles.findIndex(f => f.id === selectedFile.id);
-        if (idx > 0) handleFileClick(filteredFiles[idx - 1]);
-    }, [selectedFile, filteredFiles]);
-
-    const handleNext = useCallback(async () => {
-        if (!selectedFile) return;
-        const idx = files.findIndex(f => f.id === selectedFile.id);
-        
-        if (idx === files.length - 1 && hasMore) {
-            setPage(prev => prev + 1);
-            // The useEffect for page will trigger loadImages(false)
-            // But we need to wait for it or trigger it here to open the next file immediately
-            toast.loading('Loading more files...', { duration: 1000 });
-            return;
-        }
-
-        if (idx < files.length - 1) handleFileClick(files[idx + 1]);
-    }, [selectedFile, files, hasMore, handleFileClick]);
-
-    useEffect(() => {
-        const handleKeyDown = (e) => {
-            if (!selectedFile) return;
-            if (e.key === 'ArrowLeft') handlePrev();
-            if (e.key === 'ArrowRight') handleNext();
-            if (e.key === 'Escape') setSelectedFile(null);
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedFile, handlePrev, handleNext]);
+    // Keyboard navigation is handled by the modal itself if passed properly
 
     if (loading) {
         return (
@@ -637,7 +621,7 @@ const Library = () => {
                                                         className="w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
                                                         loading="lazy"
                                                     />
-                                                ) : file.data ? (
+                                                ) : (file.data && (file.file_type === 'image' || !file.file_type)) ? (
                                                     <img
                                                         src={file.data}
                                                         alt={file.file_name || file.subject_name}
@@ -650,6 +634,7 @@ const Library = () => {
                                                             {file.file_type === 'pdf' ? <FileText className="w-7 h-7 text-rose-400" /> :
                                                              file.file_type === 'xlsx' ? <Layers className="w-7 h-7 text-emerald-400" /> :
                                                              file.file_type === 'doc' ? <FileText className="w-7 h-7 text-blue-400" /> :
+                                                             file.file_type === 'html' ? <FileText className="w-7 h-7 text-orange-400" /> :
                                                              <ImageIcon className="w-7 h-7 text-indigo-400" />}
                                                         </div>
                                                         <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">{file.file_type || 'Image'}</span>
@@ -782,6 +767,8 @@ const Library = () => {
                 isOpen={showAddModal}
                 onClose={() => setShowAddModal(false)}
                 onFileSaved={handleImageSaved}
+                subjectId={selectedSubjectId === 'all' ? null : selectedSubjectId}
+                isLibrary={true}
             />
 
             {loadingMore && (
@@ -792,38 +779,6 @@ const Library = () => {
                         </div>
                     ))}
                 </div>
-            )}
-
-            {selectedFile && (
-                <FileViewerModal
-                    key={selectedFile.id}
-                    isOpen={true}
-                    onClose={() => {
-                        setSelectedFile(null);
-                        setIsFileViewerMinimized(false);
-                    }}
-                    file={selectedFile}
-                    allFiles={filteredFiles}
-                    onPrev={handlePrev}
-                    onNext={handleNext}
-                    onSelect={handleFileClick}
-                    isMinimized={isFileViewerMinimized}
-                    onMinimize={setIsFileViewerMinimized}
-                    onDelete={async (deletedFile) => {
-                        await filesApi.delete(deletedFile.subject_id, deletedFile.id);
-                        setFiles(prev => prev.filter(f => f.id !== deletedFile.id));
-                        setSelectedFile(null);
-                        setIsFileViewerMinimized(false);
-                        toast.success("File deleted successfully");
-                    }}
-                    onNavigateToLinkedContent={(file) => {
-                        if (file.linked_question_id || file.linked_note_id) {
-                            const tab = file.linked_question_id ? 'questions' : 'notes';
-                            const contentId = file.linked_question_id || file.linked_note_id;
-                            navigate(`/subjects/${file.subject_id}?tab=${tab}&id=${contentId}`);
-                        }
-                    }}
-                />
             )}
 
             <TimeTraveler

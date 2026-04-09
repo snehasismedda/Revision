@@ -21,13 +21,13 @@ export const generateThumbnail = async (content, fileType) => {
 
         if (fileType === 'image') {
             const thumbnailBuffer = await sharp(buffer)
-                .resize(200, 200, {
+                .resize(300, 400, {
                     fit: 'inside',
                     withoutEnlargement: true
                 })
                 .toFormat('webp')
                 .toBuffer();
-            
+
             return `data:image/webp;base64,${thumbnailBuffer.toString('base64')}`;
         }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { X, FileText, Link2 as LinkIcon, Pencil, ChevronLeft, ChevronRight, List, Copy, PanelLeftClose, PanelLeftOpen, Plus, ArrowLeft, Wand2, Check, XCircle, Loader2, Sun, Moon, Settings, Type, Palette, Trash2, Edit3, Maximize2, Minimize2, ExternalLink, Hash, Image as ImageIcon, Sparkles, RefreshCw, Type as TypeIcon, Layout } from 'lucide-react';
+import { X, FileText, Link2 as LinkIcon, Pencil, ChevronLeft, ChevronRight, List, Copy, PanelLeftClose, PanelLeftOpen, Plus, ArrowLeft, Wand2, Check, XCircle, Loader2, Sun, Moon, Settings, Type, Palette, Trash2, Edit3, Maximize2, Minimize2, ExternalLink, Hash, Image as ImageIcon, Sparkles, RefreshCw, Type as TypeIcon, Layout, Eye, EyeOff } from 'lucide-react';
 import { authApi, notesApi } from '../../api/index.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { formatDate } from '../../utils/dateUtils';
@@ -435,7 +435,28 @@ const TableEditPanel = ({ editOriginalText, editText, setEditText, editPosition,
 };
 
 
-const ViewNoteModal = ({ isOpen, onClose, note, subjectId, onNavigateToQuestion, sourceImage, isFetchingImage, onEdit, onPrev, onNext, onAddToNote, parentNoteTitle, onUpdateNoteContent, onAIEditSection, childNotes, onOpenChildNote, allNotes = [], onNavigateToNote }) => {
+const ViewNoteModal = ({ 
+    isOpen, 
+    onClose, 
+    note, 
+    subjectId, 
+    onNavigateToQuestion, 
+    sourceImage, 
+    isFetchingImage, 
+    onEdit, 
+    onPrev, 
+    onNext, 
+    onAddToNote, 
+    parentNoteTitle, 
+    onUpdateNoteContent, 
+    onAIEditSection, 
+    childNotes, 
+    onOpenChildNote, 
+    allNotes = [], 
+    onNavigateToNote,
+    isMinimized,
+    onMinimize
+}) => {
 
     const { user, updatePreferences } = useAuth();
     const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -1058,11 +1079,52 @@ const ViewNoteModal = ({ isOpen, onClose, note, subjectId, onNavigateToQuestion,
 
     return (
         <ModalPortal>
-            <div className={`fixed inset-0 z-[100] flex items-end sm:items-center justify-center modal-backdrop fade-in ${isLightMode ? 'bg-black/20' : 'bg-black/80'}`}
-                style={{ padding: isFullscreen ? '0' : 'undefined' }} // Clear padding for true fullscreen
-            >
+            {/* Minimized Floating Restore Bar */}
+            {isMinimized && (
+                <div className="fixed bottom-10 right-10 z-[200] animate-in slide-in-from-bottom-5 duration-300">
+                    <div className={`flex items-center gap-1 p-1 rounded-2xl shadow-2xl border backdrop-blur-xl transition-all
+                        ${isLightMode 
+                            ? 'bg-white/90 border-slate-200 shadow-indigo-100/50' 
+                            : 'bg-[#1a1a2e]/90 border-white/10 shadow-black/60'}`}
+                    >
+                        <button
+                            onClick={() => onMinimize && onMinimize(false)}
+                            className={`p-3 rounded-xl transition-all active:scale-90 cursor-pointer group flex items-center justify-center
+                                ${isLightMode ? 'hover:bg-indigo-50 text-indigo-600' : 'hover:bg-indigo-500/10 text-indigo-400'}`}
+                            title="Restore Note"
+                        >
+                            <div className="relative">
+                                <EyeOff size={22} strokeWidth={2.5} className="group-hover:scale-110 transition-transform" />
+                                <div className="absolute -top-1 -right-1 w-2 h-2 bg-indigo-500 rounded-full border-2 border-white dark:border-[#1a1a2e]" />
+                            </div>
+                        </button>
+
+                        <div className={`w-px h-6 mx-0.5 ${isLightMode ? 'bg-slate-200' : 'bg-white/10'}`} />
+
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (onClose) onClose();
+                            }}
+                            className={`p-3 rounded-xl transition-all active:scale-90 cursor-pointer group flex items-center justify-center
+                                ${isLightMode ? 'hover:bg-rose-50 text-slate-400 hover:text-rose-500' : 'hover:bg-rose-500/10 text-slate-500 hover:text-rose-400'}`}
+                            title="Close Note"
+                        >
+                            <X size={20} strokeWidth={2.5} className="group-hover:rotate-90 transition-transform" />
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <div className={`fixed inset-0 z-[110] flex flex-col items-center justify-center overflow-hidden font-sans transition-all duration-500
+                    ${isMinimized ? 'opacity-0 pointer-events-none scale-95' : 'opacity-100 scale-100'}`}>
+                
+                <div className={`absolute inset-0 z-0 modal-backdrop fade-in transition-opacity duration-500 ${isLightMode ? 'bg-black/10' : 'bg-black/80'} ${isMinimized ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+                    style={{ padding: isFullscreen ? '0' : 'undefined' }}
+                />
+
                 <div
-                    className={`w-full flex flex-col ${isFullscreen ? 'h-[100dvh] sm:max-h-screen rounded-none border-none' : 'h-[95dvh] sm:h-auto sm:max-h-[85vh] rounded-t-[1.5rem] sm:rounded-2xl shadow-2xl sm:border'} overflow-hidden relative transition-all duration-300 transform`}
+                    className={`w-full flex flex-col z-10 ${isFullscreen ? 'h-[100dvh] sm:max-h-screen rounded-none border-none' : 'h-[95dvh] sm:h-auto sm:max-h-[85vh] rounded-t-[1.5rem] sm:rounded-2xl shadow-2xl sm:border'} overflow-hidden relative transition-all duration-300 transform`}
                     style={{
                         background: isLightMode ? '#f5f7fa' : '#161625',
                         borderColor: isLightMode ? '#e2e8f0' : 'rgba(255,255,255,0.08)',
@@ -1431,6 +1493,16 @@ const ViewNoteModal = ({ isOpen, onClose, note, subjectId, onNavigateToQuestion,
                                 </div>
 
                                 <div className={`w-[1px] h-4 mx-0.5 ${isLightMode ? 'bg-slate-300' : 'bg-white/[0.1]'}`} />
+
+                                {onMinimize && (
+                                    <button
+                                        onClick={() => onMinimize(true)}
+                                        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all ${isLightMode ? 'text-slate-500 hover:bg-slate-100' : 'text-slate-400 hover:bg-white/5'}`}
+                                        title="Minimize Mode"
+                                    >
+                                        <Eye size={17} strokeWidth={2.5} />
+                                    </button>
+                                )}
 
                                 <button
                                     onClick={() => handleSafeAction(onClose)}

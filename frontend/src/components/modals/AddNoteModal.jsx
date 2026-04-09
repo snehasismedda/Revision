@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { notesApi, aiApi } from '../../api/index.js';
 import toast from 'react-hot-toast';
-import { X, PlusCircle, Trash2, Save, FileText, Image as ImageIcon, Camera, RefreshCcw, FlipHorizontal, ChevronDown, Scissors, Check, RotateCw, ZoomIn, ZoomOut, Wand2, Sparkles, Info, Tag, Type, LayoutGrid, Sun, Moon } from 'lucide-react';
+import { X, PlusCircle, Trash2, Save, FileText, Image as ImageIcon, Camera, RefreshCcw, FlipHorizontal, ChevronDown, Scissors, Check, RotateCw, ZoomIn, ZoomOut, Wand2, Sparkles, Info, Tag, Type, LayoutGrid, Sun, Moon, Eye, EyeOff } from 'lucide-react';
 import ModalPortal from '../ModalPortal.jsx';
 import ImageCropper from '../common/ImageCropper.jsx';
 
-const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, initialTitle, initialContent, parentNoteId }) => {
+const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, initialTitle, initialContent, parentNoteId, isMinimized, onMinimize }) => {
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
     const [tags, setTags] = useState([]);
@@ -416,9 +416,50 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
 
     return (
         <ModalPortal>
-            <div className={`fixed inset-0 z-[110] flex items-center justify-center p-0 modal-backdrop fade-in ${isLightMode ? 'bg-black/10' : 'bg-black/60'}`}>
+            {/* Minimized Floating Restore Bar */}
+            {isMinimized && (
+                <div className="fixed bottom-10 right-10 z-[200] animate-in slide-in-from-bottom-5 duration-300">
+                    <div className={`flex items-center gap-1 p-1 rounded-2xl shadow-2xl border backdrop-blur-xl transition-all
+                        ${isLightMode 
+                            ? 'bg-white/90 border-slate-200 shadow-emerald-100/50' 
+                            : 'bg-[#1a1a2e]/90 border-white/10 shadow-black/60'}`}
+                    >
+                        <button
+                            onClick={() => onMinimize && onMinimize(false)}
+                            className={`p-3 rounded-xl transition-all active:scale-90 cursor-pointer group flex items-center justify-center
+                                ${isLightMode ? 'hover:bg-emerald-50 text-emerald-600' : 'hover:bg-emerald-500/10 text-emerald-400'}`}
+                            title="Restore New Note"
+                        >
+                            <div className="relative">
+                                <EyeOff size={22} strokeWidth={2.5} className="group-hover:scale-110 transition-transform" />
+                                <div className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full border-2 border-white dark:border-[#1a1a2e]" />
+                            </div>
+                        </button>
+
+                        <div className={`w-px h-6 mx-0.5 ${isLightMode ? 'bg-slate-200' : 'bg-white/10'}`} />
+
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleModalClose();
+                            }}
+                            className={`p-3 rounded-xl transition-all active:scale-90 cursor-pointer group flex items-center justify-center
+                                ${isLightMode ? 'hover:bg-rose-50 text-slate-400 hover:text-rose-500' : 'hover:bg-rose-500/10 text-slate-500 hover:text-rose-400'}`}
+                            title="Close"
+                        >
+                            <X size={20} strokeWidth={2.5} className="group-hover:rotate-90 transition-transform" />
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <div className={`fixed inset-0 z-[110] flex items-center justify-center p-0 transition-all duration-500
+                    ${isMinimized ? 'opacity-0 pointer-events-none scale-95' : 'opacity-100 scale-100'}`}>
+                
+                <div className={`absolute inset-0 modal-backdrop transition-opacity duration-500 ${isLightMode ? 'bg-black/10' : 'bg-black/60'} ${isMinimized ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} />
+
                 <div
-                    className="w-full h-[100dvh] flex flex-col overflow-hidden"
+                    className="w-full h-[100dvh] flex flex-col overflow-hidden relative z-10"
                     style={{ background: isLightMode ? '#f5f7fa' : '#161625', transition: 'background 0.3s ease' }}
                     onClick={e => e.stopPropagation()}
                 >
@@ -446,24 +487,36 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
                             </button>
 
                             {!isCropping && (
-                                <button
-                                    form="add-note-form"
-                                    type="submit"
-                                    disabled={addingNote || !title.trim() || !content.trim()}
-                                    className="bg-emerald-500 hover:bg-emerald-400 text-white text-[13px] font-bold px-6 py-2 rounded-lg disabled:opacity-40 disabled:hover:bg-emerald-500 transition-all flex items-center gap-2 active:scale-[0.97] cursor-pointer shadow-lg shadow-emerald-500/20"
-                                >
-                                    {addingNote ? (
-                                        <>
-                                            <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                            <span>Saving</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Save className="w-3.5 h-3.5" />
-                                            <span>Save Note</span>
-                                        </>
+                                <>
+                                    <button
+                                        form="add-note-form"
+                                        type="submit"
+                                        disabled={addingNote || !title.trim() || !content.trim()}
+                                        className="bg-emerald-500 hover:bg-emerald-400 text-white text-[13px] font-bold px-6 py-2 rounded-lg disabled:opacity-40 disabled:hover:bg-emerald-500 transition-all flex items-center gap-2 active:scale-[0.97] cursor-pointer shadow-lg shadow-emerald-500/20"
+                                    >
+                                        {addingNote ? (
+                                            <>
+                                                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                <span>Saving</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Save className="w-3.5 h-3.5" />
+                                                <span>Save Note</span>
+                                            </>
+                                        )}
+                                    </button>
+
+                                    {onMinimize && (
+                                        <button
+                                            onClick={() => onMinimize(true)}
+                                            className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all border ${isLightMode ? 'bg-white shadow-sm text-slate-500 border-slate-200 hover:bg-slate-50' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.08]'}`}
+                                            title="Minimize Mode"
+                                        >
+                                            <Eye className="w-4 h-4" />
+                                        </button>
                                     )}
-                                </button>
+                                </>
                             )}
                             <button
                                 onClick={() => handleModalClose()}

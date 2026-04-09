@@ -76,36 +76,43 @@ const AppRoutes = () => (
 );
 
 import { Toaster } from 'react-hot-toast';
+import { QuickViewProvider } from './context/QuickViewContext.jsx';
+import QuickViewBar from './components/QuickViewBar.jsx';
+import GlobalQuickViewModal from './components/GlobalQuickViewModal.jsx';
 
 const App = () => (
   <BrowserRouter>
     <AuthProvider>
-      <SubjectProvider>
-        <TestSeriesProvider>
-          <TopicProvider>
-            <AnalyticsProvider>
-              <FileProvider>
-                <Toaster
-                position="top-right"
-                toastOptions={{
-                  duration: 4000,
-                  style: {
-                    background: '#1a1a2e',
-                    color: '#fff',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '12px',
-                    fontSize: '14px',
-                    padding: '12px 16px',
-                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                  },
-                }}
-              />
-              <AppRoutes />
-            </FileProvider>
-          </AnalyticsProvider>
-          </TopicProvider>
-        </TestSeriesProvider>
-      </SubjectProvider>
+      <QuickViewProvider>
+        <SubjectProvider>
+          <TestSeriesProvider>
+            <TopicProvider>
+              <AnalyticsProvider>
+                <FileProvider>
+                  <Toaster
+                  position="top-right"
+                  toastOptions={{
+                    duration: 4000,
+                    style: {
+                      background: '#1a1a2e',
+                      color: '#fff',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '12px',
+                      fontSize: '14px',
+                      padding: '12px 16px',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                    },
+                  }}
+                />
+                <AppRoutes />
+                <GlobalQuickViewModal />
+                <QuickViewBar />
+              </FileProvider>
+            </AnalyticsProvider>
+            </TopicProvider>
+          </TestSeriesProvider>
+        </SubjectProvider>
+      </QuickViewProvider>
     </AuthProvider>
   </BrowserRouter>
 );

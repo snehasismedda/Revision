@@ -2,11 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { filesApi, subjectsApi, aiApi } from '../../api/index.js';
 import { useSubjects } from '../../context/SubjectContext.jsx';
 import toast from 'react-hot-toast';
-import { X, PlusCircle, Wand2, FileText, Image as ImageIcon, Trash2, Save, Scissors, Check, RotateCw, ZoomIn, ZoomOut, Camera, RefreshCcw, FlipHorizontal, ChevronDown, Sparkles, Table, UploadCloud, Loader2, Hash } from 'lucide-react';
+import { X, PlusCircle, Wand2, FileText, Image as ImageIcon, Trash2, Save, Scissors, Check, RotateCw, ZoomIn, ZoomOut, Camera, RefreshCcw, FlipHorizontal, ChevronDown, Sparkles, Table, UploadCloud, Loader2, Hash, Layers } from 'lucide-react';
 import ModalPortal from '../ModalPortal.jsx';
 import ImageCropper from '../common/ImageCropper.jsx';
 
-const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId }) => {
+const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId, isLibrary = false }) => {
     // Top-level workflow
     const [workflowPath, setWorkflowPath] = useState('image'); // 'image' or 'document'
 
@@ -86,6 +86,8 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId }) => {
             name.endsWith('.doc') || name.endsWith('.docx')
         ) {
             detectedType = 'doc';
+        } else if (file.type === 'text/html' || name.endsWith('.html') || name.endsWith('.htm')) {
+            detectedType = 'html';
         }
 
         // Validate workflow vs detected type
@@ -277,7 +279,7 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId }) => {
                 fileType: fileType,
                 fileName: fileName || originalFileName || 'Untitled',
                 subjectId: selectedSubjectId,
-                skipAI: workflowPath === 'document' ? true : (actualSaveType === 'question' ? !analyzeWithAI : true)
+                skipAI: workflowPath === 'document' ? true : !analyzeWithAI
             };
 
             if (workflowPath === 'image' && actualSaveType === 'note') {
@@ -366,6 +368,39 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId }) => {
                     {/* Body */}
                     <form id="add-file-form" onSubmit={handleSaveFile} className="px-7 pb-6 overflow-y-auto custom-scrollbar">
                         <div className="space-y-6">
+                            {/* Subject Selection - Show only in global Library */}
+                            {isLibrary && (
+                                <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
+                                    <label className="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">
+                                        <Layers className="w-3 h-3" /> Target Subject
+                                    </label>
+                                    <div className="relative group">
+                                        <select
+                                            value={selectedSubjectId}
+                                            onChange={(e) => setSelectedSubjectId(e.target.value)}
+                                            className="w-full bg-white/[0.03] border border-white/[0.06] text-white rounded-xl px-4 py-3 text-[13px] focus:outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20 transition-all font-medium appearance-none cursor-pointer"
+                                            style={{
+                                                backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(148, 163, 184, 1)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                                                backgroundRepeat: 'no-repeat',
+                                                backgroundPosition: 'right 1rem center',
+                                                backgroundSize: '1.2em'
+                                            }}
+                                        >
+                                            {!selectedSubjectId && <option value="" disabled>Select Subject</option>}
+                                            {subjects.map(s => (
+                                                <option key={s.id} value={s.id} className="bg-surface-2 text-white">{s.name}</option>
+                                            ))}
+                                        </select>
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500 group-hover:text-primary transition-colors">
+                                            <ChevronDown size={14} />
+                                        </div>
+                                        {subjects.length === 0 && !isLoadingSubjects && (
+                                            <p className="text-[11px] text-rose-500 font-medium mt-1 px-1">No subjects found. Please create a subject first.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* File Name Input - Minimal */}
                             <div className="relative group">
                                 <label className="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 px-1">
@@ -543,7 +578,7 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId }) => {
                                     >
                                         <input
                                             type="file"
-                                            accept=".pdf,.doc,.docx,.xls,.xlsx,.csv"
+                                            accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.html,.htm"
                                             className="absolute inset-0 opacity-0 cursor-pointer z-10"
                                             onChange={(e) => e.target.files?.[0] && handleFileSelection(e.target.files[0])}
                                         />
@@ -551,7 +586,8 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId }) => {
                                             <div className="flex items-center gap-4 w-full p-4 bg-white/[0.02] rounded-xl border border-white/5 relative group/preview">
                                                 <div className={`p-4 rounded-xl shadow-lg ${
                                                     fileType === 'pdf' ? 'bg-red-500/20 text-red-500' :
-                                                    fileType === 'xlsx' ? 'bg-emerald-500/20 text-emerald-500' : 'bg-blue-500/20 text-blue-500'
+                                                    fileType === 'xlsx' ? 'bg-emerald-500/20 text-emerald-400' : 
+                                                    fileType === 'html' ? 'bg-orange-500/20 text-orange-500' : 'bg-blue-500/20 text-blue-500'
                                                 }`}>
                                                     {fileType === 'xlsx' ? <Table size={24} /> : <FileText size={24} />}
                                                 </div>
@@ -573,6 +609,7 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId }) => {
                                                     <span className="text-[10px] font-black text-slate-600 border border-white/5 px-1.5 py-0.5 rounded">PDF</span>
                                                     <span className="text-[10px] font-black text-slate-600 border border-white/5 px-1.5 py-0.5 rounded">DOCX</span>
                                                     <span className="text-[10px] font-black text-slate-600 border border-white/5 px-1.5 py-0.5 rounded">XLSX</span>
+                                                    <span className="text-[10px] font-black text-slate-600 border border-white/5 px-1.5 py-0.5 rounded">HTML</span>
                                                 </div>
                                             </div>
                                         )}
@@ -585,7 +622,7 @@ const AddFileModal = ({ isOpen, onClose, onFileSaved, subjectId }) => {
                     {/* Footer - minimal */}
                     <div className="px-7 py-5 bg-white/[0.01] border-t border-white/[0.04] shrink-0 flex items-center justify-between">
                         <div>
-                            {workflowPath === 'image' && saveType === 'question' && (
+                            {workflowPath === 'image' && (saveType === 'question' || saveType === 'note') && (
                                 <button
                                     type="button"
                                     onClick={() => setAnalyzeWithAI(!analyzeWithAI)}

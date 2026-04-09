@@ -10,6 +10,7 @@ import ModalPortal from '../ModalPortal.jsx';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
+import { useFiles } from '../../context/FileContext.jsx';
 
 const FileViewerModal = ({
     isOpen,
@@ -24,18 +25,21 @@ const FileViewerModal = ({
     onMinimize,
     onDelete
 }) => {
+    const { getFileData } = useFiles();
 
     const [renderType, setRenderType] = useState(null);
     const [excelData, setExcelData] = useState(null);
     const [excelSheets, setExcelSheets] = useState([]);
     const [activeSheet, setActiveSheet] = useState(0);
     const [wordHtml, setWordHtml] = useState('');
+    const [contentUrl, setContentUrl] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [isLightMode, setIsLightMode] = useState(localStorage.getItem('theme') !== 'dark');
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isFileListOpen, setIsFileListOpen] = useState(false);
     const [fileListSearch, setFileListSearch] = useState('');
+    const [imageScale, setImageScale] = useState(1);
     const mountedRef = useRef(true);
     const listRef = useRef(null);
 
@@ -45,20 +49,35 @@ const FileViewerModal = ({
     }, [allFiles, file]);
 
     const processFile = useCallback(async (currentFile) => {
-        if (!currentFile?.data) {
-            if (mountedRef.current) {
-                setError('File data is missing or corrupted.');
-                setLoading(false);
+        if (!currentFile) return;
+
+        let fileToProcess = currentFile;
+        
+        // If data is missing (partial file from list), fetch the full file
+        if (!fileToProcess.data) {
+            try {
+                const fullFile = await getFileData(fileToProcess.subject_id, fileToProcess.id);
+                if (mountedRef.current) {
+                    fileToProcess = fullFile;
+                }
+            } catch (err) {
+                console.error('Error fetching full file:', err);
+                if (mountedRef.current) {
+                    setError('Failed to fetch file content.');
+                    setLoading(false);
+                }
+                return;
             }
-            return;
         }
 
-        const type = currentFile.file_type?.toLowerCase() || 'image';
+        if (mountedRef.current) setContentUrl(fileToProcess.data);
+
+        const type = fileToProcess.file_type?.toLowerCase() || 'image';
         if (mountedRef.current) setRenderType(type);
 
         try {
             if (type === 'xlsx' || type === 'xls' || type === 'csv') {
-                const response = await fetch(currentFile.data);
+                const response = await fetch(fileToProcess.data);
                 if (!response.ok) throw new Error('Failed to fetch file data');
                 const arrayBuffer = await response.arrayBuffer();
                 const workbook = XLSX.read(arrayBuffer, { type: 'array' });
@@ -72,7 +91,7 @@ const FileViewerModal = ({
                     setExcelData(json);
                 }
             } else if (type === 'doc' || type === 'docx') {
-                const response = await fetch(currentFile.data);
+                const response = await fetch(fileToProcess.data);
                 if (!response.ok) throw new Error('Failed to fetch document');
                 const arrayBuffer = await response.arrayBuffer();
                 const result = await mammoth.convertToHtml({ arrayBuffer });
@@ -105,6 +124,8 @@ const FileViewerModal = ({
             setExcelData(null);
             setExcelSheets([]);
             setWordHtml('');
+            setContentUrl(null);
+            setImageScale(1);
             processFile(file);
         }
 
@@ -196,11 +217,13 @@ const FileViewerModal = ({
                                 ${renderType === 'image' ? (isLightMode ? 'bg-indigo-50 text-indigo-500 border-indigo-100' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20') :
                                 renderType === 'pdf' ? (isLightMode ? 'bg-rose-50 text-rose-500 border-rose-100' : 'bg-rose-500/10 text-rose-400 border-rose-500/20') :
                                     renderType === 'xlsx' ? (isLightMode ? 'bg-emerald-50 text-emerald-500 border-emerald-100' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20') :
-                                        (isLightMode ? 'bg-blue-50 text-blue-500 border-blue-100' : 'bg-blue-500/10 text-blue-400 border-blue-500/20')}`}
+                                        renderType === 'html' ? (isLightMode ? 'bg-orange-50 text-orange-500 border-orange-100' : 'bg-orange-500/10 text-orange-400 border-orange-500/20') :
+                                            (isLightMode ? 'bg-blue-50 text-blue-500 border-blue-100' : 'bg-blue-500/10 text-blue-400 border-blue-500/20')}`}
                         >
                             {renderType === 'image' && <ImageIcon size={20} strokeWidth={2.5} />}
                             {renderType === 'pdf' && <FileText size={20} strokeWidth={2.5} />}
                             {renderType === 'xlsx' && <TableIcon size={20} strokeWidth={2.5} />}
+                            {renderType === 'html' && <LinkIcon size={20} strokeWidth={2.5} />}
                             {(renderType === 'doc' || renderType === 'docx') && <FileText size={20} strokeWidth={2.5} />}
                         </div>
                         <div className="min-w-0">
@@ -231,6 +254,20 @@ const FileViewerModal = ({
                                 title="Toggle Outline"
                             >
                                 <PanelLeft size={16} />
+                            </button>
+                        )}
+
+                        {(file?.linked_question_id || file?.linked_note_id) && (
+                            <button
+                                onClick={() => {
+                                    if (onNavigateToLinkedContent) onNavigateToLinkedContent(file);
+                                    if (onMinimize) onMinimize(true);
+                                }}
+                                className={`p-1.5 rounded-lg transition-all flex items-center gap-2 group cursor-pointer border
+                                        ${isLightMode ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border-indigo-100' : 'text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 border-indigo-500/20'}`}
+                                title="View Linked Content"
+                            >
+                                <LinkIcon size={16} strokeWidth={2} />
                             </button>
                         )}
 
@@ -267,10 +304,11 @@ const FileViewerModal = ({
                                                     ? (isLightMode ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-indigo-500/20 text-indigo-400 border-indigo-500/40')
                                                     : (isLightMode ? 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300' : 'bg-white/5 border-white/10 text-slate-400 hover:border-white/20')}`}
                                         >
-                                            <List size={14} />
-                                            <span className="text-[12px] font-bold">List</span>
-                                            <span className={`text-[10px] opacity-60 font-medium ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>{allFiles.length}</span>
-                                            <ChevronDown size={12} strokeWidth={3} className={`transition-transform duration-200 ${isFileListOpen ? 'rotate-180' : ''}`} />
+                                            <List size={14} className="opacity-70" />
+                                            <span className="text-[12px] font-bold whitespace-nowrap">
+                                                {fileIndex + 1} / {allFiles.length}
+                                            </span>
+                                            <ChevronDown size={12} strokeWidth={3} className={`transition-transform duration-200 ${isFileListOpen ? 'rotate-180' : ''} opacity-60`} />
                                         </button>
 
                                         {/* Files Dropdown - ViewNoteModal Style */}
@@ -362,7 +400,7 @@ const FileViewerModal = ({
                                                         >
                                                             <ChevronLeft size={13} strokeWidth={2.5} /> Prev
                                                         </button>
-                                                        <span className={`text-[10px] font-bold tabular-nums ${isLightMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                                                        <span className={`text-[10px] font-bold tabular-nums ${isLightMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                                             {fileIndex + 1} / {allFiles.length}
                                                         </span>
                                                         <button
@@ -390,19 +428,6 @@ const FileViewerModal = ({
                                     <ChevronRight size={16} strokeWidth={2.5} />
                                 </button>
                             </div>
-                        )}
-                        {(file?.linked_question_id || file?.linked_note_id) && (
-                            <button
-                                onClick={() => {
-                                    if (onNavigateToLinkedContent) onNavigateToLinkedContent(file);
-                                    if (onMinimize) onMinimize(true);
-                                }}
-                                className={`p-1.5 rounded-lg transition-all flex items-center gap-2 group cursor-pointer border mr-2
-                                        ${isLightMode ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border-indigo-100' : 'text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 border-indigo-500/20'}`}
-                                title="View Linked Content"
-                            >
-                                <LinkIcon size={16} strokeWidth={2} />
-                            </button>
                         )}
                         
 
@@ -433,12 +458,22 @@ const FileViewerModal = ({
                 <div className={`flex-1 relative flex items-center justify-center overflow-hidden transition-colors
                         ${isLightMode ? 'bg-[#f1f3f5]' : 'bg-[#0a0a0f]'}`}>
                     {loading ? (
-                        <div className="flex flex-col items-center gap-5">
-                            <div className="relative">
-                                <div className="absolute inset-0 bg-primary/20 blur-2xl animate-pulse rounded-full" />
-                                <Loader2 size={48} className="text-primary animate-spin relative z-10" strokeWidth={2.5} />
+                        <div className="flex flex-col items-center gap-8">
+                            <div className="relative w-20 h-20">
+                                {/* Orbital Ring */}
+                                <div className="absolute inset-0 border-2 border-primary/5 rounded-full" />
+                                <div className="absolute inset-0 border-t-2 border-primary rounded-full animate-[orbital-spin_0.8s_linear_infinite]" />
+                                
+                                {/* Inner Pulsing Core */}
+                                <div className="absolute inset-4 bg-primary/20 rounded-xl blur-md animate-[pulse-inner_2s_ease-in-out_infinite]" />
+                                <div className="absolute inset-5 bg-primary/40 rounded-lg flex items-center justify-center">
+                                    <div className="w-2 h-2 bg-primary rounded-full" />
+                                </div>
                             </div>
-                            <span className="text-slate-400 font-black uppercase tracking-[0.3em] text-[12px] animate-pulse">Initializing Viewer</span>
+                            <div className="flex flex-col items-center gap-1.5 translate-y-2">
+                                <span className="text-primary font-black uppercase tracking-[0.4em] text-[11px] animate-pulse">Initializing</span>
+                                <div className="h-[1px] w-8 bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+                            </div>
                         </div>
                     ) : error ? (
                         <div className="text-center p-12 max-w-sm glass-card border-rose-500/20 bg-rose-500/[0.02]">
@@ -460,6 +495,9 @@ const FileViewerModal = ({
                                         minScale={0.5}
                                         maxScale={6}
                                         centerOnInit
+                                        onTransformed={(ref) => {
+                                            if (mountedRef.current) setImageScale(ref.state.scale);
+                                        }}
                                     >
                                         {({ zoomIn, zoomOut, resetTransform, state }) => (
                                             <div className="relative w-full h-full flex flex-col">
@@ -468,20 +506,16 @@ const FileViewerModal = ({
                                                         ${isLightMode ? 'bg-white/90 border-slate-200' : 'bg-[#1a1a24]/90 border-white/10'}`}>
                                                     <div className={`px-4 py-1.5 flex items-center justify-center min-w-[4.5rem] text-[13px] font-medium
                                                             ${isLightMode ? 'text-slate-600' : 'text-slate-300'}`}>
-                                                        {Math.round(state.scale * 100)}%
+                                                        {Math.round(imageScale * 100)}%
                                                     </div>
                                                     <div className={`w-px h-5 ${isLightMode ? 'bg-slate-200' : 'bg-white/10'} mx-0.5`} />
                                                     <button onClick={() => zoomOut()} className={`p-2 rounded-xl transition-all cursor-pointer ${isLightMode ? 'hover:bg-slate-100 text-slate-600' : 'hover:bg-white/10 text-slate-300'}`} title="Zoom Out"><ZoomOut size={18} strokeWidth={2} /></button>
                                                     <button onClick={() => zoomIn()} className={`p-2 rounded-xl transition-all cursor-pointer ${isLightMode ? 'hover:bg-slate-100 text-slate-600' : 'hover:bg-white/10 text-slate-300'}`} title="Zoom In"><ZoomIn size={18} strokeWidth={2} /></button>
                                                     <button onClick={() => resetTransform()} className={`p-2 rounded-xl transition-all cursor-pointer ${isLightMode ? 'hover:bg-slate-100 text-slate-600' : 'hover:bg-white/10 text-slate-300'}`} title="Reset Zoom"><RefreshCw size={18} strokeWidth={2} /></button>
-                                                    <div className={`w-px h-5 ${isLightMode ? 'bg-slate-200' : 'bg-white/10'} mx-0.5`} />
-                                                    <button onClick={handleDownload} className={`p-2 rounded-xl transition-all cursor-pointer ${isLightMode ? 'hover:bg-indigo-50 text-indigo-600' : 'hover:bg-indigo-500/20 text-indigo-400'}`} title="Download">
-                                                        <Download size={18} strokeWidth={2} />
-                                                    </button>
                                                 </div>
                                                 <TransformComponent wrapperClass="!w-full !h-full" contentClass="!w-full !h-full flex items-center justify-center">
                                                     <img
-                                                        src={file.data}
+                                                        src={contentUrl}
                                                         className="max-w-[95vw] max-h-[90vh] object-contain rounded-md"
                                                         alt={file.file_name || 'Preview'}
                                                     />
@@ -491,12 +525,12 @@ const FileViewerModal = ({
                                     </TransformWrapper>
                                 )}
 
-                                {renderType === 'pdf' && (
+                                {(renderType === 'pdf' || renderType === 'html') && contentUrl && (
                                     <div className={`w-full h-full flex items-center justify-center p-0`}>
                                         <iframe
-                                            src={`${file.data}#view=FitH&toolbar=1`}
+                                            src={renderType === 'pdf' ? `${contentUrl}#view=FitH&toolbar=1` : contentUrl}
                                             className="w-full h-full border-0 rounded-none shadow-2xl"
-                                            title={file.file_name || 'PDF Preview'}
+                                            title={file.file_name || `${renderType.toUpperCase()} Preview`}
                                         />
                                     </div>
                                 )}
@@ -661,6 +695,15 @@ const FileViewerModal = ({
                         }
                         .animate-in.slide-in-from-top-2 {
                             animation: slide-in-top 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+                        }
+
+                        @keyframes orbital-spin {
+                            from { transform: rotate(0deg); }
+                            to { transform: rotate(360deg); }
+                        }
+                        @keyframes pulse-inner {
+                            0%, 100% { transform: scale(0.9); opacity: 0.3; }
+                            50% { transform: scale(1.1); opacity: 0.7; }
                         }
                     `}} />
             </div>

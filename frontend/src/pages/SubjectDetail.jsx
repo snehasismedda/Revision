@@ -5,6 +5,7 @@ import { sessionsApi, questionsApi, notesApi, filesApi, aiApi, revisionApi, solu
 import { useTopics } from '../context/TopicContext.jsx';
 import { useSubjects } from '../context/SubjectContext.jsx';
 import { useFiles } from '../context/FileContext.jsx';
+import { useQuickView } from '../context/QuickViewContext.jsx';
 import TopicTree from '../components/TopicTree.jsx';
 import SessionCard from '../components/SessionCard.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
@@ -167,7 +168,8 @@ const SubjectDetail = () => {
     const [confirmDeleteRevisionSession, setConfirmDeleteRevisionSession] = useState({ open: false, sessionId: null });
 
 
-    const { getFileData } = useFiles();
+    const { getFileData, clearFileCacheMany } = useFiles();
+    const { openItem, minimize: globalMinimize } = useQuickView();
 
     // Toggle state for grouped questions
     const [expandedGroups, setExpandedGroups] = useState({});
@@ -191,20 +193,9 @@ const SubjectDetail = () => {
         }
     }, [viewingFile, files]);
 
-    const handleFileClick = useCallback(async (file) => {
-        try {
-            if (!file.data) {
-                const toastId = toast.loading('Fetching file data...');
-                const fullFile = await getFileData(file.subject_id || id, file.id);
-                toast.dismiss(toastId);
-                setViewingFile(fullFile);
-            } else {
-                setViewingFile(file);
-            }
-        } catch (err) {
-            console.error('Failed to open file:', err);
-        }
-    }, [id, getFileData]);
+    const handleFileClick = useCallback((file) => {
+        setViewingFile(file);
+    }, []);
 
     const handleNextFile = useCallback(async () => {
         if (!hasMoreFiles && fileIndex >= files.length - 1) return;
@@ -516,12 +507,37 @@ const SubjectDetail = () => {
 
         const loadingToast = toast.loading(`Deleting ${itemsToDelete.length} ${isNotes ? 'note(s)' : 'question(s)'}...`);
         try {
-            await Promise.all(itemsToDelete.map(itemId => api.delete(id, itemId)));
+            const results = await Promise.all(itemsToDelete.map(itemId => api.delete(id, itemId)));
+
+            // Collect all cascade-deleted IDs across all results
+            const allDeletedImageIds = [];
+            const allDeletedNoteIds = [];
+            const allDeletedSolutionIds = [];
+            results.forEach(res => {
+                const cascade = res?.cascade || {};
+                if (cascade.deletedImageIds) allDeletedImageIds.push(...cascade.deletedImageIds);
+                if (cascade.deletedNoteIds) allDeletedNoteIds.push(...cascade.deletedNoteIds);
+                if (cascade.deletedSolutionIds) allDeletedSolutionIds.push(...cascade.deletedSolutionIds);
+            });
 
             if (isNotes) {
                 setNotes(prev => prev.filter(n => !selectedItems.has(n.id)));
             } else {
                 setQuestions(prev => prev.filter(q => !selectedItems.has(q.id)));
+                // For question deletions, also remove cascade-deleted notes/solutions
+                if (allDeletedNoteIds.length > 0) {
+                    setNotes(prev => prev.filter(n => !allDeletedNoteIds.includes(n.id)));
+                }
+                if (allDeletedSolutionIds.length > 0) {
+                    setSolutions(prev => prev.filter(s => !allDeletedSolutionIds.includes(s.id)));
+                }
+            }
+
+            // Remove all cascade-deleted files from the gallery and cache
+            const uniqueImageIds = [...new Set(allDeletedImageIds)];
+            if (uniqueImageIds.length > 0) {
+                setFiles(prev => prev.filter(f => !uniqueImageIds.includes(f.id)));
+                clearFileCacheMany(uniqueImageIds);
             }
 
             setSelectedItems(new Set());
@@ -1266,33 +1282,37 @@ const SubjectDetail = () => {
                 const zip = new JSZip();
                 const usedNames = new Map();
 
-                selectedItems.forEach(id => {
-                    const f = files.find(file => file.id === id);
-                    if (f && f.data) {
-                        let baseName = f.file_name || 'file';
-                        let ext = '';
-                        const lastDot = baseName.lastIndexOf('.');
-                        if (lastDot !== -1) {
-                            ext = baseName.substring(lastDot);
-                            baseName = baseName.substring(0, lastDot);
-                        } else {
-                            const typeMap = { 'image': '.jpg', 'pdf': '.pdf', 'doc': '.docx', 'xlsx': '.xlsx' };
-                            ext = typeMap[f.file_type] || '';
-                        }
+                for (const fileId of selectedItems) {
+                    try {
+                        const f = await getFileData(id, fileId);
+                        if (f && f.data) {
+                            let baseName = f.file_name || 'file';
+                            let ext = '';
+                            const lastDot = baseName.lastIndexOf('.');
+                            if (lastDot !== -1) {
+                                ext = baseName.substring(lastDot);
+                                baseName = baseName.substring(0, lastDot);
+                            } else {
+                                const typeMap = { 'image': '.jpg', 'pdf': '.pdf', 'doc': '.docx', 'xlsx': '.xlsx', 'html': '.html', 'csv': '.csv' };
+                                ext = typeMap[f.file_type] || '';
+                            }
 
-                        let finalName = `${baseName}${ext}`;
-                        if (usedNames.has(finalName)) {
-                            const count = usedNames.get(finalName) + 1;
-                            usedNames.set(finalName, count);
-                            finalName = `${baseName}_${count}${ext}`;
-                        } else {
-                            usedNames.set(finalName, 1);
-                        }
+                            let finalName = `${baseName}${ext}`;
+                            if (usedNames.has(finalName)) {
+                                const count = usedNames.get(finalName) + 1;
+                                usedNames.set(finalName, count);
+                                finalName = `${baseName}_${count}${ext}`;
+                            } else {
+                                usedNames.set(finalName, 1);
+                            }
 
-                        const base64Content = f.data.split(',')[1];
-                        zip.file(finalName, base64Content, { base64: true });
+                            const base64Content = f.data.includes(',') ? f.data.split(',')[1] : f.data;
+                            zip.file(finalName, base64Content, { base64: true });
+                        }
+                    } catch (err) {
+                        console.error(`Failed to include file ${fileId} in zip:`, err);
                     }
-                });
+                }
 
                 const content = await zip.generateAsync({ type: 'blob' });
                 const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
@@ -2164,8 +2184,28 @@ const SubjectDetail = () => {
         if (!questionId) return;
         const loadingToast = toast.loading('Deleting question...');
         try {
-            await questionsApi.delete(id, questionId);
+            const res = await questionsApi.delete(id, questionId);
+            const cascade = res?.cascade || {};
+            const deletedImageIds = cascade.deletedImageIds || [];
+            const deletedNoteIds = cascade.deletedNoteIds || [];
+            const deletedSolutionIds = cascade.deletedSolutionIds || [];
+
             setQuestions((prev) => prev.filter((q) => q.id !== questionId));
+
+            // Remove cascade-deleted notes and solutions from state
+            if (deletedNoteIds.length > 0) {
+                setNotes(prev => prev.filter(n => !deletedNoteIds.includes(n.id)));
+            }
+            if (deletedSolutionIds.length > 0) {
+                setSolutions(prev => prev.filter(s => !deletedSolutionIds.includes(s.id)));
+            }
+
+            // Remove cascade-deleted files from gallery state and file cache
+            if (deletedImageIds.length > 0) {
+                setFiles(prev => prev.filter(f => !deletedImageIds.includes(f.id)));
+                clearFileCacheMany(deletedImageIds);
+            }
+
             toast.success('Question deleted', { id: loadingToast });
             updateLocalStats(id, 'availableQuestions', -1);
             refreshStats([id]);
@@ -2185,12 +2225,22 @@ const SubjectDetail = () => {
 
         const loadingToast = toast.loading(`Deleting ${typeLabel}...`);
         try {
-            await api.delete(id, item.id);
+            const res = await api.delete(id, item.id);
+            const cascade = res?.cascade || {};
+            const deletedImageIds = cascade.deletedImageIds || [];
+
             if (isSolution) {
                 setSolutions((prev) => prev.filter((s) => s.id !== item.id));
             } else {
                 setNotes((prev) => prev.filter((n) => n.id !== item.id));
             }
+
+            // Remove cascade-deleted images from gallery state and file cache
+            if (deletedImageIds.length > 0) {
+                setFiles(prev => prev.filter(f => !deletedImageIds.includes(f.id)));
+                clearFileCacheMany(deletedImageIds);
+            }
+
             toast.success(`${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} deleted`, { id: loadingToast });
             updateLocalStats(id, isSolution ? 'totalSolutions' : 'totalNotes', -1);
         } catch {
@@ -2524,6 +2574,41 @@ const SubjectDetail = () => {
                         } else {
                             setViewingNote(null);
                         }
+                    }}
+                    onMinimize={() => {
+                        globalMinimize({
+                            type: 'note',
+                            id: viewingNote.id,
+                            data: viewingNote,
+                            title: viewingNote.title,
+                            typeLabel: 'Note',
+                            props: {
+                                onNavigateToQuestion: navigateToQuestion,
+                                sourceImage: viewingNote ? fetchedImages[`note-${viewingNote.id}`] : null,
+                                isFetchingImage: fetchingImageId === (viewingNote ? `note-${viewingNote.id}` : null),
+                                onEdit: setEditingNote,
+                                onPrev: viewingNote?.id?.toString().startsWith('img-') ? handlePrevFile : handlePrevNote,
+                                onNext: viewingNote?.id?.toString().startsWith('img-') ? handleNextFile : handleNextNote,
+                                onAddToNote: (selectedText) => {
+                                    setAddToNoteData({
+                                        selectedText,
+                                        parentNoteId: viewingNote?.id || null,
+                                    });
+                                },
+                                parentNoteTitle: noteStack.length > 0 ? noteStack[noteStack.length - 1]?.title : null,
+                                childNotes: viewingNote ? notes.filter(n => n.parent_note_id === viewingNote.id) : [],
+                                onOpenChildNote: (childNote) => {
+                                    handleOpenNote(childNote, true);
+                                },
+                                onUpdateNoteContent: async (noteId, newContent) => {
+                                    try {
+                                        const existingNote = notes.find(n => n.id === noteId) || viewingNote;
+                                        await notesApi.update(id, noteId, { title: existingNote?.title || '', content: newContent });
+                                    } catch (err) { console.error(err); }
+                                }
+                            }
+                        });
+                        setViewingNote(null);
                     }}
                     note={viewingNote}
                     subjectId={id}
@@ -4516,33 +4601,37 @@ const SubjectDetail = () => {
                                                     const zip = new JSZip();
                                                     const usedNames = new Map();
 
-                                                    selectedItems.forEach(id => {
-                                                        const f = files.find(file => file.id === id);
-                                                        if (f && f.data) {
-                                                            let baseName = f.file_name || 'file';
-                                                            let ext = '';
-                                                            const lastDot = baseName.lastIndexOf('.');
-                                                            if (lastDot !== -1) {
-                                                                ext = baseName.substring(lastDot);
-                                                                baseName = baseName.substring(0, lastDot);
-                                                            } else {
-                                                                const typeMap = { 'image': '.jpg', 'pdf': '.pdf', 'doc': '.docx', 'xlsx': '.xlsx' };
-                                                                ext = typeMap[f.file_type] || '';
-                                                            }
+                                                    for (const fileId of selectedItems) {
+                                                        try {
+                                                            const f = await getFileData(id, fileId);
+                                                            if (f && f.data) {
+                                                                let baseName = f.file_name || 'file';
+                                                                let ext = '';
+                                                                const lastDot = baseName.lastIndexOf('.');
+                                                                if (lastDot !== -1) {
+                                                                    ext = baseName.substring(lastDot);
+                                                                    baseName = baseName.substring(0, lastDot);
+                                                                } else {
+                                                                    const typeMap = { 'image': '.jpg', 'pdf': '.pdf', 'doc': '.docx', 'xlsx': '.xlsx', 'html': '.html', 'csv': '.csv' };
+                                                                    ext = typeMap[f.file_type] || '';
+                                                                }
 
-                                                            let finalName = `${baseName}${ext}`;
-                                                            if (usedNames.has(finalName)) {
-                                                                const count = usedNames.get(finalName) + 1;
-                                                                usedNames.set(finalName, count);
-                                                                finalName = `${baseName}_${count}${ext}`;
-                                                            } else {
-                                                                usedNames.set(finalName, 1);
-                                                            }
+                                                                let finalName = `${baseName}${ext}`;
+                                                                if (usedNames.has(finalName)) {
+                                                                    const count = usedNames.get(finalName) + 1;
+                                                                    usedNames.set(finalName, count);
+                                                                    finalName = `${baseName}_${count}${ext}`;
+                                                                } else {
+                                                                    usedNames.set(finalName, 1);
+                                                                }
 
-                                                            const base64Content = f.data.split(',')[1];
-                                                            zip.file(finalName, base64Content, { base64: true });
+                                                                const base64Content = f.data.includes(',') ? f.data.split(',')[1] : f.data;
+                                                                zip.file(finalName, base64Content, { base64: true });
+                                                            }
+                                                        } catch (err) {
+                                                            console.error(`Failed to include file ${fileId} in zip:`, err);
                                                         }
-                                                    });
+                                                    }
 
                                                     const content = await zip.generateAsync({ type: 'blob' });
                                                     const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
@@ -4685,7 +4774,7 @@ const SubjectDetail = () => {
                                                             ref={isGlobalLast ? lastFileElementRef : null}
                                                             className={`group relative aspect-square rounded-xl bg-surface-2 transition-all duration-300 cursor-pointer shadow-lg active:scale-[0.98] fade-in border ${isSelectionMode
                                                                 ? (selectedItems.has(file.id) ? 'border-indigo-500 ring-2 ring-indigo-500/50 bg-indigo-500/10 scale-95 opacity-90' : 'border-white/[0.04] scale-100 opacity-100')
-                                                                : (activeFileDropdown === file.id ? 'border-primary/40 shadow-xl' : 'border-white/[0.04] hover:border-primary/40 hover:shadow-primary/5')
+                                                                : (activeFileDropdown === file.id ? 'border-primary/40 shadow-xl z-[40]' : 'border-white/[0.04] hover:border-primary/40 hover:shadow-primary/5')
                                                                 }`}
                                                             onClick={() => {
                                                                 if (isSelectionMode) {
@@ -4708,7 +4797,7 @@ const SubjectDetail = () => {
                                                                         className="w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
                                                                         loading="lazy"
                                                                     />
-                                                                ) : file.data ? (
+                                                                ) : (file.data && (file.file_type === 'image' || !file.file_type)) ? (
                                                                     <img
                                                                         src={file.data}
                                                                         alt={file.file_name}
@@ -4721,6 +4810,7 @@ const SubjectDetail = () => {
                                                                             {file.file_type === 'pdf' ? <FileText className="w-7 h-7 text-rose-400" /> :
                                                                              file.file_type === 'xlsx' ? <Layers className="w-7 h-7 text-emerald-400" /> :
                                                                              file.file_type === 'doc' ? <FileText className="w-7 h-7 text-blue-400" /> :
+                                                                             file.file_type === 'html' ? <FileText className="w-7 h-7 text-orange-400" /> :
                                                                              <ImageIcon className="w-7 h-7 text-indigo-400" />}
                                                                         </div>
                                                                         <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">{file.file_type || 'Image'}</span>
@@ -4894,6 +4984,7 @@ const SubjectDetail = () => {
                         }
                         const deletedIds = new Set(confirmDeleteFile.items.map(f => f.id));
                         setFiles(prev => prev.filter(f => !deletedIds.has(f.id)));
+                        clearFileCacheMany([...deletedIds]);
                         setSelectedItems(prev => {
                             const next = new Set(prev);
                             deletedIds.forEach(id => next.delete(id));
@@ -4937,22 +5028,31 @@ const SubjectDetail = () => {
 
             {viewingFile && (
                 <FileViewerModal
-                    key={viewingFile.id}
-                    isOpen={true}
-                    onClose={() => {
+                    isOpen={!!viewingFile}
+                    onClose={() => setViewingFile(null)}
+                    onMinimize={() => {
+                        globalMinimize({
+                            type: 'file',
+                            id: viewingFile.id,
+                            data: viewingFile,
+                            title: viewingFile.file_name || 'Untitled File',
+                            typeLabel: viewingFile.file_type?.toUpperCase() || 'FILE',
+                            props: {
+                                onNext: handleNextFile,
+                                onPrev: handlePrevFile
+                            }
+                        });
                         setViewingFile(null);
-                        setIsFileViewerMinimized(false);
                     }}
                     file={viewingFile}
                     allFiles={files}
                     onPrev={handlePrevFile}
                     onNext={handleNextFile}
                     onSelect={handleFileClick}
-                    isMinimized={isFileViewerMinimized}
-                    onMinimize={setIsFileViewerMinimized}
                     onDelete={async (deletedFile) => {
                         await filesApi.delete(deletedFile.subject_id, deletedFile.id);
                         setFiles(prev => (prev || []).filter(f => f.id !== deletedFile.id));
+                        clearFileCacheMany([deletedFile.id]);
                         setViewingFile(null);
                         setIsFileViewerMinimized(false);
                         toast.success("File deleted successfully");
