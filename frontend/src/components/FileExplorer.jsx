@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { Target, ArrowLeft, Plus, Calendar, Search, LayoutGrid, List, FileText, Image as ImageIcon, MoreVertical, Download, CheckCircle, Pencil, Layers, Save, Trash, X, Table, Folder, FolderPlus, MoreHorizontal, File } from 'lucide-react';
+import { Target, ArrowLeft, Plus, Calendar, Search, LayoutGrid, List, FileText, Image as ImageIcon, MoreVertical, Download, CheckCircle, Pencil, Layers, Save, Trash, X, Table, Folder, FolderPlus, MoreHorizontal, File, Lock } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog.jsx';
 import toast from 'react-hot-toast';
 import JSZip from 'jszip';
@@ -98,6 +98,16 @@ const FileExplorer = ({
             // Filter by Current Folder
             fList = fList.filter(f => (f.folder_id || null) === currentFolderId);
             dList = dList.filter(d => (d.parent_id || null) === currentFolderId && !d.is_deleted);
+        }
+
+        // IMPORTANT: Always filter by scope to avoid cumulative folders from context showing up
+        const sId = String(scopeId);
+        if (scopeType === 'subject') {
+            dList = dList.filter(d => String(d.subject_id) === sId);
+            fList = fList.filter(f => String(f.subject_id) === sId);
+        } else {
+            dList = dList.filter(d => String(d.test_series_id) === sId);
+            fList = fList.filter(f => String(f.test_series_id) === sId);
         }
 
         let combined = [...dList, ...fList];
@@ -571,7 +581,15 @@ const FileExplorer = ({
                                 isSelectionMode={isSelectionMode}
                                 activeDropdown={activeDropdown}
                                 onToggleSelect={(e) => toggleSelection(e, item.id)}
-                                onClick={() => item._isFolder ? handleNavigate(item.id) : !isSelectionMode && onFileClick(item)}
+                                onClick={(e) => {
+                                    if (isSelectionMode && !item._isFolder) {
+                                        toggleSelection(e, item.id);
+                                    } else if (item._isFolder) {
+                                        handleNavigate(item.id);
+                                    } else {
+                                        onFileClick(item);
+                                    }
+                                }}
                                 onMenuClick={(e) => { e.stopPropagation(); setActiveDropdown(activeDropdown?.id === item.id ? null : { id: item.id, type: item._isFolder ? 'folder' : 'file', item }); }}
                                 onAction={(action) => handleAction(action, item)}
                                 onDrop={(fileId) => handleDragDrop(fileId, item.id)}
@@ -599,7 +617,15 @@ const FileExplorer = ({
                                         isSelectionMode={isSelectionMode}
                                         activeDropdown={activeDropdown}
                                         onToggleSelect={(e) => toggleSelection(e, item.id)}
-                                        onClick={() => item._isFolder ? handleNavigate(item.id) : !isSelectionMode && onFileClick(item)}
+                                        onClick={(e) => {
+                                            if (isSelectionMode && !item._isFolder) {
+                                                toggleSelection(e, item.id);
+                                            } else if (item._isFolder) {
+                                                handleNavigate(item.id);
+                                            } else {
+                                                onFileClick(item);
+                                            }
+                                        }}
                                         onMenuClick={(e) => { e.stopPropagation(); setActiveDropdown(activeDropdown?.id === item.id ? null : { id: item.id, type: item._isFolder ? 'folder' : 'file', item }); }}
                                         onAction={(action) => handleAction(action, item)}
                                         onDrop={(fileId) => handleDragDrop(fileId, item.id)}
@@ -737,7 +763,14 @@ const ItemCard = ({ item, isSelected, isSelectionMode, activeDropdown, onToggleS
             {/* Content Preview */}
             <div className="flex-1 overflow-hidden rounded-t-xl relative flex items-center justify-center p-4">
                 {isFolder ? (
-                    <Folder className="w-16 h-16 text-indigo-400/80 group-hover:scale-105 transition-transform duration-300" strokeWidth={1} style={{ fill: 'currentColor' }} />
+                    <div className="relative">
+                        <Folder className="w-16 h-16 text-indigo-400/80 group-hover:scale-105 transition-transform duration-300" strokeWidth={1} style={{ fill: 'currentColor' }} />
+                        {item.is_system && (
+                            <div className="absolute -bottom-1 -right-1 bg-[#1c1c1f] p-1 rounded-full border border-white/10 text-indigo-400 shadow-xl">
+                                <Lock className="w-3.5 h-3.5" />
+                            </div>
+                        )}
+                    </div>
                 ) : item.thumbnail ? (
                     <img src={item.thumbnail} alt={item.file_name} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy" draggable={false} />
                 ) : item.file_type === 'image' ? (
@@ -763,7 +796,12 @@ const ItemCard = ({ item, isSelected, isSelectionMode, activeDropdown, onToggleS
                             <MoreHorizontal className="w-4 h-4" />
                         </button>
                         {activeDropdown?.id === item.id && (
-                            <ContextMenu type={isFolder ? 'folder' : 'file'} item={item} onAction={onAction} />
+                            <ContextMenu 
+                                type={isFolder ? 'folder' : 'file'} 
+                                item={item} 
+                                onAction={onAction} 
+                                isParentSystem={!isFolder && folders.find(f => f.id === item.folder_id)?.is_system}
+                            />
                         )}
                     </div>
                 )}
@@ -801,10 +839,18 @@ const ItemRow = ({ item, isSelected, isSelectionMode, activeDropdown, onToggleSe
                         {isSelected && <CheckCircle className="w-3 h-3 text-white" />}
                     </div>
                 ) : (
-                    isFolder ? <Folder className="w-4 h-4 text-indigo-400" style={{ fill: 'currentColor', fillOpacity: 0.2 }} /> :
-                        item.file_type === 'pdf' ? <FileText className="w-4 h-4 text-rose-400" /> :
-                            item.file_type === 'image' ? <ImageIcon className="w-4 h-4 text-amber-400" /> :
-                                <File className="w-4 h-4 text-blue-400" />
+                    <div className="relative inline-block">
+                        {isFolder ? <Folder className="w-4 h-4 text-indigo-400" style={{ fill: 'currentColor', fillOpacity: 0.2 }} /> :
+                            item.file_type === 'pdf' ? <FileText className="w-4 h-4 text-rose-400" /> :
+                                item.file_type === 'image' ? <ImageIcon className="w-4 h-4 text-amber-400" /> :
+                                    <File className="w-4 h-4 text-blue-400" />
+                        }
+                        {item.is_system && (
+                            <div className="absolute -bottom-1.5 -right-1.5 bg-[#0f0f13] rounded-full p-0.5 border border-white/10">
+                                <Lock className="w-2 h-2 text-indigo-400" />
+                            </div>
+                        )}
+                    </div>
                 )}
             </td>
             <td className="px-4 py-3 min-w-[200px]">
@@ -826,7 +872,13 @@ const ItemRow = ({ item, isSelected, isSelectionMode, activeDropdown, onToggleSe
                         </button>
                         {activeDropdown?.id === item.id && (
                             <div className="absolute right-8 top-1/2 -translate-y-1/2 z-50">
-                                <ContextMenu type={isFolder ? 'folder' : 'file'} item={item} onAction={onAction} alignRight />
+                                <ContextMenu 
+                                    type={isFolder ? 'folder' : 'file'} 
+                                    item={item} 
+                                    onAction={onAction} 
+                                    alignRight 
+                                    isParentSystem={!isFolder && folders.find(f => f.id === item.folder_id)?.is_system}
+                                />
                             </div>
                         )}
                     </>
@@ -836,7 +888,9 @@ const ItemRow = ({ item, isSelected, isSelectionMode, activeDropdown, onToggleSe
     );
 }
 
-const ContextMenu = ({ type, item, onAction, alignRight }) => {
+const ContextMenu = ({ type, item, onAction, alignRight, isParentSystem }) => {
+    const isProtected = item.is_system || isParentSystem;
+
     return (
         <div className={`absolute ${alignRight ? 'right-0 top-full mt-1' : 'right-0 top-full mt-2'} w-40 bg-[#1e1e24] border border-white/10 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.8)] py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100`} onClick={(e) => e.stopPropagation()}>
             {!item._isFolder && (
@@ -844,16 +898,20 @@ const ContextMenu = ({ type, item, onAction, alignRight }) => {
                     <CheckCircle className="w-3.5 h-3.5 text-indigo-400" /> Select
                 </button>
             )}
-            <button onClick={() => onAction('rename')} className="w-full text-left px-3.5 py-2 text-[12px] text-slate-300 hover:bg-white/10 hover:text-white flex items-center gap-2">
-                <Pencil className="w-3.5 h-3.5 text-emerald-400" /> Rename
-            </button>
+            {!isProtected && (
+                <button onClick={() => onAction('rename')} className="w-full text-left px-3.5 py-2 text-[12px] text-slate-300 hover:bg-white/10 hover:text-white flex items-center gap-2">
+                    <Pencil className="w-3.5 h-3.5 text-emerald-400" /> Rename
+                </button>
+            )}
             <button onClick={() => onAction('download')} className="w-full text-left px-3.5 py-2 text-[12px] text-slate-300 hover:bg-white/10 hover:text-white flex items-center gap-2">
                 <Download className="w-3.5 h-3.5 text-indigo-400" /> Download
             </button>
-            <div className="h-px bg-white/10 my-1.5 mx-2" />
-            <button onClick={() => onAction('delete')} className="w-full text-left px-3.5 py-2 text-[12px] text-rose-400 hover:bg-rose-500/10 flex items-center gap-2">
-                <Trash className="w-3.5 h-3.5" /> Delete
-            </button>
+            {!isProtected && <div className="h-px bg-white/10 my-1.5 mx-2" />}
+            {!isProtected && (
+                <button onClick={() => onAction('delete')} className="w-full text-left px-3.5 py-2 text-[12px] text-rose-400 hover:bg-rose-500/10 flex items-center gap-2">
+                    <Trash className="w-3.5 h-3.5" /> Delete
+                </button>
+            )}
         </div>
     );
 };

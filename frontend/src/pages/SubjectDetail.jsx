@@ -6,6 +6,7 @@ import { useTopics } from '../context/TopicContext.jsx';
 import { useSubjects } from '../context/SubjectContext.jsx';
 import { useFiles } from '../context/FileContext.jsx';
 import { useQuickView } from '../context/QuickViewContext.jsx';
+import { useFolders } from '../context/FolderContext.jsx';
 import TopicTree from '../components/TopicTree.jsx';
 import SessionCard from '../components/SessionCard.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
@@ -18,7 +19,7 @@ import autoTable from 'jspdf-autotable';
 import { marked } from 'marked';
 import { saveAs } from 'file-saver';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, ImageRun, Table, TableRow, TableCell, WidthType, AlignmentType } from 'docx';
-import { ArrowLeft, PlusCircle, BarChart3, Wand2, BookOpen, Activity, ListChecks, FileText, Image as ImageIcon, Layers, Trash2, ChevronDown, Pencil, Hash, Search, X, Link2 as LinkIcon, Maximize2, Minimize2, LayoutGrid, List, CheckCircle, Download, ClipboardList, RotateCcw, Clock, RefreshCw, Notebook, MoreHorizontal, MoreVertical, History, Loader2 } from 'lucide-react';
+import { ArrowLeft, PlusCircle, BarChart3, Wand2, BookOpen, Activity, Puzzle, FileText, Image as ImageIcon, Layers, Trash2, ChevronDown, Pencil, Hash, Search, X, Link2 as LinkIcon, Maximize2, Minimize2, LayoutGrid, List, CheckCircle, Download, ClipboardList, RotateCcw, Clock, RefreshCw, Notebook, MoreHorizontal, MoreVertical, History, Loader2, Lightbulb, LibraryBig } from 'lucide-react';
 import FileExplorer from '../components/FileExplorer.jsx';
 import { foldersApi } from '../api/index.js';
 
@@ -97,9 +98,15 @@ const SubjectDetail = () => {
     const [questions, setQuestions] = useState([]);
     const [notes, setNotes] = useState([]);
     const [files, setFiles] = useState([]);
-    const [folders, setFolders] = useState([]);
     const [solutions, setSolutions] = useState([]);
     const [uploadFolderId, setUploadFolderId] = useState(null);
+    const [currentFolderId, setCurrentFolderId] = useState(null);
+    const {
+        folders,
+        fetchFolderContents,
+        setFolders,
+    } = useFolders();
+
     const [loadedTabs, setLoadedTabs] = useState(new Set());
     const [tabLoading, setTabLoading] = useState(false);
 
@@ -107,13 +114,13 @@ const SubjectDetail = () => {
     const [filePage, setFilePage] = useState(0);
     const [loadingMoreFiles, setLoadingMoreFiles] = useState(false);
     const [hasMoreFiles, setHasMoreFiles] = useState(true);
-    const FILE_LIMIT = 20;
+    const FILE_LIMIT = 50;
 
     // Pagination for notes
     const [notePage, setNotePage] = useState(0);
     const [loadingMoreNotes, setLoadingMoreNotes] = useState(false);
     const [hasMoreNotes, setHasMoreNotes] = useState(true);
-    const NOTE_LIMIT = 12;
+    const NOTE_LIMIT = 50;
 
     const [activeTab, setActiveTab] = useState('topics');
     const [showTopicModal, setShowTopicModal] = useState(false);
@@ -1653,8 +1660,8 @@ const SubjectDetail = () => {
         const loadMore = async () => {
             setLoadingMoreFiles(true);
             try {
-                const res = await filesApi.listBySubject(id, FILE_LIMIT, filePage * FILE_LIMIT, null, true);
-                const newFiles = res.images || res.files || [];
+                const res = await fetchFolderContents(id, 'subject', currentFolderId, FILE_LIMIT, filePage * FILE_LIMIT);
+                const newFiles = res.files || [];
                 setHasMoreFiles(newFiles.length === FILE_LIMIT);
                 setFiles(prev => [...prev, ...newFiles]);
             } catch {
@@ -1664,7 +1671,8 @@ const SubjectDetail = () => {
             }
         };
         loadMore();
-    }, [id, filePage]);
+    }, [id, filePage, currentFolderId]);
+
 
     useEffect(() => {
         if (notePage === 0) return;
@@ -1732,15 +1740,10 @@ const SubjectDetail = () => {
                     break;
                 }
                 case 'library': {
-                    // Load files and folders for the subject
-                    const [fileRes, folderRes] = await Promise.all([
-                        filesApi.listBySubject(id, FILE_LIMIT, 0, null, true),
-                        foldersApi.list(id)
-                    ]);
-                    const initialFiles = fileRes.images || fileRes.files || [];
-                    setFiles(initialFiles);
-                    setFolders(folderRes.folders || []);
-                    setHasMoreFiles(initialFiles.length === FILE_LIMIT);
+                    // Load files and folders using the folder-aware API
+                    const res = await fetchFolderContents(id, 'subject', null, FILE_LIMIT, 0);
+                    setFiles(res.files || []);
+                    setHasMoreFiles((res.files || []).length === FILE_LIMIT);
                     setFilePage(0);
                     break;
                 }
@@ -1959,13 +1962,12 @@ const SubjectDetail = () => {
             setQuestions(prev => [...newRes.questions, ...prev]);
         }
 
-        // Refetch files to be thorough
+        // Refetch files to be thorough, respecting current folder navigation
         const refreshFiles = async () => {
             setFilePage(0);
-            const res = await filesApi.listBySubject(id, FILE_LIMIT, 0, null, true);
-            const newFiles = res.images || res.files || [];
-            setFiles(newFiles);
-            setHasMoreFiles(newFiles.length === FILE_LIMIT);
+            const res = await fetchFolderContents(id, 'subject', currentFolderId, FILE_LIMIT, 0);
+            setFiles(res.files || []);
+            setHasMoreFiles((res.files || []).length === FILE_LIMIT);
         };
         refreshFiles();
         refreshStats([id]);
@@ -2512,11 +2514,15 @@ const SubjectDetail = () => {
             {showFileModal && (
                 <AddFileModal
                     isOpen={true}
-                    onClose={() => setShowFileModal(false)}
+                    onClose={() => { setShowFileModal(false); setUploadFolderId(null); }}
                     subjectId={id}
                     onFileSaved={handleFileAdded}
+                    folders={folders}
+                    initialFolderId={uploadFolderId}
+                    isLibrary={true}
                 />
             )}
+
 
             {(showNoteModal || !!addToNoteData) && (
                 <AddNoteModal
@@ -2756,132 +2762,63 @@ const SubjectDetail = () => {
 
 
 
-            {/* Controls (Sub-Nav + Action) — Glass background wrapper */}
-            <div className="relative p-2 rounded-2xl bg-surface-2/80 border border-white/[0.04] mb-8 ring-1 ring-white/[0.02]">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-50">
-                    {/* Segmented Tabs */}
-                    <div className="flex gap-1 p-1 bg-black/20 rounded-xl border border-white/[0.06] overflow-x-auto no-scrollbar max-w-full" >
-                        {
-                            ['topics', 'sessions', 'questions', 'notes', 'solutions', 'revision', 'library'].map((tab) => {
-                                let count;
-                                switch (tab) {
-                                    case 'topics': count = overview?.totalTopics ?? topics.length; break;
-                                    case 'sessions': count = overview?.totalSessions ?? sessions.length; break;
-                                    case 'questions': count = overview?.availableQuestions ?? questions.length; break;
-                                    case 'notes': count = overview?.totalNotes ?? notes.length; break;
-                                    case 'solutions': count = overview?.totalSolutions ?? solutions.length; break;
-                                    case 'library': count = overview?.total_files ?? overview?.totalFiles ?? files?.length ?? 0; break;
-                                    case 'revision': count = overview?.totalRevisionSessions ?? revisionSessions.length; break;
-                                }
-                                return (
-                                    <button
-                                        key={tab}
-                                        onClick={() => setActiveTab(tab)}
-                                        className={`flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-[13px] font-bold capitalize transition-all duration-300 cursor-pointer whitespace-nowrap
-                                            ${activeTab === tab
-                                                ? 'bg-primary text-white shadow-[0_4px_16px_rgba(139,92,246,0.4)] scale-[1.02]'
-                                                : 'text-slate-500 hover:text-slate-200 hover:bg-white/[0.04]'
-                                            }`}
-                                    >
-                                        {tab}
-
-                                        <span className={`min-w-5 h-5 px-1.5 flex items-center justify-center rounded-full text-[10px] font-black leading-none
-                                            ${activeTab === tab
-                                                ? 'bg-white/20 text-white'
-                                                : 'bg-white/[0.06] text-slate-500'
+            {/* Controls (Sub-Nav) — Glass background wrapper */}
+            <div className="relative mb-10">
+                <div className="flex items-center gap-1 p-2 bg-surface-2/60 backdrop-blur-sm border border-white/[0.1] rounded-[22px] overflow-x-auto no-scrollbar shadow-2xl">
+                    {[
+                        { id: 'topics', label: 'Topics', icon: BookOpen },
+                        { id: 'sessions', label: 'Sessions', icon: Activity },
+                        { id: 'questions', label: 'Questions', icon: Puzzle },
+                        { id: 'notes', label: 'Notes', icon: FileText },
+                        { id: 'solutions', label: 'Solutions', icon: Lightbulb },
+                        { id: 'revision', label: 'Revision', icon: RefreshCw },
+                        { id: 'library', label: 'Library', icon: LibraryBig },
+                    ].map(({ id, label, icon: Icon }, index, array) => {
+                        let count;
+                        switch (id) {
+                            case 'topics': count = overview?.totalTopics ?? topics.length; break;
+                            case 'sessions': count = overview?.totalSessions ?? sessions.length; break;
+                            case 'questions': count = overview?.availableQuestions ?? questions.length; break;
+                            case 'notes': count = overview?.totalNotes ?? notes.length; break;
+                            case 'solutions': count = overview?.totalSolutions ?? solutions.length; break;
+                            case 'revision': count = overview?.totalRevisionSessions ?? revisionSessions.length; break;
+                            case 'library': count = overview?.total_files ?? overview?.totalFiles ?? files?.length ?? 0; break;
+                        }
+                        const isActive = activeTab === id;
+                        return (
+                            <React.Fragment key={id}>
+                                <button
+                                    onClick={() => setActiveTab(id)}
+                                    className={`relative flex items-center gap-2 px-[18px] py-4 rounded-xl text-[14px] font-bold transition-all duration-200 cursor-pointer whitespace-nowrap shrink-0 group
+                                        ${isActive
+                                            ? 'bg-white/[0.08] text-white shadow-sm'
+                                            : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.04]'
+                                        }`}
+                                >
+                                    <Icon className={`w-4 h-4 transition-colors ${isActive ? 'text-primary' : 'text-slate-600 group-hover:text-slate-400'}`} />
+                                    <span>{label}</span>
+                                    {count !== undefined && count !== null && (
+                                        <span className={`min-w-[20px] h-[20px] px-1.5 flex items-center justify-center rounded-full text-[10px] font-black leading-none transition-all
+                                            ${isActive
+                                                ? 'bg-primary/20 text-primary'
+                                                : 'bg-white/[0.05] text-slate-600 group-hover:bg-white/[0.08] group-hover:text-slate-400'
                                             }`}
                                         >
                                             {count}
                                         </span>
-                                    </button>
-                                );
-                            })
-                        }
-                    </div >
-
-                    {/* Action Bar — same row height as tabs */}
-                    < div className="flex items-center gap-3" >
-                        {activeTab === 'sessions' && (
-                            <button
-                                onClick={() => setShowSessionModal(true)}
-                                className="bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 hover:border-violet-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
-                            >
-                                <PlusCircle className="w-4 h-4" strokeWidth={2} />
-                                <span>New Session</span>
-                            </button>
-                        )}
-
-                        {
-                            activeTab === 'questions' && (
-                                <button
-                                    onClick={() => setShowQuestionModal(true)}
-                                    className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
-                                >
-                                    <PlusCircle className="w-4 h-4" strokeWidth={2} />
-                                    <span>Add Question</span>
+                                    )}
+                                    {isActive && (
+                                        <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-primary rounded-full" />
+                                    )}
                                 </button>
-                            )
-                        }
-
-                        {
-                            activeTab === 'notes' && (
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => setNotesViewMode(notesViewMode === 'grid' ? 'list' : 'grid')}
-                                        className="bg-white/[0.03] text-slate-400 border border-white/[0.08] hover:bg-white/[0.08] hover:text-white p-2.5 rounded-lg transition-all shadow-sm cursor-pointer"
-                                        title={`Switch to ${notesViewMode === 'grid' ? 'List' : 'Grid'} View`}
-                                    >
-                                        {notesViewMode === 'grid' ? <List className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
-                                    </button>
-                                    <button
-                                        onClick={() => setShowNoteModal(true)}
-                                        className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
-                                    >
-                                        <PlusCircle className="w-4 h-4" strokeWidth={2} />
-                                        <span>Add Note</span>
-                                    </button>
-                                </div>
-                            )
-                        }
-
-                        {
-                            activeTab === 'library' && (
-                                <button
-                                    onClick={() => setShowFileModal(true)}
-                                    className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
-                                >
-                                    <PlusCircle className="w-4 h-4" strokeWidth={2} />
-                                    <span>Add File</span>
-                                </button>
-                            )
-                        }
-
-                        {
-                            activeTab === 'topics' && (
-                                <button
-                                    onClick={() => setShowTopicModal(true)}
-                                    className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
-                                >
-                                    <PlusCircle className="w-4 h-4" strokeWidth={2} />
-                                    <span>Manage Syllabus</span>
-                                </button>
-                            )
-                        }
-
-                        {
-                            activeTab === 'revision' && (
-                                <button
-                                    onClick={() => setShowCreateRevisionSession(true)}
-                                    className="bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 hover:border-violet-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
-                                >
-                                    <PlusCircle className="w-4 h-4" strokeWidth={2} />
-                                    <span>New Session</span>
-                                </button>
-                            )
-                        }
-                    </div >
-                </div >
-            </div >
+                                {index < array.length - 1 && (
+                                    <div className="w-px h-5 bg-white/[0.08] shrink-0" />
+                                )}
+                            </React.Fragment>
+                        );
+                    })}
+                </div>
+            </div>
 
             {/* Main Content Area */}
             {tabLoading && !loadedTabs.has(activeTab) ? (
@@ -2903,7 +2840,7 @@ const SubjectDetail = () => {
                                     <BookOpen className="w-6 h-6 text-indigo-400" />
                                     <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Syllabus</h3>
                                 </div>
-                                <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2 ml-auto">
                                     <button
                                         onClick={handleDownloadSyllabus}
                                         disabled={isDownloadingSyllabus}
@@ -2939,6 +2876,13 @@ const SubjectDetail = () => {
                                         <Minimize2 className="w-3.5 h-3.5" />
                                         <span>Collapse All</span>
                                     </button>
+                                    <button
+                                        onClick={() => setShowTopicModal(true)}
+                                        className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98] shrink-0 ml-auto"
+                                    >
+                                        <PlusCircle className="w-4 h-4" strokeWidth={2} />
+                                        <span>Manage Syllabus</span>
+                                    </button>
                                 </div>
                             </div>
                             {topics.length === 0 ? (
@@ -2947,16 +2891,9 @@ const SubjectDetail = () => {
                                         <BookOpen className="w-10 h-10 text-indigo-500/70" />
                                     </div>
                                     <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No topics yet</h3>
-                                    <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                    <p className="text-slate-400 text-sm max-w-sm leading-relaxed">
                                         Build your syllabus by adding topics and subtopics to organize your study material.
                                     </p>
-                                    <button
-                                        onClick={() => setShowTopicModal(true)}
-                                        className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
-                                    >
-                                        <PlusCircle className="w-4 h-4" />
-                                        <span>Manage Syllabus</span>
-                                    </button>
                                 </div>
                             ) : (
                                 <TopicTree
@@ -2976,7 +2913,7 @@ const SubjectDetail = () => {
                                     <Activity className="w-6 h-6 text-indigo-400" />
                                     <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Study Sessions</h3>
                                 </div>
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-3 ml-auto">
                                     <div className="relative group flex-1 sm:min-w-[280px]">
                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
                                         <input
@@ -3011,6 +2948,13 @@ const SubjectDetail = () => {
                                             <List className="w-4 h-4" />
                                         </button>
                                     </div>
+                                    <button
+                                        onClick={() => setShowSessionModal(true)}
+                                        className="bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 hover:border-violet-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98] shrink-0 ml-auto"
+                                    >
+                                        <PlusCircle className="w-4 h-4" strokeWidth={2} />
+                                        <span className="hidden sm:inline">New Session</span>
+                                    </button>
                                 </div>
                             </div>
 
@@ -3067,127 +3011,136 @@ const SubjectDetail = () => {
                             {/* Header for Questions */}
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
                                 <div className="flex items-center gap-2">
-                                    <ListChecks className="w-6 h-6 text-indigo-400" />
+                                    <Puzzle className="w-6 h-6 text-indigo-400" />
                                     <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Question Bank</h3>
                                 </div>
-                                {isSelectionMode ? (
-                                    <div className="flex items-center h-[50px] bg-[#1a1a1e] border border-white/[0.12] rounded-2xl px-2 shadow-[0_12px_40px_rgba(0,0,0,0.8)] transition-all animate-in fade-in zoom-in-95 duration-300 w-full sm:w-auto relative z-[999]">
-                                        <div className="flex items-center pl-3 pr-2 border-r border-white/[0.08] mr-2">
-                                            <div className="w-6 h-6 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center text-[12px] font-bold mr-2">
-                                                {selectedItems.size}
+                                <div className="flex items-center gap-3 ml-auto">
+                                    {isSelectionMode ? (
+                                        <div className="flex items-center h-[50px] bg-[#1a1a1e] border border-white/[0.12] rounded-2xl px-2 shadow-[0_12px_40px_rgba(0,0,0,0.8)] transition-all animate-in fade-in zoom-in-95 duration-300 w-full sm:w-auto relative z-[999]">
+                                            <div className="flex items-center pl-3 pr-2 border-r border-white/[0.08] mr-2">
+                                                <div className="w-6 h-6 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center text-[12px] font-bold mr-2">
+                                                    {selectedItems.size}
+                                                </div>
+                                                <span className="text-[13px] text-slate-300 font-medium hidden sm:inline">selected</span>
                                             </div>
-                                            <span className="text-[13px] text-slate-300 font-medium hidden sm:inline">selected</span>
-                                        </div>
 
-                                        <button
-                                            onClick={handleSelectAll}
-                                            className="text-[12px] font-medium text-slate-300 hover:text-white px-4 py-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
-                                        >
-                                            {selectedItems.size > 0 && selectedItems.size === groupedQuestions.flatMap(g => g.questions).length ? 'Clear' : 'Select All'}
-                                        </button>
-
-                                        <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
-
-                                        <div className="flex items-center gap-1 relative">
                                             <button
-                                                onClick={(e) => { e.stopPropagation(); setShowExportMenu(!showExportMenu); }}
-                                                disabled={selectedItems.size === 0}
-                                                className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all cursor-pointer ${showExportMenu ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
+                                                onClick={handleSelectAll}
+                                                className="text-[12px] font-medium text-slate-300 hover:text-white px-4 py-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
                                             >
-                                                <Download className="w-4 h-4" />
-                                                <span className="text-[12px] font-medium hidden md:inline">Export</span>
-                                                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${showExportMenu ? 'rotate-180' : ''}`} />
+                                                {selectedItems.size > 0 && selectedItems.size === groupedQuestions.flatMap(g => g.questions).length ? 'Clear' : 'Select All'}
                                             </button>
 
-                                            {showExportMenu && selectedItems.size > 0 && (
-                                                <div
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="absolute top-full right-0 mt-3 w-60 bg-[#1e1e22] border border-white/15 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in slide-in-from-top-3 z-[1000] backdrop-blur-2xl transition-all p-2 space-y-1 block"
+                                            <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
+
+                                            <div className="flex items-center gap-1 relative">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setShowExportMenu(!showExportMenu); }}
+                                                    disabled={selectedItems.size === 0}
+                                                    className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all cursor-pointer ${showExportMenu ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
                                                 >
-                                                    <div className="px-3 py-2 border-b border-white/5 mb-1.5 leading-none">
-                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Select Export Format</span>
+                                                    <Download className="w-4 h-4" />
+                                                    <span className="text-[12px] font-medium hidden md:inline">Export</span>
+                                                    <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${showExportMenu ? 'rotate-180' : ''}`} />
+                                                </button>
+
+                                                {showExportMenu && selectedItems.size > 0 && (
+                                                    <div
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="absolute top-full right-0 mt-3 w-60 bg-[#1e1e22] border border-white/15 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in slide-in-from-top-3 z-[1000] backdrop-blur-2xl transition-all p-2 space-y-1 block"
+                                                    >
+                                                        <div className="px-3 py-2 border-b border-white/5 mb-1.5 leading-none">
+                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Select Export Format</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => { handleDownloadSelected(); setShowExportMenu(false); }}
+                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
+                                                        >
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
+                                                                    <FileText className="w-4 h-4 text-indigo-400" />
+                                                                </div>
+                                                                <span>PDF Document</span>
+                                                            </div>
+                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => { handleDownloadWordSelected(); setShowExportMenu(false); }}
+                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
+                                                        >
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
+                                                                    <FileText className="w-4 h-4 text-emerald-400" />
+                                                                </div>
+                                                                <span>Word Document</span>
+                                                            </div>
+                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => { handleDownloadMarkdownSelected(); setShowExportMenu(false); }}
+                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
+                                                        >
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center group-hover:bg-orange-500/20 transition-colors">
+                                                                    <FileText className="w-4 h-4 text-orange-400" />
+                                                                </div>
+                                                                <span>Markdown File</span>
+                                                            </div>
+                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
+                                                        </button>
                                                     </div>
-                                                    <button
-                                                        onClick={() => { handleDownloadSelected(); setShowExportMenu(false); }}
-                                                        className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
-                                                    >
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
-                                                                <FileText className="w-4 h-4 text-indigo-400" />
-                                                            </div>
-                                                            <span>PDF Document</span>
-                                                        </div>
-                                                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => { handleDownloadWordSelected(); setShowExportMenu(false); }}
-                                                        className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
-                                                    >
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
-                                                                <FileText className="w-4 h-4 text-emerald-400" />
-                                                            </div>
-                                                            <span>Word Document</span>
-                                                        </div>
-                                                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => { handleDownloadMarkdownSelected(); setShowExportMenu(false); }}
-                                                        className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
-                                                    >
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center group-hover:bg-orange-500/20 transition-colors">
-                                                                <FileText className="w-4 h-4 text-orange-400" />
-                                                            </div>
-                                                            <span>Markdown File</span>
-                                                        </div>
-                                                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
+                                                )}
+                                            </div>
 
-                                        <button
-                                            onClick={() => {
-                                                setConfirmBulkDelete({ open: true, type: 'questions', count: selectedItems.size });
-                                            }}
-                                            disabled={selectedItems.size === 0}
-                                            className="flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:text-white hover:bg-rose-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                            <span className="text-[12px] font-medium hidden md:inline">Delete</span>
-                                        </button>
-
-                                        <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
-
-                                        <button
-                                            onClick={() => { setIsSelectionMode(false); setSelectedItems(new Set()); }}
-                                            className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
-                                            title="Cancel Selection"
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="relative group w-full sm:min-w-[300px] sm:w-auto">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
-                                        <input
-                                            type="text"
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            placeholder="Search content or tags..."
-                                            className="w-full sm:w-[300px] bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
-                                        />
-                                        {searchQuery && (
                                             <button
-                                                onClick={() => setSearchQuery('')}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                                onClick={() => { setConfirmBulkDelete({ open: true, type: 'questions', count: selectedItems.size }); }}
+                                                disabled={selectedItems.size === 0}
+                                                className="flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:text-white hover:bg-rose-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                                <span className="text-[12px] font-medium hidden md:inline">Delete</span>
+                                            </button>
+
+                                            <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
+
+                                            <button
+                                                onClick={() => { setIsSelectionMode(false); setSelectedItems(new Set()); }}
+                                                className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
+                                                title="Cancel Selection"
                                             >
                                                 <X className="w-4 h-4" />
                                             </button>
-                                        )}
-                                    </div>
-                                )}
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-3">
+                                            <div className="relative group w-full sm:min-w-[280px] sm:w-auto">
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                                                <input
+                                                    type="text"
+                                                    value={searchQuery}
+                                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                                    placeholder="Search content or tags..."
+                                                    className="w-full sm:w-[280px] bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                                                />
+                                                {searchQuery && (
+                                                    <button
+                                                        onClick={() => setSearchQuery('')}
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={() => setShowQuestionModal(true)}
+                                                className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98] shrink-0"
+                                            >
+                                                <PlusCircle className="w-4 h-4" strokeWidth={2} />
+                                                <span>Add Question</span>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 gap-6 items-start">
@@ -3198,7 +3151,7 @@ const SubjectDetail = () => {
                                     {questions.length === 0 ? (
                                         <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
                                             <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 rotate-3">
-                                                <ListChecks className="w-10 h-10 text-indigo-500/70" />
+                                                <Puzzle className="w-10 h-10 text-indigo-500/70" />
                                             </div>
                                             <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">Your question bank is empty</h3>
                                             <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
@@ -3240,7 +3193,7 @@ const SubjectDetail = () => {
                                                         <div
                                                             key={q.id}
                                                             id={`question-${q.id}`}
-                                                            className={`question-card group relative transition-all overflow-visible ${activeQuestionDropdown === q.id ? 'border-indigo-500/40 shadow-xl' : ''} ${isSelectionMode ? (selectedItems.has(q.id) ? 'ring-2 ring-indigo-500 cursor-pointer bg-indigo-500/5' : 'cursor-pointer hover:bg-white/[0.02]') : ''}`}
+                                                            className={`question-card group relative transition-all overflow-visible ${activeQuestionDropdown === q.id ? 'active' : ''} ${isSelectionMode ? (selectedItems.has(q.id) ? 'selected-item' : 'cursor-pointer') : ''}`}
                                                             onClick={() => {
                                                                 if (isSelectionMode) {
                                                                     const next = new Set(selectedItems);
@@ -3250,37 +3203,100 @@ const SubjectDetail = () => {
                                                                 }
                                                             }}
                                                         >
-                                                            {isSelectionMode && (
-                                                                <div className="absolute top-4 right-4 z-20">
-                                                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(q.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-500 bg-surface-3/50'}`}>
-                                                                        {selectedItems.has(q.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
-                                                                    </div>
+
+                                                            <div className="question-card-header">
+                                                                <div className="question-number-badge font-bold">Q</div>
+                                                                <div className="flex flex-col mr-4">
+                                                                    <span className="flex items-center gap-1.5 px-2 py-0.5 bg-indigo-500/10 text-indigo-300 rounded-md text-[10px] font-bold uppercase tracking-wider border border-indigo-500/20 w-fit">
+                                                                        {q.type === 'image' ? <ImageIcon className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
+                                                                        {q.type === 'image' ? 'Image' : 'Text'}
+                                                                    </span>
+                                                                    <span className="text-[10px] text-slate-500 font-medium mt-1">
+                                                                        {new Date(q.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                                                                    </span>
                                                                 </div>
-                                                            )}
-                                                            {/* Card Header — question number + metadata */}
-                                                            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-white/[0.06]">
-                                                                <span className="text-[15px] font-heading font-bold text-primary tracking-tight">
-                                                                    Q
-                                                                </span>
-                                                                <span className="flex items-center gap-1.5 px-2.5 py-1 bg-surface-3/80 text-slate-300 rounded-md text-[12px] font-semibold border border-white/5">
-                                                                    {q.type === 'image' ? <ImageIcon className="w-4 h-4 text-indigo-400" /> : <FileText className="w-4 h-4 text-emerald-400" />}
-                                                                    {q.type === 'image' ? 'Image' : 'Text'}
-                                                                </span>
-                                                                <div className="flex items-center gap-1 ml-auto relative" ref={activeQuestionDropdown === q.id ? questionDropdownRef : null}>
+
+                                                                <div className="flex items-center gap-2 ml-auto">
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleGenerateAINote(q.id);
+                                                                        }}
+                                                                        disabled={generatingAINoteId === q.id}
+                                                                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${existingAINote ? 'bg-purple-500/10 border-purple-500/20 text-purple-400 hover:bg-purple-500/20' : 'bg-amber-500/5 border-amber-500/10 text-amber-500/70 hover:bg-amber-500/10 hover:text-amber-500'} disabled:opacity-50 cursor-pointer uppercase tracking-tight`}
+                                                                    >
+                                                                        {generatingAINoteId === q.id ? (
+                                                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                                                        ) : existingAINote ? (
+                                                                            <BookOpen className="w-3 h-3" />
+                                                                        ) : (
+                                                                            <Wand2 className="w-3 h-3" />
+                                                                        )}
+                                                                        <span>{existingAINote ? "AI Note" : "AI Note"}</span>
+                                                                    </button>
+
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            const existingRes = solutions.find(s => s.question_id === q.id);
+                                                                            if (existingRes) {
+                                                                                setViewingSolution(existingRes);
+                                                                                if (existingRes.source_image_id) handleFetchSolutionImage(existingRes.id);
+                                                                            } else {
+                                                                                setSelectedQuestionIdForSolution(q.id);
+                                                                                setShowSolutionModal(true);
+                                                                            }
+                                                                        }}
+                                                                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${solutions.some(s => s.question_id === q.id) ? 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20' : 'bg-slate-500/5 border-white/5 text-slate-400 hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/5'} cursor-pointer uppercase tracking-tight`}
+                                                                    >
+                                                                        <Puzzle className="w-3 h-3" />
+                                                                        <span>{solutions.some(s => s.question_id === q.id) ? "Solution" : "Solution"}</span>
+                                                                    </button>
+
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setSelectedQuestionIdForNote(q.id);
+                                                                            setShowNoteModal(true);
+                                                                        }}
+                                                                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border bg-slate-500/5 border-white/5 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/30 hover:bg-emerald-500/5 cursor-pointer uppercase tracking-tight"
+                                                                    >
+                                                                        <PlusCircle className="w-3 h-3" />
+                                                                        <span>Note</span>
+                                                                    </button>
+                                                                </div>
+
+                                                                <div className="flex items-center justify-center w-9 h-9 relative" ref={activeQuestionDropdown === q.id ? questionDropdownRef : null}>
+                                                                    {isSelectionMode && (
+                                                                        <div
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                const next = new Set(selectedItems);
+                                                                                if (next.has(q.id)) next.delete(q.id);
+                                                                                else next.add(q.id);
+                                                                                setSelectedItems(next);
+                                                                            }}
+                                                                            className="absolute inset-0 flex items-center justify-center z-20 cursor-pointer"
+                                                                        >
+                                                                            <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${selectedItems.has(q.id) ? 'bg-indigo-500 border-indigo-500 scale-110 shadow-lg shadow-indigo-500/20' : 'border-slate-500 bg-slate-900/50 hover:border-indigo-400'}`}>
+                                                                                {selectedItems.has(q.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
                                                                     <button
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
                                                                             setActiveQuestionDropdown(activeQuestionDropdown === q.id ? null : q.id);
                                                                         }}
-                                                                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${activeQuestionDropdown === q.id ? 'bg-white/10 text-indigo-400' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}
+                                                                        className={`w-full h-full flex items-center justify-center rounded-lg transition-all cursor-pointer ${activeQuestionDropdown === q.id ? 'bg-white/10 text-indigo-400' : 'text-slate-500 hover:text-white hover:bg-white/5'} ${isSelectionMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
                                                                         title="More Options"
                                                                     >
-                                                                        <MoreVertical className="w-4.5 h-4.5" />
+                                                                        <MoreVertical className="w-4 h-4" />
                                                                     </button>
-
+                                                                    {/* ... dropdown content same as before ... */}
                                                                     {activeQuestionDropdown === q.id && (
                                                                         <div
-                                                                            className="absolute right-0 top-full mt-2 w-44 glass rounded-xl border border-white/10 shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+                                                                            className="absolute right-0 top-full mt-2 w-48 glass rounded-xl border border-white/10 shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
                                                                             onClick={(e) => e.stopPropagation()}
                                                                         >
                                                                             <button
@@ -3290,9 +3306,9 @@ const SubjectDetail = () => {
                                                                                     setSelectedItems(new Set([q.id]));
                                                                                     setActiveQuestionDropdown(null);
                                                                                 }}
-                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-slate-100 hover:text-white hover:bg-white/10 transition-colors text-left"
                                                                             >
-                                                                                <CheckCircle className="w-3.5 h-3.5 text-indigo-400" />
+                                                                                <CheckCircle className="w-5 h-5 text-indigo-400" />
                                                                                 <span>Select Question</span>
                                                                             </button>
                                                                             <button
@@ -3302,58 +3318,10 @@ const SubjectDetail = () => {
                                                                                     setEditingQuestion(q);
                                                                                     setShowEditQuestionModal(true);
                                                                                 }}
-                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-slate-100 hover:text-white hover:bg-white/10 transition-colors text-left"
                                                                             >
-                                                                                <Pencil className="w-3.5 h-3.5 text-indigo-400" />
+                                                                                <Pencil className="w-5 h-5 text-indigo-400" />
                                                                                 <span>Edit Question</span>
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    setActiveQuestionDropdown(null);
-                                                                                    setSelectedQuestionIdForNote(q.id);
-                                                                                    setShowNoteModal(true);
-                                                                                }}
-                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
-                                                                            >
-                                                                                <FileText className="w-3.5 h-3.5 text-emerald-400" />
-                                                                                <span>Manual Note</span>
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    setActiveQuestionDropdown(null);
-                                                                                    const existingRes = solutions.find(s => s.question_id === q.id);
-                                                                                    if (existingRes) {
-                                                                                        setViewingSolution(existingRes);
-                                                                                        if (existingRes.source_image_id) handleFetchSolutionImage(existingRes.id);
-                                                                                    } else {
-                                                                                        setSelectedQuestionIdForSolution(q.id);
-                                                                                        setShowSolutionModal(true);
-                                                                                    }
-                                                                                }}
-                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
-                                                                            >
-                                                                                <ListChecks className="w-3.5 h-3.5 text-blue-400" />
-                                                                                <span>{solutions.some(s => s.question_id === q.id) ? "View Solution" : "Add Solution"}</span>
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    setActiveQuestionDropdown(null);
-                                                                                    handleGenerateAINote(q.id);
-                                                                                }}
-                                                                                disabled={generatingAINoteId === q.id}
-                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left disabled:opacity-50"
-                                                                            >
-                                                                                {generatingAINoteId === q.id ? (
-                                                                                    <div className="w-3.5 h-3.5 border border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
-                                                                                ) : existingAINote ? (
-                                                                                    <BookOpen className="w-3.5 h-3.5 text-purple-400" />
-                                                                                ) : (
-                                                                                    <Wand2 className="w-3.5 h-3.5 text-amber-400" />
-                                                                                )}
-                                                                                <span>{existingAINote ? "View AI Note" : "AI Note"}</span>
                                                                             </button>
                                                                             <div className="h-px bg-white/5 my-1" />
                                                                             <button
@@ -3362,9 +3330,9 @@ const SubjectDetail = () => {
                                                                                     setActiveQuestionDropdown(null);
                                                                                     setConfirmDeleteQuestion({ open: true, questionId: q.id });
                                                                                 }}
-                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-red-400 hover:bg-red-500/10 transition-colors text-left"
+                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-slate-100 hover:text-red-400 hover:bg-red-500/10 transition-colors text-left"
                                                                             >
-                                                                                <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                                                                                <Trash2 className="w-5 h-5 text-red-400" />
                                                                                 <span>Delete Question</span>
                                                                             </button>
                                                                         </div>
@@ -3372,83 +3340,82 @@ const SubjectDetail = () => {
                                                                 </div>
                                                             </div>
 
-                                                            {/* Card Body — question content */}
-                                                            <div className="prose prose-invert prose-lg max-w-none text-slate-200 text-[15px] leading-[1.7]">
-                                                                {q.formatted_content && q.formatted_content.root ? (
-                                                                    <RichTextRenderer content={q.formatted_content} />
-                                                                ) : (
-                                                                    <ReactMarkdown
-                                                                        remarkPlugins={[remarkGfm, remarkMath]}
-                                                                        rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
-                                                                    >
-                                                                        {preprocessMarkdown(q.content)}
-                                                                    </ReactMarkdown>
+                                                            <div className="question-card-body">
+                                                                <div className="prose prose-invert prose-lg max-w-none text-slate-200 text-[15px] leading-[1.7] mb-6">
+                                                                    {q.formatted_content && q.formatted_content.root ? (
+                                                                        <RichTextRenderer content={q.formatted_content} />
+                                                                    ) : (
+                                                                        <ReactMarkdown
+                                                                            remarkPlugins={[remarkGfm, remarkMath]}
+                                                                            rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                                                        >
+                                                                            {preprocessMarkdown(q.content)}
+                                                                        </ReactMarkdown>
+                                                                    )}
+                                                                </div>
+
+                                                                {q.type === 'image' && (
+                                                                    <div className="mt-4 mb-6 relative group/img-container w-fit">
+                                                                        {fetchedImages[q.id] || fetchedImages[q.source_image_id] ? (
+                                                                            <div className="relative">
+                                                                                <div className="rounded-xl overflow-hidden border border-white/10 inline-block bg-black/40 group/img relative shadow-lg">
+                                                                                    <img
+                                                                                        src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
+                                                                                        alt="Original Question"
+                                                                                        className="max-h-80 object-contain transition-all group-hover/img:opacity-50"
+                                                                                    />
+                                                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
+                                                                                        <span className="bg-black/60 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/10 backdrop-blur-sm">
+                                                                                            Reference Image
+                                                                                        </span>
+                                                                                    </div>
+                                                                                </div>
+                                                                                <button
+                                                                                    onClick={() => handleHideImage(q.id)}
+                                                                                    className="absolute -top-2 -right-2 p-1.5 bg-slate-800/95 text-slate-400 hover:text-white rounded-full border border-white/10 shadow-xl opacity-0 group-hover/img-container:opacity-100 transition-all cursor-pointer z-10"
+                                                                                    title="Hide Image"
+                                                                                >
+                                                                                    <X className="w-3.5 h-3.5" />
+                                                                                </button>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <button
+                                                                                onClick={() => handleFetchImage(q.id)}
+                                                                                disabled={fetchingImageId === q.id}
+                                                                                className="flex items-center gap-2.5 px-4 py-2 rounded-xl text-[12px] font-bold bg-indigo-500/5 text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all border border-indigo-500/10 shadow-sm disabled:opacity-50 cursor-pointer uppercase tracking-tight"
+                                                                            >
+                                                                                {fetchingImageId === q.id ? (
+                                                                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                                                ) : (
+                                                                                    <ImageIcon className="w-4 h-4" />
+                                                                                )}
+                                                                                <span>
+                                                                                    {fetchingImageId === q.id ? 'Processing...' : 'View Original Capture'}
+                                                                                </span>
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+
+                                                                {q.parsedTags && q.parsedTags.length > 0 && (
+                                                                    <div className="flex flex-wrap gap-2 pt-2 border-t border-white/[0.03]">
+                                                                        {q.parsedTags.map((tag, idx) => (
+                                                                            <span key={idx} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-3/50 border border-white/5 text-[10px] font-semibold text-slate-400 lowercase tracking-tight">
+                                                                                <Hash className="w-2.5 h-2.5 text-indigo-500/50" />
+                                                                                {tag}
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
                                                                 )}
                                                             </div>
 
-                                                            {/* Tags display */}
-                                                            {q.parsedTags && q.parsedTags.length > 0 && (
-                                                                <div className="mt-4 flex flex-wrap gap-2">
-                                                                    {q.parsedTags.map((tag, idx) => (
-                                                                        <span key={idx} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                                                            <Hash className="w-2.5 h-2.5" />
-                                                                            {tag}
-                                                                        </span>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-
-                                                            {q.type === 'image' && (
-                                                                <div className="mt-5 relative group/img-container w-fit">
-                                                                    {fetchedImages[q.id] || fetchedImages[q.source_image_id] ? (
-                                                                        <div className="relative">
-                                                                            <div className="rounded-xl overflow-hidden border border-white/10 inline-block bg-black/40 group/img relative">
-                                                                                <img
-                                                                                    src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
-                                                                                    alt="Original Question"
-                                                                                    className="max-h-80 object-contain transition-all group-hover/img:opacity-50"
-                                                                                />
-                                                                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
-                                                                                    <span className="bg-black/60 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/10">
-                                                                                        Original Attachment
-                                                                                    </span>
-                                                                                </div>
-                                                                            </div>
-                                                                            <button
-                                                                                onClick={() => handleHideImage(q.id)}
-                                                                                className="absolute -top-2 -right-2 p-1.5 bg-slate-800/90 text-slate-400 hover:text-white rounded-full border border-white/10 shadow-lg opacity-0 group-hover/img-container:opacity-100 transition-all cursor-pointer z-10"
-                                                                                title="Hide Image"
-                                                                            >
-                                                                                <X className="w-3.5 h-3.5" />
-                                                                            </button>
-                                                                        </div>
-                                                                    ) : (
-                                                                        <button
-                                                                            onClick={() => handleFetchImage(q.id)}
-                                                                            disabled={fetchingImageId === q.id}
-                                                                            className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-surface-3/80 text-slate-300 hover:text-white hover:bg-surface-3 transition-all border border-white/5 shadow-sm disabled:opacity-50 cursor-pointer"
-                                                                        >
-                                                                            {fetchingImageId === q.id ? (
-                                                                                <div className="w-3.5 h-3.5 border border-white/30 border-t-white rounded-full animate-spin" />
-                                                                            ) : (
-                                                                                <ImageIcon className="w-4 h-4 text-indigo-400" />
-                                                                            )}
-                                                                            <span>
-                                                                                {fetchingImageId === q.id ? 'Loading...' : 'Show Source Image'}
-                                                                            </span>
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            )}
-
-
                                                         </div>
                                                     );
+
                                                 }
 
                                                 return (
                                                     <div key={group.rootId} className="flex flex-col gap-3">
-                                                        {/* Group Header */}
                                                         <div
                                                             onClick={() => toggleGroup(group.rootId)}
                                                             className="flex items-center justify-between p-4 rounded-xl bg-surface-2 border border-white/[0.06] cursor-pointer hover:bg-surface-3 transition-colors group/header"
@@ -3478,7 +3445,6 @@ const SubjectDetail = () => {
                                                             </div>
                                                         </div>
 
-                                                        {/* Group Content */}
                                                         {isExpanded && (
                                                             <div className="flex flex-col gap-5 pl-8 border-l-2 border-white/[0.06] mt-2 mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
                                                                 {group.questions.map((q, qidx) => {
@@ -3487,7 +3453,7 @@ const SubjectDetail = () => {
                                                                         <div
                                                                             key={q.id}
                                                                             id={`question-${q.id}`}
-                                                                            className={`question-card group relative transition-all overflow-visible ${activeQuestionDropdown === q.id ? 'border-indigo-500/40 shadow-xl' : ''} ${isSelectionMode ? (selectedItems.has(q.id) ? 'ring-2 ring-indigo-500 cursor-pointer bg-indigo-500/5' : 'cursor-pointer hover:bg-white/[0.02]') : ''}`}
+                                                                            className={`question-card group relative transition-all overflow-visible ${activeQuestionDropdown === q.id ? 'active' : ''} ${isSelectionMode ? (selectedItems.has(q.id) ? 'selected-item' : 'cursor-pointer') : ''}`}
                                                                             onClick={() => {
                                                                                 if (isSelectionMode) {
                                                                                     const next = new Set(selectedItems);
@@ -3497,37 +3463,100 @@ const SubjectDetail = () => {
                                                                                 }
                                                                             }}
                                                                         >
-                                                                            {isSelectionMode && (
-                                                                                <div className="absolute top-4 right-4 z-20">
-                                                                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(q.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-500 bg-surface-3/50'}`}>
-                                                                                        {selectedItems.has(q.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
-                                                                                    </div>
-                                                                                </div>
-                                                                            )}
-                                                                            {/* Card Header — question number + metadata */}
-                                                                            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-white/[0.06]">
-                                                                                <span className="text-[15px] font-heading font-bold text-primary tracking-tight">
-                                                                                    #{qidx + 1}
-                                                                                </span>
-                                                                                <span className="text-[12px] text-slate-500 ml-auto font-medium">
-                                                                                    {new Date(q.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                                                </span>
 
-                                                                                <div className="flex items-center gap-1 ml-2 relative" ref={activeQuestionDropdown === q.id ? questionDropdownRef : null}>
+                                                                            <div className="question-card-header">
+                                                                                <div className="question-number-badge font-bold">Q{qidx + 1}</div>
+                                                                                <div className="flex flex-col mr-4">
+                                                                                    <span className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 text-emerald-400 rounded-md text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20 w-fit">
+                                                                                        {q.type === 'image' ? <ImageIcon className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
+                                                                                        {q.type === 'image' ? 'Image' : 'Text'}
+                                                                                    </span>
+                                                                                    <span className="text-[10px] text-slate-500 font-medium mt-1">
+                                                                                        {new Date(q.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                                                                                    </span>
+                                                                                </div>
+
+                                                                                <div className="flex items-center gap-2 ml-auto">
+                                                                                    <button
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            handleGenerateAINote(q.id);
+                                                                                        }}
+                                                                                        disabled={generatingAINoteId === q.id}
+                                                                                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${existingAINote ? 'bg-purple-500/10 border-purple-500/20 text-purple-400 hover:bg-purple-500/20' : 'bg-amber-500/5 border-amber-500/10 text-amber-500/70 hover:bg-amber-500/10 hover:text-amber-500'} disabled:opacity-50 cursor-pointer uppercase tracking-tight`}
+                                                                                    >
+                                                                                        {generatingAINoteId === q.id ? (
+                                                                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                                                                        ) : existingAINote ? (
+                                                                                            <BookOpen className="w-3 h-3" />
+                                                                                        ) : (
+                                                                                            <Wand2 className="w-3 h-3" />
+                                                                                        )}
+                                                                                        <span>{existingAINote ? "AI Note" : "AI"}</span>
+                                                                                    </button>
+
+                                                                                    <button
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            const existingRes = solutions.find(s => s.question_id === q.id);
+                                                                                            if (existingRes) {
+                                                                                                setViewingSolution(existingRes);
+                                                                                                if (existingRes.source_image_id) handleFetchSolutionImage(existingRes.id);
+                                                                                            } else {
+                                                                                                setSelectedQuestionIdForSolution(q.id);
+                                                                                                setShowSolutionModal(true);
+                                                                                            }
+                                                                                        }}
+                                                                                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${solutions.some(s => s.question_id === q.id) ? 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20' : 'bg-slate-500/5 border-white/5 text-slate-400 hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/5'} cursor-pointer uppercase tracking-tight`}
+                                                                                    >
+                                                                                        <Puzzle className="w-3 h-3" />
+                                                                                        <span>{solutions.some(s => s.question_id === q.id) ? "Ans" : "Ans"}</span>
+                                                                                    </button>
+
+                                                                                    <button
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            setSelectedQuestionIdForNote(q.id);
+                                                                                            setShowNoteModal(true);
+                                                                                        }}
+                                                                                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border bg-slate-500/5 border-white/5 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/30 hover:bg-emerald-500/5 cursor-pointer uppercase tracking-tight"
+                                                                                    >
+                                                                                        <PlusCircle className="w-3 h-3" />
+                                                                                        <span>Note</span>
+                                                                                    </button>
+                                                                                </div>
+
+                                                                                <div className="flex items-center justify-center w-9 h-9 relative" ref={activeQuestionDropdown === q.id ? questionDropdownRef : null}>
+                                                                                    {isSelectionMode && (
+                                                                                        <div
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation();
+                                                                                                const next = new Set(selectedItems);
+                                                                                                if (next.has(q.id)) next.delete(q.id);
+                                                                                                else next.add(q.id);
+                                                                                                setSelectedItems(next);
+                                                                                            }}
+                                                                                            className="absolute inset-0 flex items-center justify-center z-20 cursor-pointer"
+                                                                                        >
+                                                                                            <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${selectedItems.has(q.id) ? 'bg-indigo-500 border-indigo-500 scale-110 shadow-lg shadow-indigo-500/20' : 'border-slate-500 bg-slate-900/50 hover:border-indigo-400'}`}>
+                                                                                                {selectedItems.has(q.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    )}
                                                                                     <button
                                                                                         onClick={(e) => {
                                                                                             e.stopPropagation();
                                                                                             setActiveQuestionDropdown(activeQuestionDropdown === q.id ? null : q.id);
                                                                                         }}
-                                                                                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${activeQuestionDropdown === q.id ? 'bg-white/10 text-indigo-400' : 'text-slate-500 hover:text-white hover:bg-white/5 opacity-0 group-hover:opacity-100'}`}
+                                                                                        className={`w-full h-full flex items-center justify-center rounded-lg transition-all cursor-pointer ${activeQuestionDropdown === q.id ? 'bg-white/10 text-indigo-400' : 'text-slate-500 hover:text-white hover:bg-white/5'} ${isSelectionMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
                                                                                         title="More Options"
                                                                                     >
-                                                                                        <MoreVertical className="w-4.5 h-4.5" />
+                                                                                        <MoreVertical className="w-4 h-4" />
                                                                                     </button>
 
                                                                                     {activeQuestionDropdown === q.id && (
                                                                                         <div
-                                                                                            className="absolute right-0 top-full mt-2 w-44 glass rounded-xl border border-white/10 shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+                                                                                            className="absolute right-0 top-full mt-2 w-48 glass rounded-xl border border-white/10 shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
                                                                                             onClick={(e) => e.stopPropagation()}
                                                                                         >
                                                                                             <button
@@ -3537,9 +3566,9 @@ const SubjectDetail = () => {
                                                                                                     setSelectedItems(new Set([q.id]));
                                                                                                     setActiveQuestionDropdown(null);
                                                                                                 }}
-                                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-slate-100 hover:text-white hover:bg-white/10 transition-colors text-left"
                                                                                             >
-                                                                                                <CheckCircle className="w-3.5 h-3.5 text-indigo-400" />
+                                                                                                <CheckCircle className="w-5 h-5 text-indigo-400" />
                                                                                                 <span>Select Question</span>
                                                                                             </button>
                                                                                             <button
@@ -3549,58 +3578,10 @@ const SubjectDetail = () => {
                                                                                                     setEditingQuestion(q);
                                                                                                     setShowEditQuestionModal(true);
                                                                                                 }}
-                                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-slate-100 hover:text-white hover:bg-white/10 transition-colors text-left"
                                                                                             >
-                                                                                                <Pencil className="w-3.5 h-3.5 text-indigo-400" />
-                                                                                                <span>Edit Question</span>
-                                                                                            </button>
-                                                                                            <button
-                                                                                                onClick={(e) => {
-                                                                                                    e.stopPropagation();
-                                                                                                    setActiveQuestionDropdown(null);
-                                                                                                    setSelectedQuestionIdForNote(q.id);
-                                                                                                    setShowNoteModal(true);
-                                                                                                }}
-                                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
-                                                                                            >
-                                                                                                <FileText className="w-3.5 h-3.5 text-emerald-400" />
-                                                                                                <span>Manual Note</span>
-                                                                                            </button>
-                                                                                            <button
-                                                                                                onClick={(e) => {
-                                                                                                    e.stopPropagation();
-                                                                                                    setActiveQuestionDropdown(null);
-                                                                                                    const existingRes = solutions.find(s => s.question_id === q.id);
-                                                                                                    if (existingRes) {
-                                                                                                        setViewingSolution(existingRes);
-                                                                                                        if (existingRes.source_image_id) handleFetchSolutionImage(existingRes.id);
-                                                                                                    } else {
-                                                                                                        setSelectedQuestionIdForSolution(q.id);
-                                                                                                        setShowSolutionModal(true);
-                                                                                                    }
-                                                                                                }}
-                                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
-                                                                                            >
-                                                                                                <ListChecks className="w-3.5 h-3.5 text-blue-400" />
-                                                                                                <span>{solutions.some(s => s.question_id === q.id) ? "View Solution" : "Add Solution"}</span>
-                                                                                            </button>
-                                                                                            <button
-                                                                                                onClick={(e) => {
-                                                                                                    e.stopPropagation();
-                                                                                                    setActiveQuestionDropdown(null);
-                                                                                                    handleGenerateAINote(q.id);
-                                                                                                }}
-                                                                                                disabled={generatingAINoteId === q.id}
-                                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left disabled:opacity-50"
-                                                                                            >
-                                                                                                {generatingAINoteId === q.id ? (
-                                                                                                    <div className="w-3.5 h-3.5 border border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
-                                                                                                ) : existingAINote ? (
-                                                                                                    <BookOpen className="w-3.5 h-3.5 text-purple-400" />
-                                                                                                ) : (
-                                                                                                    <Wand2 className="w-3.5 h-3.5 text-amber-400" />
-                                                                                                )}
-                                                                                                <span>{existingAINote ? "View AI Note" : "AI Note"}</span>
+                                                                                                <Pencil className="w-5 h-5 text-indigo-400" />
+                                                                                                <span>Edit Details</span>
                                                                                             </button>
                                                                                             <div className="h-px bg-white/5 my-1" />
                                                                                             <button
@@ -3609,9 +3590,9 @@ const SubjectDetail = () => {
                                                                                                     setActiveQuestionDropdown(null);
                                                                                                     setConfirmDeleteQuestion({ open: true, questionId: q.id });
                                                                                                 }}
-                                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-red-400 hover:bg-red-500/10 transition-colors text-left"
+                                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-slate-100 hover:text-red-400 hover:bg-red-500/10 transition-colors text-left"
                                                                                             >
-                                                                                                <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                                                                                                <Trash2 className="w-5 h-5 text-red-400" />
                                                                                                 <span>Delete Question</span>
                                                                                             </button>
                                                                                         </div>
@@ -3619,75 +3600,74 @@ const SubjectDetail = () => {
                                                                                 </div>
                                                                             </div>
 
-                                                                            {/* Card Body — question content */}
-                                                                            <div className="prose prose-invert prose-lg max-w-none text-slate-200 text-[15px] leading-[1.7]">
-                                                                                {q.formatted_content && q.formatted_content.root ? (
-                                                                                    <RichTextRenderer content={q.formatted_content} />
-                                                                                ) : (
-                                                                                    <ReactMarkdown
-                                                                                        remarkPlugins={[remarkGfm, remarkMath]}
-                                                                                        rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
-                                                                                    >
-                                                                                        {preprocessMarkdown(q.content)}
-                                                                                    </ReactMarkdown>
-                                                                                )}
-                                                                            </div>
-
-                                                                            {/* Tags display */}
-                                                                            {q.parsedTags && q.parsedTags.length > 0 && (
-                                                                                <div className="mt-4 flex flex-wrap gap-2">
-                                                                                    {q.parsedTags.map((tag, idx) => (
-                                                                                        <span key={idx} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                                                                            <Hash className="w-2.5 h-2.5" />
-                                                                                            {tag}
-                                                                                        </span>
-                                                                                    ))}
-                                                                                </div>
-                                                                            )}
-
-                                                                            {q.type === 'image' && qidx === 0 && (
-                                                                                <div className="mt-5 relative group/img-container w-fit">
-                                                                                    {fetchedImages[q.id] || fetchedImages[q.source_image_id] ? (
-                                                                                        <div className="relative">
-                                                                                            <div className="rounded-xl overflow-hidden border border-white/10 inline-block bg-black/40 group/img relative">
-                                                                                                <img
-                                                                                                    src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
-                                                                                                    alt="Original Question"
-                                                                                                    className="max-h-80 object-contain transition-all group-hover/img:opacity-50"
-                                                                                                />
-                                                                                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
-                                                                                                    <span className="bg-black/60 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/10">
-                                                                                                        Source Image
-                                                                                                    </span>
-                                                                                                </div>
-                                                                                            </div>
-                                                                                            <button
-                                                                                                onClick={() => handleHideImage(q.id)}
-                                                                                                className="absolute -top-2 -right-2 p-1.5 bg-slate-800/90 text-slate-400 hover:text-white rounded-full border border-white/10 shadow-lg opacity-0 group-hover/img-container:opacity-100 transition-all cursor-pointer z-10"
-                                                                                                title="Hide Image"
-                                                                                            >
-                                                                                                <X className="w-3.5 h-3.5" />
-                                                                                            </button>
-                                                                                        </div>
+                                                                            <div className="question-card-body">
+                                                                                <div className="prose prose-invert prose-lg max-w-none text-slate-200 text-[15px] leading-[1.7] mb-6">
+                                                                                    {q.formatted_content && q.formatted_content.root ? (
+                                                                                        <RichTextRenderer content={q.formatted_content} />
                                                                                     ) : (
-                                                                                        <button
-                                                                                            onClick={() => handleFetchImage(q.id)}
-                                                                                            disabled={fetchingImageId === q.id}
-                                                                                            className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-surface-3/80 text-slate-300 hover:text-white hover:bg-surface-3 transition-all border border-white/5 shadow-sm disabled:opacity-50 cursor-pointer"
+                                                                                        <ReactMarkdown
+                                                                                            remarkPlugins={[remarkGfm, remarkMath]}
+                                                                                            rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
                                                                                         >
-                                                                                            {fetchingImageId === q.id ? (
-                                                                                                <div className="w-3.5 h-3.5 border border-white/30 border-t-white rounded-full animate-spin" />
-                                                                                            ) : (
-                                                                                                <ImageIcon className="w-4 h-4 text-indigo-400" />
-                                                                                            )}
-                                                                                            <span>
-                                                                                                {fetchingImageId === q.id ? 'Loading...' : 'Show Shared Source Image'}
-                                                                                            </span>
-                                                                                        </button>
+                                                                                            {preprocessMarkdown(q.content)}
+                                                                                        </ReactMarkdown>
                                                                                     )}
                                                                                 </div>
-                                                                            )}
 
+                                                                                {q.type === 'image' && qidx === 0 && (
+                                                                                    <div className="mt-4 mb-6 relative group/img-container w-fit">
+                                                                                        {fetchedImages[q.id] || fetchedImages[q.source_image_id] ? (
+                                                                                            <div className="relative">
+                                                                                                <div className="rounded-xl overflow-hidden border border-white/10 inline-block bg-black/40 group/img relative shadow-lg">
+                                                                                                    <img
+                                                                                                        src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
+                                                                                                        alt="Original Question"
+                                                                                                        className="max-h-80 object-contain transition-all group-hover/img:opacity-50"
+                                                                                                    />
+                                                                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
+                                                                                                        <span className="bg-black/60 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/10 backdrop-blur-sm">
+                                                                                                            Shared Image
+                                                                                                        </span>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                                <button
+                                                                                                    onClick={() => handleHideImage(q.id)}
+                                                                                                    className="absolute -top-2 -right-2 p-1.5 bg-slate-800/95 text-slate-400 hover:text-white rounded-full border border-white/10 shadow-xl opacity-0 group-hover/img-container:opacity-100 transition-all cursor-pointer z-10"
+                                                                                                    title="Hide Image"
+                                                                                                >
+                                                                                                    <X className="w-3.5 h-3.5" />
+                                                                                                </button>
+                                                                                            </div>
+                                                                                        ) : (
+                                                                                            <button
+                                                                                                onClick={() => handleFetchImage(q.id)}
+                                                                                                disabled={fetchingImageId === q.id}
+                                                                                                className="flex items-center gap-2.5 px-4 py-2 rounded-xl text-[12px] font-bold bg-indigo-500/5 text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10 transition-all border border-emerald-500/10 shadow-sm disabled:opacity-50 cursor-pointer uppercase tracking-tight"
+                                                                                            >
+                                                                                                {fetchingImageId === q.id ? (
+                                                                                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                                                                ) : (
+                                                                                                    <ImageIcon className="w-4 h-4" />
+                                                                                                )}
+                                                                                                <span>
+                                                                                                    {fetchingImageId === q.id ? 'Processing...' : 'Fetch Base Image'}
+                                                                                                </span>
+                                                                                            </button>
+                                                                                        )}
+                                                                                    </div>
+                                                                                )}
+
+                                                                                {q.parsedTags && q.parsedTags.length > 0 && (
+                                                                                    <div className="flex flex-wrap gap-2 pt-2 border-t border-white/[0.03]">
+                                                                                        {q.parsedTags.map((tag, idx) => (
+                                                                                            <span key={idx} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-3/50 border border-white/5 text-[10px] font-semibold text-slate-400 lowercase tracking-tight">
+                                                                                                <Hash className="w-2.5 h-2.5 text-emerald-500/50" />
+                                                                                                {tag}
+                                                                                            </span>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
 
                                                                         </div>
                                                                     );
@@ -3711,145 +3691,140 @@ const SubjectDetail = () => {
                                     <FileText className="w-6 h-6 text-indigo-400" />
                                     <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Notes</h3>
                                 </div>
-                                {isSelectionMode ? (
-                                    <div className="flex items-center h-[50px] bg-[#1a1a1e] border border-white/[0.12] rounded-2xl px-2 shadow-[0_12px_40px_rgba(0,0,0,0.8)] transition-all animate-in fade-in zoom-in-95 duration-300 w-full sm:w-auto relative z-[999]">
-                                        <div className="flex items-center pl-3 pr-2 border-r border-white/[0.08] mr-2">
-                                            <div className="w-6 h-6 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center text-[12px] font-bold mr-2">
-                                                {selectedItems.size}
+                                <div className="flex items-center gap-3 ml-auto">
+                                    {isSelectionMode ? (
+                                        <div className="flex items-center h-[50px] bg-[#1a1a1e] border border-white/[0.12] rounded-2xl px-2 shadow-[0_12px_40px_rgba(0,0,0,0.8)] transition-all animate-in fade-in zoom-in-95 duration-300 w-full sm:w-auto relative z-[999]">
+                                            <div className="flex items-center pl-3 pr-2 border-r border-white/[0.08] mr-2">
+                                                <div className="w-6 h-6 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center text-[12px] font-bold mr-2">
+                                                    {selectedItems.size}
+                                                </div>
+                                                <span className="text-[13px] text-slate-300 font-medium hidden sm:inline">selected</span>
                                             </div>
-                                            <span className="text-[13px] text-slate-300 font-medium hidden sm:inline">selected</span>
-                                        </div>
 
-                                        <button
-                                            onClick={handleSelectAll}
-                                            className="text-[12px] font-medium text-slate-300 hover:text-white px-4 py-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
-                                        >
-                                            {selectedItems.size > 0 && selectedItems.size === filteredNotes.length ? 'Clear' : 'Select All'}
-                                        </button>
-
-                                        <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
-
-                                        <div className="flex items-center gap-1 relative">
                                             <button
-                                                onClick={(e) => { e.stopPropagation(); setShowExportMenu(!showExportMenu); }}
-                                                disabled={selectedItems.size === 0}
-                                                className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all cursor-pointer ${showExportMenu ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
+                                                onClick={handleSelectAll}
+                                                className="text-[12px] font-medium text-slate-300 hover:text-white px-4 py-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
                                             >
-                                                <Download className="w-4 h-4" />
-                                                <span className="text-[12px] font-medium hidden md:inline">Export</span>
-                                                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${showExportMenu ? 'rotate-180' : ''}`} />
+                                                {selectedItems.size > 0 && selectedItems.size === filteredNotes.length ? 'Clear' : 'Select All'}
                                             </button>
 
-                                            {showExportMenu && selectedItems.size > 0 && (
-                                                <div
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="absolute top-full right-0 mt-3 w-60 bg-[#1e1e22] border border-white/15 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in slide-in-from-top-3 z-[1000] backdrop-blur-2xl transition-all p-2 space-y-1 block"
-                                                >
-                                                    <div className="px-3 py-2 border-b border-white/5 mb-1.5 leading-none">
-                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Select Export Format</span>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => { handleDownloadSelected(); setShowExportMenu(false); }}
-                                                        className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
-                                                    >
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
-                                                                <FileText className="w-4 h-4 text-indigo-400" />
-                                                            </div>
-                                                            <span>PDF Document</span>
-                                                        </div>
-                                                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => { handleDownloadWordSelected(); setShowExportMenu(false); }}
-                                                        className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
-                                                    >
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
-                                                                <FileText className="w-4 h-4 text-emerald-400" />
-                                                            </div>
-                                                            <span>Word Document</span>
-                                                        </div>
-                                                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => { handleDownloadMarkdownSelected(); setShowExportMenu(false); }}
-                                                        className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
-                                                    >
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center group-hover:bg-orange-500/20 transition-colors">
-                                                                <FileText className="w-4 h-4 text-orange-400" />
-                                                            </div>
-                                                            <span>Markdown File</span>
-                                                        </div>
-                                                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
+                                            <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
 
-                                        <button
-                                            onClick={() => {
-                                                setConfirmBulkDelete({ open: true, type: 'notes', count: selectedItems.size });
-                                                setShowExportMenu(false);
-                                            }}
-                                            disabled={selectedItems.size === 0}
-                                            className="flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:text-white hover:bg-rose-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                            <span className="text-[12px] font-medium hidden md:inline">Delete</span>
-                                        </button>
-
-                                        <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
-
-                                        <button
-                                            onClick={() => { setIsSelectionMode(false); setSelectedItems(new Set()); setShowExportMenu(false); }}
-                                            className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
-                                            title="Cancel Selection"
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col sm:flex-row sm:items-center items-stretch gap-3 w-full sm:w-auto">
-                                        <div className="relative group flex-1 sm:min-w-[280px]">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
-                                            <input
-                                                type="text"
-                                                value={noteSearchQuery}
-                                                onChange={(e) => setNoteSearchQuery(e.target.value)}
-                                                placeholder="Search notes..."
-                                                className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
-                                            />
-                                            {noteSearchQuery && (
+                                            <div className="flex items-center gap-1 relative">
                                                 <button
-                                                    onClick={() => setNoteSearchQuery('')}
-                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                                    onClick={(e) => { e.stopPropagation(); setShowExportMenu(!showExportMenu); }}
+                                                    disabled={selectedItems.size === 0}
+                                                    className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all cursor-pointer ${showExportMenu ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
                                                 >
-                                                    <X className="w-4 h-4" />
+                                                    <Download className="w-4 h-4" />
+                                                    <span className="text-[12px] font-medium hidden md:inline">Export</span>
+                                                    <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${showExportMenu ? 'rotate-180' : ''}`} />
                                                 </button>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            {allNoteTags.length > 0 && (
-                                                <div className="flex-1">
-                                                    <select
-                                                        value={selectedNoteTag}
-                                                        onChange={(e) => setSelectedNoteTag(e.target.value)}
-                                                        className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-200 rounded-xl px-4 py-2 text-[13px] focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all appearance-none cursor-pointer pr-10 hover:border-white/[0.15]"
-                                                        style={{
-                                                            backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(148, 163, 184, 1)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                                                            backgroundRepeat: 'no-repeat',
-                                                            backgroundPosition: 'right 0.75rem center',
-                                                            backgroundSize: '1em'
-                                                        }}
+
+                                                {showExportMenu && selectedItems.size > 0 && (
+                                                    <div
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="absolute top-full right-0 mt-3 w-60 bg-[#1e1e22] border border-white/15 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in slide-in-from-top-3 z-[1000] backdrop-blur-2xl transition-all p-2 space-y-1 block"
                                                     >
-                                                        <option value="">All Tags</option>
-                                                        {allNoteTags.map(tag => (
-                                                            <option key={tag} value={tag}>{tag}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
+                                                        <div className="px-3 py-2 border-b border-white/5 mb-1.5 leading-none">
+                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Select Export Format</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => { handleDownloadSelected(); setShowExportMenu(false); }}
+                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
+                                                        >
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
+                                                                    <FileText className="w-4 h-4 text-indigo-400" />
+                                                                </div>
+                                                                <span>PDF Document</span>
+                                                            </div>
+                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => { handleDownloadWordSelected(); setShowExportMenu(false); }}
+                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
+                                                        >
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
+                                                                    <FileText className="w-4 h-4 text-emerald-400" />
+                                                                </div>
+                                                                <span>Word Document</span>
+                                                            </div>
+                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => { handleDownloadMarkdownSelected(); setShowExportMenu(false); }}
+                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
+                                                        >
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center group-hover:bg-orange-500/20 transition-colors">
+                                                                    <FileText className="w-4 h-4 text-orange-400" />
+                                                                </div>
+                                                                <span>Markdown File</span>
+                                                            </div>
+                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <button
+                                                onClick={() => { setConfirmBulkDelete({ open: true, type: 'notes', count: selectedItems.size }); setShowExportMenu(false); }}
+                                                disabled={selectedItems.size === 0}
+                                                className="flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:text-white hover:bg-rose-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                                <span className="text-[12px] font-medium hidden md:inline">Delete</span>
+                                            </button>
+
+                                            <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
+
+                                            <button
+                                                onClick={() => { setIsSelectionMode(false); setSelectedItems(new Set()); setShowExportMenu(false); }}
+                                                className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
+                                                title="Cancel Selection"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-3">
+                                            <div className="relative group flex-1 sm:min-w-[280px]">
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                                                <input
+                                                    type="text"
+                                                    value={noteSearchQuery}
+                                                    onChange={(e) => setNoteSearchQuery(e.target.value)}
+                                                    placeholder="Search notes..."
+                                                    className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                                                />
+                                                {noteSearchQuery && (
+                                                    <button
+                                                        onClick={() => setNoteSearchQuery('')}
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {allNoteTags.length > 0 && (
+                                                <select
+                                                    value={selectedNoteTag}
+                                                    onChange={(e) => setSelectedNoteTag(e.target.value)}
+                                                    className="bg-surface-2/50 border border-white/[0.08] text-slate-200 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all appearance-none cursor-pointer pr-10 hover:border-white/[0.15]"
+                                                    style={{
+                                                        backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(148, 163, 184, 1)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                                                        backgroundRepeat: 'no-repeat',
+                                                        backgroundPosition: 'right 0.75rem center',
+                                                        backgroundSize: '1em'
+                                                    }}
+                                                >
+                                                    <option value="">All Tags</option>
+                                                    {allNoteTags.map(tag => (
+                                                        <option key={tag} value={tag}>{tag}</option>
+                                                    ))}
+                                                </select>
                                             )}
                                             <div className="flex bg-surface-2/50 p-1 rounded-xl border border-white/[0.06] shrink-0">
                                                 <button
@@ -3867,9 +3842,16 @@ const SubjectDetail = () => {
                                                     <List className="w-4 h-4" />
                                                 </button>
                                             </div>
+                                            <button
+                                                onClick={() => setShowNoteModal(true)}
+                                                className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98] shrink-0"
+                                            >
+                                                <PlusCircle className="w-4 h-4" strokeWidth={2} />
+                                                <span>Add Note</span>
+                                            </button>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
 
 
@@ -3963,22 +3945,7 @@ const SubjectDetail = () => {
                                                                     {note.title}
                                                                 </h4>
 
-                                                                {notesViewMode === 'grid' && (() => {
-                                                                    const nTags = Array.isArray(note.tags) ? note.tags : (note.parsedTags || []);
-                                                                    if (!nTags || nTags.length === 0) return null;
-                                                                    return (
-                                                                        <div className="flex flex-wrap gap-1.5 mt-4">
-                                                                            {nTags.slice(0, 3).map((tag, idx) => (
-                                                                                <span key={idx} className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-white/[0.03] text-slate-400 border border-white/[0.06] uppercase tracking-wider">
-                                                                                    {tag}
-                                                                                </span>
-                                                                            ))}
-                                                                            {nTags.length > 3 && (
-                                                                                <span className="text-[9px] font-bold text-slate-600 px-1">+{nTags.length - 3}</span>
-                                                                            )}
-                                                                        </div>
-                                                                    );
-                                                                })()}
+
                                                             </div>
                                                         </div>
 
@@ -4133,7 +4100,7 @@ const SubjectDetail = () => {
                             {/* Header & Search */}
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
                                 <div className="flex items-center gap-2">
-                                    <ListChecks className="w-6 h-6 text-blue-400" />
+                                    <Lightbulb className="w-6 h-6 text-blue-400" />
                                     <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Solutions Library</h3>
                                 </div>
 
@@ -4171,7 +4138,7 @@ const SubjectDetail = () => {
                                 {solutions.length === 0 ? (
                                     <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
                                         <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 rotate-3">
-                                            <ListChecks className="w-10 h-10 text-blue-500/70" />
+                                            <Lightbulb className="w-10 h-10 text-blue-500/70" />
                                         </div>
                                         <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No solutions yet</h3>
                                         <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
@@ -4210,7 +4177,7 @@ const SubjectDetail = () => {
                                                         {/* Title Section */}
                                                         <div className={`flex items-start gap-3 relative z-10 ${solutionsViewMode === 'list' ? 'w-1/3 shrink-0' : 'mb-4'}`}>
                                                             <div className={`rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0 ${solutionsViewMode === 'list' ? 'p-1.5' : 'p-2.5'}`}>
-                                                                <ListChecks className={`${solutionsViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
+                                                                <Lightbulb className={`${solutionsViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
                                                             </div>
                                                             <div className="min-w-0">
                                                                 <h4 className={`font-heading font-bold text-white tracking-tight break-words truncate group-hover:text-blue-400 transition-colors ${solutionsViewMode === 'list' ? 'text-[14px]' : 'text-[15px]'}`}>
@@ -4543,6 +4510,13 @@ const SubjectDetail = () => {
                                         <RefreshCw className="w-6 h-6 text-indigo-400" />
                                         <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Revision Tracker</h3>
                                     </div>
+                                    <button
+                                        onClick={() => setShowCreateRevisionSession(true)}
+                                        className="bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 hover:border-violet-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98] ml-auto shrink-0"
+                                    >
+                                        <PlusCircle className="w-4 h-4" strokeWidth={2} />
+                                        <span>New Session</span>
+                                    </button>
                                 </div>
 
                                 {revisionSessions.length === 0 ? (
@@ -4572,389 +4546,39 @@ const SubjectDetail = () => {
                     })()}
 
                     {activeTab === 'library' && (
-                        <div className="fade-in pb-12 px-1">
-                            {/* Header for Library */}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
-                                <div className="flex items-center gap-2">
-                                    <Layers className="w-6 h-6 text-indigo-400" />
-                                    <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Resource Library</h3>
-                                </div>
-                                {isSelectionMode ? (
-                                    <div className="flex items-center h-[50px] bg-[#121214]/80 border border-white/[0.08] rounded-2xl px-2 shadow-[0_8px_30px_rgb(0,0,0,0.6)] transition-all animate-in fade-in zoom-in-95 duration-300 w-full sm:w-auto">
-                                        <div className="flex items-center pl-3 pr-2">
-                                            <div className="w-6 h-6 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center text-[12px] font-bold mr-2">
-                                                {selectedItems.size}
-                                            </div>
-                                            <span className="text-[13px] text-slate-300 font-medium hidden sm:inline">selected</span>
-                                        </div>
-
-                                        <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
-
-                                        <button
-                                            onClick={() => {
-                                                if (selectedItems.size === files.length) setSelectedItems(new Set());
-                                                else setSelectedItems(new Set(files.map(f => f.id)));
-                                            }}
-                                            className="text-[12px] font-medium text-slate-300 hover:text-white px-4 py-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
-                                        >
-                                            {selectedItems.size > 0 && selectedItems.size === files.length ? 'Clear' : 'Select All'}
-                                        </button>
-
-                                        <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
-
-                                        <button
-                                            onClick={async () => {
-                                                const loadingToast = toast.loading('Creating Zip...');
-                                                try {
-                                                    const zip = new JSZip();
-                                                    const usedNames = new Map();
-
-                                                    for (const fileId of selectedItems) {
-                                                        try {
-                                                            const f = await getFileData(id, fileId);
-                                                            if (f && f.data) {
-                                                                let baseName = f.file_name || 'file';
-                                                                let ext = '';
-                                                                const lastDot = baseName.lastIndexOf('.');
-                                                                if (lastDot !== -1) {
-                                                                    ext = baseName.substring(lastDot);
-                                                                    baseName = baseName.substring(0, lastDot);
-                                                                } else {
-                                                                    const typeMap = { 'image': '.jpg', 'pdf': '.pdf', 'doc': '.docx', 'xlsx': '.xlsx', 'html': '.html', 'csv': '.csv' };
-                                                                    ext = typeMap[f.file_type] || '';
-                                                                }
-
-                                                                let finalName = `${baseName}${ext}`;
-                                                                if (usedNames.has(finalName)) {
-                                                                    const count = usedNames.get(finalName) + 1;
-                                                                    usedNames.set(finalName, count);
-                                                                    finalName = `${baseName}_${count}${ext}`;
-                                                                } else {
-                                                                    usedNames.set(finalName, 1);
-                                                                }
-
-                                                                const base64Content = f.data.includes(',') ? f.data.split(',')[1] : f.data;
-                                                                zip.file(finalName, base64Content, { base64: true });
-                                                            }
-                                                        } catch (err) {
-                                                            console.error(`Failed to include file ${fileId} in zip:`, err);
-                                                        }
-                                                    }
-
-                                                    const content = await zip.generateAsync({ type: 'blob' });
-                                                    const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
-                                                    const zipFileName = `${subject?.name || 'Library'}_Export_${timestamp}.zip`.replace(/\s+/g, '_');
-                                                    saveAs(content, zipFileName);
-
-                                                    setIsSelectionMode(false);
-                                                    setSelectedItems(new Set());
-                                                    toast.success('Zip downloaded!', { id: loadingToast });
-                                                } catch (err) {
-                                                    console.error('Zip download error:', err);
-                                                    toast.error('Failed to create Zip', { id: loadingToast });
-                                                }
-                                            }}
-                                            disabled={selectedItems.size === 0}
-                                            className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all cursor-pointer ${selectedItems.size === 0 ? 'text-slate-600 cursor-not-allowed opacity-50' : 'text-emerald-400 hover:text-white hover:bg-emerald-500/20'}`}
-                                        >
-                                            <Download className="w-4 h-4" />
-                                            <span className="text-[12px] font-medium hidden md:inline">Download</span>
-                                        </button>
-
-                                        <button
-                                            onClick={() => {
-                                                setConfirmDeleteFile({ open: true, items: Array.from(selectedItems).map(id => files.find(f => f.id === id)).filter(Boolean) });
-                                            }}
-                                            disabled={selectedItems.size === 0 || Array.from(selectedItems).some(id => files.find(f => f.id === id)?.is_linked)}
-                                            className="flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:text-white hover:bg-rose-500/20 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                                            title={Array.from(selectedItems).some(id => files.find(f => f.id === id)?.is_linked) ? "Some selected files are linked to notes/questions" : ""}
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                            <span className="text-[12px] font-medium hidden md:inline">Delete</span>
-                                        </button>
-
-                                        <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
-
-                                        <button
-                                            onClick={() => {
-                                                setIsSelectionMode(false);
-                                                setSelectedItems(new Set());
-                                            }}
-                                            className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
-                                            title="Cancel Selection"
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center bg-white/[0.03] p-1 rounded-xl border border-white/[0.06] shrink-0">
-                                        <div className="flex items-center bg-white/[0.02] rounded-lg p-0.5">
-                                            <div className="relative group">
-                                                <button
-                                                    onClick={() => setLibraryViewMode('categorywise')}
-                                                    className={`p-1.5 rounded-lg transition-all ${libraryViewMode === 'categorywise' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
-                                                    title="Type View"
-                                                >
-                                                    <LayoutGrid className="w-3.5 h-3.5" />
-                                                </button>
-                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#121214] border border-white/10 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 uppercase tracking-widest shadow-xl">
-                                                    Type
-                                                </div>
-                                            </div>
-                                            <div className="relative group">
-                                                <button
-                                                    onClick={() => setLibraryViewMode('datewise')}
-                                                    className={`p-1.5 rounded-lg transition-all ${libraryViewMode === 'datewise' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
-                                                    title="Timeline View"
-                                                >
-                                                    <Clock className="w-3.5 h-3.5" />
-                                                </button>
-                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#121214] border border-white/10 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 uppercase tracking-widest shadow-xl">
-                                                    Timeline
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="w-px h-4 bg-white/10 mx-1" />
-
-                                        <div className="flex items-center gap-0 shrink-0">
-                                            <button
-                                                onClick={() => setShowTimeTraveler(true)}
-                                                className={`px-3 py-1.5 ${fileSearchQuery ? 'rounded-l-lg' : 'rounded-lg'} text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 border ${fileSearchQuery ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30 border-r-indigo-500/10 hover:bg-indigo-500/30' : 'text-slate-500 hover:text-white hover:bg-white/[0.05] border-transparent'}`}
-                                            >
-                                                <History className="w-3.5 h-3.5" />
-                                                <span className="hidden sm:inline">Filter</span>
-                                            </button>
-                                            {fileSearchQuery && (
-                                                <button
-                                                    onClick={() => setFileSearchQuery('')}
-                                                    className="h-[28px] px-2 flex items-center justify-center rounded-r-lg bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 border border-indigo-500/30 border-l-0 hover:border-rose-500/30 transition-colors"
-                                                    title="Clear Filters"
-                                                >
-                                                    <X className="w-3.5 h-3.5" />
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {files.length === 0 ? (
-                                <div className="glass-panel rounded-xl p-16 text-center border-dashed border-primary/20 w-full relative overflow-hidden group">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-                                    <div className="w-20 h-20 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-6 border border-primary/20 pulse-ring">
-                                        <Layers className="w-10 h-10 text-primary" strokeWidth={1.5} />
-                                    </div>
-                                    <h3 className="text-2xl font-heading font-bold text-white mb-3 tracking-tight">No resources yet</h3>
-                                    <p className="text-slate-400 text-sm max-w-sm mx-auto mb-8 leading-relaxed">
-                                        Upload documents, diagrams, textbook snippets, or handwritten notes. They'll be saved here for easy reference.
-                                    </p>
-                                    <button
-                                        onClick={() => setShowFileModal(true)}
-                                        className="btn-primary flex items-center gap-2 mx-auto px-6 py-3 rounded-xl text-sm font-semibold cursor-pointer"
-                                    >
-                                        <PlusCircle className="w-4 h-4" />
-                                        <span>Upload Your First File</span>
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="space-y-12">
-                                    {groupedLibraryItems.map((group, gIdx) => (
-                                        <div key={group.title} className="relative">
-                                            <div className="sticky top-0 z-30 pt-4 pb-6 bg-surface mb-2">
-                                                <div className="flex items-center gap-4">
-                                                    <h2 className="text-xl font-heading font-bold text-white tracking-tight flex items-center gap-3">
-                                                        {group.title}
-                                                        <span className="text-[11px] font-bold text-slate-500 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">{group.items.length}</span>
-                                                    </h2>
-                                                    <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
-                                                </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                                                {group.items.map((file, index) => {
-                                                    const isGlobalLast = gIdx === groupedLibraryItems.length - 1 && index === group.items.length - 1;
-                                                    const hasLink = file.linked_question_id || file.linked_note_id;
-
-                                                    return (
-                                                        <div
-                                                            key={file.id}
-                                                            ref={isGlobalLast ? lastFileElementRef : null}
-                                                            className={`group relative aspect-square rounded-xl bg-surface-2 transition-all duration-300 cursor-pointer shadow-lg active:scale-[0.98] fade-in border ${isSelectionMode
-                                                                ? (selectedItems.has(file.id) ? 'border-indigo-500 ring-2 ring-indigo-500/50 bg-indigo-500/10 scale-95 opacity-90' : 'border-white/[0.04] scale-100 opacity-100')
-                                                                : (activeFileDropdown === file.id ? 'border-primary/40 shadow-xl z-[40]' : 'border-white/[0.04] hover:border-primary/40 hover:shadow-primary/5')
-                                                                }`}
-                                                            onClick={() => {
-                                                                if (isSelectionMode) {
-                                                                    const newSelected = new Set(selectedItems);
-                                                                    if (newSelected.has(file.id)) newSelected.delete(file.id);
-                                                                    else newSelected.add(file.id);
-                                                                    setSelectedItems(newSelected);
-                                                                    return;
-                                                                }
-                                                                if (activeFileDropdown === file.id) setActiveFileDropdown(null);
-                                                                else handleFileClick(file);
-                                                            }}
-                                                            style={{ animationDelay: `${(index % 10) * 0.05}s` }}
-                                                        >
-                                                            <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none">
-                                                                {file.thumbnail ? (
-                                                                    <img
-                                                                        src={file.thumbnail}
-                                                                        alt={file.file_name}
-                                                                        className="w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
-                                                                        loading="lazy"
-                                                                    />
-                                                                ) : (file.data && (file.file_type === 'image' || !file.file_type)) ? (
-                                                                    <img
-                                                                        src={file.data}
-                                                                        alt={file.file_name}
-                                                                        className="w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
-                                                                        loading="lazy"
-                                                                    />
-                                                                ) : (
-                                                                    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-surface-3 to-surface-2 transition-all duration-500 text-slate-300">
-                                                                        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                                                            {file.file_type === 'pdf' ? <FileText className="w-7 h-7 text-rose-400" /> :
-                                                                                file.file_type === 'xlsx' ? <Layers className="w-7 h-7 text-emerald-400" /> :
-                                                                                    file.file_type === 'doc' ? <FileText className="w-7 h-7 text-blue-400" /> :
-                                                                                        file.file_type === 'html' ? <FileText className="w-7 h-7 text-orange-400" /> :
-                                                                                            <ImageIcon className="w-7 h-7 text-indigo-400" />}
-                                                                        </div>
-                                                                        <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">{file.file_type || 'Image'}</span>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-
-                                                            {/* Indicators */}
-                                                            {hasLink && (
-                                                                <div className="absolute top-2 left-2 flex gap-1 z-20">
-                                                                    {file.linked_question_id && (
-                                                                        <div className="p-1.5 rounded-lg bg-indigo-500/80 text-white border border-white/10 shadow-lg" title="Linked to Question">
-                                                                            <Activity className="w-3 h-3" />
-                                                                        </div>
-                                                                    )}
-                                                                    {file.linked_note_id && (
-                                                                        <div className="p-1.5 rounded-lg bg-emerald-500/80 text-white border border-white/10 shadow-lg" title="Linked to Note">
-                                                                            <FileText className="w-3 h-3" />
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            )}
-
-                                                            {/* Selection Indicator */}
-                                                            {isSelectionMode && (
-                                                                <div className="absolute top-3 right-3 z-30">
-                                                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(file.id) ? 'bg-indigo-500 border-indigo-500' : 'border-white/30 bg-black/40 backdrop-blur-sm'}`}>
-                                                                        {selectedItems.has(file.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
-                                                                    </div>
-                                                                </div>
-                                                            )}
-
-                                                            {/* Standard Identical Overlay from Library.jsx */}
-                                                            <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-4 z-10 transition-all group-hover:bg-black/20">
-                                                                <div className="flex items-center justify-between mb-1.5 relative">
-                                                                    <div className="text-[10px] font-bold text-primary uppercase tracking-wider">
-                                                                        {subject?.name}
-                                                                    </div>
-
-                                                                    <div className={`flex items-center gap-1 transition-opacity ${activeFileDropdown === file.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                                                                        {!isSelectionMode && hasLink && (
-                                                                            <button
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    if (file.linked_question_id) navigateToQuestion(file.linked_question_id);
-                                                                                    else if (file.linked_note_id) {
-                                                                                        const note = notes.find(n => n.id === file.linked_note_id);
-                                                                                        if (note) {
-                                                                                            setViewingNote(note);
-
-                                                                                        }
-                                                                                    }
-                                                                                }}
-                                                                                className="p-1 px-[5px] bg-primary/20 hover:bg-primary text-white rounded-lg border border-primary/30 transition-all cursor-pointer"
-                                                                                title="View Linked Content"
-                                                                            >
-                                                                                <LinkIcon className="w-3 h-3" />
-                                                                            </button>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-
-                                                                <div className="flex items-center justify-between gap-2">
-                                                                    <p className="text-[11px] font-semibold text-white truncate flex-1 leading-tight mb-0.5">
-                                                                        {file.file_name || new Date(file.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                                                    </p>
-
-                                                                    {!isSelectionMode && (
-                                                                        <div className={`relative shrink-0 transition-opacity ${activeFileDropdown === file.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} onClick={e => e.stopPropagation()}>
-                                                                            <button
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    setActiveFileDropdown(activeFileDropdown === file.id ? null : file.id);
-                                                                                }}
-                                                                                className={`p-1 flex items-center justify-center rounded-lg border transition-all cursor-pointer ${activeFileDropdown === file.id ? 'bg-primary border-primary text-white' : 'bg-black/40 hover:bg-black/60 text-white/80 border-white/10 backdrop-blur-sm'}`}
-                                                                                title="More Options"
-                                                                            >
-                                                                                <MoreVertical className="w-3.5 h-3.5" />
-                                                                            </button>
-                                                                            {activeFileDropdown === file.id && (
-                                                                                <div className="absolute right-0 top-full mt-2 w-36 bg-[#121214]/95 border border-white/10 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.6)] py-1.5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50 backdrop-blur-xl" onClick={e => e.stopPropagation()}>
-                                                                                    <button
-                                                                                        onClick={() => { setIsSelectionMode(true); setSelectedItems(new Set([file.id])); setActiveFileDropdown(null); }}
-                                                                                        className="w-full flex items-center justify-start gap-2.5 px-3.5 py-2 text-[12px] font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
-                                                                                    >
-                                                                                        <CheckCircle className="w-3.5 h-3.5 text-indigo-400" /> Select
-                                                                                    </button>
-                                                                                    <button
-                                                                                        onClick={() => {
-                                                                                            setActiveFileDropdown(null);
-                                                                                            setRenameFileData({ open: true, file, name: file.file_name || '' });
-                                                                                        }}
-                                                                                        className="w-full flex items-center justify-start gap-2.5 px-3.5 py-2 text-[12px] font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
-                                                                                    >
-                                                                                        <Pencil className="w-3.5 h-3.5 text-emerald-400" /> Rename
-                                                                                    </button>
-                                                                                    <button
-                                                                                        onClick={() => {
-                                                                                            if (file.is_linked) return;
-                                                                                            setActiveFileDropdown(null);
-                                                                                            setConfirmDeleteFile({ open: true, items: [file] });
-                                                                                        }}
-                                                                                        disabled={file.is_linked}
-                                                                                        className={`w-full flex items-center justify-start gap-2.5 px-3.5 py-2 text-[12px] font-medium transition-all ${file.is_linked ? 'text-slate-600 cursor-not-allowed grayscale' : 'text-slate-300 hover:text-rose-400 hover:bg-rose-500/10 cursor-pointer'}`}
-                                                                                        title={file.is_linked ? "This file is linked to a note or question" : "Delete File"}
-                                                                                    >
-                                                                                        <Trash2 className={`w-3.5 h-3.5 ${file.is_linked ? 'text-slate-700' : 'text-rose-500'}`} /> {file.is_linked ? 'In Use' : 'Delete'}
-                                                                                    </button>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {loadingMoreFiles && (
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5 mt-5">
-                                    {[...Array(5)].map((_, i) => (
-                                        <div key={`skeleton-${i}`} className="aspect-square rounded-2xl bg-surface-2/40 border border-white/[0.04] animate-pulse overflow-hidden">
-                                            <div className="w-full h-full bg-indigo-500/5" />
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                        <div className="fade-in pb-12">
+                            <FileExplorer
+                                files={files}
+                                folders={folders}
+                                scopeId={id}
+                                scopeType="subject"
+                                onFilesChange={setFiles}
+                                onFoldersChange={setFolders}
+                                onFileUpload={(fId) => {
+                                    setUploadFolderId(fId);
+                                    setShowFileModal(true);
+                                }}
+                                onNavigate={(folderId) => {
+                                    setCurrentFolderId(folderId);
+                                    setFilePage(0);
+                                    fetchFolderContents(id, 'subject', folderId, FILE_LIMIT, 0).then(res => {
+                                        setFiles(res.files || []);
+                                        setHasMoreFiles((res.files || []).length === FILE_LIMIT);
+                                    });
+                                }}
+                                isSelectionMode={isSelectionMode}
+                                setIsSelectionMode={setIsSelectionMode}
+                                selectedIds={selectedItems}
+                                setSelectedIds={setSelectedItems}
+                                onFileClick={setViewingFile}
+                                foldersApi={foldersApi}
+                                filesApi={filesApi}
+                            />
                         </div>
                     )}
                 </>
             )}
+
 
             <CreateRevisionSessionModal
                 isOpen={showCreateRevisionSession}

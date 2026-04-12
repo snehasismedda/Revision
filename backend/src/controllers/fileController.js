@@ -2,6 +2,7 @@ import * as noteModel from '../models/noteModel.js';
 import * as questionModel from '../models/questionModel.js';
 import * as fileModel from '../models/fileModel.js';
 import * as topicModel from '../models/topicModel.js';
+import * as folderModel from '../models/folderModel.js';
 import { ollama, models } from '../config/ollama.js';
 import { noteAnalysisPrompt } from '../system_prompts/index.js';
 import { parseQuestionToRichText } from '../services/ai_service/response/questionParser.js';
@@ -27,7 +28,18 @@ export const getAllFiles = async (req, res) => {
 export const getFileById = async (req, res) => {
     try {
         const { id, subjectId, seriesId } = req.params;
-        const file = await fileModel.getFileById(id, subjectId, seriesId);
+        const { metadataOnly } = req.query;
+        
+        let file;
+        if (metadataOnly === 'true') {
+            file = await fileModel.getFileById(id, subjectId, seriesId);
+            if (file) {
+                delete file.data; // Remove huge data string
+            }
+        } else {
+            file = await fileModel.getFileById(id, subjectId, seriesId);
+        }
+
         if (!file) return res.status(404).json({ error: 'File not found' });
         res.status(200).json({ file });
     } catch (error) {
@@ -184,6 +196,16 @@ export const saveFileAs = async (req, res) => {
 export const deleteFile = async (req, res) => {
     try {
         const { id, subjectId, seriesId } = req.params;
+        
+        // Check if file is in a system folder
+        const file = await fileModel.getFileById(id, subjectId, seriesId);
+        if (file?.folder_id) {
+            const folder = await folderModel.getFolderById(file.folder_id, subjectId, seriesId);
+            if (folder?.is_system) {
+                return res.status(403).json({ error: 'Files in system folders cannot be deleted manually' });
+            }
+        }
+
         console.log(`[deleteFile] Attempting soft delete for file: ${id}, subjectId: ${subjectId}, seriesId: ${seriesId}`);
         await fileModel.softDeleteFile(id, subjectId, seriesId);
         res.status(200).json({ success: true });
@@ -197,11 +219,48 @@ export const updateFile = async (req, res) => {
     try {
         const { id, subjectId, seriesId } = req.params;
         const { fileName, folderId } = req.body;
+
+        // Check if file is in a system folder (prevent renaming or moving out)
+        const file = await fileModel.getFileById(id, subjectId, seriesId);
+        if (file?.folder_id) {
+            const folder = await folderModel.getFolderById(file.folder_id, subjectId, seriesId);
+            if (folder?.is_system) {
+                return res.status(403).json({ error: 'Files in system folders cannot be renamed or moved' });
+            }
+        }
+
         const [updatedFile] = await fileModel.updateFileName(id, subjectId, seriesId, fileName, folderId);
         if (!updatedFile) return res.status(404).json({ error: 'File not found' });
         res.status(200).json({ file: updatedFile });
     } catch (error) {
         console.error('[updateFile]', error);
         res.status(500).json({ error: 'Failed to update file' });
+    }
+};
+
+export const getFileRawData = async (req, res) => {
+    try {
+        const { id } = req.params;
+        // We use a simplified fetch here as id is unique
+        const file = await fileModel.getFileById(id);
+        if (!file || !file.data) return res.status(404).json({ error: 'File not found' });
+
+        // Handle Data URIs
+        if (file.data.startsWith('data:')) {
+            const [header, base64Data] = file.data.split(';base64,');
+            const contentType = header.split(':')[1];
+            const buffer = Buffer.from(base64Data, 'base64');
+            
+            res.setHeader('Content-Type', contentType);
+            res.setHeader('Content-Length', buffer.length);
+            res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for a year
+            return res.send(buffer);
+        }
+
+        // Fallback for plain data
+        res.status(400).json({ error: 'File data format not supported for raw streaming' });
+    } catch (error) {
+        console.error('[getFileRawData]', error);
+        res.status(500).json({ error: 'Failed to stream file data' });
     }
 };

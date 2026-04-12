@@ -37,7 +37,7 @@ export const FolderProvider = ({ children }) => {
         }
     }, []);
 
-    const fetchFolderContents = useCallback(async (scopeId, scopeType, folderId = null, limit = 20, offset = 0) => {
+    const fetchFolderContents = useCallback(async (scopeId, scopeType, folderId = null, limit = 50, offset = 0) => {
         if (!scopeId) return { folders: [], files: [] };
         
         setLoading(true);

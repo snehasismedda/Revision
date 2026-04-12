@@ -1,9 +1,11 @@
+import * as folderModel from '../models/folderModel.js';
 import * as questionModel from '../models/questionModel.js';
 import * as topicModel from '../models/topicModel.js';
 import * as fileModel from '../models/fileModel.js';
 import * as deletionService from '../services/deletionService.js';
 import * as subjectModel from '../models/subjectModel.js';
 import { parseQuestionToRichText } from '../services/ai_service/response/questionParser.js';
+import { generateThumbnail } from '../utils/thumbnailGenerator.js';
 
 export const getQuestions = async (req, res, next) => {
     try {
@@ -57,7 +59,15 @@ export const createQuestion = async (req, res, next) => {
         if (skipAI) {
             let sourceImageId = null;
             if (typeValue === 'image') {
-                const savedImage = await fileModel.createFile(subjectId, content);
+                const questionsFolder = await folderModel.getSystemFolderByName(subjectId, 'Questions');
+                const thumbnail = await generateThumbnail(content, 'image');
+                const savedImage = await fileModel.createFile({ 
+                    subjectId, 
+                    data: content, 
+                    thumbnail,
+                    folderId: questionsFolder?.id,
+                    fileName: `Question_${Date.now()}.png`
+                });
                 sourceImageId = savedImage.id;
             }
 
@@ -68,6 +78,12 @@ export const createQuestion = async (req, res, next) => {
                 source_image_id: sourceImageId,
                 tags: JSON.stringify(finalManualTags)
             });
+
+            // Update filename with question ID
+            if (sourceImageId && question?.id) {
+                await fileModel.updateFileName(sourceImageId, subjectId, null, `question_${question.id}.png`);
+            }
+
             await subjectModel.touchSubject(subjectId);
             return res.status(201).json({ questions: [question] });
         }
@@ -82,7 +98,15 @@ export const createQuestion = async (req, res, next) => {
 
         let sourceImageId = null;
         if (typeValue === 'image') {
-            const savedImage = await fileModel.createFile(subjectId, content);
+            const questionsFolder = await folderModel.getSystemFolderByName(subjectId, 'Questions');
+            const thumbnail = await generateThumbnail(content, 'image');
+            const savedImage = await fileModel.createFile({ 
+                subjectId, 
+                data: content, 
+                thumbnail,
+                folderId: questionsFolder?.id,
+                fileName: `Question_${Date.now()}.png`
+            });
             sourceImageId = savedImage.id;
         }
 
@@ -99,6 +123,12 @@ export const createQuestion = async (req, res, next) => {
                 source_image_id: sourceImageId,
                 tags: JSON.stringify(mergedTags)
             });
+
+            // Update filename with question ID
+            if (sourceImageId && question?.[0]?.id) {
+                await fileModel.updateFileName(sourceImageId, subjectId, null, `question_${question[0].id}.png`);
+            }
+
             await subjectModel.touchSubject(subjectId);
             return res.status(201).json({ questions: question });
         } else {
@@ -121,6 +151,12 @@ export const createQuestion = async (req, res, next) => {
                     source_image_id: sourceImageId,
                 };
             }));
+
+            // Update filename with parent question ID
+            if (sourceImageId && parentQuestion?.[0]?.id) {
+                await fileModel.updateFileName(sourceImageId, subjectId, null, `question_${parentQuestion[0].id}.png`);
+            }
+
             await subjectModel.touchSubject(subjectId);
             return res.status(201).json({ questions: childQuestions });
         }

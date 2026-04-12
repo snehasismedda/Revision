@@ -1,5 +1,5 @@
 import express from 'express';
-import { getAllFiles, saveFileAs, getFilesBySubject, getFilesByTestSeries, deleteFile, updateFile, getFileById } from '../controllers/fileController.js';
+import { getAllFiles, saveFileAs, getFilesBySubject, getFilesByTestSeries, deleteFile, updateFile, getFileById, getFileRawData } from '../controllers/fileController.js';
 import authenticate from '../middlewares/authenticate.js';
 
 const router = express.Router();
@@ -7,6 +7,7 @@ const router = express.Router();
 router.use(authenticate);
 
 router.get('/', getAllFiles);
+router.get('/:id/raw', getFileRawData);
 router.post('/save-as', saveFileAs);
 
 // Subject-based files

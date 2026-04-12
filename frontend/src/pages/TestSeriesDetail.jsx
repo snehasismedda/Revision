@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Target, ArrowLeft, Plus, Calendar, Activity, TrendingUp, TrendingDown, BookOpen, Trash2, Edit2, ChevronRight, ChevronDown, X, Brain, CheckCircle2, BarChart3, Notebook, BarChart2, Search, History, Clock, LayoutGrid, List, FileText, Image as ImageIcon, MoreVertical, Download, CheckCircle, Pencil, Layers, Save, Trash, FileDown, Eye, Maximize2, PlusCircle, RefreshCw, Filter, Link as LinkIcon, Table } from 'lucide-react';
+import { Target, ArrowLeft, Plus, Calendar, Activity, TrendingUp, TrendingDown, BookOpen, Trash2, Edit2, ChevronRight, ChevronDown, X, Brain, CheckCircle2, BarChart3, Notebook, BarChart2, Search, History, Clock, LayoutGrid, List, FileText, Image as ImageIcon, MoreVertical, Download, CheckCircle, Pencil, Layers, Save, Trash, FileDown, Eye, Maximize2, PlusCircle, RefreshCw, Filter, Link as LinkIcon, Table, LibraryBig } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 
 import * as testSeriesApi from '../api/testSeriesApi';
@@ -138,10 +138,10 @@ const TestSeriesDetail = () => {
         if (!seriesId) return;
         setLoadingFiles(true);
         try {
-            const res = await fetchFolderContents(seriesId, 'series', folderId, 20, page * 20);
+            const res = await fetchFolderContents(seriesId, 'series', folderId, 50, page * 50);
             if (page === 0) setFiles(res.files || []);
             else setFiles(prev => [...prev, ...(res.files || [])]);
-            setHasMoreFiles((res.files || []).length === 20);
+            setHasMoreFiles((res.files || []).length === 50);
         } catch (err) {
             toast.error("Failed to load library");
         } finally {
@@ -440,27 +440,28 @@ const TestSeriesDetail = () => {
             {/* Divider and section Heading */}
             <div className="h-px bg-gradient-to-r from-white/[0.08] via-white/[0.06] to-transparent mb-4" />
 
-            <div className="flex items-center gap-6 mb-8 mt-4 border-b border-white/[0.04]">
+            <div className="flex items-center gap-4 mb-10 mt-6 border-b border-white/[0.06]">
                 <button
                     onClick={() => setActiveTab('tests')}
-                    className={`pb-4 px-2 text-[15px] font-bold transition-all relative cursor-pointer ${activeTab === 'tests' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    className={`pb-5 px-4 text-[16px] font-black transition-all relative cursor-pointer ${activeTab === 'tests' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
                 >
-                    <div className="flex items-center gap-2">
-                        <Notebook className="w-4 h-4" />
+                    <div className="flex items-center gap-3">
+                        <Notebook className="w-5 h-5" />
                         <span>Tests</span>
-                        <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded-full border border-white/5">{tests.length}</span>
+                        <span className="text-[11px] bg-white/5 px-2 py-0.5 rounded-full border border-white/10 font-bold">{tests.length}</span>
                     </div>
-                    {activeTab === 'tests' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-pink-500 rounded-t-full shadow-[0_-4px_12px_rgba(236,72,153,0.5)] fade-in" />}
+                    {activeTab === 'tests' && <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-pink-500 rounded-t-full shadow-[0_-4px_12px_rgba(236,72,153,0.5)] fade-in" />}
                 </button>
+                <div className="w-px h-6 bg-white/[0.08] mb-5 shrink-0" />
                 <button
                     onClick={() => setActiveTab('library')}
-                    className={`pb-4 px-2 text-[15px] font-bold transition-all relative cursor-pointer ${activeTab === 'library' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'}`}
+                    className={`pb-5 px-4 text-[16px] font-black transition-all relative cursor-pointer ${activeTab === 'library' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'}`}
                 >
-                    <div className="flex items-center gap-2">
-                        <Layers className="w-4 h-4" />
+                    <div className="flex items-center gap-3">
+                        <LibraryBig className="w-5 h-5" />
                         <span>Library</span>
                     </div>
-                    {activeTab === 'library' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-500 rounded-t-full shadow-[0_-4px_12px_rgba(99,102,241,0.5)] fade-in" />}
+                    {activeTab === 'library' && <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-indigo-500 rounded-t-full shadow-[0_-4px_12px_rgba(99,102,241,0.5)] fade-in" />}
                 </button>
             </div>
 
@@ -591,9 +592,9 @@ const TestSeriesDetail = () => {
                             loadLibrary(0, folderId);
                         }}
                         isSelectionMode={isSelectionMode}
-                        onSelectionModeChange={setIsSelectionMode}
+                        setIsSelectionMode={setIsSelectionMode}
                         selectedIds={selectedItems}
-                        onSelectionChange={setSelectedItems}
+                        setSelectedIds={setSelectedItems}
                         onFileClick={setViewingFile}
                         foldersApi={foldersApi}
                         filesApi={filesApi}

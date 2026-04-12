@@ -5,12 +5,10 @@ import { filesApi } from '../api/index.js';
 import { useSubjects } from '../context/SubjectContext.jsx';
 import { useFiles } from '../context/FileContext.jsx';
 import { useQuickView } from '../context/QuickViewContext.jsx';
-import { Clock, LayoutGrid, Layers, PlusCircle, Search, X, History, Activity, Maximize2, Link as LinkIcon, ChevronDown, FileText, MoreHorizontal, MoreVertical, CheckCircle, Pencil, Trash2, Download, ExternalLink, Image as ImageIcon } from 'lucide-react';
+import { Clock, LayoutGrid, LibraryBig, PlusCircle, Search, X, History, Activity, Maximize2, Link as LinkIcon, ChevronDown, FileText, MoreHorizontal, MoreVertical, CheckCircle, Pencil, Trash2, Download, ExternalLink, Image as ImageIcon, Table } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AddFileModal from '../components/modals/AddFileModal.jsx';
 import TimeTraveler from '../components/TimeTraveler.jsx';
-import ViewNoteModal from '../components/modals/ViewNoteModal.jsx';
-import FileViewerModal from '../components/modals/FileViewerModal.jsx';
 import ModalPortal from '../components/ModalPortal.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import { formatDate } from '../utils/dateUtils';
@@ -22,7 +20,7 @@ const Library = () => {
     const [loadingMore, setLoadingMore] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const [page, setPage] = useState(0);
-    const LIMIT = 20;
+    const LIMIT = 50;
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedSubjectId, setSelectedSubjectId] = useState('all');
     const [viewMode, setViewMode] = useState('type'); // 'type' or 'timeline'
@@ -62,7 +60,7 @@ const Library = () => {
         const items = confirmDeleteFile.items || [];
         if (items.length === 0) return;
         try {
-            await Promise.all(items.map(file => filesApi.delete(file.subject_id, file.id)));
+            await Promise.all(items.map(file => filesApi.delete(file.id, file.subject_id, file.test_series_id)));
             const itemIds = new Set(items.map(f => f.id));
             setFiles(prev => prev.filter(f => !itemIds.has(f.id)));
 
@@ -74,8 +72,8 @@ const Library = () => {
             }
 
             toast.success(items.length > 1 ? `Successfully deleted ${items.length} files` : 'File deleted successfully');
-        } catch {
-            toast.error(items.length > 1 ? 'Failed to delete some files' : 'Failed to delete file');
+        } catch (err) {
+            toast.error(err.message || (items.length > 1 ? 'Failed to delete some files' : 'Failed to delete file'));
         } finally {
             setConfirmDeleteFile({ open: false, items: [] });
         }
@@ -163,12 +161,12 @@ const Library = () => {
         const file = editingFile;
         if (!file) return;
         try {
-            await filesApi.update(file.subject_id, file.id, { fileName: editingFileName });
+            await filesApi.update(file.id, { fileName: editingFileName }, file.subject_id, file.test_series_id);
             setFiles(prev => prev.map(f => f.id === file.id ? { ...f, file_name: editingFileName } : f));
             setEditingFile(null);
             toast.success('File renamed successfully');
-        } catch {
-            toast.error('Failed to rename file');
+        } catch (err) {
+            toast.error(err.message || 'Failed to rename file');
         }
     };
 
@@ -401,7 +399,7 @@ const Library = () => {
                 <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-6">
                     <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
-                            <Layers className="w-5 h-5 text-primary" />
+                            <LibraryBig className="w-5 h-5 text-primary" />
                             <span className="text-[11px] font-bold tracking-[0.2em] text-primary uppercase">Resource Hub</span>
                         </div>
                         <h1 className="text-3xl font-heading font-bold text-white tracking-tight">Library Gallery</h1>
@@ -554,7 +552,7 @@ const Library = () => {
                 <div className="glass-panel rounded-xl p-16 text-center border-dashed border-primary/20 w-full relative overflow-hidden group">
                     <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
                     <div className="w-20 h-20 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-6 border border-primary/20 pulse-ring">
-                        <Layers className="w-10 h-10 text-primary" strokeWidth={1.5} />
+                        <LibraryBig className="w-10 h-10 text-primary" strokeWidth={1.5} />
                     </div>
                     <h3 className="text-2xl font-heading font-bold text-white mb-3 tracking-tight">No files found</h3>
                     <p className="text-slate-400 text-sm max-w-sm mx-auto mb-8 leading-relaxed">
@@ -632,7 +630,7 @@ const Library = () => {
                                                     <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-surface-3 to-surface-2 transition-all duration-500 text-slate-300">
                                                         <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                                                             {file.file_type === 'pdf' ? <FileText className="w-7 h-7 text-rose-400" /> :
-                                                             file.file_type === 'xlsx' ? <Layers className="w-7 h-7 text-emerald-400" /> :
+                                                             file.file_type === 'xlsx' ? <Table className="w-7 h-7 text-emerald-400" /> :
                                                              file.file_type === 'doc' ? <FileText className="w-7 h-7 text-blue-400" /> :
                                                              file.file_type === 'html' ? <FileText className="w-7 h-7 text-orange-400" /> :
                                                              <ImageIcon className="w-7 h-7 text-indigo-400" />}

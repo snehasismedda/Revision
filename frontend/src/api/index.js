@@ -30,6 +30,10 @@ export const request = async (path, options = {}) => {
         }
     }
 
+    if (options.blob) {
+        return await res.blob();
+    }
+
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
@@ -255,8 +259,9 @@ export const filesApi = {
         const qs = q.length ? '?' + q.join('&') : '';
         return request(`/files/test-series/${seriesId}${qs}`);
     },
-    getById: (id, subjectId, seriesId) => {
-        const path = subjectId ? `/files/subject/${subjectId}/${id}` : `/files/test-series/${seriesId}/${id}`;
+    getById: (id, subjectId, seriesId, metadataOnly = false) => {
+        const query = metadataOnly ? '?metadataOnly=true' : '';
+        const path = subjectId ? `/files/subject/${subjectId}/${id}${query}` : `/files/test-series/${seriesId}/${id}${query}`;
         return request(path);
     },
     saveAs: (body) => request('/files/save-as', { method: 'POST', body }),
@@ -268,6 +273,7 @@ export const filesApi = {
         const path = subjectId ? `/files/subject/${subjectId}/${id}` : `/files/test-series/${seriesId}/${id}`;
         return request(path, { method: 'PUT', body });
     },
+    getRaw: (id) => request(`/files/${id}/raw`, { blob: true }),
 };
 
 // Folders

@@ -8,7 +8,13 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 Minutes
 const MAX_CACHE_SIZE = 100 * 1024 * 1024; // 100 MB
 
 const estimateSize = (obj) => {
+    if (!obj) return 0;
     try {
+        // Optimization: If it's a file object with a large data string, use its length directly
+        // to avoid expensive JSON.stringify on multi-megabyte strings.
+        if (obj.data && typeof obj.data === 'string') {
+            return obj.data.length + 1024; // Data length + ~1KB for metadata
+        }
         const str = JSON.stringify(obj);
         return str ? str.length : 0;
     } catch {
@@ -42,12 +48,29 @@ export const FileProvider = ({ children }) => {
 
         const fetchPromise = (async () => {
             try {
-                const res = await filesApi.getById(fileId, subjectId, seriesId);
-                const fullFile = res.file;
-                const size = estimateSize(fullFile);
+                // 1. Fetch metadata first (no huge data string)
+                const res = await filesApi.getById(fileId, subjectId, seriesId, true);
+                const metadata = res.file;
+
+                // 2. Fetch raw data as blob
+                const blob = await filesApi.getRaw(fileId);
+                const blobUrl = URL.createObjectURL(blob);
+                
+                const fullFile = {
+                    ...metadata,
+                    data: blobUrl,
+                    isBlobUrl: true
+                };
+                
+                const size = blob.size;
 
                 setFileCache(prev => {
                     const next = { ...prev };
+                    
+                    // If we are replacing an existing cache item, revoke its URL
+                    if (next[fileId]?.data?.isBlobUrl) {
+                        URL.revokeObjectURL(next[fileId].data.data);
+                    }
                     delete next[fileId];
 
                     let currentTotalSize = Object.values(next).reduce((acc, item) => acc + (item.size || 0), 0);
@@ -56,6 +79,9 @@ export const FileProvider = ({ children }) => {
                         const entries = Object.entries(next).sort((a, b) => a[1].timestamp - b[1].timestamp);
                         while (currentTotalSize + size > MAX_CACHE_SIZE && entries.length > 0) {
                             const [oldId, oldItem] = entries.shift();
+                            if (oldItem.data?.isBlobUrl) {
+                                URL.revokeObjectURL(oldItem.data.data);
+                            }
                             currentTotalSize -= oldItem.size || 0;
                             delete next[oldId];
                         }
@@ -85,6 +111,9 @@ export const FileProvider = ({ children }) => {
 
     const clearFileCache = useCallback((fileId) => {
         setFileCache(prev => {
+            if (prev[fileId]?.data?.isBlobUrl) {
+                URL.revokeObjectURL(prev[fileId].data.data);
+            }
             const next = { ...prev };
             delete next[fileId];
             return next;
@@ -95,7 +124,12 @@ export const FileProvider = ({ children }) => {
         if (!fileIds || fileIds.length === 0) return;
         setFileCache(prev => {
             const next = { ...prev };
-            fileIds.forEach(id => delete next[id]);
+            fileIds.forEach(id => {
+                if (next[id]?.data?.isBlobUrl) {
+                    URL.revokeObjectURL(next[id].data.data);
+                }
+                delete next[id];
+            });
             return next;
         });
         fileIds.forEach(id => delete fetchingRegistry.current[id]);

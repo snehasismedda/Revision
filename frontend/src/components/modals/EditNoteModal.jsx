@@ -662,6 +662,32 @@ const EditNoteModal = ({ isOpen, onClose, subjectId, note, onNoteUpdated, isMini
                                             className={`w-full border rounded-xl px-4 py-3 text-[13px] focus:outline-none focus:ring-1 transition-all ${isLightMode ? 'bg-white border-slate-200 text-slate-900 focus:border-emerald-500/40 focus:ring-emerald-500/10 placeholder:text-slate-400' : 'bg-white/[0.03] border-white/[0.06] text-slate-100 focus:border-emerald-500/30 focus:ring-emerald-500/10 placeholder:text-slate-700'}`}
                                             placeholder="Add tag + Enter"
                                         />
+
+                                        {/* Existing Tags Suggestions */}
+                                        {availableTags.filter(t => !tags.includes(t)).length > 0 && (
+                                            <div className="mt-3">
+                                                <p className={`text-[9px] font-extrabold uppercase tracking-wider mb-2 ${isLightMode ? 'text-slate-400' : 'text-slate-600'}`}>Existing Tags</p>
+                                                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto custom-scrollbar pr-1">
+                                                    {availableTags
+                                                        .filter(t => !tags.includes(t))
+                                                        .map(tag => (
+                                                            <button
+                                                                key={tag}
+                                                                type="button"
+                                                                onClick={() => setTags([...tags, tag])}
+                                                                className={`px-2 py-1 text-[10px] font-medium rounded-md border transition-all cursor-pointer ${
+                                                                    isLightMode 
+                                                                        ? 'bg-white border-slate-200 text-slate-600 hover:border-emerald-500/40 hover:bg-emerald-50/30' 
+                                                                        : 'bg-white/[0.02] border-white/[0.06] text-slate-400 hover:border-emerald-500/30 hover:bg-emerald-500/5'
+                                                                }`}
+                                                            >
+                                                                {tag}
+                                                            </button>
+                                                        ))
+                                                    }
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>

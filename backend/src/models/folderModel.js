@@ -1,16 +1,28 @@
 import db from '../knex/db.js';
 
-export const createFolder = async ({ name, parentId, subjectId, testSeriesId }) => {
+export const createFolder = async ({ name, parentId, subjectId, testSeriesId, isSystem = false }) => {
     const insertData = {
         name,
         parent_id: parentId || null,
         subject_id: subjectId || null,
         test_series_id: testSeriesId || null,
+        is_system: isSystem
     };
     const [folder] = await db('revision.file_folders')
         .insert(insertData)
         .returning('*');
     return folder;
+};
+
+export const getSystemFolderByName = async (subjectId, name) => {
+    return await db('revision.file_folders')
+        .where({ 
+            subject_id: subjectId, 
+            name, 
+            is_system: true, 
+            is_deleted: false 
+        })
+        .first();
 };
 
 export const getFoldersByScope = async (subjectId, testSeriesId, parentId = undefined) => {

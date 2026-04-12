@@ -11,6 +11,10 @@ import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
 import { useFiles } from '../../context/FileContext.jsx';
+import { Worker, Viewer } from '@react-pdf-viewer/core';
+import { defaultLayoutPlugin } from '@react-pdf-viewer/default-layout';
+import '@react-pdf-viewer/core/lib/styles/index.css';
+import '@react-pdf-viewer/default-layout/lib/styles/index.css';
 
 const FileViewerModal = ({
     isOpen,
@@ -42,11 +46,28 @@ const FileViewerModal = ({
     const [imageScale, setImageScale] = useState(1);
     const mountedRef = useRef(true);
     const listRef = useRef(null);
+    const objectUrlRef = useRef(null);
+    const workbookRef = useRef(null);
+    const [objectUrl, setObjectUrl] = useState(null);
+
+    const pdfContainerRef = useRef(null);
+    const pdfCurrentZoomRef = useRef(1);
+
+    const defaultLayoutPluginInstance = defaultLayoutPlugin();
+    const zoomPluginInstance = defaultLayoutPluginInstance.toolbarPluginInstance?.zoomPluginInstance;
 
     const fileIndex = useMemo(() => {
         if (!allFiles || !file) return 0;
         return allFiles.findIndex(f => f.id === file.id);
     }, [allFiles, file]);
+
+    const revokeCurrentUrl = useCallback(() => {
+        if (objectUrlRef.current) {
+            URL.revokeObjectURL(objectUrlRef.current);
+            objectUrlRef.current = null;
+            setObjectUrl(null);
+        }
+    }, []);
 
     const processFile = useCallback(async (currentFile) => {
         if (!currentFile) return;
@@ -56,7 +77,6 @@ const FileViewerModal = ({
         // If data is missing (partial file from list), fetch the full file
         if (!fileToProcess.data) {
             try {
-                // Pass subject_id OR test_series_id — getFileData(subjectId, fileId, seriesId)
                 const fullFile = await getFileData(
                     fileToProcess.subject_id || null,
                     fileToProcess.id,
@@ -82,19 +102,58 @@ const FileViewerModal = ({
             }
         }
 
-        if (mountedRef.current) setContentUrl(fileToProcess.data);
+        let blob = null;
+        if (mountedRef.current) {
+            // Revoke old URL before creating a new one
+            if (objectUrlRef.current) {
+                URL.revokeObjectURL(objectUrlRef.current);
+                objectUrlRef.current = null;
+            }
+
+            // Convert Base64 Data URI to Blob URL for high performance and reliability with large files
+            try {
+                if (fileToProcess.data && fileToProcess.data.startsWith('data:')) {
+                    const response = await fetch(fileToProcess.data);
+                    blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    objectUrlRef.current = url;
+                    setObjectUrl(url);
+                    setContentUrl(url);
+                } else if (fileToProcess.data && fileToProcess.data.startsWith('blob:')) {
+                    // Already a blob URL (likely from FileContext)
+                    setContentUrl(fileToProcess.data);
+                } else {
+                    setContentUrl(fileToProcess.data);
+                }
+            } catch (blobErr) {
+                console.error('Failed to process file data:', blobErr);
+                setContentUrl(fileToProcess.data);
+            }
+        }
 
         const type = fileToProcess.file_type?.toLowerCase() || 'image';
         if (mountedRef.current) setRenderType(type);
 
         try {
             if (type === 'xlsx' || type === 'xls' || type === 'csv') {
-                const response = await fetch(fileToProcess.data);
-                if (!response.ok) throw new Error('Failed to fetch file data');
-                const arrayBuffer = await response.arrayBuffer();
-                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                let arrayBuffer;
+                try {
+                    if (blob) {
+                        arrayBuffer = await blob.arrayBuffer();
+                    } else if (fileToProcess.data) {
+                        const response = await fetch(fileToProcess.data);
+                        if (!response.ok) throw new Error('Failed to fetch file content for processing');
+                        arrayBuffer = await response.arrayBuffer();
+                    } else {
+                        throw new Error('No file data available');
+                    }
+                } catch (dataErr) {
+                    throw new Error(`Data access failed: ${dataErr.message}`);
+                }
 
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
                 if (mountedRef.current) {
+                    workbookRef.current = workbook;
                     setExcelSheets(workbook.SheetNames);
                     setActiveSheet(0);
 
@@ -103,9 +162,15 @@ const FileViewerModal = ({
                     setExcelData(json);
                 }
             } else if (type === 'doc' || type === 'docx') {
-                const response = await fetch(fileToProcess.data);
-                if (!response.ok) throw new Error('Failed to fetch document');
-                const arrayBuffer = await response.arrayBuffer();
+                let arrayBuffer;
+                if (blob) {
+                    arrayBuffer = await blob.arrayBuffer();
+                } else {
+                    const response = await fetch(fileToProcess.data);
+                    if (!response.ok) throw new Error('Failed to fetch document');
+                    arrayBuffer = await response.arrayBuffer();
+                }
+
                 const result = await mammoth.convertToHtml({ arrayBuffer });
                 if (mountedRef.current) setWordHtml(result.value);
             }
@@ -133,8 +198,8 @@ const FileViewerModal = ({
         if (file) {
             setLoading(true);
             setError(null);
-            setExcelData(null);
             setExcelSheets([]);
+            workbookRef.current = null;
             setWordHtml('');
             setContentUrl(null);
             setImageScale(1);
@@ -143,18 +208,50 @@ const FileViewerModal = ({
 
         return () => {
             mountedRef.current = false;
+            // Revoke URL on unmount using ref to be safe
+            if (objectUrlRef.current) {
+                URL.revokeObjectURL(objectUrlRef.current);
+                objectUrlRef.current = null;
+            }
+            workbookRef.current = null;
         };
     }, [file, processFile]);
 
-    const handleSheetChange = async (idx) => {
-        if (!file || !file.data) return;
-        if (mountedRef.current) setActiveSheet(idx);
-        const response = await fetch(file.data);
-        const arrayBuffer = await response.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        const sheet = workbook.Sheets[workbook.SheetNames[idx]];
-        const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-        if (mountedRef.current) setExcelData(json);
+    // Fast zoom via wheel for PDF viewer
+    useEffect(() => {
+        const container = pdfContainerRef.current;
+        if (!container || renderType !== 'pdf') return;
+
+        const onWheel = (e) => {
+            if (!e.ctrlKey && !e.metaKey) return; // only intercept pinch / ctrl+scroll
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Normalize delta across touchpad and mouse wheel
+            const delta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+            // Higher multiplier = faster zoom, tune to taste
+            const zoomFactor = delta < 0 ? 1.1 : 0.9;
+            const next = Math.min(5, Math.max(0.25, pdfCurrentZoomRef.current * zoomFactor));
+            pdfCurrentZoomRef.current = next;
+
+            if (zoomPluginInstance?.zoomTo) {
+                zoomPluginInstance.zoomTo(next);
+            }
+        };
+
+        container.addEventListener('wheel', onWheel, { passive: false });
+        return () => container.removeEventListener('wheel', onWheel);
+    }, [renderType, zoomPluginInstance]);
+
+    const handleSheetChange = (idx) => {
+        if (!workbookRef.current) return;
+        if (mountedRef.current) {
+            setActiveSheet(idx);
+            const workbook = workbookRef.current;
+            const sheet = workbook.Sheets[workbook.SheetNames[idx]];
+            const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+            setExcelData(json);
+        }
     };
 
     const handleDownload = () => {
@@ -557,13 +654,32 @@ const FileViewerModal = ({
                                     </TransformWrapper>
                                 )}
 
-                                {(renderType === 'pdf' || renderType === 'html') && contentUrl && (
+                                {renderType === 'html' && contentUrl && (
                                     <div className={`w-full h-full flex items-center justify-center p-0`}>
                                         <iframe
-                                            src={renderType === 'pdf' ? `${contentUrl}#view=FitH&toolbar=1` : contentUrl}
+                                            src={contentUrl}
                                             className="w-full h-full border-0 rounded-none shadow-2xl"
-                                            title={file.file_name || `${renderType.toUpperCase()} Preview`}
+                                            title={file.file_name || 'HTML Preview'}
                                         />
+                                    </div>
+                                )}
+
+                                {renderType === 'pdf' && contentUrl && (
+                                    <div
+                                        ref={pdfContainerRef}
+                                        className={`w-full h-full flex flex-col p-0 transition-colors duration-300 relative`}
+                                        style={{ touchAction: 'pan-x pan-y' }}
+                                    >
+                                        <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js">
+                                            <Viewer
+                                                fileUrl={contentUrl}
+                                                plugins={[defaultLayoutPluginInstance]}
+                                                theme={isLightMode ? 'light' : 'dark'}
+                                                onZoom={(e) => {
+                                                    pdfCurrentZoomRef.current = e.scale;
+                                                }}
+                                            />
+                                        </Worker>
                                     </div>
                                 )}
 

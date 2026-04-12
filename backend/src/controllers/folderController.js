@@ -1,12 +1,33 @@
 import * as folderModel from '../models/folderModel.js';
 import * as fileModel from '../models/fileModel.js';
 
+const ensureDefaultFolders = async (subjectId) => {
+    if (!subjectId) return;
+    const defaults = ['Questions', 'Solutions'];
+    for (const name of defaults) {
+        const existing = await folderModel.getSystemFolderByName(subjectId, name);
+        if (!existing) {
+            await folderModel.createFolder({ 
+                name, 
+                subjectId, 
+                isSystem: true 
+            });
+        }
+    }
+};
+
 export const getFolders = async (req, res) => {
     try {
         const { subjectId, testSeriesId, parentId } = req.query;
         if (!subjectId && !testSeriesId) {
             return res.status(400).json({ error: 'subjectId or testSeriesId is required' });
         }
+
+        // Auto-ensure default folders for subjects at root
+        if (subjectId && (parentId === 'null' || parentId === null || parentId === undefined)) {
+            await ensureDefaultFolders(subjectId);
+        }
+
         const folders = await folderModel.getFoldersByScope(subjectId, testSeriesId, parentId);
         res.status(200).json({ folders });
     } catch (error) {
@@ -20,6 +41,11 @@ export const getFolderContents = async (req, res) => {
         const { subjectId, testSeriesId, folderId, limit, offset } = req.query;
         if (!subjectId && !testSeriesId) {
             return res.status(400).json({ error: 'subjectId or testSeriesId is required' });
+        }
+
+        // Auto-ensure default folders for subjects at root
+        if (subjectId && (folderId === 'null' || folderId === null || folderId === undefined)) {
+            await ensureDefaultFolders(subjectId);
         }
 
         // Fetch folders at this level
@@ -75,6 +101,11 @@ export const renameFolder = async (req, res) => {
         
         if (!name) return res.status(400).json({ error: 'name is required' });
 
+        const folderToRename = await folderModel.getFolderById(id, subjectId, testSeriesId);
+        if (folderToRename?.is_system) {
+            return res.status(403).json({ error: 'System folders cannot be renamed' });
+        }
+
         const [folder] = await folderModel.renameFolder(id, name, subjectId, testSeriesId);
         if(!folder) return res.status(404).json({ error: 'Folder not found' });
         
@@ -90,6 +121,11 @@ export const deleteFolder = async (req, res) => {
          const { id } = req.params;
          const { subjectId, testSeriesId, deleteFiles } = req.body; // deleteFiles boolean
          
+         const folderToDelete = await folderModel.getFolderById(id, subjectId, testSeriesId);
+         if (folderToDelete?.is_system) {
+             return res.status(403).json({ error: 'System folders cannot be deleted' });
+         }
+
          const allFolderIds = await folderModel.getSubfolderIds(id);
 
          if(deleteFiles) {

@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { LayoutDashboard, LibraryBig, LogOut, Activity, ChevronLeft, ChevronRight, Settings, Layers, Target } from 'lucide-react';
+import { LayoutDashboard, LibraryBig, LogOut, Activity, ChevronLeft, ChevronRight, Settings, Layers, Target, BookMarked } from 'lucide-react';
 
 import EditProfileModal from './modals/EditProfileModal.jsx';
+import ConfirmDialog from './ConfirmDialog.jsx';
 
 
 const navItems = [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { to: '/subjects', label: 'Subjects', icon: LibraryBig },
+    { to: '/subjects', label: 'Subjects', icon: BookMarked },
     { to: '/tests', label: 'Tests', icon: Target },
-    { to: '/library', label: 'Library', icon: Layers },
+    { to: '/library', label: 'Library', icon: LibraryBig },
 ];
 
 const Sidebar = () => {
@@ -18,6 +19,7 @@ const Sidebar = () => {
     const navigate = useNavigate();
     const [isCollapsed, setIsCollapsed] = useState(() => window.innerWidth < 768);
     const [showEditProfile, setShowEditProfile] = useState(false);
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
     useEffect(() => {
         const handleResize = () => {
@@ -44,6 +46,10 @@ const Sidebar = () => {
     const handleLogout = async () => {
         await logout();
         navigate('/login');
+    };
+
+    const triggerLogout = () => {
+        setShowLogoutConfirm(true);
     };
 
     return (
@@ -197,7 +203,7 @@ const Sidebar = () => {
                                 <span>Settings</span>
                             </button>
                             <button
-                                onClick={handleLogout}
+                                onClick={triggerLogout}
                                 className="flex-1 flex items-center justify-center gap-2 px-2 py-2 text-[11px] font-bold text-slate-300 bg-white/[0.05] rounded-xl border border-white/5 transition-all hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 cursor-pointer"
                             >
                                 <LogOut className="w-3.5 h-3.5" />
@@ -216,7 +222,7 @@ const Sidebar = () => {
                                 <Settings className="w-4 h-4" />
                             </button>
                             <button
-                                onClick={handleLogout}
+                                onClick={triggerLogout}
                                 title="Logout"
                                 className="w-full flex items-center justify-center p-2.5 text-slate-400 bg-white/[0.03] rounded-xl hover:bg-red-500/10 hover:text-red-400 transition-all cursor-pointer border border-white/5"
                             >
@@ -230,6 +236,17 @@ const Sidebar = () => {
             <EditProfileModal
                 isOpen={showEditProfile}
                 onClose={() => setShowEditProfile(false)}
+            />
+
+            <ConfirmDialog
+                isOpen={showLogoutConfirm}
+                title="Confirm Logout"
+                message="Are you sure you want to log out? You will need to sign in again to access your tracker."
+                onConfirm={handleLogout}
+                onCancel={() => setShowLogoutConfirm(false)}
+                confirmText="Logout"
+                type="danger"
+                icon={LogOut}
             />
         </aside>
     );
