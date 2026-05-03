@@ -19,6 +19,7 @@ import testSeriesRoute from './routes/testSeriesRoute.js';
 import testRoute from './routes/testRoute.js';
 import solutionRoute from './routes/solutionRoute.js';
 import revisionTrackerRoute from './routes/revisionTrackerRoute.js';
+import systemPromptRoute from './routes/systemPromptRoute.js';
 import { dateSerializationMiddleware } from './utils/serialization.js';
 
 const app = express();
@@ -50,6 +51,7 @@ app.use('/api/test-series', testSeriesRoute);
 app.use('/api/test-series/:seriesId/tests', testRoute);
 app.use('/api/subjects/:subjectId/revision-tracker', revisionTrackerRoute);
 app.use('/api/subjects/:subjectId/solutions', solutionRoute);
+app.use('/api/system-prompts', systemPromptRoute);
 
 // --- Health Check ---
 app.get('/health', (req, res) => res.json({ status: 'ok' }));

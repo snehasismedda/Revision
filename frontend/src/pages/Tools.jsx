@@ -1,36 +1,26 @@
 import React, { useState } from 'react';
-import { Wrench, Search, X, Zap, Code, Cpu, Sparkles } from 'lucide-react';
+import { Wrench, Search, X, Zap, Code, Cpu, Sparkles, Youtube } from 'lucide-react';
 import ToolCard from '../components/tools/ToolCard.jsx';
 import ToolDetailsCard from '../components/tools/ToolDetailsCard.jsx';
+import YouTubeTranscriptTool from '../components/tools/YouTubeTranscriptTool.jsx';
+import { ArrowLeft } from 'lucide-react';
 
-const DUMMY_TOOLS = [
+const TOOLS = [
     {
-        id: 1,
-        name: "Syllabus Parser",
-        description: "Automatically extract topics and subtopics from syllabus PDF files with AI precision.",
-        icon: Code,
-        tag: "AI Powered"
+        id: 'youtube-transcript',
+        name: "YouTube Transcript Generator",
+        description: "Fetch transcripts from YouTube videos and format them for AI processing with custom system prompts.",
+        icon: Youtube,
+        tag: "Utility",
+        isActive: true
     },
     {
-        id: 2,
-        name: "Performance Optimizer",
-        description: "Analyze your study patterns and suggest the best revision schedule using data science.",
-        icon: Zap,
-        tag: "Analytics"
-    },
-    {
-        id: 3,
-        name: "Question Generator",
-        description: "Generate high-quality practice questions based on your notes and uploaded materials.",
-        icon: Cpu,
-        tag: "AI Powered"
-    },
-    {
-        id: 4,
-        name: "Concept Linker",
-        description: "Visualize connections between different subjects to build a stronger mental model.",
+        id: 'note-enhancer',
+        name: "AI Note Enhancer",
+        description: "Automatically structure, highlight, and summarize your raw notes into perfect study material.",
         icon: Sparkles,
-        tag: "Experimental"
+        tag: "AI Powered",
+        isActive: false
     }
 ];
 
@@ -38,10 +28,54 @@ const Tools = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTool, setSelectedTool] = useState(null);
 
-    const filteredTools = DUMMY_TOOLS.filter(tool =>
+    const filteredTools = TOOLS.filter(tool =>
         tool.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         tool.description.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    if (selectedTool) {
+        return (
+            <div className="fade-in">
+                {/* Tool Header */}
+                <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-4">
+                        <button 
+                            onClick={() => setSelectedTool(null)}
+                            className="p-2.5 rounded-xl bg-surface-2 border border-border text-text-muted hover:text-primary hover:border-primary/30 transition-all cursor-pointer group"
+                        >
+                            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
+                        </button>
+                        <div>
+                            <div className="flex items-center gap-2 mb-0.5">
+                                <selectedTool.icon className="w-4 h-4 text-primary" />
+                                <span className="text-[10px] font-bold tracking-widest text-primary uppercase">Tool</span>
+                            </div>
+                            <h1 className="text-2xl font-heading font-bold text-text tracking-tight">{selectedTool.name}</h1>
+                        </div>
+                    </div>
+                    
+                    <div className="hidden sm:block">
+                        <span className="px-3 py-1.5 rounded-lg bg-surface-2 border border-border text-[11px] font-bold text-text-muted uppercase tracking-wider">
+                            {selectedTool.tag}
+                        </span>
+                    </div>
+                </div>
+
+                {/* Tool Content */}
+                <div className="glass-panel rounded-3xl border border-border p-8 min-h-[70vh]">
+                    {selectedTool.id === 'youtube-transcript' ? (
+                        <YouTubeTranscriptTool />
+                    ) : (
+                        <ToolDetailsCard 
+                            tool={selectedTool} 
+                            onClose={() => setSelectedTool(null)}
+                            inline={true} // New prop to handle inline display
+                        />
+                    )}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="fade-in max-w-6xl mx-auto">
@@ -99,14 +133,6 @@ const Tools = () => {
                         />
                     ))}
                 </div>
-            )}
-
-            {/* Tool Details Modal */}
-            {selectedTool && (
-                <ToolDetailsCard
-                    tool={selectedTool}
-                    onClose={() => setSelectedTool(null)}
-                />
             )}
         </div>
     );

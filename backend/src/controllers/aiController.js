@@ -5,6 +5,7 @@ import * as analyticsModel from '../models/analyticsModel.js';
 import db from '../knex/db.js';
 import { ollama, models } from '../config/ollama.js';
 import { syllabusPrompt, insightPrompt, globalInsightPrompt, noteAnalysisPrompt, enhanceNotePrompt, noteFormatterPrompt, noteDescriptionPrompt, editSectionPrompt } from '../system_prompts/index.js';
+import { YoutubeTranscript } from 'youtube-transcript';
 
 export const editSection = async (req, res) => {
     try {
@@ -554,5 +555,61 @@ ${context}`
     } catch (error) {
         console.error('getTestInsights error:', error);
         res.status(500).json({ error: 'Failed to generate test insights' });
+    }
+};
+
+export const getYouTubeTranscript = async (req, res) => {
+    try {
+        const { url } = req.body;
+        if (!url) {
+            return res.status(400).json({ error: "YouTube URL is required" });
+        }
+
+        const transcript = await YoutubeTranscript.fetchTranscript(url);
+        const fullText = transcript.map(t => t.text).join(' ');
+
+        res.status(200).json({ transcript: fullText });
+    } catch (error) {
+        console.error("YouTube Transcript Error:", error);
+        res.status(500).json({ error: "Failed to fetch YouTube transcript. Make sure the video has captions enabled." });
+    }
+};
+
+export const processTranscript = async (req, res) => {
+    try {
+        const { systemPrompt, transcript, stream = false } = req.body;
+        if (!transcript) return res.status(400).json({ error: 'Transcript is required' });
+
+        const messages = [
+            { role: "system", content: systemPrompt || "Process the following transcript." },
+            { role: "user", content: transcript }
+        ];
+
+        if (stream) {
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+            res.setHeader('Transfer-Encoding', 'chunked');
+            const response = await ollama.chat({
+                model: models.TEXT,
+                messages,
+                stream: true
+            });
+            for await (const part of response) {
+                if (part.message?.content) {
+                    res.write(part.message.content);
+                }
+            }
+            res.end();
+            return;
+        }
+
+        const response = await ollama.chat({
+            model: models.TEXT,
+            messages,
+            stream: false
+        });
+        res.status(200).json({ result: response.message?.content });
+    } catch (error) {
+        console.error('processTranscript error:', error);
+        res.status(500).json({ error: 'Failed to process transcript' });
     }
 };

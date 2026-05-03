@@ -176,6 +176,9 @@ export const aiApi = {
     formatNoteStream: (body, onChunk) => streamRequest('/ai/format-note', body, onChunk),
     editSection: (body) => request('/ai/edit-section', { method: 'POST', body }),
     editSectionStream: (body, onChunk) => streamRequest('/ai/edit-section', body, onChunk),
+    youtubeTranscript: (body) => request('/ai/youtube-transcript', { method: 'POST', body }),
+    processTranscript: (body) => request('/ai/process-transcript', { method: 'POST', body }),
+    processTranscriptStream: (body, onChunk) => streamRequest('/ai/process-transcript', body, onChunk),
 };
 
 // Questions
@@ -297,4 +300,12 @@ export const foldersApi = {
     create: (body) => request('/folders', { method: 'POST', body }),
     rename: (id, body) => request(`/folders/${id}`, { method: 'PUT', body }),
     delete: (id, body) => request(`/folders/${id}`, { method: 'DELETE', body }), // body takes { deleteFiles: boolean, subjectId, testSeriesId }
+};
+
+// System Prompts
+export const systemPromptsApi = {
+    list: () => request('/system-prompts'),
+    create: (body) => request('/system-prompts', { method: 'POST', body }),
+    update: (id, body) => request(`/system-prompts/${id}`, { method: 'PUT', body }),
+    delete: (id) => request(`/system-prompts/${id}`, { method: 'DELETE' }),
 };
