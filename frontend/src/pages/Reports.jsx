@@ -45,7 +45,7 @@ const RED = '#ef4444';
 const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
     return (
-        <div className="glass p-3 border border-border rounded-lg shadow-xl  text-sm">
+        <div className="bg-surface-2/95 p-3 border border-border rounded-lg shadow-xl text-sm">
             <p className="text-text-muted font-heading font-bold mb-2 pb-2 border-b border-border">{label}</p>
             <div className="space-y-2">
                 {payload.map((p) => (
@@ -141,7 +141,7 @@ const Reports = () => {
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
-                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                <div className="w-8 h-8 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
             </div>
         );
     }
@@ -201,9 +201,9 @@ const Reports = () => {
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6 relative z-10">
                         {/* Net Accuracy — Hero */}
-                        <div className="col-span-2 md:col-span-1 flex flex-col items-center justify-center py-4 border-r border-border md:border-r-white/5">
+                        <div className="col-span-2 md:col-span-1 flex flex-col items-center justify-center py-4 border-r border-border md:border-r-border/30">
                             <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-3">Accuracy</p>
-                            <div className={`text-5xl font-heading font-bold tracking-tight ${overview.accuracy >= 75 ? 'text-emerald-400' : overview.accuracy >= 50 ? 'text-amber-400' : 'text-red-400'
+                            <div className={`text-5xl font-heading font-bold tracking-tight ${overview.accuracy >= 75 ? 'text-emerald-500 [.dark_&]:text-emerald-400' : overview.accuracy >= 50 ? 'text-amber-600 [.dark_&]:text-amber-400' : 'text-rose-600 [.dark_&]:text-rose-400'
                                 }`}>
                                 {overview.accuracy}%
                             </div>
@@ -228,7 +228,7 @@ const Reports = () => {
                                 <CheckCircle2 className="w-4 h-4 text-emerald-500/70" />
                                 <span className="text-[10px] font-bold text-emerald-500/70 uppercase tracking-widest">Correct</span>
                             </div>
-                            <p className="text-3xl font-heading font-bold text-emerald-400">{overview.totalCorrect}</p>
+                            <p className="text-3xl font-heading font-bold text-emerald-500 [.dark_&]:text-emerald-400">{overview.totalCorrect}</p>
                             <div className="w-full bg-surface-3/10 rounded-full h-1.5 mt-2.5 overflow-hidden">
                                 <div className="bg-emerald-500 h-full rounded-full transition-all duration-1000" style={{ width: `${overview.totalQuestions ? (overview.totalCorrect / overview.totalQuestions) * 100 : 0}%` }} />
                             </div>
@@ -237,12 +237,12 @@ const Reports = () => {
                         {/* Incorrect */}
                         <div className="flex flex-col justify-center py-2">
                             <div className="flex items-center gap-2 mb-1.5">
-                                <XCircle className="w-4 h-4 text-red-500/70" />
-                                <span className="text-[10px] font-bold text-red-500/70 uppercase tracking-widest">Incorrect</span>
+                                <XCircle className="w-4 h-4 text-rose-500/70" />
+                                <span className="text-[10px] font-bold text-rose-500/70 uppercase tracking-widest">Incorrect</span>
                             </div>
-                            <p className="text-3xl font-heading font-bold text-red-400">{overview.totalIncorrect}</p>
+                            <p className="text-3xl font-heading font-bold text-rose-600 [.dark_&]:text-rose-400">{overview.totalIncorrect}</p>
                             <div className="w-full bg-surface-3/10 rounded-full h-1.5 mt-2.5 overflow-hidden">
-                                <div className="bg-red-500/60 h-full rounded-full transition-all duration-1000" style={{ width: `${overview.totalQuestions ? (overview.totalIncorrect / overview.totalQuestions) * 100 : 0}%` }} />
+                                <div className="bg-rose-500/60 h-full rounded-full transition-all duration-1000" style={{ width: `${overview.totalQuestions ? (overview.totalIncorrect / overview.totalQuestions) * 100 : 0}%` }} />
                             </div>
                         </div>
                     </div>
@@ -288,10 +288,11 @@ const Reports = () => {
                                         <stop offset="100%" stopColor={PURPLE} stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border/20" vertical={false} />
                                 <XAxis
                                     dataKey="title"
-                                    tick={{ fill: '#475569', fontSize: 10, fontWeight: 500 }}
+                                    tick={{ fill: 'currentColor', fontSize: 10, fontWeight: 500 }}
+                                    className="text-text-muted/50"
                                     tickLine={false}
                                     axisLine={false}
                                     dy={10}
@@ -299,7 +300,8 @@ const Reports = () => {
                                 <YAxis
                                     yAxisId="left"
                                     domain={[0, 100]}
-                                    tick={{ fill: '#64748b', fontSize: 10 }}
+                                    tick={{ fill: 'currentColor', fontSize: 10 }}
+                                    className="text-text-muted/50"
                                     tickLine={false}
                                     axisLine={false}
                                     tickFormatter={(v) => `${v}%`}
@@ -308,7 +310,8 @@ const Reports = () => {
                                     yAxisId="right"
                                     orientation="right"
                                     domain={[0, 'auto']}
-                                    tick={{ fill: '#475569', fontSize: 10 }}
+                                    tick={{ fill: 'currentColor', fontSize: 10 }}
+                                    className="text-text-muted/50"
                                     tickLine={false}
                                     axisLine={false}
                                     hide={window.innerWidth < 768}
@@ -323,7 +326,8 @@ const Reports = () => {
                                     yAxisId="right"
                                     dataKey="total"
                                     name="Question Count"
-                                    fill="rgba(255,255,255,0.05)"
+                                    fill="currentColor"
+                                    className="text-surface-3/20"
                                     radius={[4, 4, 0, 0]}
                                     barSize={20}
                                 />
@@ -363,12 +367,14 @@ const Reports = () => {
                                     <ReferenceLine
                                         yAxisId="left"
                                         y={overview.accuracy}
-                                        stroke="rgba(255,255,255,0.2)"
+                                        stroke="currentColor"
+                                        className="text-text-muted/30"
                                         strokeWidth={1}
                                         label={{
                                             value: `Avg: ${overview.accuracy}%`,
                                             position: 'insideBottomRight',
-                                            fill: '#94a3b8',
+                                            fill: 'currentColor',
+                                            className: 'text-text-muted/60',
                                             fontSize: 9,
                                             fontWeight: 700
                                         }}
@@ -429,7 +435,7 @@ const Reports = () => {
                             </div>
 
                             <div className="flex flex-wrap items-center gap-4">
-                                <div className="flex gap-1 p-1 bg-surface-2/60 rounded-xl border border-border">
+                                <div className="flex gap-1 p-1 bg-surface-3/10 rounded-xl border border-border">
                                     {[
                                         { id: 'most', label: 'Most Revised' },
                                         { id: 'least', label: 'Least Revised' },
@@ -438,7 +444,7 @@ const Reports = () => {
                                         <button
                                             key={tab.id}
                                             onClick={() => setRevisionDetailTab(tab.id)}
-                                            className={`px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${revisionDetailTab === tab.id ? 'bg-violet-600 text-text shadow-lg shadow-violet-600/20' : 'text-text-muted hover:text-text-muted'}`}
+                                            className={`px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${revisionDetailTab === tab.id ? 'bg-violet-500/20 text-violet-600 [.dark_&]:text-violet-400' : 'text-text-muted hover:text-text'}`}
                                         >
                                             {tab.label}
                                         </button>
@@ -616,7 +622,7 @@ const Reports = () => {
                             </div>
 
                             <div className="flex flex-wrap items-center gap-4">
-                                <div className="flex gap-1 p-1 bg-surface-2/60 rounded-xl border border-border">
+                                <div className="flex gap-1 p-1 bg-surface-3/10 rounded-xl border border-border">
                                     {[
                                         { id: 'most', label: 'Most Asked' },
                                         { id: 'all', label: 'All Topics' }
@@ -624,7 +630,7 @@ const Reports = () => {
                                         <button
                                             key={tab.id}
                                             onClick={() => setTopicTab(tab.id)}
-                                            className={`px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${topicTab === tab.id ? 'bg-emerald-600 text-text shadow-lg shadow-emerald-600/20' : 'text-text-muted hover:text-text-muted'}`}
+                                            className={`px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${topicTab === tab.id ? 'bg-emerald-500/20 text-emerald-600 [.dark_&]:text-emerald-400' : 'text-text-muted hover:text-text'}`}
                                         >
                                             {tab.label}
                                         </button>

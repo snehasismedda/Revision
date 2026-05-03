@@ -26,6 +26,7 @@ const TestSeriesDetail = lazy(() => import('./pages/TestSeriesDetail.jsx'));
 const TestDetail = lazy(() => import('./pages/TestDetail.jsx'));
 const TestAnalytics = lazy(() => import('./pages/TestAnalytics.jsx'));
 const TestSeriesInsights = lazy(() => import('./pages/TestSeriesInsights.jsx'));
+const Tools = lazy(() => import('./pages/Tools.jsx'));
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -69,6 +70,7 @@ const AppRoutes = () => (
         <Route path="tests/:seriesId/test/:testId/analytics" element={<TestAnalytics />} />
         <Route path="tests/:seriesId/insights" element={<TestSeriesInsights />} />
         <Route path="library" element={<Library />} />
+        <Route path="tools" element={<Tools />} />
       </Route>
 
       {/* Fallback */}

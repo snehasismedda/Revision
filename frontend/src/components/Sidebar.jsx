@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { LayoutDashboard, LibraryBig, LogOut, Activity, ChevronLeft, ChevronRight, Settings, Layers, Target, BookMarked, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, LibraryBig, LogOut, Activity, ChevronLeft, ChevronRight, Settings, Layers, Target, BookMarked, Sun, Moon, Wrench } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext.jsx';
 
 import EditProfileModal from './modals/EditProfileModal.jsx';
@@ -13,6 +13,7 @@ const navItems = [
     { to: '/subjects', label: 'Subjects', icon: BookMarked },
     { to: '/tests', label: 'Tests', icon: Target },
     { to: '/library', label: 'Library', icon: LibraryBig },
+    { to: '/tools', label: 'Tools', icon: Wrench },
 ];
 
 const Sidebar = () => {
@@ -155,31 +156,6 @@ const Sidebar = () => {
 
             {/* User Profile Section */}
             <div className={`mt-auto transition-all duration-300 z-10 ${isCollapsed ? 'px-3 pb-4' : 'px-4 pb-4'}`}>
-                
-                {/* Theme Toggle Button */}
-                <div className="mb-4">
-                    <button
-                        onClick={toggleTheme}
-                        className={`w-full flex items-center transition-all duration-300 rounded-xl border border-border bg-surface-3/30 hover:bg-surface-3/60 group/theme
-                            ${isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'}`}
-                        title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-                    >
-                        {theme === 'dark' ? (
-                            <>
-                                <Sun className="w-[18px] h-[18px] text-amber-400 shrink-0" />
-                                {!isCollapsed && <span className="text-[13px] font-semibold text-text">Light Mode</span>}
-                            </>
-                        ) : (
-                            <>
-                                <Moon className="w-[18px] h-[18px] text-indigo-400 shrink-0" />
-                                {!isCollapsed && <span className="text-[13px] font-semibold text-text">Dark Mode</span>}
-                            </>
-                        )}
-                    </button>
-                </div>
-
-                <div className="h-px w-full bg-border mb-4" />
-
                 <div
                     className={`rounded-2xl relative overflow-hidden transition-all duration-500
                         ${isCollapsed ? 'p-2' : 'p-3.5'}
@@ -187,13 +163,17 @@ const Sidebar = () => {
                 >
                     <div className={`flex items-center relative z-10 ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
                         <div className="relative">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-heading font-bold text-text overflow-hidden bg-gradient-to-tr from-primary to-indigo-500 shadow-lg shadow-primary/30`}>
+                            <button 
+                                onClick={() => setShowEditProfile(true)}
+                                className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-heading font-bold text-text overflow-hidden bg-gradient-to-tr from-primary to-indigo-500 shadow-lg shadow-primary/30 hover:scale-105 active:scale-95 transition-all cursor-pointer ring-offset-2 ring-offset-surface-2 hover:ring-2 hover:ring-primary/50`}
+                                title="Open Settings"
+                            >
                                 {user?.profile_picture ? (
                                     <img src={user.profile_picture} alt="Profile" className="w-full h-full object-cover" />
                                 ) : (
                                     user?.name?.charAt(0)?.toUpperCase()
                                 )}
-                            </div>
+                            </button>
                             <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-surface rounded-full flex items-center justify-center border border-border`}>
                                 <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
                             </div>
@@ -208,17 +188,21 @@ const Sidebar = () => {
                     </div>
 
                     {!isCollapsed && (
-                        <div className="mt-3 flex gap-2 relative z-10">
+                        <div className="mt-3 flex items-center gap-2 relative z-10">
                             <button
-                                onClick={() => setShowEditProfile(true)}
-                                className="flex-1 flex items-center justify-center gap-2 px-2 py-2 text-[11px] font-bold text-text-muted bg-surface/50 rounded-xl border border-border transition-all hover:bg-surface-3 hover:text-text cursor-pointer"
+                                onClick={toggleTheme}
+                                className="w-10 h-10 flex items-center justify-center shrink-0 text-text-muted bg-surface/50 rounded-xl border border-border transition-all hover:bg-surface-3 hover:text-text cursor-pointer"
+                                title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                             >
-                                <Settings className="w-3.5 h-3.5" />
-                                <span>Settings</span>
+                                {theme === 'dark' ? (
+                                    <Sun className="w-4 h-4 text-amber-400" />
+                                ) : (
+                                    <Moon className="w-4 h-4 text-indigo-400" />
+                                )}
                             </button>
                             <button
                                 onClick={triggerLogout}
-                                className="flex-1 flex items-center justify-center gap-2 px-2 py-2 text-[11px] font-bold text-text-muted bg-surface/50 rounded-xl border border-border transition-all hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/20 cursor-pointer"
+                                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-[11px] font-bold text-text-muted bg-surface/50 rounded-xl border border-border transition-all hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/20 cursor-pointer"
                             >
                                 <LogOut className="w-3.5 h-3.5" />
                                 <span>Logout</span>
@@ -229,11 +213,15 @@ const Sidebar = () => {
                     {isCollapsed && (
                         <div className="mt-4 space-y-2 relative z-10">
                             <button
-                                onClick={() => setShowEditProfile(true)}
-                                title="Settings"
+                                onClick={toggleTheme}
+                                title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                                 className="w-full flex items-center justify-center p-2.5 text-text-muted bg-surface/50 rounded-xl hover:bg-surface-3 hover:text-text transition-all cursor-pointer border border-border"
                             >
-                                <Settings className="w-4 h-4" />
+                                {theme === 'dark' ? (
+                                    <Sun className="w-4 h-4 text-amber-400" />
+                                ) : (
+                                    <Moon className="w-4 h-4 text-indigo-400" />
+                                )}
                             </button>
                             <button
                                 onClick={triggerLogout}

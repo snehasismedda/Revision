@@ -233,10 +233,10 @@ const ActivityDetailModal = ({ isOpen, onClose, month, year, initialDay }) => {
                                         <span className="text-[10px] font-black text-primary uppercase">{monthNames[month].substring(0,3)}</span>
                                     </div>
 
-                                    <div className="p-4 rounded-[1.75rem] bg-black/20 border border-border shadow-inner">
+                                    <div className="p-4 rounded-[1.75rem] bg-surface-3/50 border border-border shadow-inner">
                                         <div className="grid grid-cols-7 gap-2 mb-3">
                                             {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
-                                                <div key={i} className="text-[10px] font-black text-text-muted/40 text-center">{d}</div>
+                                                <div key={i} className="text-[10px] font-black text-text-muted/60 text-center">{d}</div>
                                             ))}
                                         </div>
                                         <div className="grid grid-cols-7 gap-1.5">
@@ -254,7 +254,7 @@ const ActivityDetailModal = ({ isOpen, onClose, month, year, initialDay }) => {
                                                                 ? 'bg-primary text-white shadow-lg shadow-primary/40 border-primary scale-110 z-10'
                                                                 : hasActivity
                                                                     ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20'
-                                                                    : 'bg-surface-3/30 border-border text-text-muted/40 hover:text-text hover:bg-surface-3/50 hover:border-text-muted/20'
+                                                                    : 'bg-surface-2 border-border/50 text-text-muted hover:text-text hover:bg-surface-3 hover:border-border'
                                                             }`}
                                                     >
                                                         {day.day}

@@ -18,19 +18,19 @@ import toast from 'react-hot-toast';
 // ── colour helpers ────────────────────────────────────────────────────────────
 const accColor = (v) => v >= 75 ? '#34d399' : v >= 50 ? '#fbbf24' : '#f87171';
 const accPill = (v) => v >= 75
-    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-    : v >= 50 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-        : 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+    ? 'bg-emerald-500/10 text-emerald-500 [.dark_&]:text-emerald-400 border-emerald-500/20'
+    : v >= 50 ? 'bg-amber-500/10 text-amber-600 [.dark_&]:text-amber-400 border-amber-500/20'
+        : 'bg-rose-500/10 text-rose-600 [.dark_&]:text-rose-400 border-rose-500/20';
 
 const consistLabel = (v) => v >= 85 ? 'Highly Consistent' : v >= 65 ? 'Moderate' : 'Inconsistent';
-const consistColor = (v) => v >= 85 ? 'text-emerald-400' : v >= 65 ? 'text-amber-400' : 'text-rose-400';
+const consistColor = (v) => v >= 85 ? 'text-emerald-500 [.dark_&]:text-emerald-400' : v >= 65 ? 'text-amber-600 [.dark_&]:text-amber-400' : 'text-rose-600 [.dark_&]:text-rose-400';
 const consistBorder = (v) => v >= 85 ? 'border-emerald-500/20 from-emerald-500/8' : v >= 65 ? 'border-amber-500/20 from-amber-500/8' : 'border-rose-500/20 from-rose-500/8';
 
 // ── Custom tooltip ────────────────────────────────────────────────────────────
 const ChartTip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
     return (
-        <div className="bg-[#13132a]/95 border border-border rounded-xl p-3 shadow-2xl text-[13px] min-w-[140px]">
+        <div className="bg-surface-2/95 border border-border rounded-xl p-3 shadow-2xl text-[13px] min-w-[140px]">
             <p className="text-text-muted mb-1.5 text-[11px] font-medium uppercase tracking-wider">{payload[0]?.payload?.date || label}</p>
             {payload.map((p, i) => (
                 <div key={i} className="flex items-center justify-between gap-4 py-0.5">
@@ -49,9 +49,9 @@ const AIInsightText = ({ text }) => (
     <div className="space-y-1 text-sm leading-relaxed">
         {text.split('\n').filter(Boolean).map((line, i) => {
             if (/^#+\s|^[A-Z][A-Za-z ]+:/.test(line.trim()) || (line.includes('→') && line.length < 70))
-                return <p key={i} className="text-pink-300 font-semibold mt-3 mb-0.5">{line.replace(/^#+\s/, '')}</p>;
+                return <p key={i} className="text-pink-600 [.dark_&]:text-pink-300 font-semibold mt-3 mb-0.5">{line.replace(/^#+\s/, '')}</p>;
             if (/^[-•*]/.test(line.trim()))
-                return <p key={i} className="text-text-muted pl-4 before:content-['·'] before:mr-2 before:text-pink-400">{line.replace(/^[-•*]\s*/, '')}</p>;
+                return <p key={i} className="text-text-muted pl-4 before:content-['·'] before:mr-2 before:text-pink-500">{line.replace(/^[-•*]\s*/, '')}</p>;
             return <p key={i} className="text-text-muted">{line}</p>;
         })}
     </div>
@@ -231,16 +231,17 @@ const TestAnalytics = () => {
                 {/* ── KPI Row ────────────────────────────────────────────── */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
                     {[
-                        { label: 'Latest Score', value: latestR ? `${latestR.my_score}/${latestR.total_score}` : '—', color: 'text-pink-400', border: 'border-pink-500/20', bg: 'from-pink-500/8' },
-                        { label: 'Latest Accuracy', value: `${latestAcc}%`, color: 'text-emerald-400', border: 'border-emerald-500/20', bg: 'from-emerald-500/8' },
-                        { label: 'Avg Accuracy', value: `${stats.avgAccuracy ?? 0}%`, color: 'text-sky-400', border: 'border-sky-500/20', bg: 'from-sky-500/8' },
-                        { label: 'Best Attempt', value: `${stats.bestAccuracy ?? 0}%`, color: 'text-amber-400', border: 'border-amber-500/20', bg: 'from-amber-500/8' },
+                        { label: 'Latest Score', value: latestR ? `${latestR.my_score}/${latestR.total_score}` : '—', color: 'text-pink-500 [.dark_&]:text-pink-400', border: 'border-pink-500/20', bg: 'from-pink-500/10', icon: <Target className="w-3.5 h-3.5" /> },
+                        { label: 'Latest Accuracy', value: `${latestAcc}%`, color: 'text-emerald-500 [.dark_&]:text-emerald-400', border: 'border-emerald-500/20', bg: 'from-emerald-500/10', icon: <Activity className="w-3.5 h-3.5" /> },
+                        { label: 'Avg Accuracy', value: `${stats.avgAccuracy ?? 0}%`, color: 'text-sky-500 [.dark_&]:text-sky-400', border: 'border-sky-500/20', bg: 'from-sky-500/10', icon: <BarChart3 className="w-3.5 h-3.5" /> },
+                        { label: 'Best Attempt', value: `${stats.bestAccuracy ?? 0}%`, color: 'text-amber-600 [.dark_&]:text-amber-400', border: 'border-amber-500/20', bg: 'from-amber-500/10', icon: <Award className="w-3.5 h-3.5" /> },
                         {
                             label: 'Improvement',
                             value: stats.improvement !== undefined ? `${impPositive ? '+' : ''}${stats.improvement}%` : '—',
-                            color: impNeutral ? 'text-text-muted' : impPositive ? 'text-emerald-400' : 'text-rose-400',
+                            color: impNeutral ? 'text-text-muted' : impPositive ? 'text-emerald-500 [.dark_&]:text-emerald-400' : 'text-rose-600 [.dark_&]:text-rose-400',
                             border: impNeutral ? 'border-border' : impPositive ? 'border-emerald-500/20' : 'border-rose-500/20',
-                            bg: impNeutral ? 'from-white/4' : impPositive ? 'from-emerald-500/8' : 'from-rose-500/8'
+                            bg: impNeutral ? 'from-surface-3/10' : impPositive ? 'from-emerald-500/10' : 'from-rose-500/10',
+                            icon: <TrendingUp className="w-3.5 h-3.5" />
                         },
                         {
                             label: 'Consistency',
@@ -248,24 +249,33 @@ const TestAnalytics = () => {
                             sub: stats.consistencyScore != null ? consistLabel(stats.consistencyScore) : '',
                             color: stats.consistencyScore != null ? consistColor(stats.consistencyScore) : 'text-text-muted',
                             border: stats.consistencyScore != null ? consistBorder(stats.consistencyScore).split(' ')[0] : 'border-border',
-                            bg: stats.consistencyScore != null ? consistBorder(stats.consistencyScore).split(' ')[1] || 'from-white/4' : 'from-white/4'
+                            bg: stats.consistencyScore != null ? (consistBorder(stats.consistencyScore).split(' ')[1] || 'from-surface-3/10').replace('/8', '/10') : 'from-surface-3/10',
+                            icon: <Zap className="w-3.5 h-3.5" />
                         },
                         {
                             label: 'Projected',
                             value: stats.projectedAccuracy != null ? `${stats.projectedAccuracy}%` : '—',
                             sub: stats.projectedAccuracy != null ? 'next attempt' : 'need 2+ attempts',
-                            color: stats.projectedAccuracy != null ? accColor(stats.projectedAccuracy).replace('#', 'text-[#') + ']' : 'text-text-muted',
+                            color: 'text-purple-500 [.dark_&]:text-purple-400',
                             colorDirect: stats.projectedAccuracy != null ? accColor(stats.projectedAccuracy) : undefined,
                             border: stats.projectedAccuracy != null ? 'border-purple-500/20' : 'border-border',
-                            bg: 'from-purple-500/8'
+                            bg: 'from-purple-500/10',
+                            icon: <Brain className="w-3.5 h-3.5" />
                         },
                     ].map((kpi, i) => (
-                        <div key={i} className={`rounded-2xl border ${kpi.border} bg-gradient-to-b ${kpi.bg} to-transparent bg-surface-2 border border-border`}>
-                            <p className="text-xl font-heading font-bold leading-none" style={kpi.colorDirect ? { color: kpi.colorDirect } : undefined}>
-                                <span className={kpi.colorDirect ? '' : kpi.color}>{kpi.value}</span>
-                            </p>
-                            {kpi.sub && <p className="text-[10px] text-text-muted">{kpi.sub}</p>}
-                            <p className="text-[11px] text-text-muted mt-auto">{kpi.label}</p>
+                        <div key={i} className={`group relative p-4 rounded-2xl border ${kpi.border} bg-gradient-to-b ${kpi.bg} to-transparent bg-surface-2 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl hover:shadow-black/5 cursor-default flex flex-col gap-2 min-h-[100px]`}>
+                            <div className={`flex items-center gap-2 opacity-70 group-hover:opacity-100 transition-opacity ${kpi.color}`}>
+                                {kpi.icon}
+                                <span className="text-[10px] font-bold uppercase tracking-wider">{kpi.label}</span>
+                            </div>
+                            <div className="mt-auto">
+                                <p className="text-2xl font-heading font-black leading-tight tracking-tight" style={kpi.colorDirect ? { color: kpi.colorDirect } : undefined}>
+                                    <span className={kpi.colorDirect ? '' : kpi.color}>{kpi.value}</span>
+                                </p>
+                                {kpi.sub && <p className="text-[10px] text-text-muted font-medium mt-1 leading-none opacity-80">{kpi.sub}</p>}
+                            </div>
+                            {/* Subtle background glow on hover */}
+                            <div className={`absolute inset-0 rounded-2xl bg-gradient-to-tr ${kpi.bg} to-transparent opacity-0 group-hover:opacity-10 transition-opacity pointer-events-none`} />
                         </div>
                     ))}
                 </div>
@@ -276,14 +286,14 @@ const TestAnalytics = () => {
                         <div className="flex items-center gap-3 flex-1">
                             <TrendingUp className="w-4 h-4 text-pink-400" />
                             <h2 className="text-sm font-heading font-semibold text-text">Trend Analysis</h2>
-                            <div className="flex bg-black/30 p-1 rounded-lg ml-2">
+                            <div className="flex bg-surface-3/10 p-1 rounded-lg ml-2">
                                 <button
                                     onClick={() => setTrendType('accuracy')}
-                                    className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${trendType === 'accuracy' ? 'bg-pink-500/20 text-pink-400' : 'text-text-muted hover:text-text-muted'}`}
+                                    className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${trendType === 'accuracy' ? 'bg-pink-500/20 text-pink-500 [.dark_&]:text-pink-400' : 'text-text-muted hover:text-text-muted'}`}
                                 >Accuracy</button>
                                 <button
                                     onClick={() => setTrendType('score')}
-                                    className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${trendType === 'score' ? 'bg-violet-500/20 text-violet-400' : 'text-text-muted hover:text-text-muted'}`}
+                                    className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${trendType === 'score' ? 'bg-violet-500/20 text-violet-600 [.dark_&]:text-violet-400' : 'text-text-muted hover:text-text-muted'}`}
                                 >Marks</button>
                             </div>
                         </div>
@@ -299,7 +309,7 @@ const TestAnalytics = () => {
                             />
                             <span className="text-sm font-bold text-pink-400 w-10">{targetScore}%</span>
                             {latestAcc !== '--' && (
-                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${latestAcc >= targetScore ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
+                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${latestAcc >= targetScore ? 'bg-emerald-500/10 text-emerald-500 [.dark_&]:text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-600 [.dark_&]:text-rose-400 border-rose-500/20'}`}>
                                     {latestAcc >= targetScore ? '✓ Hit' : `${(targetScore - latestAcc).toFixed(1)}% gap`}
                                 </span>
                             )}
@@ -316,12 +326,13 @@ const TestAnalytics = () => {
                                             <stop offset="95%" stopColor={trendType === 'accuracy' ? '#ec4899' : '#8b5cf6'} stopOpacity={0.0} />
                                         </linearGradient>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                                    <XAxis dataKey="attempt" tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }} tickLine={false} axisLine={false} dy={6} />
+                                    <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border/20" vertical={false} />
+                                    <XAxis dataKey="attempt" tick={{ fill: 'currentColor', fontSize: 11 }} className="text-text-muted/50" tickLine={false} axisLine={false} dy={6} />
                                     <YAxis
                                         domain={trendType === 'accuracy' ? [0, 100] : ['auto', 'auto']}
                                         tickFormatter={v => trendType === 'accuracy' ? `${v}%` : v}
-                                        tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }}
+                                        tick={{ fill: 'currentColor', fontSize: 10 }}
+                                        className="text-text-muted/50"
                                         tickLine={false}
                                         axisLine={false}
                                     />
@@ -366,16 +377,16 @@ const TestAnalytics = () => {
                             {examTraps.map((t, i) => {
                                 const acc = Number(t.accuracy);
                                 const riskLevel = t.riskScore >= 3 ? 'High' : t.riskScore >= 1.5 ? 'Medium' : 'Low';
-                                const riskColor = t.riskScore >= 3 ? 'text-rose-400 bg-rose-500/10 border-rose-500/20'
-                                    : t.riskScore >= 1.5 ? 'text-orange-400 bg-orange-500/10 border-orange-500/20'
-                                        : 'text-amber-400 bg-amber-500/10 border-amber-500/20';
+                                const riskColor = t.riskScore >= 3 ? 'text-rose-600 [.dark_&]:text-rose-400 bg-rose-500/10 border-rose-500/20'
+                                    : t.riskScore >= 1.5 ? 'text-orange-600 [.dark_&]:text-orange-400 bg-orange-500/10 border-orange-500/20'
+                                        : 'text-amber-600 [.dark_&]:text-amber-400 bg-amber-500/10 border-amber-500/20';
                                 return (
-                                    <div key={i} className="bg-black/20 rounded-xl p-4 border border-border flex flex-col gap-3">
+                                    <div key={i} className="bg-surface-3/10 rounded-xl p-4 border border-border flex flex-col gap-3">
                                         <div className="flex items-start justify-between gap-2">
                                             <p className="text-sm font-semibold text-text leading-tight">{t.topic_name}</p>
                                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex-shrink-0 ${riskColor}`}>{riskLevel}</span>
                                         </div>
-                                        <div className="w-full bg-black/30 rounded-full h-1.5">
+                                        <div className="w-full bg-surface-3/20 rounded-full h-1.5">
                                             <div className="h-full rounded-full" style={{ width: `${acc}%`, backgroundColor: accColor(acc) }} />
                                         </div>
                                         <div className="flex items-center justify-between text-[11px]">
@@ -400,7 +411,7 @@ const TestAnalytics = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {recovering.length > 0 && (
                                 <div>
-                                    <p className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5 mb-3 uppercase tracking-wider">
+                                    <p className="text-xs font-semibold text-emerald-500 [.dark_&]:text-emerald-400 flex items-center gap-1.5 mb-3 uppercase tracking-wider">
                                         <ArrowUpRight className="w-3.5 h-3.5" /> Improving ({recovering.length})
                                     </p>
                                     <div className="space-y-2">
@@ -410,7 +421,7 @@ const TestAnalytics = () => {
                                                     <p className="text-xs font-medium text-text truncate">{t.name}</p>
                                                     <p className="text-[10px] text-text-muted mt-0.5">{t.first}% → {t.last}%</p>
                                                 </div>
-                                                <span className="text-sm font-bold text-emerald-400 flex-shrink-0">+{t.delta.toFixed(1)}%</span>
+                                                <span className="text-sm font-bold text-emerald-500 [.dark_&]:text-emerald-400 flex-shrink-0">+{t.delta.toFixed(1)}%</span>
                                             </div>
                                         ))}
                                     </div>
@@ -418,7 +429,7 @@ const TestAnalytics = () => {
                             )}
                             {declining.length > 0 && (
                                 <div>
-                                    <p className="text-xs font-semibold text-rose-400 flex items-center gap-1.5 mb-3 uppercase tracking-wider">
+                                    <p className="text-xs font-semibold text-rose-600 [.dark_&]:text-rose-400 flex items-center gap-1.5 mb-3 uppercase tracking-wider">
                                         <ArrowDownRight className="w-3.5 h-3.5" /> Declining ({declining.length})
                                     </p>
                                     <div className="space-y-2">
@@ -428,7 +439,7 @@ const TestAnalytics = () => {
                                                     <p className="text-xs font-medium text-text truncate">{t.name}</p>
                                                     <p className="text-[10px] text-text-muted mt-0.5">{t.first}% → {t.last}%</p>
                                                 </div>
-                                                <span className="text-sm font-bold text-rose-400 flex-shrink-0">−{t.delta.toFixed(1)}%</span>
+                                                <span className="text-sm font-bold text-rose-600 [.dark_&]:text-rose-400 flex-shrink-0">−{t.delta.toFixed(1)}%</span>
                                             </div>
                                         ))}
                                     </div>
@@ -458,12 +469,12 @@ const TestAnalytics = () => {
                                                 .map((s, i) => {
                                                     const acc = Number(s.accuracy);
                                                     return (
-                                                        <div key={i} className="bg-black/20 rounded-xl p-3 border border-border">
+                                                        <div key={i} className="bg-surface-3/10 rounded-xl p-3 border border-border">
                                                             <div className="flex items-center justify-between mb-1.5">
                                                                 <span className="text-xs font-medium text-text">{s.subject_name}</span>
                                                                 <span className={`text-xs font-bold px-1.5 py-0.5 rounded-lg border ${accPill(acc)}`}>{acc}%</span>
                                                             </div>
-                                                            <div className="w-full bg-black/30 rounded-full h-1"><div className="h-full rounded-full" style={{ width: `${acc}%`, backgroundColor: accColor(acc) }} /></div>
+                                                            <div className="w-full bg-surface-3/20 rounded-full h-1"><div className="h-full rounded-full" style={{ width: `${acc}%`, backgroundColor: accColor(acc) }} /></div>
                                                             <p className="text-[10px] text-text-muted mt-1">{s.total_correct}/{s.total_questions} correct · {Number(s.total_questions) - Number(s.total_correct)} wrong</p>
                                                         </div>
                                                     );
@@ -482,10 +493,10 @@ const TestAnalytics = () => {
                                                 .map((t, i) => {
                                                     const acc = Number(t.accuracy);
                                                     return (
-                                                        <div key={i} className="bg-black/20 rounded-xl p-3 border border-border flex items-center gap-3">
+                                                        <div key={i} className="bg-surface-3/10 rounded-xl p-3 border border-border flex items-center gap-3">
                                                             <div className="flex-1 min-w-0">
-                                                                <p className="text-xs font-medium text-text truncate">{t.topic_name}</p>
-                                                                <div className="w-full bg-black/30 rounded-full h-1 mt-1"><div className="h-full rounded-full" style={{ width: `${acc}%`, backgroundColor: accColor(acc) }} /></div>
+                                                                 <p className="text-xs font-medium text-text truncate">{t.topic_name}</p>
+                                                                 <div className="w-full bg-surface-3/20 rounded-full h-1 mt-1"><div className="h-full rounded-full" style={{ width: `${acc}%`, backgroundColor: accColor(acc) }} /></div>
                                                             </div>
                                                             <div className="text-right flex-shrink-0">
                                                                 <p className="text-xs font-bold" style={{ color: accColor(acc) }}>{acc}%</p>
@@ -518,9 +529,9 @@ const TestAnalytics = () => {
                                     value={filterTopicSubject}
                                     onChange={e => setFilterTopicSubject(e.target.value)}
                                 >
-                                    <option value="All" className="bg-[#161622]">ALL SUBJECTS</option>
+                                    <option value="All" className="bg-surface-2">ALL SUBJECTS</option>
                                     {Object.keys(topicsBySub).sort().map(sub => (
-                                        <option key={sub} value={sub} className="bg-[#161622]">{sub.toUpperCase()}</option>
+                                        <option key={sub} value={sub} className="bg-surface-2">{sub.toUpperCase()}</option>
                                     ))}
                                 </select>
                                 <ChevronDown className="w-3.5 h-3.5 text-text-muted absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none group-hover:text-text-muted transition-colors" />
@@ -566,10 +577,10 @@ const TestAnalytics = () => {
                             <h2 className="text-sm font-heading font-semibold text-text">Global Breakdown</h2>
                             <span className="text-xs text-text-muted">all attempts combined</span>
                         </div>
-                        <div className="flex bg-black/30 p-1 rounded-xl w-fit">
+                        <div className="flex bg-surface-3/10 p-1 rounded-xl w-fit">
                             {['subjects', 'topics'].map(t => (
                                 <button key={t} onClick={() => setActiveTab(t)}
-                                    className={`px-4 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all ${activeTab === t ? 'bg-surface-3/10 text-text' : 'text-text-muted hover:text-text'}`}>
+                                    className={`px-4 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all ${activeTab === t ? 'bg-surface-2 shadow-sm text-text' : 'text-text-muted hover:text-text'}`}>
                                     {t}
                                 </button>
                             ))}
@@ -582,9 +593,9 @@ const TestAnalytics = () => {
                                 <div style={{ height: Math.max(140, subjectBarData.length * 36) }}>
                                     <ResponsiveContainer width="100%" height="100%">
                                         <BarChart data={subjectBarData} layout="vertical" margin={{ left: 0, right: 30, top: 0, bottom: 0 }}>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" horizontal={false} />
-                                            <XAxis type="number" domain={[0, 100]} tickFormatter={v => `${v}%`} tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} tickLine={false} axisLine={false} />
-                                            <YAxis type="category" dataKey="name" width={100} tick={{ fill: 'rgba(255,255,255,0.55)', fontSize: 10 }} tickLine={false} axisLine={false} />
+                                            <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border/20" horizontal={false} />
+                                            <XAxis type="number" domain={[0, 100]} tickFormatter={v => `${v}%`} tick={{ fill: 'currentColor', fontSize: 10 }} className="text-text-muted/50" tickLine={false} axisLine={false} />
+                                            <YAxis type="category" dataKey="name" width={100} tick={{ fill: 'currentColor', fontSize: 10 }} className="text-text-muted/80" tickLine={false} axisLine={false} />
                                             <Tooltip content={<ChartTip />} />
                                             <Bar dataKey="Accuracy" radius={[0, 6, 6, 0]} barSize={13}>
                                                 {subjectBarData.map((e, i) => <Cell key={i} fill={accColor(e.Accuracy)} />)}
@@ -629,7 +640,7 @@ const TestAnalytics = () => {
                         <div className="flex items-center gap-2">
                             <Activity className="w-4 h-4 text-pink-400" />
                             <h2 className="text-sm font-heading font-semibold text-text">Attempt History</h2>
-                            <span className="px-2 py-0.5 rounded-full bg-white/8 text-[11px] text-text/40">{attempts.length}</span>
+                            <span className="px-2 py-0.5 rounded-full bg-surface-3/10 border border-border text-[11px] text-text-muted">{attempts.length}</span>
                         </div>
                         <div className="space-y-2">
                             {[...attempts].reverse().map((a, revIdx) => {
@@ -639,7 +650,7 @@ const TestAnalytics = () => {
                                 const pct = a.accuracy ?? 0;
                                 const isOpen = expandedAttempt === r.id;
                                 return (
-                                    <div key={r.id} className={`rounded-2xl border transition-all overflow-hidden ${isOpen ? 'border-pink-500/25 bg-[#0f0f1a]' : 'border-border bg-surface-3/10 hover:bg-surface-3/10'}`}>
+                                    <div key={r.id} className={`rounded-2xl border transition-all overflow-hidden ${isOpen ? 'border-pink-500/25 bg-surface-2' : 'border-border bg-surface-3/10 hover:bg-surface-3/10'}`}>
                                         <button className="w-full p-4 flex items-center gap-3 text-left" onClick={() => setExpanded(isOpen ? null : r.id)}>
                                             <div className="w-8 h-8 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center flex-shrink-0">
                                                 <span className="text-[10px] font-bold text-pink-400">#{num}</span>
@@ -660,10 +671,10 @@ const TestAnalytics = () => {
                                             <div className="px-4 pb-4 border-t border-border pt-3">
                                                 <div className="flex items-center justify-between mb-3">
                                                     <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Breakdown</span>
-                                                    <div className="flex bg-black/30 p-0.5 rounded-lg">
+                                                    <div className="flex bg-surface-3/10 p-0.5 rounded-lg">
                                                         {['subjects', 'topics'].map(t => (
                                                             <button key={t} onClick={() => setAttemptTab(t)}
-                                                                className={`px-3 py-0.5 rounded-md text-xs font-semibold capitalize transition-all ${attemptTab === t ? 'bg-surface-3/10 text-text' : 'text-text-muted hover:text-text'}`}>{t}</button>
+                                                                className={`px-3 py-0.5 rounded-md text-xs font-semibold capitalize transition-all ${attemptTab === t ? 'bg-surface-2 shadow-sm text-text' : 'text-text-muted hover:text-text'}`}>{t}</button>
                                                         ))}
                                                     </div>
                                                 </div>
@@ -697,7 +708,7 @@ const BreakdownCard = ({ name, accuracy, correct, total, marks }) => (
             <p className="text-xs font-semibold text-text leading-tight">{name}</p>
             <span className={`px-2 py-0.5 rounded-lg text-xs font-bold border flex-shrink-0 ${accPill(accuracy)}`}>{accuracy}%</span>
         </div>
-        <div className="w-full bg-black/30 rounded-full h-1.5">
+        <div className="w-full bg-surface-3/20 rounded-full h-1.5">
             <div className="h-full rounded-full" style={{ width: `${Math.min(100, accuracy)}%`, backgroundColor: accColor(accuracy) }} />
         </div>
         <p className="text-[11px] text-text-muted">
@@ -749,10 +760,10 @@ const BreakdownList = ({ items, nameKey, emptyText, groupTopicsBySubject = false
 const BreakdownListItem = ({ item, nameKey }) => {
     const acc = Number(item.accuracy);
     return (
-        <div className="bg-black/20 rounded-xl p-2.5 border border-border flex items-center gap-3">
+        <div className="bg-surface-3/10 rounded-xl p-2.5 border border-border flex items-center gap-3">
             <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-text truncate">{item[nameKey]}</p>
-                <div className="w-full bg-black/30 rounded-full h-1 mt-1.5">
+                <div className="w-full bg-surface-3/20 rounded-full h-1 mt-1.5">
                     <div className="h-full rounded-full" style={{ width: `${Math.min(100, acc)}%`, backgroundColor: accColor(acc) }} />
                 </div>
             </div>

@@ -53,26 +53,28 @@ const MiniProgressBar = ({ value, max, colorClass = 'bg-primary' }) => {
 /* ── Stat Card ─────────────────────────────────────────────── */
 // eslint-disable-next-line no-unused-vars
 const StatCard = ({ label, value, sub, icon: Icon, colorClass, delayClass, trend, progressValue, progressMax, progressColor, className = '' }) => (
-    <div className={`bg-surface border border-border-card bg-surface border border-border p-6 min-h-[150px] flex flex-col justify-between fade-in ${delayClass} relative overflow-hidden group ${className}`}>
+    <div className={`bg-surface-2 border border-border p-5 min-h-[140px] flex flex-col justify-between fade-in ${delayClass} relative overflow-hidden group hover:scale-[1.02] transition-all duration-300 rounded-2xl ${className}`}>
         <div className="flex justify-between items-start mb-4 relative z-10">
-            <div className={`p-3 rounded-xl border border-border bg-surface-3/20 shadow-inner ${colorClass}`}>
+            <div className={`p-2.5 rounded-xl border border-border bg-surface-3/10 shadow-inner ${colorClass}`}>
                 <Icon className="w-5 h-5" strokeWidth={2.2} />
             </div>
             {trend && (
-                <div className={`flex items-center gap-0.5 text-[11px] font-semibold px-2 py-0.5 rounded-full ${trend.startsWith('+') ? 'text-emerald-400 bg-emerald-500/10' : trend === '--' ? 'text-text-muted bg-surface-3/40' : 'text-red-400 bg-red-500/10'}`}>
+                <div className={`flex items-center gap-0.5 text-[11px] font-bold px-2.5 py-1 rounded-lg ${trend.startsWith('+') ? 'text-emerald-500 bg-emerald-500/10 border border-emerald-500/20' : trend === '--' ? 'text-text-muted bg-surface-3/20 border border-border' : 'text-rose-600 bg-rose-500/10 border border-rose-500/20'}`}>
                     {trend !== '--' && <ArrowUpRight className="w-3 h-3" />}
                     {trend}
                 </div>
             )}
         </div>
         <div className="relative z-10">
-            <p className="text-3xl font-heading font-bold text-text tracking-tight">{value}</p>
-            <p className="text-[13px] font-medium text-text-muted mt-1">{label}</p>
-            {sub && <p className="text-[11px] font-medium text-text-muted mt-1.5 uppercase tracking-wider">{sub}</p>}
+            <p className="text-3xl font-heading font-black text-text tracking-tight leading-none">{value}</p>
+            <p className="text-[13px] font-bold text-text-muted mt-2">{label}</p>
+            {sub && <p className="text-[10px] font-bold text-text-muted/60 mt-1.5 uppercase tracking-widest">{sub}</p>}
             {progressValue != null && progressMax != null && (
                 <MiniProgressBar value={progressValue} max={progressMax} colorClass={progressColor || 'bg-primary'} />
             )}
         </div>
+        {/* Subtle glow effect */}
+        <div className={`absolute -right-4 -bottom-4 w-24 h-24 rounded-full blur-3xl opacity-0 group-hover:opacity-20 transition-opacity pointer-events-none ${colorClass?.includes('text-primary') ? 'bg-primary' : colorClass?.includes('text-pink') ? 'bg-pink-500' : colorClass?.includes('text-blue') ? 'bg-blue-400' : 'bg-purple-400'}`} />
     </div>
 );
 
@@ -339,62 +341,64 @@ const Dashboard = () => {
             {/* Global Stats Grid — Bento Layout */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
                 {/* Global Accuracy & Questions Attempted - Hero Card */}
-                <div className="md:col-span-2 bg-surface border border-border-card bg-surface border border-border p-8 relative overflow-hidden group border-indigo-500/20 bg-indigo-500/[0.02] flex flex-col justify-between fade-in stagger-1 min-h-[220px]">
+                <div className="md:col-span-2 bg-surface-2 border border-border p-8 relative overflow-hidden group border-indigo-500/20 bg-gradient-to-br from-indigo-500/10 to-transparent flex flex-col justify-between fade-in stagger-1 min-h-[220px] rounded-[2rem]">
                     <div className="flex justify-between items-start mb-2 z-10 relative">
-                        <div className="flex items-center gap-3">
-                            <div className="p-3.5 rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shadow-inner">
-                                <Target className="w-6 h-6" strokeWidth={2.2} />
+                        <div className="flex items-center gap-4">
+                            <div className="p-4 rounded-2xl bg-indigo-500/10 text-indigo-500 [.dark_&]:text-indigo-400 border border-indigo-500/20 shadow-inner">
+                                <Target className="w-7 h-7" strokeWidth={2.2} />
                             </div>
                             <div>
-                                <h3 className="text-lg font-heading font-bold text-text tracking-tight">Performance Summary</h3>
-                                <p className="text-text-muted text-sm mt-0.5">{totalQuestions} Questions Attempted</p>
+                                <h3 className="text-xl font-heading font-bold text-text tracking-tight">Performance Summary</h3>
+                                <p className="text-text-muted text-sm font-medium mt-0.5">{totalQuestions} Questions Attempted</p>
                             </div>
                         </div>
 
                         {globalAccuracy !== '--' && (
-                            <div className={`px-3 py-1.5 rounded-full text-[11px] font-bold tracking-wider flex items-center gap-1.5 uppercase
-                                ${globalAccuracy >= 75 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                    : globalAccuracy >= 50 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                                        : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
-                                {globalAccuracy >= 75 ? <><TrendingUp className="w-3.5 h-3.5" /> Excellent</>
-                                    : globalAccuracy >= 50 ? <><Activity className="w-3.5 h-3.5" /> Good</>
-                                        : <><AlertTriangle className="w-3.5 h-3.5" /> Needs Work</>}
+                            <div className={`px-4 py-2 rounded-xl text-[11px] font-bold tracking-wider flex items-center gap-2 uppercase shadow-sm
+                                ${globalAccuracy >= 75 ? 'bg-emerald-500/10 text-emerald-600 [.dark_&]:text-emerald-400 border border-emerald-500/20'
+                                    : globalAccuracy >= 50 ? 'bg-amber-500/10 text-amber-600 [.dark_&]:text-amber-400 border border-amber-500/20'
+                                        : 'bg-rose-500/10 text-rose-600 [.dark_&]:text-rose-400 border border-rose-500/20'}`}>
+                                {globalAccuracy >= 75 ? <><TrendingUp className="w-4 h-4" /> Excellent</>
+                                    : globalAccuracy >= 50 ? <><Activity className="w-4 h-4" /> Good</>
+                                        : <><AlertTriangle className="w-4 h-4" /> Needs Work</>}
                             </div>
                         )}
                     </div>
 
-                    <div className="z-10 relative mt-6 grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
+                    <div className="z-10 relative mt-8 grid grid-cols-1 md:grid-cols-2 gap-10 items-end">
                         <div>
                             <div className="flex items-baseline gap-2 mb-1">
-                                <span className="text-6xl md:text-7xl font-heading font-black text-text tracking-tighter leading-none">
+                                <span className="text-7xl md:text-8xl font-heading font-black text-text tracking-tighter leading-none">
                                     {globalAccuracy === '--' ? '--' : globalAccuracy}
                                 </span>
-                                {globalAccuracy !== '--' && <span className="text-2xl font-bold text-text-muted mb-1">%</span>}
+                                {globalAccuracy !== '--' && <span className="text-3xl font-bold text-text-muted mb-2">%</span>}
                             </div>
-                            <p className="text-xs font-bold text-text-muted uppercase tracking-widest ml-1">Global Accuracy</p>
+                            <p className="text-[11px] font-bold text-text-muted uppercase tracking-[0.2em] ml-2">Global Accuracy Index</p>
                         </div>
 
                         {totalQuestions > 0 && (
-                            <div className="w-full pb-1">
-                                <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider mb-2 px-0.5">
-                                    <span className="text-emerald-400">Correct: {totalCorrect}</span>
-                                    <span className="text-red-400">Incorrect: {totalIncorrect}</span>
+                            <div className="w-full pb-2">
+                                <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-wider mb-3 px-1">
+                                    <span className="text-emerald-500 [.dark_&]:text-emerald-400">Correct: {totalCorrect}</span>
+                                    <span className="text-rose-500 [.dark_&]:text-rose-400">Incorrect: {totalIncorrect}</span>
                                 </div>
-                                <div className="w-full h-2.5 bg-surface-3/40 rounded-full overflow-hidden">
+                                <div className="w-full h-3 bg-surface-3/30 rounded-full overflow-hidden shadow-inner">
                                     <div
-                                        className={`h-full rounded-full transition-all duration-1000 ease-out 
-                                            ${globalAccuracy >= 75 ? 'bg-emerald-400'
-                                                : globalAccuracy >= 50 ? 'bg-amber-400' : 'bg-red-400'}`}
+                                        className={`h-full rounded-full transition-all duration-1000 ease-out shadow-lg
+                                            ${globalAccuracy >= 75 ? 'bg-emerald-500'
+                                                : globalAccuracy >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`}
                                         style={{ width: `${globalAccuracy}%` }}
                                     />
                                 </div>
-                                <div className="flex justify-between items-center text-[10px] font-semibold text-text-muted mt-2 px-0.5">
-                                    <span>{totalQuestions} Total Attempts</span>
-                                    <span className="text-emerald-400/80">Keep going!</span>
+                                <div className="flex justify-between items-center text-[10px] font-bold text-text-muted mt-3 px-1 uppercase tracking-widest">
+                                    <span>{totalQuestions} Total Efforts</span>
+                                    <span className="text-indigo-500 [.dark_&]:text-indigo-400">Keep Mastering!</span>
                                 </div>
                             </div>
                         )}
                     </div>
+                    {/* Decorative Background Elements */}
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
                 </div>
 
                 {/* Active Subjects */}

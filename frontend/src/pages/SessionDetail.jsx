@@ -43,7 +43,7 @@ const RED = '#ef4444';
 const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
     return (
-        <div className="glass p-3 border border-border-hover rounded-lg shadow-xl  text-sm">
+        <div className="bg-surface-2/95 p-3 border border-border rounded-lg shadow-xl text-sm">
             <p className="text-text font-heading font-semibold mb-1.5">{label}</p>
             {payload.map((p) => (
                 <div key={p.name} className="flex items-center gap-2">
@@ -228,10 +228,10 @@ const SessionDetail = () => {
             {/* ═══════════════════════════════════════ */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-10">
                 {/* Accuracy Card */}
-                <div className="lg:col-span-1 glass p-6 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group">
+                <div className="lg:col-span-1 bg-surface-2 border border-border p-6 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group">
                     <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                     <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-4">Final Accuracy</span>
-                    <div className={`text-5xl font-heading font-bold tracking-tighter ${session.accuracy >= 75 ? 'text-emerald-400' : session.accuracy >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
+                    <div className={`text-5xl font-heading font-bold tracking-tighter ${session.accuracy >= 75 ? 'text-emerald-500 [.dark_&]:text-emerald-400' : session.accuracy >= 50 ? 'text-amber-600 [.dark_&]:text-amber-400' : 'text-rose-600 [.dark_&]:text-rose-400'}`}>
                         {session.accuracy}%
                     </div>
                     <div className="mt-4">
@@ -240,21 +240,21 @@ const SessionDetail = () => {
                 </div>
 
                 {/* Score Breakdown Card */}
-                <div className="lg:col-span-3 glass p-6 rounded-2xl flex flex-col justify-center relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-surface-2 rounded-bl-full pointer-events-none" />
+                <div className="lg:col-span-3 bg-surface-2 border border-border p-6 rounded-2xl flex flex-col justify-center relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-surface-3/10 rounded-bl-full pointer-events-none" />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center relative z-10">
                         <div className="space-y-4">
                             <div className="flex items-center justify-between text-sm">
                                 <span className="text-text-muted font-medium">Session Distribution</span>
                                 <span className="text-text-muted text-xs">{session.totalQuestions} Questions</span>
                             </div>
-                            <div className="w-full bg-surface-2 rounded-full h-3.5 overflow-hidden flex shadow-inner group-hover:shadow-primary/5 transition-shadow">
+                            <div className="w-full bg-surface-3/10 rounded-full h-3.5 overflow-hidden flex shadow-inner group-hover:shadow-primary/5 transition-shadow">
                                 <div
                                     className="bg-emerald-500 h-full transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(16,185,129,0.3)]"
                                     style={{ width: `${(session.totalCorrect / session.totalQuestions) * 100}%` }}
                                 />
                                 <div
-                                    className="bg-red-500/50 h-full transition-all duration-1000 ease-out"
+                                    className="bg-rose-500/50 h-full transition-all duration-1000 ease-out"
                                     style={{ width: `${(session.totalIncorrect / session.totalQuestions) * 100}%` }}
                                 />
                             </div>
@@ -265,12 +265,12 @@ const SessionDetail = () => {
                                 </div>
                                 <div className="flex items-center gap-2.5">
                                     <span className="text-sm font-semibold text-text">{session.totalIncorrect} Incorrect</span>
-                                    <div className="w-2.5 h-2.5 rounded-full bg-red-500/50" />
+                                    <div className="w-2.5 h-2.5 rounded-full bg-rose-500/50" />
                                 </div>
                             </div>
                         </div>
 
-                        <div className="bg-surface-2 border border-border p-4 rounded-xl">
+                        <div className="bg-surface-3/10 border border-border p-4 rounded-xl">
                             <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-widest mb-3">Author's Note</h4>
                             <p className="text-[13px] text-text-muted leading-relaxed italic">
                                 {session.notes || "No additional notes provided for this study session."}
@@ -301,17 +301,19 @@ const SessionDetail = () => {
                                 layout="vertical"
                                 margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                             >
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" horizontal={false} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border/20" horizontal={false} />
                                 <XAxis
                                     type="number"
-                                    tick={{ fill: '#475569', fontSize: 11 }}
+                                    tick={{ fill: 'currentColor', fontSize: 11 }}
+                                    className="text-text-muted/50"
                                     tickLine={false}
                                     axisLine={false}
                                 />
                                 <YAxis
                                     type="category"
                                     dataKey="topicName"
-                                    tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }}
+                                    tick={{ fill: 'currentColor', fontSize: 11, fontWeight: 500 }}
+                                    className="text-text-muted/70"
                                     tickLine={false}
                                     axisLine={false}
                                     width={140}
@@ -354,8 +356,8 @@ const SessionDetail = () => {
             {topicPerformance.length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
                     {/* Best Areas */}
-                    <div className="glass p-6 rounded-2xl border-emerald-500/10 relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-32 h-32 bg-emerald-500/[0.04] rounded-full blur-3xl pointer-events-none" />
+                    <div className="bg-surface-2 border border-border p-6 rounded-2xl border-emerald-500/10 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
                         <div className="flex items-center gap-2 mb-5 relative z-10">
                             <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                             <h2 className="text-lg font-heading font-bold text-text tracking-tight">Session Victories</h2>
@@ -382,10 +384,10 @@ const SessionDetail = () => {
                     </div>
 
                     {/* Weak Areas */}
-                    <div className="glass p-6 rounded-2xl border-red-500/10 relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-32 h-32 bg-red-500/[0.04] rounded-full blur-3xl pointer-events-none" />
+                    <div className="bg-surface-2 border border-border p-6 rounded-2xl border-rose-500/10 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-32 h-32 bg-rose-500/5 rounded-full blur-3xl pointer-events-none" />
                         <div className="flex items-center gap-2 mb-5 relative z-10">
-                            <AlertTriangle className="w-5 h-5 text-red-500" />
+                            <AlertTriangle className="w-5 h-5 text-rose-500" />
                             <h2 className="text-lg font-heading font-bold text-text tracking-tight">Needs Support</h2>
                         </div>
                         <div className="space-y-2 relative z-10">
@@ -428,11 +430,12 @@ const SessionDetail = () => {
                         {topicPerformance.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={topicPerformance} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" horizontal={false} />
+                                    <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border/20" horizontal={false} />
                                     <XAxis
                                         type="number"
                                         domain={[0, 100]}
-                                        tick={{ fill: '#475569', fontSize: 11 }}
+                                        tick={{ fill: 'currentColor', fontSize: 11 }}
+                                        className="text-text-muted/50"
                                         tickFormatter={(v) => `${v}%`}
                                         axisLine={false}
                                         tickLine={false}
@@ -440,7 +443,8 @@ const SessionDetail = () => {
                                     <YAxis
                                         type="category"
                                         dataKey="topicName"
-                                        tick={{ fill: '#cbd5e1', fontSize: 12, fontWeight: 500 }}
+                                        tick={{ fill: 'currentColor', fontSize: 12, fontWeight: 500 }}
+                                        className="text-text-muted/70"
                                         width={140}
                                         axisLine={false}
                                         tickLine={false}

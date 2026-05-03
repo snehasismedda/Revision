@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAnalytics } from '../context/AnalyticsContext.jsx';
+import { useTheme } from '../context/ThemeContext.jsx';
 import {
     CalendarDays, FileText, HelpCircle, Lightbulb,
     Activity, Target, BookOpen, ChevronLeft, ChevronRight, Flame, RefreshCw,
@@ -60,8 +61,8 @@ const getIntensity = (data) => {
 };
 
 /* Richer intensity palette — layered violet fills with subtle differentiation */
-const CELL_COLORS = [
-    { bg: 'rgba(255,255,255,0.02)', border: 'rgba(255,255,255,0.03)', glow: 'none' },                  // 0 — empty
+const getCellColors = (theme) => [
+    { bg: theme === 'light' ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.02)', border: theme === 'light' ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.03)', glow: 'none' },                  // 0 — empty
     { bg: 'rgba(139,92,246,0.12)',   border: 'rgba(139,92,246,0.08)', glow: 'none' },                    // 1 — low
     { bg: 'rgba(139,92,246,0.28)',   border: 'rgba(139,92,246,0.15)', glow: 'none' },                    // 2 — medium
     { bg: 'rgba(124,58,237,0.48)',   border: 'rgba(139,92,246,0.25)', glow: 'rgba(139,92,246,0.1)' },    // 3 — high
@@ -120,72 +121,49 @@ const Tooltip = ({ date, data, x, y, containerWidth }) => {
             className="absolute z-50 pointer-events-none fade-in"
             style={{ left: x, top: y - 12, transform: `translate(${translateX}, -100%)` }}
         >
-            <div style={{
-                background: 'rgba(15,15,25,0.95)',
-                border: '1px solid rgba(139,92,246,0.25)',
-                borderRadius: 20,
-                padding: '16px',
-                width: tooltipWidth,
-                backdropFilter: 'blur(16px)',
-                boxShadow: '0 20px 40px -10px rgba(0,0,0,0.7), 0 0 20px rgba(139,92,246,0.1)',
-            }}>
+            <div className="bg-surface-2 border border-border rounded-[20px] p-4 backdrop-blur-md shadow-2xl" style={{ width: tooltipWidth }}>
                 {/* Date header */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: total > 0 ? 12 : 0, paddingBottom: total > 0 ? 10 : 0, borderBottom: total > 0 ? '1px solid rgba(255,255,255,0.08)' : 'none' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: 13, fontWeight: 800, color: '#f8fafc', fontFamily: 'Outfit, sans-serif' }}>{formatted}</span>
-                        <span style={{ fontSize: 10, color: '#64748b', fontWeight: 600, marginTop: 2 }}>{total === 0 ? 'No activities' : `${total} ${total === 1 ? 'activity' : 'activities'}`}</span>
+                <div className={`flex items-center justify-between ${total > 0 ? 'mb-3 pb-2.5 border-b border-border' : ''}`}>
+                    <div className="flex flex-col">
+                        <span className="text-[13px] font-black text-text font-heading">{formatted}</span>
+                        <span className="text-[10px] text-text-muted font-semibold mt-0.5">{total === 0 ? 'No activities' : `${total} ${total === 1 ? 'activity' : 'activities'}`}</span>
                     </div>
                     {total > 0 && (
-                        <div style={{
-                            width: 32, height: 32, borderRadius: 10,
-                            background: 'rgba(139,92,246,0.15)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            border: '1px solid rgba(139,92,246,0.2)'
-                        }}>
-                             <Activity style={{ width: 14, height: 14, color: '#a78bfa' }} strokeWidth={2.5} />
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20">
+                             <Activity className="w-3.5 h-3.5 text-primary-light" strokeWidth={2.5} />
                         </div>
                     )}
                 </div>
 
                 {/* Stat rows */}
                 {total > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div className="flex flex-col gap-1.5">
                         {STAT_ITEMS.filter(s => data && data[s.key] > 0).map(({ key, icon: Icon, label, color }) => (
-                            <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                    <Icon style={{ width: 12, height: 12, color, opacity: 0.9 }} strokeWidth={2.5} />
-                                    <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>{label}</span>
+                            <div key={key} className="flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                    <Icon style={{ color }} className="w-3 h-3 opacity-90" strokeWidth={2.5} />
+                                    <span className="text-xs text-text-muted font-medium">{label}</span>
                                 </div>
-                                <span style={{ fontSize: 13, fontWeight: 800, color: '#e2e8f0', fontFamily: 'Outfit, sans-serif' }}>{data[key]}</span>
+                                <span className="text-[13px] font-black text-text font-heading">{data[key]}</span>
                             </div>
                         ))}
                         {data && data.topicsRevised > 0 && (
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                                <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Topics Revised</span>
-                                <span style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa' }}>{data.topicsRevised}</span>
+                            <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-border/50">
+                                <span className="text-[11px] text-text-muted font-semibold">Topics Revised</span>
+                                <span className="text-xs font-black text-primary-light">{data.topicsRevised}</span>
                             </div>
                         )}
                     </div>
                 )}
 
                 {total === 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', padding: '4px 0' }}>
-                        <span style={{ fontSize: 11, color: '#475569', fontWeight: 600 }}>Stay consistent!</span>
+                    <div className="flex items-center gap-2 justify-center py-1">
+                        <span className="text-[11px] text-text-muted font-semibold">Stay consistent!</span>
                     </div>
                 )}
             </div>
             {/* Arrow */}
-            <div style={{
-                position: 'absolute',
-                bottom: -6,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: 0,
-                height: 0,
-                borderLeft: '6px solid transparent',
-                borderRight: '6px solid transparent',
-                borderTop: '6px solid rgba(139,92,246,0.25)',
-            }} />
+            <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-border" />
         </div>
     );
 };
@@ -193,12 +171,13 @@ const Tooltip = ({ date, data, x, y, containerWidth }) => {
 
 /* ────────────────────── Month Card ────────────────────── */
 
-const MonthCard = ({ grid, activityData, onCellHover, onCellLeave, isCurrentMonth, onMonthClick, onDayClick }) => {
+const MonthCard = ({ grid, activityData, onCellHover, onCellLeave, isCurrentMonth, onMonthClick, onDayClick, theme }) => {
     const now = new Date();
     const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
 
     const activeDays = grid.weeks.flat().filter(d => d && activityData[d] && getTotal(activityData[d]) > 0).length;
     const totalDays = grid.weeks.flat().filter(Boolean).length;
+    const cellColors = getCellColors(theme);
 
     return (
         <div 
@@ -248,11 +227,11 @@ const MonthCard = ({ grid, activityData, onCellHover, onCellLeave, isCurrentMont
                 className="p-4.5 rounded-[1.25rem] transition-all duration-500 group-hover/month:border-border group-hover/month:bg-surface-3/10 group-hover/month:shadow-2xl group-hover/month:shadow-black/40"
                 style={{
                     background: isCurrentMonth
-                        ? 'linear-gradient(180deg, rgba(139,92,246,0.08) 0%, rgba(20,20,30,0.4) 100%)'
-                        : 'rgba(255,255,255,0.02)',
+                        ? (theme === 'light' ? 'linear-gradient(180deg, rgba(139,92,246,0.05) 0%, rgba(248,250,252,0.4) 100%)' : 'linear-gradient(180deg, rgba(139,92,246,0.08) 0%, rgba(20,20,30,0.4) 100%)')
+                        : (theme === 'light' ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)'),
                     border: isCurrentMonth
-                        ? '1px solid rgba(139,92,246,0.2)'
-                        : '1px solid rgba(255,255,255,0.06)',
+                        ? (theme === 'light' ? '1px solid rgba(139,92,246,0.15)' : '1px solid rgba(139,92,246,0.2)')
+                        : (theme === 'light' ? '1px solid rgba(0,0,0,0.05)' : '1px solid rgba(255,255,255,0.06)'),
                 }}
             >
                 <div style={{ display: 'flex', gap: 0 }}>
@@ -290,8 +269,8 @@ const MonthCard = ({ grid, activityData, onCellHover, onCellLeave, isCurrentMont
                                             }}
                                             className="h-[15px] rounded-[4px] transition-all duration-300 relative group/cell flex items-center justify-center overflow-hidden"
                                             style={{
-                                                background: CELL_COLORS[intensity].bg,
-                                                boxShadow: intensity > 2 ? `0 0 10px ${CELL_COLORS[intensity].glow}` : 'none',
+                                                background: cellColors[intensity].bg,
+                                                boxShadow: intensity > 2 ? `0 0 10px ${cellColors[intensity].glow}` : 'none',
                                                 cursor: 'pointer',
                                                 outline: isToday ? '1.5px solid #a78bfa' : 'none',
                                                 outlineOffset: 2,
@@ -302,14 +281,14 @@ const MonthCard = ({ grid, activityData, onCellHover, onCellLeave, isCurrentMont
                                                 e.currentTarget.style.zIndex = '50';
                                                 e.currentTarget.style.boxShadow = intensity > 0
                                                     ? '0 6px 15px rgba(139,92,246,0.4)'
-                                                    : '0 4px 10px rgba(255,255,255,0.08)';
-                                                e.currentTarget.style.background = intensity === 0 ? 'rgba(255,255,255,0.08)' : CELL_COLORS[intensity].bg;
+                                                    : (theme === 'light' ? '0 4px 10px rgba(0,0,0,0.05)' : '0 4px 10px rgba(255,255,255,0.08)');
+                                                e.currentTarget.style.background = intensity === 0 ? (theme === 'light' ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)') : cellColors[intensity].bg;
                                             }}
                                             onMouseOut={(e) => {
                                                 e.currentTarget.style.transform = 'scale(1)';
                                                 e.currentTarget.style.zIndex = isToday ? '10' : '0';
-                                                e.currentTarget.style.boxShadow = intensity > 2 ? `0 0 10px ${CELL_COLORS[intensity].glow}` : 'none';
-                                                e.currentTarget.style.background = CELL_COLORS[intensity].bg;
+                                                e.currentTarget.style.boxShadow = intensity > 2 ? `0 0 10px ${cellColors[intensity].glow}` : 'none';
+                                                e.currentTarget.style.background = cellColors[intensity].bg;
                                             }}
                                         >
                                             <span 
@@ -335,6 +314,7 @@ const MonthCard = ({ grid, activityData, onCellHover, onCellLeave, isCurrentMont
 /* ────────────────────── Main Component ────────────────────── */
 
 const ActivityHeatmap = () => {
+    const { theme } = useTheme();
     const { activityMap, loadingActivity, loadActivityMap, refreshActivityMap } = useAnalytics();
     const [tooltip, setTooltip] = useState({ visible: false, date: null, x: 0, y: 0 });
     const [detailMonth, setDetailMonth] = useState({ isOpen: false, month: null, year: null });
@@ -455,7 +435,7 @@ const ActivityHeatmap = () => {
                         </div>
                     </div>
                     <div>
-                        <h3 className="text-xl font-black text-slate-50 font-heading tracking-tight m-0 flex items-center gap-2">
+                        <h3 className="text-xl font-black text-text font-heading tracking-tight m-0 flex items-center gap-2">
                             Consistency Map
                             <span className="text-[10px] font-black tracking-widest text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-full border border-violet-500/20 border-opacity-50 uppercase">
                                 Analysis
@@ -540,6 +520,7 @@ const ActivityHeatmap = () => {
                         isCurrentMonth={grid.month === currentMonth && monthOffset === 0}
                         onMonthClick={handleMonthClick}
                         onDayClick={handleDayClick}
+                        theme={theme}
                     />
                 ))}
             </div>
@@ -550,7 +531,7 @@ const ActivityHeatmap = () => {
                     <div className="flex items-center gap-2">
                         <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">Less</span>
                         <div className="flex gap-[3px]">
-                            {CELL_COLORS.map((c, i) => (
+                            {getCellColors(theme).map((c, i) => (
                                 <div key={i} className="w-[10px] h-[10px] rounded-[2px]" style={{ background: c.bg, border: `1px solid ${c.border}` }} />
                             ))}
                         </div>
