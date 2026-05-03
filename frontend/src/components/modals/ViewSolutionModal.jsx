@@ -64,18 +64,18 @@ const SimpleCodeBlock = React.memo(({ children, isLightMode, fontSize = 16, prim
         <div className={`relative group/code my-8 rounded-2xl border overflow-hidden transition-all duration-500 shadow-xl
             ${isLightMode 
                 ? 'bg-[#fdfdfd] border-slate-200/60 shadow-slate-200/30' 
-                : 'bg-[#0f0f1b] border-white/[0.06] shadow-black/40'}`}>
+                : 'bg-[#0f0f1b] border-border shadow-black/40'}`}>
             
             <div className={`flex items-center justify-between px-6 py-3 border-b transition-colors duration-300
-                ${isLightMode ? 'bg-[#f1f3f7] border-slate-200/60' : 'bg-white/[0.03] border-white/[0.05]'}`}>
+                ${isLightMode ? 'bg-[#f1f3f7] border-slate-200/60' : 'bg-surface-2 border-border'}`}>
                 <div className="flex items-center gap-2.5">
                     <div className="flex gap-1.5 mr-2">
-                         <div className={`w-2.5 h-2.5 rounded-full ${isLightMode ? 'bg-slate-300' : 'bg-white/10'}`} />
-                         <div className={`w-2.5 h-2.5 rounded-full ${isLightMode ? 'bg-slate-300' : 'bg-white/10'}`} />
-                         <div className={`w-2.5 h-2.5 rounded-full ${isLightMode ? 'bg-slate-300' : 'bg-white/10'}`} />
+                         <div className={`w-2.5 h-2.5 rounded-full ${isLightMode ? 'bg-surface-2' : 'bg-surface-3'}`} />
+                         <div className={`w-2.5 h-2.5 rounded-full ${isLightMode ? 'bg-surface-2' : 'bg-surface-3'}`} />
+                         <div className={`w-2.5 h-2.5 rounded-full ${isLightMode ? 'bg-surface-2' : 'bg-surface-3'}`} />
                     </div>
                     <span className={`text-[10px] font-black uppercase tracking-[0.2em]
-                        ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                        ${isLightMode ? 'text-text-muted' : 'text-text-muted'}`}>
                         {languageMatch || 'CODE'}
                     </span>
                 </div>
@@ -83,8 +83,8 @@ const SimpleCodeBlock = React.memo(({ children, isLightMode, fontSize = 16, prim
                     onClick={handleCopy}
                     className={`px-3 py-1.5 rounded-lg transition-all duration-300 cursor-pointer flex items-center gap-2 group/btn
                         ${isLightMode 
-                            ? 'hover:bg-slate-200/60 text-slate-600' 
-                            : 'hover:bg-white/10 text-slate-300'}`}
+                            ? 'hover:bg-surface-2 text-text-muted' 
+                            : 'hover:bg-surface-3 text-text'}`}
                     style={copied ? { color: primaryColor, backgroundColor: `${primaryColor}15` } : {}}
                 >
                     {copied ? (
@@ -181,17 +181,17 @@ const ViewSolutionModal = ({ isOpen, onClose, solution, sourceImage, isFetchingI
                     onClick={e => e.stopPropagation()}
                 >
                     {/* Header */}
-                    <div className={`flex items-center justify-between px-5 py-3.5 border-b shrink-0 ${isLightMode ? 'bg-[#f8fafc] border-slate-200 text-slate-900' : 'bg-surface-2/80 border-white/[0.06] text-white'}`}>
+                    <div className={`flex items-center justify-between px-5 py-3.5 border-b shrink-0 ${isLightMode ? 'bg-[#f8fafc] border-slate-200 text-text-muted' : 'bg-surface-2/80 border-border text-text'}`}>
                         <div className="flex items-center gap-3">
                             <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500 border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.1)]">
                                 <FileText className="w-4 h-4" />
                             </div>
                             <div>
-                                <h3 className={`text-[16px] font-heading font-bold ${isLightMode ? 'text-slate-900' : 'text-white'} tracking-tight leading-snug`}>
+                                <h3 className={`text-[16px] font-heading font-bold ${isLightMode ? 'text-text-muted' : 'text-text'} tracking-tight leading-snug`}>
                                     {solution.title || 'Solution'}
                                 </h3>
                                 <div className="flex items-center gap-2 mt-0.5 opacity-80">
-                                    <span className={`text-[11px] font-medium ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                    <span className={`text-[11px] font-medium ${isLightMode ? 'text-text-muted' : 'text-text-muted'}`}>
                                         Solution  ·  {formatDate(solution.created_at)}
 
                                     </span>
@@ -223,7 +223,7 @@ const ViewSolutionModal = ({ isOpen, onClose, solution, sourceImage, isFetchingI
                                 >
                                     {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                                 </button>
-                            <button onClick={onClose} className={`p-1.5 rounded-lg transition-all ${isLightMode ? 'text-slate-400 hover:bg-black/5' : 'text-slate-500 hover:bg-white/10'}`}>
+                            <button onClick={onClose} className={`p-1.5 rounded-lg transition-all ${isLightMode ? 'text-text-muted hover:bg-black/5' : 'text-text-muted hover:bg-surface-3'}`}>
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
@@ -233,10 +233,10 @@ const ViewSolutionModal = ({ isOpen, onClose, solution, sourceImage, isFetchingI
                     <div ref={contentRef} className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar scroll-smooth">
                         <div className={`max-w-4xl mx-auto prose prose-invert prose-blue prose-sm md:prose-base transition-colors duration-300 ${isLightMode ? 'prose-slate' : ''}`}>
                              {sourceImage && (
-                                <div className="mb-10 group relative rounded-2xl overflow-hidden border border-white/[0.08] shadow-2xl transition-all hover:scale-[1.01]">
+                                <div className="mb-10 group relative rounded-2xl overflow-hidden border border-border shadow-2xl transition-all hover:scale-[1.01]">
                                     <img src={sourceImage} alt="Solution Original" className="w-full h-auto rounded-xl select-none" />
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                        <button onClick={handleOpenOriginal} className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all">
+                                    <div className="absolute inset-0 bg-surface-2/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                        <button onClick={handleOpenOriginal} className="bg-surface-3 hover:bg-white/20 text-text border border-white/20 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all">
                                             <Maximize2 className="w-4 h-4" /> View Original
                                         </button>
                                     </div>
@@ -244,7 +244,7 @@ const ViewSolutionModal = ({ isOpen, onClose, solution, sourceImage, isFetchingI
                             )}
 
                             {isFetchingImage && (
-                                <div className="mb-10 h-64 bg-surface-2/30 rounded-2xl flex items-center justify-center animate-pulse border border-white/[0.05]">
+                                <div className="mb-10 h-64 bg-surface-2/30 rounded-2xl flex items-center justify-center animate-pulse border border-border">
                                     <div className="flex flex-col items-center gap-3">
                                         <Loader2 className="w-8 h-8 text-blue-500/40 animate-spin" />
                                         <span className="text-xs font-bold text-blue-400/40 uppercase tracking-widest">Loading Media...</span>
@@ -256,15 +256,15 @@ const ViewSolutionModal = ({ isOpen, onClose, solution, sourceImage, isFetchingI
                                 remarkPlugins={[remarkGfm, remarkMath]}
                                 rehypePlugins={[rehypeRaw, rehypeKatex]}
                                 components={{
-                                    h1: ({ node, ...props }) => <h1 className={`font-heading font-extrabold tracking-tight ${isLightMode ? 'text-slate-900' : 'text-white'}`} {...props} />,
-                                    h2: ({ node, ...props }) => <h2 className={`font-heading font-bold tracking-tight ${isLightMode ? 'text-slate-800' : 'text-white'}`} {...props} />,
+                                    h1: ({ node, ...props }) => <h1 className={`font-heading font-extrabold tracking-tight ${isLightMode ? 'text-text-muted' : 'text-text'}`} {...props} />,
+                                    h2: ({ node, ...props }) => <h2 className={`font-heading font-bold tracking-tight ${isLightMode ? 'text-text-muted' : 'text-text'}`} {...props} />,
                                     table: ({ node, ...props }) => (
-                                        <div className="overflow-x-auto my-6 rounded-xl border border-white/[0.06] shadow-xl">
+                                        <div className="overflow-x-auto my-6 rounded-xl border border-border shadow-xl">
                                             <table className="w-full border-collapse text-[13px]" {...props} />
                                         </div>
                                     ),
-                                    th: ({ node, ...props }) => <th className={`px-4 py-3 bg-surface-3/50 text-left font-bold ${isLightMode ? 'text-slate-700' : 'text-slate-200'}`} {...props} />,
-                                    td: ({ node, ...props }) => <td className={`px-4 py-3 border-t border-white/5 ${isLightMode ? 'text-slate-600' : 'text-slate-400'}`} {...props} />,
+                                    th: ({ node, ...props }) => <th className={`px-4 py-3 bg-surface-3/50 text-left font-bold ${isLightMode ? 'text-text-muted' : 'text-text'}`} {...props} />,
+                                    td: ({ node, ...props }) => <td className={`px-4 py-3 border-t border-border ${isLightMode ? 'text-text-muted' : 'text-text-muted'}`} {...props} />,
                                     pre: ({ children }) => children,
                                     code: ({ node, className, children, ...props }) => {
                                         const isBlock = /language-(\w+)/.exec(className || '') || String(children).includes('\n');

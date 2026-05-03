@@ -91,38 +91,38 @@ const TimeTraveler = ({ isOpen, onClose, onApply, initialQuery = '' }) => {
 
     return (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 md:p-6">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} />
+            <div className="absolute inset-0 bg-surface-3/60 backdrop-blur-md" onClick={onClose} />
             
-            <div className="relative w-full max-w-sm glass-panel rounded-3xl overflow-hidden border border-white/10 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="relative w-full max-w-sm bg-surface rounded-3xl overflow-hidden border border-border shadow-2xl animate-in zoom-in-95 duration-200">
                 {/* Header */}
-                <div className="p-6 border-b border-white/5 bg-white/[0.02]">
+                <div className="p-6 border-b border-border bg-surface-3/5">
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
                             <History className="w-5 h-5 text-indigo-400" />
-                            <h3 className="text-lg font-heading font-black text-white tracking-tight">Time Traveler</h3>
+                            <h3 className="text-lg font-heading font-black text-text tracking-tight">Time Traveler</h3>
                         </div>
-                        <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full text-slate-400 transition-colors">
+                        <button onClick={onClose} className="p-2 hover:bg-surface-3/10 rounded-full text-text-muted transition-colors">
                             <X className="w-5 h-5" />
                         </button>
                     </div>
 
                     {/* Navigation Tabs */}
-                    <div className="flex items-center bg-white/5 p-1 rounded-xl gap-1">
+                    <div className="flex items-center bg-surface-3/5 p-1 rounded-xl gap-1">
                         <button 
                             onClick={() => setView('year')}
-                            className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${view === 'year' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                            className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${view === 'year' ? 'bg-indigo-500 text-white' : 'text-text-muted hover:text-text'}`}
                         >
                             Years
                         </button>
                         <button 
                             onClick={() => setView('month')}
-                            className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${view === 'month' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                            className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${view === 'month' ? 'bg-indigo-500 text-white' : 'text-text-muted hover:text-text'}`}
                         >
                             Months
                         </button>
                         <button 
                             onClick={() => setView('day')}
-                            className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${view === 'day' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                            className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${view === 'day' ? 'bg-indigo-500 text-white' : 'text-text-muted hover:text-text'}`}
                         >
                             Days
                         </button>
@@ -137,12 +137,12 @@ const TimeTraveler = ({ isOpen, onClose, onApply, initialQuery = '' }) => {
                                 <button
                                     key={year}
                                     onClick={() => toggleYear(year)}
-                                    className={`group relative h-20 rounded-2xl border p-4 flex flex-col justify-end transition-all overflow-hidden ${selection.years.includes(year) ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-400' : 'bg-surface-2/40 border-white/[0.04] text-slate-500 hover:border-white/[0.1] hover:bg-surface-2/60'}`}
+                                    className={`group relative h-20 rounded-2xl border p-4 flex flex-col justify-end transition-all overflow-hidden ${selection.years.includes(year) ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-400' : 'bg-surface-2/40 border-border text-text-muted hover:border-border hover:bg-surface-2/60'}`}
                                 >
                                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        {selection.years.includes(year) ? <Check className="w-4 h-4" /> : <PlusCircle className="w-4 h-4 text-slate-600" />}
+                                        {selection.years.includes(year) ? <Check className="w-4 h-4" /> : <PlusCircle className="w-4 h-4 text-text-muted/60" />}
                                     </div>
-                                    <span className={`text-2xl font-heading font-black ${selection.years.includes(year) ? 'text-white' : ''}`}>{year}</span>
+                                    <span className={`text-2xl font-heading font-black ${selection.years.includes(year) ? 'text-text' : ''}`}>{year}</span>
                                     <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Year</span>
                                 </button>
                             ))}
@@ -155,7 +155,7 @@ const TimeTraveler = ({ isOpen, onClose, onApply, initialQuery = '' }) => {
                                 <button
                                     key={month}
                                     onClick={() => toggleMonth(month)}
-                                    className={`h-16 rounded-xl flex flex-col items-center justify-center text-[11px] font-black uppercase tracking-widest transition-all border ${selection.months.includes(month) ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/40' : 'bg-surface-2/20 text-slate-500 border-white/[0.04] hover:bg-surface-2/50 hover:text-slate-300'}`}
+                                    className={`h-16 rounded-xl flex flex-col items-center justify-center text-[11px] font-black uppercase tracking-widest transition-all border ${selection.months.includes(month) ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/40' : 'bg-surface-2/20 text-text-muted border-border hover:bg-surface-2/50 hover:text-text'}`}
                                 >
                                     <span>{month.slice(0, 3)}</span>
                                     {selection.months.includes(month) && <Check className="w-3 h-3 mt-1" />}
@@ -169,16 +169,16 @@ const TimeTraveler = ({ isOpen, onClose, onApply, initialQuery = '' }) => {
                             {/* Calendar Sub-Header */}
                             <div className="flex items-center justify-between mb-4 px-1">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xs font-black uppercase text-white tracking-widest">{selectedYearForMonthView}</span>
-                                    <div className="flex items-center gap-1 bg-white/5 rounded-lg p-0.5">
-                                        <button onClick={() => setSelectedMonthForDayView(prev => prev === 0 ? 11 : prev - 1)} className="p-1 hover:text-white"><ChevronLeft className="w-3.5 h-3.5" /></button>
-                                        <span className="text-[10px] font-black uppercase px-2 w-16 text-center text-slate-400">{months[selectedMonthForDayView].slice(0,3)}</span>
-                                        <button onClick={() => setSelectedMonthForDayView(prev => prev === 11 ? 0 : prev + 1)} className="p-1 hover:text-white"><ChevronRight className="w-3.5 h-3.5" /></button>
+                                    <span className="text-xs font-black uppercase text-text tracking-widest">{selectedYearForMonthView}</span>
+                                    <div className="flex items-center gap-1 bg-surface-3/5 rounded-lg p-0.5">
+                                        <button onClick={() => setSelectedMonthForDayView(prev => prev === 0 ? 11 : prev - 1)} className="p-1 hover:text-text"><ChevronLeft className="w-3.5 h-3.5" /></button>
+                                        <span className="text-[10px] font-black uppercase px-2 w-16 text-center text-text-muted">{months[selectedMonthForDayView].slice(0,3)}</span>
+                                        <button onClick={() => setSelectedMonthForDayView(prev => prev === 11 ? 0 : prev + 1)} className="p-1 hover:text-text"><ChevronRight className="w-3.5 h-3.5" /></button>
                                     </div>
                                 </div>
                                 <button 
                                     onClick={() => setSelectedYearForMonthView(prev => prev - 1)}
-                                    className="p-1.5 bg-white/5 rounded-lg text-slate-500 hover:text-white transition-colors"
+                                    className="p-1.5 bg-surface-3/5 rounded-lg text-text-muted hover:text-text transition-colors"
                                 >
                                     <ChevronLeft className="w-3.5 h-3.5" />
                                 </button>
@@ -186,7 +186,7 @@ const TimeTraveler = ({ isOpen, onClose, onApply, initialQuery = '' }) => {
 
                             <div className="grid grid-cols-7 gap-1 mb-6">
                                 {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => (
-                                    <div key={d} className="text-center text-[10px] font-black text-slate-600 py-1">{d}</div>
+                                    <div key={d} className="text-center text-[10px] font-black text-text-muted/60 py-1">{d}</div>
                                 ))}
                                 {[...Array(firstDayOfMonth(selectedYearForMonthView, selectedMonthForDayView))].map((_, i) => (
                                     <div key={`empty-${i}`} />
@@ -202,7 +202,7 @@ const TimeTraveler = ({ isOpen, onClose, onApply, initialQuery = '' }) => {
                                         <button
                                             key={day}
                                             onClick={() => toggleDay(dateStr)}
-                                            className={`aspect-square rounded-lg flex items-center justify-center text-[10px] font-bold transition-all ${isSelected ? 'bg-indigo-500 text-white shadow-lg scale-110 z-10' : inRange ? 'bg-indigo-500/20 text-indigo-400' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+                                            className={`aspect-square rounded-lg flex items-center justify-center text-[10px] font-bold transition-all ${isSelected ? 'bg-indigo-500 text-white shadow-lg scale-110 z-10' : inRange ? 'bg-indigo-500/20 text-indigo-400' : 'text-text-muted hover:bg-surface-3/10 hover:text-text'}`}
                                         >
                                             {day}
                                         </button>
@@ -214,7 +214,7 @@ const TimeTraveler = ({ isOpen, onClose, onApply, initialQuery = '' }) => {
                 </div>
 
                 {/* Footer Selection Summary */}
-                <div className="p-4 bg-white/[0.01] border-t border-white/5">
+                <div className="p-4 bg-surface-3/5 border-t border-border">
                     <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto no-scrollbar">
                         {selection.years.map(y => (
                             <div key={y} className="flex items-center gap-1 bg-indigo-500/10 text-indigo-400 px-2 py-1 rounded-md text-[9px] font-black uppercase border border-indigo-500/20">
@@ -235,18 +235,18 @@ const TimeTraveler = ({ isOpen, onClose, onApply, initialQuery = '' }) => {
                             </div>
                         )}
                         {selection.years.length === 0 && selection.months.length === 0 && selection.days.length === 0 && (
-                            <span className="text-[10px] font-black uppercase text-slate-600 tracking-widest pl-1 py-1">No filters selected</span>
+                            <span className="text-[10px] font-black uppercase text-text-muted/60 tracking-widest pl-1 py-1">No filters selected</span>
                         )}
                     </div>
                 </div>
 
                 {/* Footer Actions */}
-                <div className="p-6 pt-2 border-t border-white/5 bg-white/[0.02] flex gap-3">
+                <div className="p-6 pt-2 border-t border-border bg-surface-3/5 flex gap-3">
                     <button 
                         onClick={() => {
                             setSelection({ years: [], months: [], days: [], range: null });
                         }}
-                        className="flex-1 py-3 rounded-2xl bg-white/5 text-slate-400 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all"
+                        className="flex-1 py-3 rounded-2xl bg-surface-3/5 text-text-muted text-[10px] font-black uppercase tracking-widest hover:bg-surface-3/10 transition-all"
                     >
                         Clear
                     </button>

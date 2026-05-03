@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { LayoutDashboard, LibraryBig, LogOut, Activity, ChevronLeft, ChevronRight, Settings, Layers, Target, BookMarked } from 'lucide-react';
+import { LayoutDashboard, LibraryBig, LogOut, Activity, ChevronLeft, ChevronRight, Settings, Layers, Target, BookMarked, Sun, Moon } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext.jsx';
 
 import EditProfileModal from './modals/EditProfileModal.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
@@ -16,6 +17,7 @@ const navItems = [
 
 const Sidebar = () => {
     const { user, logout } = useAuth();
+    const { theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
     const [isCollapsed, setIsCollapsed] = useState(() => window.innerWidth < 768);
     const [showEditProfile, setShowEditProfile] = useState(false);
@@ -55,11 +57,8 @@ const Sidebar = () => {
     return (
         <aside
             className={`flex-shrink-0 flex flex-col h-[100dvh] sticky top-0 transition-all duration-500 ease-in-out group/sidebar z-[50]
-            ${isCollapsed ? 'w-[80px]' : 'w-[260px]'}`}
-            style={{
-                background: 'linear-gradient(180deg, rgba(13, 13, 18, 1) 0%, rgba(9, 9, 14, 1) 100%)',
-                borderRight: '1px solid rgba(255,255,255,0.04)',
-            }}
+            ${isCollapsed ? 'w-[80px]' : 'w-[260px]'}
+            bg-surface-2 border-r border-border`}
         >
             {/* Atmospheric Background Layers - static, no expensive blur/animation */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
@@ -73,7 +72,7 @@ const Sidebar = () => {
             >
                 <button
                     onClick={() => setIsCollapsed(!isCollapsed)}
-                    className="w-8 h-8 rounded-full bg-primary border border-white/20 flex items-center justify-center text-white shadow-[0_4px_12px_rgba(0,0,0,0.5)] cursor-pointer transition-all duration-300 hover:scale-110 active:scale-95 group/btn"
+                    className="w-8 h-8 rounded-full bg-primary border border-border flex items-center justify-center text-white shadow-[0_4px_12px_rgba(0,0,0,0.5)] cursor-pointer transition-all duration-300 hover:scale-110 active:scale-95 group/btn"
                     title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
                 >
                     <div className={`transition-transform duration-500 ${isCollapsed ? '' : 'rotate-180'}`}>
@@ -86,19 +85,15 @@ const Sidebar = () => {
             <div className={`pt-7 pb-4 transition-all duration-300 z-10 ${isCollapsed ? 'px-3' : 'px-4'}`}>
                 <div
                     className={`rounded-2xl relative overflow-hidden transition-all duration-500
-                        ${isCollapsed ? 'p-2' : 'p-3.5'}`}
-                    style={{
-                        background: 'linear-gradient(145deg, rgba(30, 30, 45, 0.4) 0%, rgba(15, 15, 25, 0.6) 100%)',
-                        border: '1px solid rgba(255,255,255,0.05)',
-                        boxShadow: '0 8px 32px -4px rgba(0,0,0,0.5)',
-                    }}
+                        ${isCollapsed ? 'p-2' : 'p-3.5'}
+                        bg-surface-3/40 border border-border shadow-lg shadow-black/5`}
                 >
                     <div className="flex items-center gap-3 cursor-default relative z-10">
                         <div className="w-11 h-11 shrink-0 rounded-xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center shadow-lg shadow-primary/30 relative overflow-hidden">
-                            <Activity className="w-6.5 h-6.5 text-white" />
+                            <Activity className="w-6.5 h-6.5 text-text" />
                         </div>
                         {!isCollapsed && (
-                            <h1 className="text-xl font-heading font-bold tracking-tight text-white leading-tight">
+                            <h1 className="text-xl font-heading font-bold tracking-tight text-text leading-tight">
                                 Prep<span className="text-primary">Tracker</span>
                             </h1>
                         )}
@@ -119,7 +114,7 @@ const Sidebar = () => {
                                 end={item.to === '/'}
                                 className={({ isActive }) =>
                                     `flex items-center text-[13px] font-semibold transition-all duration-300 relative rounded-xl group/nav
-                                    ${isActive ? 'text-white' : 'text-slate-400 hover:text-slate-100'}
+                                    ${isActive ? 'text-text' : 'text-text-muted hover:text-text'}
                                     ${isCollapsed ? 'justify-center p-3' : 'gap-3.5 px-4 py-2.5 mx-1'}`
                                 }
                                 onClick={() => {
@@ -145,7 +140,7 @@ const Sidebar = () => {
                                             strokeWidth={isActive ? 2.4 : 1.8}
                                         />
                                         {!isCollapsed && (
-                                            <span className={`transition-colors duration-200 relative z-10 ${isActive ? 'tracking-tight text-white' : ''}`}>
+                                            <span className={`transition-colors duration-200 relative z-10 ${isActive ? 'tracking-tight text-text' : ''}`}>
                                                 {item.label}
                                             </span>
                                         )}
@@ -160,35 +155,54 @@ const Sidebar = () => {
 
             {/* User Profile Section */}
             <div className={`mt-auto transition-all duration-300 z-10 ${isCollapsed ? 'px-3 pb-4' : 'px-4 pb-4'}`}>
-                <div className="h-px w-full bg-gradient-to-r from-transparent via-white/[0.08] to-transparent mb-4" />
+                
+                {/* Theme Toggle Button */}
+                <div className="mb-4">
+                    <button
+                        onClick={toggleTheme}
+                        className={`w-full flex items-center transition-all duration-300 rounded-xl border border-border bg-surface-3/30 hover:bg-surface-3/60 group/theme
+                            ${isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-4 py-2.5'}`}
+                        title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                    >
+                        {theme === 'dark' ? (
+                            <>
+                                <Sun className="w-[18px] h-[18px] text-amber-400 shrink-0" />
+                                {!isCollapsed && <span className="text-[13px] font-semibold text-text">Light Mode</span>}
+                            </>
+                        ) : (
+                            <>
+                                <Moon className="w-[18px] h-[18px] text-indigo-400 shrink-0" />
+                                {!isCollapsed && <span className="text-[13px] font-semibold text-text">Dark Mode</span>}
+                            </>
+                        )}
+                    </button>
+                </div>
+
+                <div className="h-px w-full bg-border mb-4" />
 
                 <div
                     className={`rounded-2xl relative overflow-hidden transition-all duration-500
-                        ${isCollapsed ? 'p-2' : 'p-3.5'}`}
-                    style={{
-                        background: 'linear-gradient(145deg, rgba(30, 30, 45, 0.4) 0%, rgba(15, 15, 25, 0.6) 100%)',
-                        border: '1px solid rgba(255,255,255,0.05)',
-                        boxShadow: '0 8px 32px -4px rgba(0,0,0,0.5)',
-                    }}
+                        ${isCollapsed ? 'p-2' : 'p-3.5'}
+                        bg-surface-3/40 border border-border shadow-lg shadow-black/5`}
                 >
                     <div className={`flex items-center relative z-10 ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
                         <div className="relative">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-heading font-bold text-white overflow-hidden bg-gradient-to-tr from-primary to-indigo-500 shadow-lg shadow-primary/30`}>
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-heading font-bold text-text overflow-hidden bg-gradient-to-tr from-primary to-indigo-500 shadow-lg shadow-primary/30`}>
                                 {user?.profile_picture ? (
                                     <img src={user.profile_picture} alt="Profile" className="w-full h-full object-cover" />
                                 ) : (
                                     user?.name?.charAt(0)?.toUpperCase()
                                 )}
                             </div>
-                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-[#0c0c14] rounded-full flex items-center justify-center border border-white/5">
+                            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-surface rounded-full flex items-center justify-center border border-border`}>
                                 <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
                             </div>
                         </div>
 
                         {!isCollapsed && (
                             <div className="flex-1 min-w-0 ml-3">
-                                <p className="text-[13px] font-heading font-bold text-white truncate leading-tight">{user?.name}</p>
-                                <p className="text-[10px] text-slate-500 truncate mt-1 font-medium">{user?.email}</p>
+                                <p className="text-[13px] font-heading font-bold text-text truncate leading-tight">{user?.name}</p>
+                                <p className="text-[10px] text-text-muted truncate mt-1 font-medium">{user?.email}</p>
                             </div>
                         )}
                     </div>
@@ -197,14 +211,14 @@ const Sidebar = () => {
                         <div className="mt-3 flex gap-2 relative z-10">
                             <button
                                 onClick={() => setShowEditProfile(true)}
-                                className="flex-1 flex items-center justify-center gap-2 px-2 py-2 text-[11px] font-bold text-slate-300 bg-white/[0.05] rounded-xl border border-white/5 transition-all hover:bg-white/[0.1] hover:text-white cursor-pointer"
+                                className="flex-1 flex items-center justify-center gap-2 px-2 py-2 text-[11px] font-bold text-text-muted bg-surface/50 rounded-xl border border-border transition-all hover:bg-surface-3 hover:text-text cursor-pointer"
                             >
                                 <Settings className="w-3.5 h-3.5" />
                                 <span>Settings</span>
                             </button>
                             <button
                                 onClick={triggerLogout}
-                                className="flex-1 flex items-center justify-center gap-2 px-2 py-2 text-[11px] font-bold text-slate-300 bg-white/[0.05] rounded-xl border border-white/5 transition-all hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 cursor-pointer"
+                                className="flex-1 flex items-center justify-center gap-2 px-2 py-2 text-[11px] font-bold text-text-muted bg-surface/50 rounded-xl border border-border transition-all hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/20 cursor-pointer"
                             >
                                 <LogOut className="w-3.5 h-3.5" />
                                 <span>Logout</span>
@@ -217,14 +231,14 @@ const Sidebar = () => {
                             <button
                                 onClick={() => setShowEditProfile(true)}
                                 title="Settings"
-                                className="w-full flex items-center justify-center p-2.5 text-slate-400 bg-white/[0.03] rounded-xl hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer border border-white/5"
+                                className="w-full flex items-center justify-center p-2.5 text-text-muted bg-surface/50 rounded-xl hover:bg-surface-3 hover:text-text transition-all cursor-pointer border border-border"
                             >
                                 <Settings className="w-4 h-4" />
                             </button>
                             <button
                                 onClick={triggerLogout}
                                 title="Logout"
-                                className="w-full flex items-center justify-center p-2.5 text-slate-400 bg-white/[0.03] rounded-xl hover:bg-red-500/10 hover:text-red-400 transition-all cursor-pointer border border-white/5"
+                                className="w-full flex items-center justify-center p-2.5 text-text-muted bg-surface/50 rounded-xl hover:bg-red-500/10 hover:text-red-500 transition-all cursor-pointer border border-border"
                             >
                                 <LogOut className="w-4 h-4" />
                             </button>

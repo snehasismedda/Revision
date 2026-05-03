@@ -8,6 +8,7 @@ import { AnalyticsProvider } from './context/AnalyticsContext.jsx';
 import { FileProvider } from './context/FileContext.jsx';
 import { FolderProvider } from './context/FolderContext.jsx';
 import Layout from './components/Layout.jsx';
+import { ThemeProvider } from './context/ThemeContext.jsx';
 
 // Lazy load pages
 const Login = lazy(() => import('./pages/Login.jsx'));
@@ -83,40 +84,42 @@ import GlobalQuickViewModal from './components/GlobalQuickViewModal.jsx';
 
 const App = () => (
   <BrowserRouter>
-    <AuthProvider>
-      <QuickViewProvider>
-        <SubjectProvider>
-          <TestSeriesProvider>
-            <TopicProvider>
-              <AnalyticsProvider>
-                <FileProvider>
-                  <Toaster
-                  position="top-right"
-                  toastOptions={{
-                    duration: 4000,
-                    style: {
-                      background: '#1a1a2e',
-                      color: '#fff',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      borderRadius: '12px',
-                      fontSize: '14px',
-                      padding: '12px 16px',
-                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                    },
-                  }}
-                />
-                <FolderProvider>
-                  <AppRoutes />
-                  <GlobalQuickViewModal />
-                  <QuickViewBar />
-                </FolderProvider>
-              </FileProvider>
-            </AnalyticsProvider>
-            </TopicProvider>
-          </TestSeriesProvider>
-        </SubjectProvider>
-      </QuickViewProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <QuickViewProvider>
+          <SubjectProvider>
+            <TestSeriesProvider>
+              <TopicProvider>
+                <AnalyticsProvider>
+                  <FileProvider>
+                    <Toaster
+                    position="top-right"
+                    toastOptions={{
+                      duration: 4000,
+                      style: {
+                        background: '#1a1a2e',
+                        color: '#fff',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '12px',
+                        fontSize: '14px',
+                        padding: '12px 16px',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                      },
+                    }}
+                  />
+                  <FolderProvider>
+                    <AppRoutes />
+                    <GlobalQuickViewModal />
+                    <QuickViewBar />
+                  </FolderProvider>
+                </FileProvider>
+              </AnalyticsProvider>
+              </TopicProvider>
+            </TestSeriesProvider>
+          </SubjectProvider>
+        </QuickViewProvider>
+      </AuthProvider>
+    </ThemeProvider>
   </BrowserRouter>
 );
 

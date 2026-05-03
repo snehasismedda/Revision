@@ -86,13 +86,12 @@ const EditProfileModal = ({ isOpen, onClose }) => {
         <ModalPortal>
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop fade-in" onClick={onClose}>
                 <div
-                    className="w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-                    style={{ background: 'rgba(22, 22, 34, 0.95)', border: '1px solid rgba(255,255,255,0.08)' }}
+                    className="w-full max-w-lg bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col"
                     onClick={e => e.stopPropagation()}
                 >
                     {/* Header */}
-                    <div className="flex items-center justify-between px-7 py-5 border-b border-white/[0.06] shrink-0">
-                        <h3 className="text-lg font-heading font-semibold text-white flex items-center gap-3">
+                    <div className="flex items-center justify-between px-7 py-5 border-b border-border shrink-0">
+                        <h3 className="text-lg font-heading font-semibold text-text flex items-center gap-3">
                             <div className="p-2 rounded-lg bg-primary/10 text-primary">
                                 <User className="w-5 h-5 text-primary-light" />
                             </div>
@@ -100,7 +99,7 @@ const EditProfileModal = ({ isOpen, onClose }) => {
                         </h3>
                         <button
                             onClick={onClose}
-                            className="p-2 text-slate-500 hover:text-white hover:bg-white/[0.06] rounded-lg transition-all cursor-pointer"
+                            className="p-2 text-text-muted hover:text-text hover:bg-surface-3/10 rounded-lg transition-all cursor-pointer"
                         >
                             <X className="w-5 h-5" />
                         </button>
@@ -128,11 +127,11 @@ const EditProfileModal = ({ isOpen, onClose }) => {
                             {/* Avatar Editor Section */}
                             <div className="flex items-center gap-5">
                                 <div className="relative group shrink-0">
-                                    <div className="w-16 h-16 rounded-full bg-surface-2 border border-white/10 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+                                    <div className="w-16 h-16 rounded-full bg-surface-2 border border-border flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
                                         {profileImgData ? (
                                             <img src={profileImgData} alt="Profile" className="w-full h-full object-cover" />
                                         ) : (
-                                            <span className="text-xl font-heading font-bold text-slate-400">
+                                            <span className="text-xl font-heading font-bold text-text-muted">
                                                 {name?.charAt(0)?.toUpperCase()}
                                             </span>
                                         )}
@@ -149,9 +148,9 @@ const EditProfileModal = ({ isOpen, onClose }) => {
                                     </label>
                                 </div>
                                 <div className="flex-1">
-                                    <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-1.5">Profile Picture</label>
+                                    <label className="block text-[10px] font-extrabold text-text-muted uppercase tracking-[0.18em] mb-1.5">Profile Picture</label>
                                     <div className="flex gap-3">
-                                        <label className="text-xs font-semibold text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] px-3 py-1.5 rounded-lg transition-all cursor-pointer">
+                                        <label className="text-xs font-semibold text-text bg-surface-3/10 hover:bg-surface-3/20 border border-border px-3 py-1.5 rounded-lg transition-all cursor-pointer">
                                             Change
                                             <input
                                                 type="file"
@@ -173,49 +172,49 @@ const EditProfileModal = ({ isOpen, onClose }) => {
                                 </div>
                             </div>
 
-                            <hr className="border-white/[0.04]" />
+                            <hr className="border-border" />
 
                             <div>
-                                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-2.5">Display Name</label>
+                                <label className="block text-[10px] font-extrabold text-text-muted uppercase tracking-[0.18em] mb-2.5">Display Name</label>
                                 <div className="relative group">
-                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-primary transition-colors" />
+                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-primary transition-colors" />
                                     <input
                                         type="text"
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
-                                        className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl pl-11 pr-4 py-3 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 focus:bg-surface-2/70 transition-all placeholder:text-slate-600/80"
+                                        className="w-full bg-surface-2 border border-border text-text rounded-xl pl-11 pr-4 py-3 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 transition-all placeholder:text-text-muted/60"
                                         placeholder="Your Name"
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-2.5">Email Address</label>
+                                <label className="block text-[10px] font-extrabold text-text-muted uppercase tracking-[0.18em] mb-2.5">Email Address</label>
                                 <div className="relative group">
-                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-primary transition-colors" />
+                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-primary transition-colors" />
                                     <input
                                         type="email"
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
-                                        className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl pl-11 pr-4 py-3 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 focus:bg-surface-2/70 transition-all placeholder:text-slate-600/80"
+                                        className="w-full bg-surface-2 border border-border text-text rounded-xl pl-11 pr-4 py-3 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 transition-all placeholder:text-text-muted/60"
                                         placeholder="your.email@example.com"
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-2.5">New Password</label>
+                                <label className="block text-[10px] font-extrabold text-text-muted uppercase tracking-[0.18em] mb-2.5">New Password</label>
                                 <div className="relative group">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-primary transition-colors" />
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-primary transition-colors" />
                                     <input
                                         type="password"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl pl-11 pr-4 py-3 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 focus:bg-surface-2/70 transition-all placeholder:text-slate-600/80"
+                                        className="w-full bg-surface-2 border border-border text-text rounded-xl pl-11 pr-4 py-3 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 transition-all placeholder:text-text-muted/60"
                                         placeholder="Leave blank to keep current"
                                     />
                                 </div>
-                                <p className="text-[11px] text-slate-500/80 mt-2.5 font-medium leading-relaxed">
+                                <p className="text-[11px] text-text-muted/60 mt-2.5 font-medium leading-relaxed">
                                     If you only want to change your name or email, leave the password field empty.
                                 </p>
                             </div>
@@ -224,11 +223,11 @@ const EditProfileModal = ({ isOpen, onClose }) => {
 
                     {/* Footer */}
                     {!isCropping && (
-                        <div className="px-7 py-5 border-t border-white/[0.06] flex gap-3 shrink-0">
+                        <div className="px-7 py-5 border-t border-border flex gap-3 shrink-0">
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="flex-1 px-5 py-3 rounded-xl text-[13px] font-semibold text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer border border-transparent hover:border-white/[0.08]"
+                                className="flex-1 px-5 py-3 rounded-xl text-[13px] font-semibold text-text-muted hover:text-text hover:bg-surface-3/10 transition-all cursor-pointer border border-transparent hover:border-border"
                             >
                                 Cancel
                             </button>

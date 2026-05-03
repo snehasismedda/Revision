@@ -71,24 +71,24 @@ const TestSeriesList = () => {
                         <Target className="w-5 h-5 text-pink-500" />
                         <span className="text-[11px] font-bold tracking-widest text-pink-500 uppercase">Preparation</span>
                     </div>
-                    <h1 className="text-3xl font-heading font-bold text-white tracking-tight">Test Series</h1>
-                    <p className="text-slate-400 text-sm mt-1.5">{series.length} series available for practice</p>
+                    <h1 className="text-3xl font-heading font-bold text-text tracking-tight">Test Series</h1>
+                    <p className="text-text-muted text-sm mt-1.5">{series.length} series available for practice</p>
                 </div>
 
                 <div className="flex items-center gap-4">
                     <div className="relative group hidden md:block">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-pink-500 transition-colors" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-pink-500 transition-colors" />
                         <input
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Filter series..."
-                            className="bg-surface-2/50 border border-white/[0.08] rounded-xl py-2.5 pl-10 pr-4 text-[13px] text-white w-[240px] focus:outline-none focus:border-pink-500/40 focus:bg-surface-2 transition-all"
+                            className="bg-surface-2/50 border border-border rounded-xl py-2.5 pl-10 pr-4 text-[13px] text-text w-[240px] focus:outline-none focus:border-pink-500/40 focus:bg-surface-2 transition-all"
                         />
                         {searchQuery && (
                             <button
                                 onClick={() => setSearchQuery('')}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white cursor-pointer"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text cursor-pointer"
                             >
                                 <X className="w-4 h-4" />
                             </button>
@@ -107,7 +107,7 @@ const TestSeriesList = () => {
             {(loading || !isLoaded) ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {[1, 2, 3].map(i => (
-                        <div key={i} className="glass p-8 animate-pulse h-[160px] rounded-xl border-white/5" />
+                        <div key={i} className="glass p-8 animate-pulse h-[160px] rounded-xl border-border" />
                     ))}
                 </div>
             ) : filteredSeries.length > 0 ? (
@@ -125,25 +125,25 @@ const TestSeriesList = () => {
                                         <div className="p-1.5 rounded-lg border shrink-0 bg-pink-500/10 border-pink-500/20 text-pink-400 group-hover:scale-110 transition-transform">
                                             <Target className="w-3.5 h-3.5" strokeWidth={2.2} />
                                         </div>
-                                        <h3 className="text-[17px] font-heading font-semibold text-slate-100 group-hover:text-pink-400 transition-colors truncate tracking-tight leading-tight">
+                                        <h3 className="text-[17px] font-heading font-semibold text-text group-hover:text-pink-400 transition-colors truncate tracking-tight leading-tight">
                                             {s.name}
                                         </h3>
                                     </div>
                                     {s.description && (
-                                        <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed mt-1 ml-[30px]">{s.description}</p>
+                                        <p className="text-[11px] text-text-muted line-clamp-2 leading-relaxed mt-1 ml-[30px]">{s.description}</p>
                                     )}
                                 </div>
                                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-200">
                                     <button
                                         onClick={(e) => handleEdit(e, s)}
-                                        className="p-1 text-slate-500 hover:text-pink-400 transition-colors"
+                                        className="p-1 text-text-muted hover:text-pink-400 transition-colors"
                                         title="Edit Series"
                                     >
                                         <Edit2 className="w-3.5 h-3.5" />
                                     </button>
                                     <button
                                         onClick={(e) => handleDelete(e, s)}
-                                        className="p-1 text-slate-500 hover:text-red-400 transition-colors"
+                                        className="p-1 text-text-muted hover:text-red-400 transition-colors"
                                         title="Delete Series"
                                     >
                                         <Trash2 className="w-3.5 h-3.5" />
@@ -152,19 +152,19 @@ const TestSeriesList = () => {
                             </div>
 
                             {/* Footer: Stats + Arrow */}
-                            <div className="mt-auto pt-3 border-t border-white/[0.06] flex items-center justify-between">
-                                <div className="flex items-center gap-3 text-[10px] font-medium text-slate-500 font-bold tracking-tight uppercase">
+                            <div className="mt-auto pt-3 border-t border-border flex items-center justify-between">
+                                <div className="flex items-center gap-3 text-[10px] font-medium text-text-muted font-bold tracking-tight uppercase">
                                     <div className="flex items-center gap-1.5">
                                         <Activity className="w-3 h-3 text-pink-400" strokeWidth={2} />
                                         <span>{s.testCount || 0} Tests</span>
                                     </div>
-                                    <div className="h-2.5 w-px bg-white/10" />
+                                    <div className="h-2.5 w-px bg-surface-3/10" />
                                     <div className="flex items-center gap-1.5">
                                         <BookOpen className="w-3 h-3 text-purple-400" strokeWidth={2} />
                                         <span>{s.subjects?.length || 0} Subjects</span>
                                     </div>
                                 </div>
-                                <button className="w-7 h-7 rounded-full bg-white/[0.05] flex items-center justify-center text-slate-500 group-hover:text-white transition-colors border border-white/5 group-hover:bg-pink-500/20">
+                                <button className="w-7 h-7 rounded-full bg-surface-3/10 flex items-center justify-center text-text-muted group-hover:text-text transition-colors border border-border group-hover:bg-pink-500/20">
                                     <ArrowRight className="w-3.5 h-3.5" />
                                 </button>
                             </div>
@@ -177,8 +177,8 @@ const TestSeriesList = () => {
                     <div className="w-20 h-20 mx-auto bg-pink-500/10 rounded-full flex items-center justify-center mb-6 border border-pink-500/20 pulse-ring">
                         <Target className="w-10 h-10 text-pink-400" strokeWidth={1.5} />
                     </div>
-                    <h3 className="text-2xl font-heading font-bold text-white mb-3 tracking-tight">No test series found</h3>
-                    <p className="text-slate-400 text-sm max-w-sm mx-auto mb-8 leading-relaxed">
+                    <h3 className="text-2xl font-heading font-bold text-text mb-3 tracking-tight">No test series found</h3>
+                    <p className="text-text-muted text-sm max-w-sm mx-auto mb-8 leading-relaxed">
                         {searchQuery
                             ? `No series match your search "${searchQuery}".`
                             : "Create your first test series to track your practice and mock exam performances."}

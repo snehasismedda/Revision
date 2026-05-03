@@ -185,18 +185,17 @@ const EditSolutionModal = ({ isOpen, onClose, subjectId, solution, onSolutionUpd
         <ModalPortal>
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop fade-in" onClick={handleModalClose}>
                 <div
-                    className="w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-                    style={{ background: 'rgba(22, 22, 34, 0.95)', border: '1px solid rgba(255,255,255,0.08)' }}
+                    className="w-full max-w-2xl bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
                     onClick={e => e.stopPropagation()}
                 >
-                    <div className="flex items-center justify-between px-7 py-5 border-b border-white/[0.06] shrink-0">
-                        <h3 className="text-lg font-heading font-semibold text-white flex items-center gap-3">
+                    <div className="flex items-center justify-between px-7 py-5 border-b border-border shrink-0">
+                        <h3 className="text-lg font-heading font-semibold text-text flex items-center gap-3">
                             <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
                                 <FileText className="w-5 h-5" />
                             </div>
                             {isCropping ? 'Crop Solution Image' : 'Edit Solution'}
                         </h3>
-                        <button onClick={handleModalClose} className="p-2 text-slate-500 hover:text-white hover:bg-white/[0.06] rounded-lg transition-all cursor-pointer">
+                        <button onClick={handleModalClose} className="p-2 text-text-muted hover:text-text hover:bg-surface-3 rounded-lg transition-all cursor-pointer">
                             <X className="w-5 h-5" />
                         </button>
                     </div>
@@ -204,16 +203,16 @@ const EditSolutionModal = ({ isOpen, onClose, subjectId, solution, onSolutionUpd
                     {!isCropping && (
                         <>
                             <div className="px-7 pt-5 shrink-0">
-                                <div className="flex bg-surface-2/40 p-1 rounded-xl border border-white/[0.06]">
+                                <div className="flex bg-surface-3 p-1 rounded-xl border border-border">
                                     <button
                                         onClick={() => handleMainTypeChange('text')}
-                                        className={`flex-1 py-2.5 text-[13px] font-semibold rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer ${mainType === 'text' ? 'bg-blue-500/[0.12] text-white border border-blue-500/20 shadow-sm' : 'text-slate-500 hover:text-slate-200 border border-transparent'}`}
+                                        className={`flex-1 py-2.5 text-[13px] font-semibold rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer ${mainType === 'text' ? 'bg-surface text-primary shadow-sm border border-border' : 'text-text-muted hover:text-text'}`}
                                     >
                                         <FileText className="w-4 h-4" /> Text Solution
                                     </button>
                                     <button
                                         onClick={() => handleMainTypeChange('image')}
-                                        className={`flex-1 py-2.5 text-[13px] font-semibold rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer ${mainType === 'image' ? 'bg-blue-500/[0.12] text-white border border-blue-500/20 shadow-sm' : 'text-slate-500 hover:text-slate-200 border border-transparent'}`}
+                                        className={`flex-1 py-2.5 text-[13px] font-semibold rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer ${mainType === 'image' ? 'bg-surface text-primary shadow-sm border border-border' : 'text-text-muted hover:text-text'}`}
                                     >
                                         <ImageIcon className="w-4 h-4" /> Image Solution
                                     </button>
@@ -223,13 +222,13 @@ const EditSolutionModal = ({ isOpen, onClose, subjectId, solution, onSolutionUpd
                             <div className="px-7 py-6 overflow-y-auto custom-scrollbar flex-1">
                                 {mainType === 'image' && (
                                     <div className="space-y-4 mb-6">
-                                        <div className="flex bg-surface-3/30 p-1 rounded-lg border border-white/5 w-fit">
-                                            <button onClick={() => handleImageMethodChange('upload')} className={`px-4 py-1.5 text-[11px] font-bold rounded-md transition-all cursor-pointer ${imageMethod === 'upload' ? 'bg-white/10 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}>Upload</button>
-                                            <button onClick={() => handleImageMethodChange('camera')} className={`px-4 py-1.5 text-[11px] font-bold rounded-md transition-all cursor-pointer ${imageMethod === 'camera' ? 'bg-white/10 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}>Camera</button>
+                                        <div className="flex p-0.5 bg-surface-3 rounded-lg border border-border w-fit">
+                                            <button onClick={() => handleImageMethodChange('upload')} className={`px-4 py-1.5 text-[11px] font-bold rounded-md transition-all cursor-pointer ${imageMethod === 'upload' ? 'bg-surface text-text shadow-sm border border-border' : 'text-text-muted hover:text-text'}`}>Upload</button>
+                                            <button onClick={() => handleImageMethodChange('camera')} className={`px-4 py-1.5 text-[11px] font-bold rounded-md transition-all cursor-pointer ${imageMethod === 'camera' ? 'bg-surface text-text shadow-sm border border-border' : 'text-text-muted hover:text-text'}`}>Camera</button>
                                         </div>
 
                                         {imageMethod === 'camera' ? (
-                                            <div className="relative aspect-video bg-black rounded-xl overflow-hidden border border-white/[0.08] shadow-2xl flex items-center justify-center group bg-[radial-gradient(circle_at_center,_#1a1a2e_0%,_#0a0a0f_100%)]">
+                                            <div className="relative aspect-video bg-black rounded-xl overflow-hidden border border-border shadow-2xl flex items-center justify-center group bg-[radial-gradient(circle_at_center,_#1a1a2e_0%,_#0a0a0f_100%)]">
                                                 {isCameraLoading ? (
                                                     <div className="flex flex-col items-center gap-4">
                                                         <div className="w-10 h-10 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
@@ -247,7 +246,7 @@ const EditSolutionModal = ({ isOpen, onClose, subjectId, solution, onSolutionUpd
                                                 )}
                                             </div>
                                         ) : (
-                                            <div className="relative border-2 border-dashed border-white/[0.08] rounded-xl p-8 flex flex-col items-center justify-center bg-surface-2/30 hover:bg-surface-2/50 transition-all cursor-pointer min-h-[200px]">
+                                            <div className="relative border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center bg-surface-2 hover:bg-surface-3 transition-all cursor-pointer min-h-[200px]">
                                                 <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer z-10" onChange={e => {
                                                     const file = e.target.files?.[0];
                                                     if (file) {
@@ -259,15 +258,15 @@ const EditSolutionModal = ({ isOpen, onClose, subjectId, solution, onSolutionUpd
                                                 {solutionImage ? (
                                                      <div className="relative group">
                                                          <img src={solutionImage} alt="Preview" className="max-h-[300px] object-contain rounded-lg shadow-lg" />
-                                                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
-                                                             <p className="text-white text-xs font-bold">Click or drag to replace image</p>
+                                                         <div className="absolute inset-0 bg-surface-2/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
+                                                             <p className="text-text text-xs font-bold">Click or drag to replace image</p>
                                                          </div>
                                                      </div>
                                                 ) : (
                                                     <div className="text-center">
-                                                        <ImageIcon className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-                                                        <h4 className="text-white font-semibold mb-1 text-[13px]">Upload your solution image</h4>
-                                                        <p className="text-[11px] text-slate-500">Drag or click to choose a file</p>
+                                                        <ImageIcon className="w-10 h-10 text-text-muted/40 mx-auto mb-3" />
+                                                        <h4 className="text-text font-semibold mb-1 text-[13px]">Upload your solution image</h4>
+                                                        <p className="text-[11px] text-text-muted">Drag or click to choose a file</p>
                                                     </div>
                                                 )}
                                             </div>
@@ -277,23 +276,23 @@ const EditSolutionModal = ({ isOpen, onClose, subjectId, solution, onSolutionUpd
 
                                 <form id="edit-solution-form" onSubmit={handleUpdateSolution} className="space-y-5 flex flex-col">
                                     <div>
-                                        <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-2.5">Solution Title</label>
+                                        <label className="block text-[10px] font-extrabold text-text-muted uppercase tracking-[0.18em] mb-2.5">Solution Title</label>
                                         <div className="relative">
-                                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400"><FileText className="w-4 h-4" /></div>
-                                            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Step-by-step solution" className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl pl-11 pr-4 py-3.5 text-[14px] focus:outline-none focus:border-blue-400/40 focus:ring-2 focus:ring-blue-400/15 transition-all" />
+                                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-text-muted/40"><FileText className="w-4 h-4" /></div>
+                                            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Step-by-step solution" className="w-full bg-surface-2 border border-border text-text rounded-xl pl-11 pr-4 py-3.5 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 transition-all" />
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-2.5">Solution Content (Markdown)</label>
-                                        <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Type the solution here..." rows={12} className="w-full min-h-[300px] bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-blue-400/40 focus:ring-2 focus:ring-blue-400/15 transition-all resize-y font-mono" />
+                                        <label className="block text-[10px] font-extrabold text-text-muted uppercase tracking-[0.18em] mb-2.5">Solution Content (Markdown)</label>
+                                        <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Type the solution here..." rows={12} className="w-full min-h-[300px] bg-surface-2 border border-border text-text rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 transition-all resize-y font-mono" />
                                     </div>
                                 </form>
                             </div>
 
-                            <div className="px-7 py-5 border-t border-white/[0.06] shrink-0 flex items-center justify-end">
+                            <div className="px-7 py-5 border-t border-border shrink-0 flex items-center justify-end bg-surface-3">
                                 <div className="flex gap-3">
-                                    <button type="button" onClick={handleModalClose} className="px-5 py-3 rounded-xl text-[13px] font-semibold text-slate-400 hover:text-white transition-all">Cancel</button>
-                                    <button form="edit-solution-form" type="submit" disabled={saving || (!title.trim() && !content.trim() && !solutionImage && !hasExistingImage)} className="bg-blue-600 text-white shadow-lg text-[13px] font-bold px-8 py-3 rounded-xl disabled:opacity-50 transition-all flex items-center gap-2">
+                                    <button type="button" onClick={handleModalClose} className="px-5 py-3 rounded-xl text-[13px] font-semibold text-text-muted hover:text-text transition-all">Cancel</button>
+                                    <button form="edit-solution-form" type="submit" disabled={saving || (!title.trim() && !content.trim() && !solutionImage && !hasExistingImage)} className="bg-primary text-white shadow-lg text-[13px] font-bold px-8 py-3 rounded-xl disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer active:scale-95">
                                         {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><Save className="w-4 h-4" /> Update Solution</>}
                                     </button>
                                 </div>

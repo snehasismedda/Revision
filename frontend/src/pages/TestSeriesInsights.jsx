@@ -20,11 +20,11 @@ const accPill = (v) => v >= 75
 const ChartTip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
     return (
-        <div className="bg-[#13132a]/95 border border-white/10 rounded-xl p-3 shadow-2xl text-[13px] min-w-[140px]">
-            <p className="text-slate-500 mb-1.5 text-[11px] font-medium uppercase tracking-wider">{payload[0]?.payload?.date || label}</p>
+        <div className="bg-[#13132a]/95 border border-border rounded-xl p-3 shadow-2xl text-[13px] min-w-[140px]">
+            <p className="text-text-muted mb-1.5 text-[11px] font-medium uppercase tracking-wider">{payload[0]?.payload?.date || label}</p>
             {payload.map((p, i) => (
                 <div key={i} className="flex items-center justify-between gap-4 py-0.5">
-                    <span className="text-slate-400 font-medium">{p.name}:</span>
+                    <span className="text-text-muted font-medium">{p.name}:</span>
                     <span style={{ color: p.color }} className="font-bold">
                         {p.value}{p.name.includes('Acc') || p.name === 'Accuracy' || p.name === 'Target' ? '%' : ''}
                     </span>
@@ -165,11 +165,11 @@ const TestSeriesInsights = () => {
     let currentAccuracies = isAll ? trendData.map(t => t.Accuracy) : subAccuracies;
     let stdDev = calculateStdDev(currentAccuracies);
     let consistencyLabel = currentAccuracies.length < 2 ? 'N/A' : (stdDev < 5 ? 'High' : stdDev < 15 ? 'Medium' : 'Low');
-    let consistencyColor = currentAccuracies.length < 2 ? 'text-slate-500' : (stdDev < 5 ? 'text-emerald-400' : stdDev < 15 ? 'text-amber-400' : 'text-rose-400');
+    let consistencyColor = currentAccuracies.length < 2 ? 'text-text-muted' : (stdDev < 5 ? 'text-emerald-400' : stdDev < 15 ? 'text-amber-400' : 'text-rose-400');
 
     let momentumVal = calculateMomentum(currentAccuracies);
     let momentumLabel = currentAccuracies.length < 2 ? 'N/A' : (momentumVal > 3 ? 'Positive' : momentumVal < -3 ? 'Negative' : 'Neutral');
-    let momentumColor = currentAccuracies.length < 2 ? 'text-slate-500' : (momentumVal > 3 ? 'text-emerald-400' : momentumVal < -3 ? 'text-rose-400' : 'text-sky-400');
+    let momentumColor = currentAccuracies.length < 2 ? 'text-text-muted' : (momentumVal > 3 ? 'text-emerald-400' : momentumVal < -3 ? 'text-rose-400' : 'text-sky-400');
 
     return (
         <div className="fade-in max-w-6xl mx-auto py-8">
@@ -178,12 +178,12 @@ const TestSeriesInsights = () => {
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => navigate(-1)}
-                        className="p-2 rounded-xl bg-surface-2 hover:bg-surface-3 transition-colors text-slate-400 hover:text-white cursor-pointer group"
+                        className="p-2 rounded-xl bg-surface-2 hover:bg-surface-3 transition-colors text-text-muted hover:text-text cursor-pointer group"
                     >
                         <ArrowLeft className="w-5 h-5" />
                     </button>
                     <div>
-                        <h1 className="text-2xl font-heading font-bold text-white tracking-tight">Series Insights: {analytics?.overview?.series_name}</h1>
+                        <h1 className="text-2xl font-heading font-bold text-text tracking-tight">Series Insights: {analytics?.overview?.series_name}</h1>
                     </div>
                 </div>
 
@@ -191,7 +191,7 @@ const TestSeriesInsights = () => {
                 {Object.keys(subjectTrend).length > 0 && (
                     <div className="relative group self-start md:self-center">
                         <select
-                            className="bg-white/5 border border-white/10 text-slate-300 text-sm font-semibold rounded-xl pl-4 pr-10 py-2.5 outline-none focus:border-pink-500/50 appearance-none cursor-pointer hover:bg-white/[0.08] transition-all min-w-[200px]"
+                            className="bg-surface-3/10 border border-border text-text-muted text-sm font-semibold rounded-xl pl-4 pr-10 py-2.5 outline-none focus:border-pink-500/50 appearance-none cursor-pointer hover:bg-surface-3/10 transition-all min-w-[200px]"
                             value={selectedSubject}
                             onChange={e => setSelectedSubject(e.target.value)}
                         >
@@ -199,7 +199,7 @@ const TestSeriesInsights = () => {
                                 <option key={sub} value={sub} className="bg-[#161622]">{sub}</option>
                             ))}
                         </select>
-                        <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none group-hover:text-slate-300 transition-colors" />
+                        <ChevronDown className="w-4 h-4 text-text-muted absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none group-hover:text-text-muted transition-colors" />
                     </div>
                 )}
             </div>
@@ -209,108 +209,108 @@ const TestSeriesInsights = () => {
                     <>
                         {/* KPIs */}
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                            <div className="bg-surface-2 border border-white/5 p-5 rounded-2xl flex flex-col gap-1 relative group">
+                            <div className="bg-surface-2 border border-border p-5 rounded-2xl flex flex-col gap-1 relative group">
                                 {/* Card Tooltip */}
-                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/98 border border-white/10 rounded-xl text-[11px] text-slate-300 z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'total' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
+                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/98 border border-border rounded-xl text-[11px] text-text-muted z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'total' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
                                     <p className="font-semibold text-pink-400 mb-1">Total Tests</p>
                                     <p className="leading-relaxed opacity-80">Total number of successfully completed tests in this series.</p>
                                 </div>
 
-                                <p className="text-3xl font-bold text-white leading-none mb-1">{isAll ? (overview.total_tests || 0) : subAttemptsCount}</p>
+                                <p className="text-3xl font-bold text-text leading-none mb-1">{isAll ? (overview.total_tests || 0) : subAttemptsCount}</p>
                                 <div className="flex items-center gap-1.5">
-                                    <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{isAll ? 'Total Tests' : 'Tests Taken'}</p>
+                                    <p className="text-[10px] uppercase tracking-wider text-text-muted font-bold">{isAll ? 'Total Tests' : 'Tests Taken'}</p>
                                     <button
                                         onClick={(e) => toggleTooltip(e, 'total')}
-                                        className={`p-0.5 rounded-md transition-all ${activeTooltip === 'total' ? 'bg-pink-500/20 text-pink-400 rotate-12' : 'text-slate-600 hover:text-slate-400'}`}
+                                        className={`p-0.5 rounded-md transition-all ${activeTooltip === 'total' ? 'bg-pink-500/20 text-pink-400 rotate-12' : 'text-text-muted hover:text-text-muted'}`}
                                     >
                                         <Info className="w-3.5 h-3.5 cursor-pointer" />
                                     </button>
                                 </div>
                             </div>
 
-                            <div className="bg-surface-2 border border-white/5 p-5 rounded-2xl flex flex-col gap-1 relative group">
-                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/98 border border-white/10 rounded-xl text-[11px] text-slate-300 z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'avg' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
+                            <div className="bg-surface-2 border border-border p-5 rounded-2xl flex flex-col gap-1 relative group">
+                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/98 border border-border rounded-xl text-[11px] text-text-muted z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'avg' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
                                     <p className="font-semibold text-sky-400 mb-1">Avg Accuracy</p>
                                     <p className="leading-relaxed opacity-80">The arithmetic mean of accuracy percentages across all attempted tests.</p>
                                 </div>
                                 <p className="text-3xl font-bold text-sky-400 leading-none mb-1">{isAll ? (stats.avgAccuracy || 0) : subAvgAcc}%</p>
                                 <div className="flex items-center gap-1.5">
-                                    <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Avg Acc</p>
+                                    <p className="text-[10px] uppercase tracking-wider text-text-muted font-bold">Avg Acc</p>
                                     <button
                                         onClick={(e) => toggleTooltip(e, 'avg')}
-                                        className={`p-0.5 rounded-md transition-all ${activeTooltip === 'avg' ? 'bg-sky-500/20 text-sky-400 rotate-12' : 'text-slate-600 hover:text-slate-400'}`}
+                                        className={`p-0.5 rounded-md transition-all ${activeTooltip === 'avg' ? 'bg-sky-500/20 text-sky-400 rotate-12' : 'text-text-muted hover:text-text-muted'}`}
                                     >
                                         <Info className="w-3.5 h-3.5 cursor-pointer" />
                                     </button>
                                 </div>
                             </div>
 
-                            <div className="bg-surface-2 border border-white/5 p-5 rounded-2xl flex flex-col gap-1 relative group">
-                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/98 border border-white/10 rounded-xl text-[11px] text-slate-300 z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'best' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
+                            <div className="bg-surface-2 border border-border p-5 rounded-2xl flex flex-col gap-1 relative group">
+                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/98 border border-border rounded-xl text-[11px] text-text-muted z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'best' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
                                     <p className="font-semibold text-emerald-400 mb-1">Best Accuracy</p>
                                     <p className="leading-relaxed opacity-80">The highest accuracy percentage achieved in a single test.</p>
                                 </div>
                                 <p className="text-3xl font-bold text-emerald-400 leading-none mb-1">{isAll ? (stats.bestAccuracy || 0) : subBestAcc}%</p>
                                 <div className="flex items-center gap-1.5">
-                                    <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Best Acc</p>
+                                    <p className="text-[10px] uppercase tracking-wider text-text-muted font-bold">Best Acc</p>
                                     <button
                                         onClick={(e) => toggleTooltip(e, 'best')}
-                                        className={`p-0.5 rounded-md transition-all ${activeTooltip === 'best' ? 'bg-emerald-500/20 text-emerald-400 rotate-12' : 'text-slate-600 hover:text-slate-400'}`}
+                                        className={`p-0.5 rounded-md transition-all ${activeTooltip === 'best' ? 'bg-emerald-500/20 text-emerald-400 rotate-12' : 'text-text-muted hover:text-text-muted'}`}
                                     >
                                         <Info className="w-3.5 h-3.5 cursor-pointer" />
                                     </button>
                                 </div>
                             </div>
 
-                            <div className="bg-surface-2 border border-white/5 p-5 rounded-2xl flex flex-col gap-1 relative group">
-                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/98 border border-white/10 rounded-xl text-[11px] text-slate-300 z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'worst' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
+                            <div className="bg-surface-2 border border-border p-5 rounded-2xl flex flex-col gap-1 relative group">
+                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/98 border border-border rounded-xl text-[11px] text-text-muted z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'worst' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
                                     <p className="font-semibold text-rose-400 mb-1">Worst Accuracy</p>
                                     <p className="leading-relaxed opacity-80">The lowest accuracy percentage recorded in a single test.</p>
                                 </div>
                                 <p className="text-3xl font-bold text-rose-400 leading-none mb-1">{isAll ? (stats.worstAccuracy || 0) : subWorstAcc}%</p>
                                 <div className="flex items-center gap-1.5">
-                                    <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Worst Acc</p>
+                                    <p className="text-[10px] uppercase tracking-wider text-text-muted font-bold">Worst Acc</p>
                                     <button
                                         onClick={(e) => toggleTooltip(e, 'worst')}
-                                        className={`p-0.5 rounded-md transition-all ${activeTooltip === 'worst' ? 'bg-rose-500/20 text-rose-400 rotate-12' : 'text-slate-600 hover:text-slate-400'}`}
+                                        className={`p-0.5 rounded-md transition-all ${activeTooltip === 'worst' ? 'bg-rose-500/20 text-rose-400 rotate-12' : 'text-text-muted hover:text-text-muted'}`}
                                     >
                                         <Info className="w-3.5 h-3.5 cursor-pointer" />
                                     </button>
                                 </div>
                             </div>
 
-                            <div className="bg-surface-2 border border-white/5 p-5 rounded-2xl flex flex-col gap-1 relative group">
-                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/98 border border-white/10 rounded-xl text-[11px] text-slate-300 z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'consistency' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
+                            <div className="bg-surface-2 border border-border p-5 rounded-2xl flex flex-col gap-1 relative group">
+                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/98 border border-border rounded-xl text-[11px] text-text-muted z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'consistency' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
                                     <p className="font-semibold text-violet-400 mb-1">Consistency</p>
                                     <p className="leading-relaxed opacity-80">Measures score stability using Standard Deviation. Higher stability (Lower Deviation &lt; 5%) indicates reliable performance.</p>
                                 </div>
                                 <p className={`text-3xl font-bold ${consistencyColor} leading-none mb-1`}>{consistencyLabel}</p>
                                 <div className="flex items-center gap-1.5">
-                                    <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold flex items-center justify-between flex-1">
-                                        Consistency <span className="text-[9px] text-slate-600 bg-white/5 px-1.5 rounded">{stdDev.toFixed(1)}</span>
+                                    <p className="text-[10px] uppercase tracking-wider text-text-muted font-bold flex items-center justify-between flex-1">
+                                        Consistency <span className="text-[9px] text-text-muted bg-surface-3/10 px-1.5 rounded">{stdDev.toFixed(1)}</span>
                                     </p>
                                     <button
                                         onClick={(e) => toggleTooltip(e, 'consistency')}
-                                        className={`p-0.5 rounded-md transition-all ${activeTooltip === 'consistency' ? 'bg-violet-500/20 text-violet-400 rotate-12' : 'text-slate-600 hover:text-slate-400'}`}
+                                        className={`p-0.5 rounded-md transition-all ${activeTooltip === 'consistency' ? 'bg-violet-500/20 text-violet-400 rotate-12' : 'text-text-muted hover:text-text-muted'}`}
                                     >
                                         <Info className="w-3.5 h-3.5 cursor-pointer" />
                                     </button>
                                 </div>
                             </div>
 
-                            <div className="bg-surface-2 border border-white/5 p-5 rounded-2xl flex flex-col gap-1 relative group">
-                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/98 border border-white/10 rounded-xl text-[11px] text-slate-300 z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'momentum' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
+                            <div className="bg-surface-2 border border-border p-5 rounded-2xl flex flex-col gap-1 relative group">
+                                <div className={`absolute inset-2.5 p-3.5 bg-[#131121]/98 border border-border rounded-xl text-[11px] text-text-muted z-50 shadow-2xl transition-all duration-300 overflow-y-auto scrollbar-none ${activeTooltip === 'momentum' ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
                                     <p className="font-semibold text-amber-400 mb-1">Momentum</p>
                                     <p className="leading-relaxed opacity-80">Compares the average of your last 2 tests against your overall average. Positive values indicate a recent upward trend.</p>
                                 </div>
                                 <p className={`text-3xl font-bold ${momentumColor} leading-none mb-1`}>{momentumLabel}</p>
                                 <div className="flex items-center gap-1.5">
-                                    <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold flex items-center justify-between flex-1">
-                                        Momentum <span className="text-[9px] text-slate-600 bg-white/5 px-1.5 rounded">{(momentumVal > 0 ? '+' : '')}{momentumVal.toFixed(1)}%</span>
+                                    <p className="text-[10px] uppercase tracking-wider text-text-muted font-bold flex items-center justify-between flex-1">
+                                        Momentum <span className="text-[9px] text-text-muted bg-surface-3/10 px-1.5 rounded">{(momentumVal > 0 ? '+' : '')}{momentumVal.toFixed(1)}%</span>
                                     </p>
                                     <button
                                         onClick={(e) => toggleTooltip(e, 'momentum')}
-                                        className={`p-0.5 rounded-md transition-all ${activeTooltip === 'momentum' ? 'bg-amber-500/20 text-amber-400 rotate-12' : 'text-slate-600 hover:text-slate-400'}`}
+                                        className={`p-0.5 rounded-md transition-all ${activeTooltip === 'momentum' ? 'bg-amber-500/20 text-amber-400 rotate-12' : 'text-text-muted hover:text-text-muted'}`}
                                     >
                                         <Info className="w-3.5 h-3.5 cursor-pointer" />
                                     </button>
@@ -321,17 +321,17 @@ const TestSeriesInsights = () => {
                         {isAll ? (
                             <>
                                 {/* Main Trend Chart */}
-                                <div className="glass rounded-3xl border border-white/8 p-6 md:p-8 shadow-xl">
+                                <div className="glass rounded-3xl border border-border p-6 md:p-8 shadow-xl">
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
                                         <div className="flex items-center gap-3">
                                             <div className="p-2 rounded-lg bg-pink-500/10">
                                                 <TrendingUp className="w-5 h-5 text-pink-400" />
                                             </div>
-                                            <h2 className="text-lg font-heading font-semibold text-white">Series Progression</h2>
+                                            <h2 className="text-lg font-heading font-semibold text-text">Series Progression</h2>
                                         </div>
-                                        <div className="flex bg-black/40 p-1.5 rounded-xl self-start sm:self-center">
-                                            <button onClick={() => setTrendType('accuracy')} className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${trendType === 'accuracy' ? 'bg-pink-500/20 text-pink-400 shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>Accuracy</button>
-                                            <button onClick={() => setTrendType('score')} className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${trendType === 'score' ? 'bg-violet-500/20 text-violet-400 shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>Marks</button>
+                                        <div className="flex bg-surface-2/40 p-1.5 rounded-xl self-start sm:self-center">
+                                            <button onClick={() => setTrendType('accuracy')} className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${trendType === 'accuracy' ? 'bg-pink-500/20 text-pink-400 shadow-lg' : 'text-text-muted hover:text-text-muted'}`}>Accuracy</button>
+                                            <button onClick={() => setTrendType('score')} className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${trendType === 'score' ? 'bg-violet-500/20 text-violet-400 shadow-lg' : 'text-text-muted hover:text-text-muted'}`}>Marks</button>
                                         </div>
                                     </div>
                                     <div className="h-[320px]">
@@ -355,12 +355,12 @@ const TestSeriesInsights = () => {
 
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                     {/* Subject Overall Bar Chart */}
-                                    <div className="glass rounded-3xl border border-white/8 p-6 md:p-8 shadow-xl">
+                                    <div className="glass rounded-3xl border border-border p-6 md:p-8 shadow-xl">
                                         <div className="flex items-center gap-3 mb-8">
                                             <div className="p-2 rounded-lg bg-sky-500/10">
                                                 <BarChart2 className="w-5 h-5 text-sky-400" />
                                             </div>
-                                            <h2 className="text-lg font-heading font-semibold text-white">Subject Mastery</h2>
+                                            <h2 className="text-lg font-heading font-semibold text-text">Subject Mastery</h2>
                                         </div>
                                         <div className="h-[280px]">
                                             {subjectBarData.length > 0 ? (
@@ -375,17 +375,17 @@ const TestSeriesInsights = () => {
                                                         </Bar>
                                                     </BarChart>
                                                 </ResponsiveContainer>
-                                            ) : <p className="text-slate-500 text-xs text-center mt-12">No subject data available</p>}
+                                            ) : <p className="text-text-muted text-xs text-center mt-12">No subject data available</p>}
                                         </div>
                                     </div>
 
                                     {/* Subject Trajectory Line Chart */}
-                                    <div className="glass rounded-3xl border border-white/8 p-6 md:p-8 shadow-xl">
+                                    <div className="glass rounded-3xl border border-border p-6 md:p-8 shadow-xl">
                                         <div className="flex items-center gap-3 mb-8">
                                             <div className="p-2 rounded-lg bg-emerald-500/10">
                                                 <TrendingUp className="w-5 h-5 text-emerald-400" />
                                             </div>
-                                            <h2 className="text-lg font-heading font-semibold text-white">Subject Trends</h2>
+                                            <h2 className="text-lg font-heading font-semibold text-text">Subject Trends</h2>
                                         </div>
                                         <div className="h-[280px]">
                                             {Object.keys(subjectTrend).length > 0 && seriesTrend.length > 1 ? (
@@ -401,7 +401,7 @@ const TestSeriesInsights = () => {
                                                         ))}
                                                     </LineChart>
                                                 </ResponsiveContainer>
-                                            ) : <p className="text-slate-500 text-xs text-center mt-12">Take at least 2 tests to see trends</p>}
+                                            ) : <p className="text-text-muted text-xs text-center mt-12">Take at least 2 tests to see trends</p>}
                                         </div>
                                     </div>
                                 </div>
@@ -410,25 +410,25 @@ const TestSeriesInsights = () => {
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-2 px-2">
                                         <div className="w-1.5 h-1.5 rounded-full bg-pink-500 shadow-[0_0_8px_rgba(236,72,153,0.5)]" />
-                                        <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest">Performance Matrix</h3>
+                                        <h3 className="text-sm font-bold text-text-muted uppercase tracking-widest">Performance Matrix</h3>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {subjectPerformance.map((s, i) => {
                                             const acc = Number(s.overall_accuracy);
                                             return (
-                                                <div key={i} className="bg-surface-2 rounded-2xl p-5 border border-white/[0.05] hover:border-white/10 transition-all flex items-center justify-between group">
-                                                    <div className="flex-1 pr-6 border-r border-white/[0.06]">
-                                                        <p className="text-[17px] font-semibold text-white mb-2 group-hover:text-pink-400 transition-colors">{s.subject_name}</p>
-                                                        <div className="w-full bg-black/40 rounded-full h-1.5"><div className="h-full rounded-full transition-all duration-1000" style={{ width: `${acc}%`, backgroundColor: accColor(acc) }} /></div>
+                                                <div key={i} className="bg-surface-2 rounded-2xl p-5 border border-border hover:border-border transition-all flex items-center justify-between group">
+                                                    <div className="flex-1 pr-6 border-r border-border">
+                                                        <p className="text-[17px] font-semibold text-text mb-2 group-hover:text-pink-400 transition-colors">{s.subject_name}</p>
+                                                        <div className="w-full bg-surface-2/40 rounded-full h-1.5"><div className="h-full rounded-full transition-all duration-1000" style={{ width: `${acc}%`, backgroundColor: accColor(acc) }} /></div>
                                                     </div>
                                                     <div className="flex gap-8 pl-6 shrink-0">
                                                         <div className="text-center">
-                                                            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Accuracy</p>
+                                                            <p className="text-[10px] text-text-muted uppercase tracking-widest font-bold mb-1">Accuracy</p>
                                                             <p className="text-lg font-bold" style={{ color: accColor(acc) }}>{acc}%</p>
                                                         </div>
                                                         <div className="text-center">
-                                                            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Questions</p>
-                                                            <p className="text-lg font-bold text-white">{s.total_correct}/{s.total_questions}</p>
+                                                            <p className="text-[10px] text-text-muted uppercase tracking-widest font-bold mb-1">Questions</p>
+                                                            <p className="text-lg font-bold text-text">{s.total_correct}/{s.total_questions}</p>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -440,13 +440,13 @@ const TestSeriesInsights = () => {
                         ) : (
                             <>
                                 {/* Specific Subject Trend Chart */}
-                                <div className="glass rounded-3xl border border-white/8 p-6 md:p-8 shadow-xl">
+                                <div className="glass rounded-3xl border border-border p-6 md:p-8 shadow-xl">
                                     <div className="flex items-center justify-between gap-4 mb-8">
                                         <div className="flex items-center gap-3">
                                             <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
                                                 <Target className="w-5 h-5" />
                                             </div>
-                                            <h2 className="text-lg font-heading font-semibold text-white">{selectedSubject} Progress</h2>
+                                            <h2 className="text-lg font-heading font-semibold text-text">{selectedSubject} Progress</h2>
                                         </div>
                                         {subAccuracies.length > 1 && (
                                             <div className={`px-4 py-2 rounded-xl text-xs font-bold border ${Number(subImprovement) > 0 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
@@ -471,7 +471,7 @@ const TestSeriesInsights = () => {
                                                     <Area type="monotone" dataKey="Accuracy" stroke="#34d399" strokeWidth={3} fill="url(#subGradPage)" dot={{ fill: '#34d399', r: 5, strokeWidth: 0 }} activeDot={{ r: 7, strokeWidth: 0 }} />
                                                 </AreaChart>
                                             </ResponsiveContainer>
-                                        ) : <p className="text-slate-500 text-center py-20 bg-black/20 rounded-2xl border border-dashed border-white/5">Take at least 2 sessions to see trend data for this subject.</p>}
+                                        ) : <p className="text-text-muted text-center py-20 bg-black/20 rounded-2xl border border-dashed border-border">Take at least 2 sessions to see trend data for this subject.</p>}
                                     </div>
                                 </div>
 
@@ -479,20 +479,20 @@ const TestSeriesInsights = () => {
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-2 px-2">
                                         <div className="w-1.5 h-1.5 rounded-full bg-pink-500 shadow-[0_0_8px_rgba(236,72,153,0.5)]" />
-                                        <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest">Test-wise History for {selectedSubject}</h3>
+                                        <h3 className="text-sm font-bold text-text-muted uppercase tracking-widest">Test-wise History for {selectedSubject}</h3>
                                     </div>
                                     <div className="grid grid-cols-1 gap-2.5">
                                         {specificTrendData.map((st, i) => {
                                             const acc = Number(st.Accuracy);
                                             return (
-                                                <div key={i} className="bg-surface-2 rounded-2xl p-4 border border-white/[0.04] flex items-center justify-between transition-all hover:bg-white/[0.02] hover:border-white/10 group">
+                                                <div key={i} className="bg-surface-2 rounded-2xl p-4 border border-border flex items-center justify-between transition-all hover:bg-surface-3/10 hover:border-border group">
                                                     <div className="flex items-center gap-5">
-                                                        <div className="w-12 h-12 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center group-hover:bg-pink-500/10 group-hover:border-pink-500/20 transition-colors">
-                                                            <span className="text-xs font-bold text-slate-400 group-hover:text-pink-400">#{st.attempt.split(' ')[1]}</span>
+                                                        <div className="w-12 h-12 rounded-xl bg-surface-2/40 border border-border flex items-center justify-center group-hover:bg-pink-500/10 group-hover:border-pink-500/20 transition-colors">
+                                                            <span className="text-xs font-bold text-text-muted group-hover:text-pink-400">#{st.attempt.split(' ')[1]}</span>
                                                         </div>
                                                         <div>
-                                                            <p className="text-[16px] font-semibold text-white mb-0.5">{st.name}</p>
-                                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{st.date || 'Test Result'}</p>
+                                                            <p className="text-[16px] font-semibold text-text mb-0.5">{st.name}</p>
+                                                            <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest">{st.date || 'Test Result'}</p>
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-8">
@@ -510,13 +510,13 @@ const TestSeriesInsights = () => {
                         )}
                     </>
                 ) : (
-                    <div className="py-24 text-center glass rounded-3xl border border-dashed border-white/10 max-w-2xl mx-auto mt-12">
-                        <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <Activity className="w-10 h-10 text-slate-700 opacity-50" />
+                    <div className="py-24 text-center glass rounded-3xl border border-dashed border-border max-w-2xl mx-auto mt-12">
+                        <div className="w-20 h-20 bg-surface-3/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <Activity className="w-10 h-10 text-text-muted opacity-50" />
                         </div>
-                        <h2 className="text-xl font-heading font-bold text-white mb-2">No Analytics Found</h2>
-                        <p className="text-slate-400 text-sm max-w-xs mx-auto mb-8">You haven't taken any tests in this series yet. Take your first test to unlock detailed insights.</p>
-                        <button onClick={() => navigate(`/tests/${seriesId}`)} className="px-6 py-2.5 rounded-xl bg-pink-500 shadow-[0_0_20px_rgba(236,72,153,0.3)] text-white text-sm font-bold hover:scale-105 transition-transform cursor-pointer">Back to Series</button>
+                        <h2 className="text-xl font-heading font-bold text-text mb-2">No Analytics Found</h2>
+                        <p className="text-text-muted text-sm max-w-xs mx-auto mb-8">You haven't taken any tests in this series yet. Take your first test to unlock detailed insights.</p>
+                        <button onClick={() => navigate(`/tests/${seriesId}`)} className="px-6 py-2.5 rounded-xl bg-pink-500 shadow-[0_0_20px_rgba(236,72,153,0.3)] text-text text-sm font-bold hover:scale-105 transition-transform cursor-pointer">Back to Series</button>
                     </div>
                 )}
             </div>

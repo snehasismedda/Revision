@@ -151,21 +151,21 @@ const ImageCropper = ({
             <style>{cropStyles}</style>
 
             {/* Header */}
-            <div className="flex items-center justify-between px-7 py-5 border-b border-white/[0.06] bg-black/20 shrink-0">
+            <div className="flex items-center justify-between px-7 py-5 border-b border-border bg-black/20 shrink-0">
                 <div className="flex items-center gap-4">
                     <div className="p-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 shadow-[0_0_15px_rgba(139,92,246,0.15)]">
                         <Scissors className="w-5 h-5" />
                     </div>
                     <div>
-                        <h3 className="text-lg font-heading font-semibold text-white leading-tight">{title}</h3>
-                        {subtitle && <p className="text-slate-500 text-[11px] font-bold uppercase tracking-widest mt-0.5 opacity-80">{subtitle}</p>}
+                        <h3 className="text-lg font-heading font-semibold text-text leading-tight">{title}</h3>
+                        {subtitle && <p className="text-text-muted text-[11px] font-bold uppercase tracking-widest mt-0.5 opacity-80">{subtitle}</p>}
                     </div>
                 </div>
 
                 <div className="flex gap-3">
                     <button
                         onClick={onCancel}
-                        className="px-5 py-2.5 rounded-xl text-[13px] font-semibold text-slate-400 hover:text-white transition-all active:scale-95 border border-transparent hover:border-white/10"
+                        className="px-5 py-2.5 rounded-xl text-[13px] font-semibold text-text-muted hover:text-text transition-all active:scale-95 border border-transparent hover:border-border-hover"
                     >
                         Cancel
                     </button>
@@ -219,20 +219,20 @@ const ImageCropper = ({
             </div>
 
             {/* Controls Bar */}
-            <div className="px-7 py-6 border-t border-white/[0.06] bg-surface-2 shrink-0">
+            <div className="px-7 py-6 border-t border-border bg-surface-2 shrink-0">
                 <div className="max-w-6xl mx-auto flex flex-wrap gap-x-12 gap-y-6 items-center justify-center">
 
                     {/* Zoom Group */}
-                    <div className="flex items-center gap-6 bg-white/[0.03] p-1.5 px-4 rounded-2xl border border-white/[0.06]">
+                    <div className="flex items-center gap-6 bg-surface-2 p-1.5 px-4 rounded-2xl border border-border">
                         <div className="flex flex-col gap-1 min-w-[140px]">
                             <div className="flex justify-between items-center px-1">
-                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest opacity-60">Zoom</span>
+                                <span className="text-[10px] font-black text-text-muted uppercase tracking-widest opacity-60">Zoom</span>
                                 <span className="text-[11px] font-black text-primary font-mono">{Math.round(zoom * 100)}%</span>
                             </div>
                             <div className="flex items-center gap-3 mt-1">
                                 <button
                                     onClick={() => setZoom(z => Math.max(0.5, z - 0.25))}
-                                    className="p-1 rounded-md hover:bg-white/10 text-slate-500 hover:text-white transition-all active:scale-90"
+                                    className="p-1 rounded-md hover:bg-surface-3 text-text-muted hover:text-text transition-all active:scale-90"
                                 >
                                     <ZoomOut className="w-3.5 h-3.5" />
                                 </button>
@@ -243,11 +243,11 @@ const ImageCropper = ({
                                     max={3}
                                     step={0.1}
                                     onChange={(e) => setZoom(parseFloat(e.target.value))}
-                                    className="flex-1 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-primary"
+                                    className="flex-1 h-1 bg-surface-3 rounded-full appearance-none cursor-pointer accent-primary"
                                 />
                                 <button
                                     onClick={() => setZoom(z => Math.min(3, z + 0.25))}
-                                    className="p-1 rounded-md hover:bg-white/10 text-slate-500 hover:text-white transition-all active:scale-90"
+                                    className="p-1 rounded-md hover:bg-surface-3 text-text-muted hover:text-text transition-all active:scale-90"
                                 >
                                     <ZoomIn className="w-3.5 h-3.5" />
                                 </button>
@@ -256,11 +256,11 @@ const ImageCropper = ({
                     </div>
 
                     {/* Tools Group */}
-                    <div className="flex items-center gap-2 bg-white/[0.03] p-1.5 px-2 rounded-2xl border border-white/[0.06]">
+                    <div className="flex items-center gap-2 bg-surface-2 p-1.5 px-2 rounded-2xl border border-border">
                         <button
                             onClick={() => handleBackingRotate(-90)}
                             disabled={isRotating}
-                            className="flex items-center gap-2.5 px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all disabled:opacity-30 group"
+                            className="flex items-center gap-2.5 px-4 py-2 rounded-xl text-text-muted hover:text-text hover:bg-surface-2 transition-all disabled:opacity-30 group"
                         >
                             <RotateCw className="w-4 h-4 -scale-x-100 group-hover:rotate-[-90deg] transition-transform duration-500" />
                             <span className="text-[11px] font-bold uppercase tracking-wider">Rotate L</span>
@@ -271,7 +271,7 @@ const ImageCropper = ({
                         <button
                             onClick={() => handleBackingRotate(90)}
                             disabled={isRotating}
-                            className="flex items-center gap-2.5 px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all disabled:opacity-30 group"
+                            className="flex items-center gap-2.5 px-4 py-2 rounded-xl text-text-muted hover:text-text hover:bg-surface-2 transition-all disabled:opacity-30 group"
                         >
                             <span className="text-[11px] font-bold uppercase tracking-wider">Rotate R</span>
                             <RotateCw className="w-4 h-4 group-hover:rotate-[90deg] transition-transform duration-500" />
@@ -283,7 +283,7 @@ const ImageCropper = ({
                             onClick={() => {
                                 if (imgRef.current) setInitialCrop(imgRef.current.width, imgRef.current.height);
                             }}
-                            className="flex items-center gap-2.5 px-4 py-2 rounded-xl text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/5 transition-all group"
+                            className="flex items-center gap-2.5 px-4 py-2 rounded-xl text-text-muted hover:text-emerald-400 hover:bg-emerald-500/5 transition-all group"
                         >
                             <Maximize className="w-4 h-4 group-hover:scale-110 transition-transform" />
                             <span className="text-[11px] font-bold uppercase tracking-wider">Fill Image</span>
@@ -293,7 +293,7 @@ const ImageCropper = ({
                     {/* Reset Button */}
                     <button
                         onClick={handleReset}
-                        className="flex items-center gap-2 text-[11px] font-bold text-slate-500 hover:text-rose-400 transition-all px-5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:bg-rose-500/5 hover:border-rose-500/20 active:scale-95"
+                        className="flex items-center gap-2 text-[11px] font-bold text-text-muted hover:text-rose-400 transition-all px-5 py-2.5 rounded-xl bg-surface-2 border border-border hover:bg-rose-500/5 hover:border-rose-500/20 active:scale-95"
                     >
                         <RefreshCw className="w-3.5 h-3.5" />
                         Reset All

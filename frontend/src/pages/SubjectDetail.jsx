@@ -2398,7 +2398,7 @@ const SubjectDetail = () => {
             <div className="max-w-6xl mx-auto animate-pulse">
                 {/* Skeleton Header Navigation */}
                 <div className="flex items-center gap-3 mb-6">
-                    <div className="w-24 h-9 bg-surface-2 rounded-lg border border-white/[0.06]" />
+                    <div className="w-24 h-9 bg-surface-2 rounded-lg border border-border" />
                 </div>
 
                 {/* Skeleton Subject Header */}
@@ -2413,11 +2413,11 @@ const SubjectDetail = () => {
                 </div>
 
                 {/* Skeleton Gradient separator */}
-                <div className="h-px bg-white/[0.08] mb-8" />
+                <div className="h-px bg-surface-2 mb-8" />
 
                 {/* Skeleton Tabs Area */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                    <div className="flex gap-1 p-1 bg-surface-2/50 rounded-xl border border-white/[0.06] w-fit">
+                    <div className="flex gap-1 p-1 bg-surface-2/50 rounded-xl border border-border w-fit">
                         <div className="w-32 h-10 bg-surface-3/50 rounded-lg" />
                         <div className="w-32 h-10 bg-surface-3/50 rounded-lg" />
                         <div className="w-32 h-10 bg-surface-3/50 rounded-lg" />
@@ -2429,9 +2429,9 @@ const SubjectDetail = () => {
                 <div className="flex flex-col gap-5">
                     <div className="h-8 bg-surface-2 rounded-lg w-24 mb-4" />
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                        <div className="h-48 bg-surface-2/40 rounded-2xl border border-white/[0.06]" />
-                        <div className="h-48 bg-surface-2/40 rounded-2xl border border-white/[0.06]" />
-                        <div className="h-48 bg-surface-2/40 rounded-2xl border border-white/[0.06]" />
+                        <div className="h-48 bg-surface-2/40 rounded-2xl border border-border" />
+                        <div className="h-48 bg-surface-2/40 rounded-2xl border border-border" />
+                        <div className="h-48 bg-surface-2/40 rounded-2xl border border-border" />
                     </div>
                 </div>
             </div>
@@ -2444,8 +2444,8 @@ const SubjectDetail = () => {
                 <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6">
                     <X className="w-10 h-10 text-rose-500/70" />
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-2">Subject not found</h2>
-                <p className="text-slate-400 mb-8">The subject you're looking for doesn't exist or you don't have access.</p>
+                <h2 className="text-2xl font-bold text-text mb-2">Subject not found</h2>
+                <p className="text-text-muted mb-8">The subject you're looking for doesn't exist or you don't have access.</p>
                 <Link to="/subjects" className="btn-primary px-8 py-3 rounded-xl">Back to Subjects</Link>
             </div>
         );
@@ -2721,7 +2721,7 @@ const SubjectDetail = () => {
                     <div className="flex-1 flex justify-start">
                         <Link
                             to="/subjects"
-                            className="flex items-center gap-2 text-[12.5px] font-bold text-slate-400 hover:text-white transition-all hover:bg-white/[0.06] pl-2.5 pr-4 py-2.5 rounded-xl border border-white/[0.04] hover:border-white/[0.1] group/back backdrop-blur-md whitespace-nowrap"
+                            className="flex items-center gap-2 text-[12.5px] font-bold text-text-muted hover:text-text transition-all hover:bg-surface-2 pl-2.5 pr-4 py-2.5 rounded-xl border border-border hover:border-border-hover group/back backdrop-blur-md whitespace-nowrap"
                         >
                             <ArrowLeft className="w-4 h-4 group-hover/back:-translate-x-0.5 transition-transform" />
                             <span>Back</span>
@@ -2730,7 +2730,7 @@ const SubjectDetail = () => {
 
                     {/* Center: Title (Maximum focus) */}
                     <div className="flex-[4] text-center min-w-0">
-                        <h1 className="text-[28px] md:text-[38px] lg:text-[46px] font-heading font-black text-white tracking-tighter leading-none truncate drop-shadow-2xl selection:bg-primary/30 py-1">
+                        <h1 className="text-[28px] md:text-[38px] lg:text-[46px] font-heading font-black text-text tracking-tighter leading-none truncate drop-shadow-2xl selection:bg-primary/30 py-1">
                             {subject?.name}
                         </h1>
                     </div>
@@ -2739,7 +2739,7 @@ const SubjectDetail = () => {
                     <div className="flex-1 flex justify-end">
                         <Link
                             to={`/subjects/${id}/reports`}
-                            className="flex items-center gap-2.5 text-[12px] font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer border border-indigo-500/10 bg-indigo-500/5 text-indigo-400 hover:text-white hover:bg-indigo-500/20 hover:border-indigo-500/30 group/anal shadow-lg shadow-indigo-500/5 backdrop-blur-sm whitespace-nowrap"
+                            className="flex items-center gap-2.5 text-[12px] font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer border border-indigo-500/10 bg-indigo-500/5 text-indigo-400 hover:text-text hover:bg-indigo-500/20 hover:border-indigo-500/30 group/anal shadow-lg shadow-indigo-500/5 backdrop-blur-sm whitespace-nowrap"
                         >
                             <BarChart3 className="w-3.5 h-3.5 text-indigo-400 group-hover/anal:scale-110 transition-transform" strokeWidth={2.5} />
                             <span className="hidden sm:inline">Analytics</span>
@@ -2751,7 +2751,7 @@ const SubjectDetail = () => {
                 {/* Optional small description below to keep the row height minimal */}
                 {subject?.description && (
                     <div className="max-w-2xl mx-auto mt-2 pb-1 text-center">
-                        <p className="text-slate-400/80 text-[13px] md:text-[14px] font-medium leading-relaxed truncate px-4">
+                        <p className="text-text-muted/80 text-[13px] md:text-[14px] font-medium leading-relaxed truncate px-4">
                             {subject.description}
                         </p>
                     </div>
@@ -2764,7 +2764,7 @@ const SubjectDetail = () => {
 
             {/* Controls (Sub-Nav) — Glass background wrapper */}
             <div className="relative mb-10">
-                <div className="flex items-center gap-1 p-2 bg-surface-2/60 backdrop-blur-sm border border-white/[0.1] rounded-[22px] overflow-x-auto no-scrollbar shadow-2xl">
+                <div className="flex items-center gap-1 p-2 bg-surface-2/60 backdrop-blur-sm border border-border-hover rounded-[22px] overflow-x-auto no-scrollbar shadow-2xl">
                     {[
                         { id: 'topics', label: 'Topics', icon: BookOpen },
                         { id: 'sessions', label: 'Sessions', icon: Activity },
@@ -2791,17 +2791,17 @@ const SubjectDetail = () => {
                                     onClick={() => setActiveTab(id)}
                                     className={`relative flex items-center gap-2 px-[18px] py-4 rounded-xl text-[14px] font-bold transition-all duration-200 cursor-pointer whitespace-nowrap shrink-0 group
                                         ${isActive
-                                            ? 'bg-white/[0.08] text-white shadow-sm'
-                                            : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.04]'
+                                            ? 'bg-surface-2 text-text shadow-sm'
+                                            : 'text-text-muted hover:text-text hover:bg-surface-2'
                                         }`}
                                 >
-                                    <Icon className={`w-4 h-4 transition-colors ${isActive ? 'text-primary' : 'text-slate-600 group-hover:text-slate-400'}`} />
+                                    <Icon className={`w-4 h-4 transition-colors ${isActive ? 'text-primary' : 'text-text-muted group-hover:text-text-muted'}`} />
                                     <span>{label}</span>
                                     {count !== undefined && count !== null && (
                                         <span className={`min-w-[20px] h-[20px] px-1.5 flex items-center justify-center rounded-full text-[10px] font-black leading-none transition-all
                                             ${isActive
                                                 ? 'bg-primary/20 text-primary'
-                                                : 'bg-white/[0.05] text-slate-600 group-hover:bg-white/[0.08] group-hover:text-slate-400'
+                                                : 'bg-surface-2 text-text-muted group-hover:bg-surface-2 group-hover:text-text-muted'
                                             }`}
                                         >
                                             {count}
@@ -2812,7 +2812,7 @@ const SubjectDetail = () => {
                                     )}
                                 </button>
                                 {index < array.length - 1 && (
-                                    <div className="w-px h-5 bg-white/[0.08] shrink-0" />
+                                    <div className="w-px h-5 bg-surface-2 shrink-0" />
                                 )}
                             </React.Fragment>
                         );
@@ -2823,10 +2823,10 @@ const SubjectDetail = () => {
             {/* Main Content Area */}
             {tabLoading && !loadedTabs.has(activeTab) ? (
                 <div className="fade-in space-y-6">
-                    <div className="h-12 w-full bg-white/[0.04] rounded-xl animate-pulse" />
+                    <div className="h-12 w-full bg-surface-2 rounded-xl animate-pulse" />
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {[...Array(3)].map((_, i) => (
-                            <div key={i} className="h-48 bg-white/[0.04] rounded-2xl animate-pulse" />
+                            <div key={i} className="h-48 bg-surface-2 rounded-2xl animate-pulse" />
                         ))}
                     </div>
                 </div>
@@ -2835,10 +2835,10 @@ const SubjectDetail = () => {
 
                     {activeTab === 'topics' && (
                         <div className="fade-in">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-border pb-4">
                                 <div className="flex items-center gap-2">
                                     <BookOpen className="w-6 h-6 text-indigo-400" />
-                                    <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Syllabus</h3>
+                                    <h3 className="text-[20px] font-heading font-bold text-text tracking-tight">Syllabus</h3>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2 ml-auto">
                                     <button
@@ -2859,7 +2859,7 @@ const SubjectDetail = () => {
                                             setTopicsDefaultExpanded(true);
                                             setTreeKey(prev => prev + 1);
                                         }}
-                                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-400 hover:text-primary hover:bg-primary/10 border border-white/5 transition-all cursor-pointer uppercase tracking-wider"
+                                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-text-muted hover:text-primary hover:bg-primary/10 border border-border transition-all cursor-pointer uppercase tracking-wider"
                                         title="Expand all"
                                     >
                                         <Maximize2 className="w-3.5 h-3.5" />
@@ -2870,7 +2870,7 @@ const SubjectDetail = () => {
                                             setTopicsDefaultExpanded(false);
                                             setTreeKey(prev => prev + 1);
                                         }}
-                                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white hover:bg-white/10 border border-white/5 transition-all cursor-pointer uppercase tracking-wider"
+                                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-text-muted hover:text-text hover:bg-surface-3 border border-border transition-all cursor-pointer uppercase tracking-wider"
                                         title="Collapse all"
                                     >
                                         <Minimize2 className="w-3.5 h-3.5" />
@@ -2886,12 +2886,12 @@ const SubjectDetail = () => {
                                 </div>
                             </div>
                             {topics.length === 0 ? (
-                                <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                    <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5">
+                                <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-border-hover flex flex-col items-center">
+                                    <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-border">
                                         <BookOpen className="w-10 h-10 text-indigo-500/70" />
                                     </div>
-                                    <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No topics yet</h3>
-                                    <p className="text-slate-400 text-sm max-w-sm leading-relaxed">
+                                    <h3 className="text-2xl font-heading font-bold text-text mb-2 tracking-tight">No topics yet</h3>
+                                    <p className="text-text-muted text-sm max-w-sm leading-relaxed">
                                         Build your syllabus by adding topics and subtopics to organize your study material.
                                     </p>
                                 </div>
@@ -2908,41 +2908,41 @@ const SubjectDetail = () => {
 
                     {activeTab === 'sessions' && (
                         <div className="fade-in">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-border pb-4">
                                 <div className="flex items-center gap-2">
                                     <Activity className="w-6 h-6 text-indigo-400" />
-                                    <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Study Sessions</h3>
+                                    <h3 className="text-[20px] font-heading font-bold text-text tracking-tight">Study Sessions</h3>
                                 </div>
                                 <div className="flex items-center gap-3 ml-auto">
                                     <div className="relative group flex-1 sm:min-w-[280px]">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-indigo-400 transition-colors" />
                                         <input
                                             type="text"
                                             value={sessionSearchQuery}
                                             onChange={(e) => setSessionSearchQuery(e.target.value)}
                                             placeholder="Search sessions..."
-                                            className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                                            className="w-full bg-surface-2/50 border border-border-hover rounded-xl py-2 pl-10 pr-4 text-[13px] text-text focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
                                         />
                                         {sessionSearchQuery && (
                                             <button
                                                 onClick={() => setSessionSearchQuery('')}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
                                             >
                                                 <X className="w-4 h-4" />
                                             </button>
                                         )}
                                     </div>
-                                    <div className="flex bg-surface-2/50 p-1 rounded-xl border border-white/[0.06] shrink-0">
+                                    <div className="flex bg-surface-2/50 p-1 rounded-xl border border-border shrink-0">
                                         <button
                                             onClick={() => setSessionsViewMode('grid')}
-                                            className={`p-1.5 rounded-lg transition-all ${sessionsViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                            className={`p-1.5 rounded-lg transition-all ${sessionsViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-text-muted hover:text-text'}`}
                                             title="Grid View"
                                         >
                                             <LayoutGrid className="w-4 h-4" />
                                         </button>
                                         <button
                                             onClick={() => setSessionsViewMode('list')}
-                                            className={`p-1.5 rounded-lg transition-all ${sessionsViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                            className={`p-1.5 rounded-lg transition-all ${sessionsViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-text-muted hover:text-text'}`}
                                             title="List View"
                                         >
                                             <List className="w-4 h-4" />
@@ -2960,12 +2960,12 @@ const SubjectDetail = () => {
 
 
                             {sessions.length === 0 ? (
-                                <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                    <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5">
+                                <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-border-hover flex flex-col items-center">
+                                    <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-border">
                                         <Activity className="w-10 h-10 text-violet-500/70" />
                                     </div>
-                                    <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No learning sessions</h3>
-                                    <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                    <h3 className="text-2xl font-heading font-bold text-text mb-2 tracking-tight">No learning sessions</h3>
+                                    <p className="text-text-muted text-sm max-w-sm leading-relaxed mb-8">
                                         You haven't recorded any sessions for this subject yet. Start a session to log your correct and incorrect topics.
                                     </p>
                                     <button
@@ -2981,9 +2981,9 @@ const SubjectDetail = () => {
                                     {(() => {
                                         if (filteredSessions.length === 0 && sessions.length > 0) {
                                             return (
-                                                <div className="col-span-full py-12 flex flex-col items-center justify-center text-center glass-panel rounded-2xl border-dashed border-white/10">
-                                                    <Search className="w-8 h-8 text-slate-600 mb-3" />
-                                                    <p className="text-slate-400 font-medium">No sessions match your search</p>
+                                                <div className="col-span-full py-12 flex flex-col items-center justify-center text-center glass-panel rounded-2xl border-dashed border-border-hover">
+                                                    <Search className="w-8 h-8 text-text-muted mb-3" />
+                                                    <p className="text-text-muted font-medium">No sessions match your search</p>
                                                     <button onClick={() => setSessionSearchQuery('')} className="mt-2 text-indigo-400 text-sm hover:underline">Clear search</button>
                                                 </div>
                                             );
@@ -3009,35 +3009,35 @@ const SubjectDetail = () => {
                     {activeTab === 'questions' && (
                         <div className="fade-in">
                             {/* Header for Questions */}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-border pb-4">
                                 <div className="flex items-center gap-2">
                                     <Puzzle className="w-6 h-6 text-indigo-400" />
-                                    <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Question Bank</h3>
+                                    <h3 className="text-[20px] font-heading font-bold text-text tracking-tight">Question Bank</h3>
                                 </div>
                                 <div className="flex items-center gap-3 ml-auto">
                                     {isSelectionMode ? (
-                                        <div className="flex items-center h-[50px] bg-[#1a1a1e] border border-white/[0.12] rounded-2xl px-2 shadow-[0_12px_40px_rgba(0,0,0,0.8)] transition-all animate-in fade-in zoom-in-95 duration-300 w-full sm:w-auto relative z-[999]">
-                                            <div className="flex items-center pl-3 pr-2 border-r border-white/[0.08] mr-2">
+                                        <div className="flex items-center h-[50px] bg-surface border border-border-hover rounded-2xl px-2 shadow-[0_12px_40px_rgba(0,0,0,0.8)] transition-all animate-in fade-in zoom-in-95 duration-300 w-full sm:w-auto relative z-[999]">
+                                            <div className="flex items-center pl-3 pr-2 border-r border-border mr-2">
                                                 <div className="w-6 h-6 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center text-[12px] font-bold mr-2">
                                                     {selectedItems.size}
                                                 </div>
-                                                <span className="text-[13px] text-slate-300 font-medium hidden sm:inline">selected</span>
+                                                <span className="text-[13px] text-text font-medium hidden sm:inline">selected</span>
                                             </div>
 
                                             <button
                                                 onClick={handleSelectAll}
-                                                className="text-[12px] font-medium text-slate-300 hover:text-white px-4 py-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+                                                className="text-[12px] font-medium text-text hover:text-text px-4 py-2 rounded-xl hover:bg-surface-3 transition-colors cursor-pointer"
                                             >
                                                 {selectedItems.size > 0 && selectedItems.size === groupedQuestions.flatMap(g => g.questions).length ? 'Clear' : 'Select All'}
                                             </button>
 
-                                            <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
+                                            <div className="w-px h-6 bg-surface-2 mx-2"></div>
 
                                             <div className="flex items-center gap-1 relative">
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); setShowExportMenu(!showExportMenu); }}
                                                     disabled={selectedItems.size === 0}
-                                                    className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all cursor-pointer ${showExportMenu ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
+                                                    className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all cursor-pointer ${showExportMenu ? 'bg-indigo-500 text-white shadow-lg' : 'text-text hover:bg-surface-3 hover:text-text'}`}
                                                 >
                                                     <Download className="w-4 h-4" />
                                                     <span className="text-[12px] font-medium hidden md:inline">Export</span>
@@ -3047,46 +3047,46 @@ const SubjectDetail = () => {
                                                 {showExportMenu && selectedItems.size > 0 && (
                                                     <div
                                                         onClick={(e) => e.stopPropagation()}
-                                                        className="absolute top-full right-0 mt-3 w-60 bg-[#1e1e22] border border-white/15 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in slide-in-from-top-3 z-[1000] backdrop-blur-2xl transition-all p-2 space-y-1 block"
+                                                        className="absolute top-full right-0 mt-3 w-60 bg-surface-2 border border-border-hover rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in slide-in-from-top-3 z-[1000] backdrop-blur-2xl transition-all p-2 space-y-1 block"
                                                     >
-                                                        <div className="px-3 py-2 border-b border-white/5 mb-1.5 leading-none">
-                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Select Export Format</span>
+                                                        <div className="px-3 py-2 border-b border-border mb-1.5 leading-none">
+                                                            <span className="text-[10px] font-bold text-text-muted uppercase tracking-[0.1em]">Select Export Format</span>
                                                         </div>
                                                         <button
                                                             onClick={() => { handleDownloadSelected(); setShowExportMenu(false); }}
-                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
+                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-text hover:text-text hover:bg-surface-3 rounded-xl transition-all cursor-pointer group"
                                                         >
                                                             <div className="flex items-center gap-2.5">
                                                                 <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
-                                                                    <FileText className="w-4 h-4 text-indigo-400" />
+                                                                    <FileText className="w-4 h-4 text-indigo-500 [.light_&]:text-indigo-600" />
                                                                 </div>
                                                                 <span>PDF Document</span>
                                                             </div>
-                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
+                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-text-muted opacity-0 group-hover:opacity-100 transition-all" />
                                                         </button>
                                                         <button
                                                             onClick={() => { handleDownloadWordSelected(); setShowExportMenu(false); }}
-                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
+                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-text hover:text-text hover:bg-surface-3 rounded-xl transition-all cursor-pointer group"
                                                         >
                                                             <div className="flex items-center gap-2.5">
                                                                 <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
-                                                                    <FileText className="w-4 h-4 text-emerald-400" />
+                                                                    <FileText className="w-4 h-4 text-emerald-500 [.light_&]:text-emerald-600" />
                                                                 </div>
                                                                 <span>Word Document</span>
                                                             </div>
-                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
+                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-text-muted opacity-0 group-hover:opacity-100 transition-all" />
                                                         </button>
                                                         <button
                                                             onClick={() => { handleDownloadMarkdownSelected(); setShowExportMenu(false); }}
-                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
+                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-text hover:text-text hover:bg-surface-3 rounded-xl transition-all cursor-pointer group"
                                                         >
                                                             <div className="flex items-center gap-2.5">
                                                                 <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center group-hover:bg-orange-500/20 transition-colors">
-                                                                    <FileText className="w-4 h-4 text-orange-400" />
+                                                                    <FileText className="w-4 h-4 text-orange-500 [.light_&]:text-orange-600" />
                                                                 </div>
                                                                 <span>Markdown File</span>
                                                             </div>
-                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
+                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-text-muted opacity-0 group-hover:opacity-100 transition-all" />
                                                         </button>
                                                     </div>
                                                 )}
@@ -3095,17 +3095,17 @@ const SubjectDetail = () => {
                                             <button
                                                 onClick={() => { setConfirmBulkDelete({ open: true, type: 'questions', count: selectedItems.size }); }}
                                                 disabled={selectedItems.size === 0}
-                                                className="flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:text-white hover:bg-rose-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:text-text hover:bg-rose-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                                 <span className="text-[12px] font-medium hidden md:inline">Delete</span>
                                             </button>
 
-                                            <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
+                                            <div className="w-px h-6 bg-surface-2 mx-2"></div>
 
                                             <button
                                                 onClick={() => { setIsSelectionMode(false); setSelectedItems(new Set()); }}
-                                                className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
+                                                className="w-10 h-10 flex items-center justify-center rounded-xl text-text-muted hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
                                                 title="Cancel Selection"
                                             >
                                                 <X className="w-4 h-4" />
@@ -3114,18 +3114,18 @@ const SubjectDetail = () => {
                                     ) : (
                                         <div className="flex items-center gap-3">
                                             <div className="relative group w-full sm:min-w-[280px] sm:w-auto">
-                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-indigo-400 transition-colors" />
                                                 <input
                                                     type="text"
                                                     value={searchQuery}
                                                     onChange={(e) => setSearchQuery(e.target.value)}
                                                     placeholder="Search content or tags..."
-                                                    className="w-full sm:w-[280px] bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                                                    className="w-full sm:w-[280px] bg-surface-2/50 border border-border-hover rounded-xl py-2 pl-10 pr-4 text-[13px] text-text focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
                                                 />
                                                 {searchQuery && (
                                                     <button
                                                         onClick={() => setSearchQuery('')}
-                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
                                                     >
                                                         <X className="w-4 h-4" />
                                                     </button>
@@ -3149,12 +3149,12 @@ const SubjectDetail = () => {
                                 {/* Questions List (Full Width) */}
                                 <div className="w-full">
                                     {questions.length === 0 ? (
-                                        <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                            <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 rotate-3">
+                                        <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-border-hover flex flex-col items-center">
+                                            <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-border rotate-3">
                                                 <Puzzle className="w-10 h-10 text-indigo-500/70" />
                                             </div>
-                                            <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">Your question bank is empty</h3>
-                                            <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                            <h3 className="text-2xl font-heading font-bold text-text mb-2 tracking-tight">Your question bank is empty</h3>
+                                            <p className="text-text-muted text-sm max-w-sm leading-relaxed mb-8">
                                                 Start adding questions from your books or notes. AI will automatically format them for better readability.
                                             </p>
                                             <button
@@ -3166,12 +3166,12 @@ const SubjectDetail = () => {
                                             </button>
                                         </div>
                                     ) : groupedQuestions.length === 0 ? (
-                                        <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                            <div className="w-16 h-16 rounded-2xl bg-surface-2 flex items-center justify-center mb-4 border border-white/5">
-                                                <Search className="w-8 h-8 text-slate-600" />
+                                        <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-border-hover flex flex-col items-center">
+                                            <div className="w-16 h-16 rounded-2xl bg-surface-2 flex items-center justify-center mb-4 border border-border">
+                                                <Search className="w-8 h-8 text-text-muted" />
                                             </div>
-                                            <h4 className="text-lg font-bold text-white mb-1">No matching questions</h4>
-                                            <p className="text-slate-500 text-sm">Try adjusting your search query or tags</p>
+                                            <h4 className="text-lg font-bold text-text mb-1">No matching questions</h4>
+                                            <p className="text-text-muted text-sm">Try adjusting your search query or tags</p>
                                             <button
                                                 onClick={() => setSearchQuery('')}
                                                 className="mt-6 text-indigo-400 hover:text-indigo-300 text-sm font-semibold"
@@ -3211,7 +3211,7 @@ const SubjectDetail = () => {
                                                                         {q.type === 'image' ? <ImageIcon className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
                                                                         {q.type === 'image' ? 'Image' : 'Text'}
                                                                     </span>
-                                                                    <span className="text-[10px] text-slate-500 font-medium mt-1">
+                                                                    <span className="text-[10px] text-text-muted font-medium mt-1">
                                                                         {new Date(q.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
                                                                     </span>
                                                                 </div>
@@ -3247,7 +3247,7 @@ const SubjectDetail = () => {
                                                                                 setShowSolutionModal(true);
                                                                             }
                                                                         }}
-                                                                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${solutions.some(s => s.question_id === q.id) ? 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20' : 'bg-slate-500/5 border-white/5 text-slate-400 hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/5'} cursor-pointer uppercase tracking-tight`}
+                                                                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${solutions.some(s => s.question_id === q.id) ? 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20' : 'bg-surface-2 border-border text-text-muted hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/5'} cursor-pointer uppercase tracking-tight`}
                                                                     >
                                                                         <Puzzle className="w-3 h-3" />
                                                                         <span>{solutions.some(s => s.question_id === q.id) ? "Solution" : "Solution"}</span>
@@ -3259,7 +3259,7 @@ const SubjectDetail = () => {
                                                                             setSelectedQuestionIdForNote(q.id);
                                                                             setShowNoteModal(true);
                                                                         }}
-                                                                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border bg-slate-500/5 border-white/5 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/30 hover:bg-emerald-500/5 cursor-pointer uppercase tracking-tight"
+                                                                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border bg-surface-2 border-border text-text-muted hover:text-emerald-400 hover:border-emerald-500/30 hover:bg-emerald-500/5 cursor-pointer uppercase tracking-tight"
                                                                     >
                                                                         <PlusCircle className="w-3 h-3" />
                                                                         <span>Note</span>
@@ -3278,8 +3278,8 @@ const SubjectDetail = () => {
                                                                             }}
                                                                             className="absolute inset-0 flex items-center justify-center z-20 cursor-pointer"
                                                                         >
-                                                                            <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${selectedItems.has(q.id) ? 'bg-indigo-500 border-indigo-500 scale-110 shadow-lg shadow-indigo-500/20' : 'border-slate-500 bg-slate-900/50 hover:border-indigo-400'}`}>
-                                                                                {selectedItems.has(q.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                                                                            <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${selectedItems.has(q.id) ? 'bg-indigo-500 border-indigo-500 scale-110 shadow-lg shadow-indigo-500/20' : 'border-slate-500 bg-surface-2 hover:border-indigo-400'}`}>
+                                                                                {selectedItems.has(q.id) && <CheckCircle className="w-3.5 h-3.5 text-text" />}
                                                                             </div>
                                                                         </div>
                                                                     )}
@@ -3288,7 +3288,7 @@ const SubjectDetail = () => {
                                                                             e.stopPropagation();
                                                                             setActiveQuestionDropdown(activeQuestionDropdown === q.id ? null : q.id);
                                                                         }}
-                                                                        className={`w-full h-full flex items-center justify-center rounded-lg transition-all cursor-pointer ${activeQuestionDropdown === q.id ? 'bg-white/10 text-indigo-400' : 'text-slate-500 hover:text-white hover:bg-white/5'} ${isSelectionMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+                                                                        className={`w-full h-full flex items-center justify-center rounded-lg transition-all cursor-pointer ${activeQuestionDropdown === q.id ? 'bg-surface-3 text-indigo-400' : 'text-text-muted hover:text-text hover:bg-surface-3'} ${isSelectionMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
                                                                         title="More Options"
                                                                     >
                                                                         <MoreVertical className="w-4 h-4" />
@@ -3296,7 +3296,7 @@ const SubjectDetail = () => {
                                                                     {/* ... dropdown content same as before ... */}
                                                                     {activeQuestionDropdown === q.id && (
                                                                         <div
-                                                                            className="absolute right-0 top-full mt-2 w-48 glass rounded-xl border border-white/10 shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+                                                                            className="absolute right-0 top-full mt-2 w-48 glass rounded-xl border border-border-hover shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
                                                                             onClick={(e) => e.stopPropagation()}
                                                                         >
                                                                             <button
@@ -3306,7 +3306,7 @@ const SubjectDetail = () => {
                                                                                     setSelectedItems(new Set([q.id]));
                                                                                     setActiveQuestionDropdown(null);
                                                                                 }}
-                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-slate-100 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-text hover:text-text hover:bg-surface-3 transition-colors text-left"
                                                                             >
                                                                                 <CheckCircle className="w-5 h-5 text-indigo-400" />
                                                                                 <span>Select Question</span>
@@ -3318,19 +3318,19 @@ const SubjectDetail = () => {
                                                                                     setEditingQuestion(q);
                                                                                     setShowEditQuestionModal(true);
                                                                                 }}
-                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-slate-100 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-text hover:text-text hover:bg-surface-3 transition-colors text-left"
                                                                             >
                                                                                 <Pencil className="w-5 h-5 text-indigo-400" />
                                                                                 <span>Edit Question</span>
                                                                             </button>
-                                                                            <div className="h-px bg-white/5 my-1" />
+                                                                            <div className="h-px bg-surface-3 my-1" />
                                                                             <button
                                                                                 onClick={(e) => {
                                                                                     e.stopPropagation();
                                                                                     setActiveQuestionDropdown(null);
                                                                                     setConfirmDeleteQuestion({ open: true, questionId: q.id });
                                                                                 }}
-                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-slate-100 hover:text-red-400 hover:bg-red-500/10 transition-colors text-left"
+                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-text hover:text-red-400 hover:bg-red-500/10 transition-colors text-left"
                                                                             >
                                                                                 <Trash2 className="w-5 h-5 text-red-400" />
                                                                                 <span>Delete Question</span>
@@ -3341,7 +3341,7 @@ const SubjectDetail = () => {
                                                             </div>
 
                                                             <div className="question-card-body">
-                                                                <div className="prose prose-invert prose-lg max-w-none text-slate-200 text-[15px] leading-[1.7] mb-6">
+                                                                <div className="prose prose-invert prose-lg max-w-none text-text text-[15px] leading-[1.7] mb-6">
                                                                     {q.formatted_content && q.formatted_content.root ? (
                                                                         <RichTextRenderer content={q.formatted_content} />
                                                                     ) : (
@@ -3358,21 +3358,21 @@ const SubjectDetail = () => {
                                                                     <div className="mt-4 mb-6 relative group/img-container w-fit">
                                                                         {fetchedImages[q.id] || fetchedImages[q.source_image_id] ? (
                                                                             <div className="relative">
-                                                                                <div className="rounded-xl overflow-hidden border border-white/10 inline-block bg-black/40 group/img relative shadow-lg">
+                                                                                <div className="rounded-xl overflow-hidden border border-border-hover inline-block bg-surface-3 group/img relative shadow-lg">
                                                                                     <img
                                                                                         src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
                                                                                         alt="Original Question"
                                                                                         className="max-h-80 object-contain transition-all group-hover/img:opacity-50"
                                                                                     />
                                                                                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
-                                                                                        <span className="bg-black/60 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/10 backdrop-blur-sm">
+                                                                                        <span className="bg-surface-3 text-text text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-border-hover backdrop-blur-sm">
                                                                                             Reference Image
                                                                                         </span>
                                                                                     </div>
                                                                                 </div>
                                                                                 <button
                                                                                     onClick={() => handleHideImage(q.id)}
-                                                                                    className="absolute -top-2 -right-2 p-1.5 bg-slate-800/95 text-slate-400 hover:text-white rounded-full border border-white/10 shadow-xl opacity-0 group-hover/img-container:opacity-100 transition-all cursor-pointer z-10"
+                                                                                    className="absolute -top-2 -right-2 p-1.5 bg-surface-2 text-text-muted hover:text-text rounded-full border border-border-hover shadow-xl opacity-0 group-hover/img-container:opacity-100 transition-all cursor-pointer z-10"
                                                                                     title="Hide Image"
                                                                                 >
                                                                                     <X className="w-3.5 h-3.5" />
@@ -3382,7 +3382,7 @@ const SubjectDetail = () => {
                                                                             <button
                                                                                 onClick={() => handleFetchImage(q.id)}
                                                                                 disabled={fetchingImageId === q.id}
-                                                                                className="flex items-center gap-2.5 px-4 py-2 rounded-xl text-[12px] font-bold bg-indigo-500/5 text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all border border-indigo-500/10 shadow-sm disabled:opacity-50 cursor-pointer uppercase tracking-tight"
+                                                                                className="flex items-center gap-2.5 px-4 py-2 rounded-xl text-[12px] font-bold bg-indigo-500/5 text-text-muted hover:text-indigo-400 hover:bg-indigo-500/10 transition-all border border-indigo-500/10 shadow-sm disabled:opacity-50 cursor-pointer uppercase tracking-tight"
                                                                             >
                                                                                 {fetchingImageId === q.id ? (
                                                                                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -3398,9 +3398,9 @@ const SubjectDetail = () => {
                                                                 )}
 
                                                                 {q.parsedTags && q.parsedTags.length > 0 && (
-                                                                    <div className="flex flex-wrap gap-2 pt-2 border-t border-white/[0.03]">
+                                                                    <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
                                                                         {q.parsedTags.map((tag, idx) => (
-                                                                            <span key={idx} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-3/50 border border-white/5 text-[10px] font-semibold text-slate-400 lowercase tracking-tight">
+                                                                            <span key={idx} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-3/50 border border-border text-[10px] font-semibold text-text-muted lowercase tracking-tight">
                                                                                 <Hash className="w-2.5 h-2.5 text-indigo-500/50" />
                                                                                 {tag}
                                                                             </span>
@@ -3418,35 +3418,35 @@ const SubjectDetail = () => {
                                                     <div key={group.rootId} className="flex flex-col gap-3">
                                                         <div
                                                             onClick={() => toggleGroup(group.rootId)}
-                                                            className="flex items-center justify-between p-4 rounded-xl bg-surface-2 border border-white/[0.06] cursor-pointer hover:bg-surface-3 transition-colors group/header"
+                                                            className="flex items-center justify-between p-4 rounded-xl bg-surface-2 border border-border cursor-pointer hover:bg-surface-3 transition-colors group/header"
                                                         >
                                                             <div className="flex items-center gap-4">
                                                                 <div className="p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
-                                                                    {rootQ.type === 'image' ? <ImageIcon className="w-5 h-5 text-indigo-400" /> : <FileText className="w-5 h-5 text-emerald-400" />}
+                                                                    {rootQ.type === 'image' ? <ImageIcon className="w-5 h-5 text-indigo-500 [.light_&]:text-indigo-600" /> : <FileText className="w-5 h-5 text-emerald-500 [.light_&]:text-emerald-600" />}
                                                                 </div>
                                                                 <div>
                                                                     <div className="flex items-center gap-3">
-                                                                        <h4 className="text-[15px] font-heading font-bold text-white tracking-tight">
+                                                                        <h4 className="text-[15px] font-heading font-bold text-text tracking-tight">
                                                                             {rootQ.type === 'image' ? 'Image' : 'Text'} Collection
                                                                         </h4>
-                                                                        <span className="px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                                                                        <span className="px-2 py-0.5 rounded-full bg-surface-2 border border-border text-[11px] font-bold text-text-muted uppercase tracking-widest">
                                                                             {group.questions.length} Items
                                                                         </span>
                                                                     </div>
-                                                                    <p className="text-[12px] text-slate-500 mt-0.5">
+                                                                    <p className="text-[12px] text-text-muted mt-0.5">
                                                                         Uploaded {new Date(group.newestAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
                                                                     </p>
                                                                 </div>
                                                             </div>
                                                             <div className="flex items-center gap-3">
-                                                                <div className={`p-2 rounded-lg bg-white/[0.03] text-slate-500 group-hover/header:text-white transition-all ${isExpanded ? 'rotate-180' : ''}`}>
+                                                                <div className={`p-2 rounded-lg bg-surface-2 text-text-muted group-hover/header:text-text transition-all ${isExpanded ? 'rotate-180' : ''}`}>
                                                                     <ChevronDown className="w-4 h-4" />
                                                                 </div>
                                                             </div>
                                                         </div>
 
                                                         {isExpanded && (
-                                                            <div className="flex flex-col gap-5 pl-8 border-l-2 border-white/[0.06] mt-2 mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                            <div className="flex flex-col gap-5 pl-8 border-l-2 border-border mt-2 mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
                                                                 {group.questions.map((q, qidx) => {
                                                                     const existingAINote = notes.find(n => n.question_id === q.id && n.title?.startsWith('AI Note'));
                                                                     return (
@@ -3471,7 +3471,7 @@ const SubjectDetail = () => {
                                                                                         {q.type === 'image' ? <ImageIcon className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
                                                                                         {q.type === 'image' ? 'Image' : 'Text'}
                                                                                     </span>
-                                                                                    <span className="text-[10px] text-slate-500 font-medium mt-1">
+                                                                                    <span className="text-[10px] text-text-muted font-medium mt-1">
                                                                                         {new Date(q.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
                                                                                     </span>
                                                                                 </div>
@@ -3507,7 +3507,7 @@ const SubjectDetail = () => {
                                                                                                 setShowSolutionModal(true);
                                                                                             }
                                                                                         }}
-                                                                                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${solutions.some(s => s.question_id === q.id) ? 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20' : 'bg-slate-500/5 border-white/5 text-slate-400 hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/5'} cursor-pointer uppercase tracking-tight`}
+                                                                                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${solutions.some(s => s.question_id === q.id) ? 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20' : 'bg-surface-2 border-border text-text-muted hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/5'} cursor-pointer uppercase tracking-tight`}
                                                                                     >
                                                                                         <Puzzle className="w-3 h-3" />
                                                                                         <span>{solutions.some(s => s.question_id === q.id) ? "Ans" : "Ans"}</span>
@@ -3519,7 +3519,7 @@ const SubjectDetail = () => {
                                                                                             setSelectedQuestionIdForNote(q.id);
                                                                                             setShowNoteModal(true);
                                                                                         }}
-                                                                                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border bg-slate-500/5 border-white/5 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/30 hover:bg-emerald-500/5 cursor-pointer uppercase tracking-tight"
+                                                                                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border bg-surface-2 border-border text-text-muted hover:text-emerald-400 hover:border-emerald-500/30 hover:bg-emerald-500/5 cursor-pointer uppercase tracking-tight"
                                                                                     >
                                                                                         <PlusCircle className="w-3 h-3" />
                                                                                         <span>Note</span>
@@ -3538,8 +3538,8 @@ const SubjectDetail = () => {
                                                                                             }}
                                                                                             className="absolute inset-0 flex items-center justify-center z-20 cursor-pointer"
                                                                                         >
-                                                                                            <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${selectedItems.has(q.id) ? 'bg-indigo-500 border-indigo-500 scale-110 shadow-lg shadow-indigo-500/20' : 'border-slate-500 bg-slate-900/50 hover:border-indigo-400'}`}>
-                                                                                                {selectedItems.has(q.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                                                                                            <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${selectedItems.has(q.id) ? 'bg-indigo-500 border-indigo-500 scale-110 shadow-lg shadow-indigo-500/20' : 'border-slate-500 bg-surface-2 hover:border-indigo-400'}`}>
+                                                                                                {selectedItems.has(q.id) && <CheckCircle className="w-3.5 h-3.5 text-text" />}
                                                                                             </div>
                                                                                         </div>
                                                                                     )}
@@ -3548,7 +3548,7 @@ const SubjectDetail = () => {
                                                                                             e.stopPropagation();
                                                                                             setActiveQuestionDropdown(activeQuestionDropdown === q.id ? null : q.id);
                                                                                         }}
-                                                                                        className={`w-full h-full flex items-center justify-center rounded-lg transition-all cursor-pointer ${activeQuestionDropdown === q.id ? 'bg-white/10 text-indigo-400' : 'text-slate-500 hover:text-white hover:bg-white/5'} ${isSelectionMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+                                                                                        className={`w-full h-full flex items-center justify-center rounded-lg transition-all cursor-pointer ${activeQuestionDropdown === q.id ? 'bg-surface-3 text-indigo-400' : 'text-text-muted hover:text-text hover:bg-surface-3'} ${isSelectionMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
                                                                                         title="More Options"
                                                                                     >
                                                                                         <MoreVertical className="w-4 h-4" />
@@ -3556,7 +3556,7 @@ const SubjectDetail = () => {
 
                                                                                     {activeQuestionDropdown === q.id && (
                                                                                         <div
-                                                                                            className="absolute right-0 top-full mt-2 w-48 glass rounded-xl border border-white/10 shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+                                                                                            className="absolute right-0 top-full mt-2 w-48 glass rounded-xl border border-border-hover shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
                                                                                             onClick={(e) => e.stopPropagation()}
                                                                                         >
                                                                                             <button
@@ -3566,7 +3566,7 @@ const SubjectDetail = () => {
                                                                                                     setSelectedItems(new Set([q.id]));
                                                                                                     setActiveQuestionDropdown(null);
                                                                                                 }}
-                                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-slate-100 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-text hover:text-text hover:bg-surface-3 transition-colors text-left"
                                                                                             >
                                                                                                 <CheckCircle className="w-5 h-5 text-indigo-400" />
                                                                                                 <span>Select Question</span>
@@ -3578,19 +3578,19 @@ const SubjectDetail = () => {
                                                                                                     setEditingQuestion(q);
                                                                                                     setShowEditQuestionModal(true);
                                                                                                 }}
-                                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-slate-100 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-text hover:text-text hover:bg-surface-3 transition-colors text-left"
                                                                                             >
                                                                                                 <Pencil className="w-5 h-5 text-indigo-400" />
                                                                                                 <span>Edit Details</span>
                                                                                             </button>
-                                                                                            <div className="h-px bg-white/5 my-1" />
+                                                                                            <div className="h-px bg-surface-3 my-1" />
                                                                                             <button
                                                                                                 onClick={(e) => {
                                                                                                     e.stopPropagation();
                                                                                                     setActiveQuestionDropdown(null);
                                                                                                     setConfirmDeleteQuestion({ open: true, questionId: q.id });
                                                                                                 }}
-                                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-slate-100 hover:text-red-400 hover:bg-red-500/10 transition-colors text-left"
+                                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-text hover:text-red-400 hover:bg-red-500/10 transition-colors text-left"
                                                                                             >
                                                                                                 <Trash2 className="w-5 h-5 text-red-400" />
                                                                                                 <span>Delete Question</span>
@@ -3601,7 +3601,7 @@ const SubjectDetail = () => {
                                                                             </div>
 
                                                                             <div className="question-card-body">
-                                                                                <div className="prose prose-invert prose-lg max-w-none text-slate-200 text-[15px] leading-[1.7] mb-6">
+                                                                                <div className="prose prose-invert prose-lg max-w-none text-text text-[15px] leading-[1.7] mb-6">
                                                                                     {q.formatted_content && q.formatted_content.root ? (
                                                                                         <RichTextRenderer content={q.formatted_content} />
                                                                                     ) : (
@@ -3618,21 +3618,21 @@ const SubjectDetail = () => {
                                                                                     <div className="mt-4 mb-6 relative group/img-container w-fit">
                                                                                         {fetchedImages[q.id] || fetchedImages[q.source_image_id] ? (
                                                                                             <div className="relative">
-                                                                                                <div className="rounded-xl overflow-hidden border border-white/10 inline-block bg-black/40 group/img relative shadow-lg">
+                                                                                                <div className="rounded-xl overflow-hidden border border-border-hover inline-block bg-surface-3 group/img relative shadow-lg">
                                                                                                     <img
                                                                                                         src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
                                                                                                         alt="Original Question"
                                                                                                         className="max-h-80 object-contain transition-all group-hover/img:opacity-50"
                                                                                                     />
                                                                                                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
-                                                                                                        <span className="bg-black/60 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/10 backdrop-blur-sm">
+                                                                                                        <span className="bg-surface-3 text-text text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-border-hover backdrop-blur-sm">
                                                                                                             Shared Image
                                                                                                         </span>
                                                                                                     </div>
                                                                                                 </div>
                                                                                                 <button
                                                                                                     onClick={() => handleHideImage(q.id)}
-                                                                                                    className="absolute -top-2 -right-2 p-1.5 bg-slate-800/95 text-slate-400 hover:text-white rounded-full border border-white/10 shadow-xl opacity-0 group-hover/img-container:opacity-100 transition-all cursor-pointer z-10"
+                                                                                                    className="absolute -top-2 -right-2 p-1.5 bg-surface-2 text-text-muted hover:text-text rounded-full border border-border-hover shadow-xl opacity-0 group-hover/img-container:opacity-100 transition-all cursor-pointer z-10"
                                                                                                     title="Hide Image"
                                                                                                 >
                                                                                                     <X className="w-3.5 h-3.5" />
@@ -3642,7 +3642,7 @@ const SubjectDetail = () => {
                                                                                             <button
                                                                                                 onClick={() => handleFetchImage(q.id)}
                                                                                                 disabled={fetchingImageId === q.id}
-                                                                                                className="flex items-center gap-2.5 px-4 py-2 rounded-xl text-[12px] font-bold bg-indigo-500/5 text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10 transition-all border border-emerald-500/10 shadow-sm disabled:opacity-50 cursor-pointer uppercase tracking-tight"
+                                                                                                className="flex items-center gap-2.5 px-4 py-2 rounded-xl text-[12px] font-bold bg-indigo-500/5 text-text-muted hover:text-emerald-400 hover:bg-emerald-400/10 transition-all border border-emerald-500/10 shadow-sm disabled:opacity-50 cursor-pointer uppercase tracking-tight"
                                                                                             >
                                                                                                 {fetchingImageId === q.id ? (
                                                                                                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -3658,9 +3658,9 @@ const SubjectDetail = () => {
                                                                                 )}
 
                                                                                 {q.parsedTags && q.parsedTags.length > 0 && (
-                                                                                    <div className="flex flex-wrap gap-2 pt-2 border-t border-white/[0.03]">
+                                                                                    <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
                                                                                         {q.parsedTags.map((tag, idx) => (
-                                                                                            <span key={idx} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-3/50 border border-white/5 text-[10px] font-semibold text-slate-400 lowercase tracking-tight">
+                                                                                            <span key={idx} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-3/50 border border-border text-[10px] font-semibold text-text-muted lowercase tracking-tight">
                                                                                                 <Hash className="w-2.5 h-2.5 text-emerald-500/50" />
                                                                                                 {tag}
                                                                                             </span>
@@ -3686,35 +3686,35 @@ const SubjectDetail = () => {
 
                     {activeTab === 'notes' && (
                         <div className="fade-in">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-border pb-4">
                                 <div className="flex items-center gap-2">
-                                    <FileText className="w-6 h-6 text-indigo-400" />
-                                    <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Notes</h3>
+                                    <FileText className="w-6 h-6 text-indigo-500 [.light_&]:text-indigo-600" />
+                                    <h3 className="text-[20px] font-heading font-bold text-text tracking-tight">Notes</h3>
                                 </div>
                                 <div className="flex items-center gap-3 ml-auto">
                                     {isSelectionMode ? (
-                                        <div className="flex items-center h-[50px] bg-[#1a1a1e] border border-white/[0.12] rounded-2xl px-2 shadow-[0_12px_40px_rgba(0,0,0,0.8)] transition-all animate-in fade-in zoom-in-95 duration-300 w-full sm:w-auto relative z-[999]">
-                                            <div className="flex items-center pl-3 pr-2 border-r border-white/[0.08] mr-2">
+                                        <div className="flex items-center h-[50px] bg-surface border border-border-hover rounded-2xl px-2 shadow-[0_12px_40px_rgba(0,0,0,0.8)] transition-all animate-in fade-in zoom-in-95 duration-300 w-full sm:w-auto relative z-[999]">
+                                            <div className="flex items-center pl-3 pr-2 border-r border-border mr-2">
                                                 <div className="w-6 h-6 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center text-[12px] font-bold mr-2">
                                                     {selectedItems.size}
                                                 </div>
-                                                <span className="text-[13px] text-slate-300 font-medium hidden sm:inline">selected</span>
+                                                <span className="text-[13px] text-text font-medium hidden sm:inline">selected</span>
                                             </div>
 
                                             <button
                                                 onClick={handleSelectAll}
-                                                className="text-[12px] font-medium text-slate-300 hover:text-white px-4 py-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+                                                className="text-[12px] font-medium text-text hover:text-text px-4 py-2 rounded-xl hover:bg-surface-3 transition-colors cursor-pointer"
                                             >
                                                 {selectedItems.size > 0 && selectedItems.size === filteredNotes.length ? 'Clear' : 'Select All'}
                                             </button>
 
-                                            <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
+                                            <div className="w-px h-6 bg-surface-2 mx-2"></div>
 
                                             <div className="flex items-center gap-1 relative">
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); setShowExportMenu(!showExportMenu); }}
                                                     disabled={selectedItems.size === 0}
-                                                    className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all cursor-pointer ${showExportMenu ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
+                                                    className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all cursor-pointer ${showExportMenu ? 'bg-indigo-500 text-white shadow-lg' : 'text-text hover:bg-surface-3 hover:text-text'}`}
                                                 >
                                                     <Download className="w-4 h-4" />
                                                     <span className="text-[12px] font-medium hidden md:inline">Export</span>
@@ -3724,46 +3724,46 @@ const SubjectDetail = () => {
                                                 {showExportMenu && selectedItems.size > 0 && (
                                                     <div
                                                         onClick={(e) => e.stopPropagation()}
-                                                        className="absolute top-full right-0 mt-3 w-60 bg-[#1e1e22] border border-white/15 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in slide-in-from-top-3 z-[1000] backdrop-blur-2xl transition-all p-2 space-y-1 block"
+                                                        className="absolute top-full right-0 mt-3 w-60 bg-surface-2 border border-border-hover rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in slide-in-from-top-3 z-[1000] backdrop-blur-2xl transition-all p-2 space-y-1 block"
                                                     >
-                                                        <div className="px-3 py-2 border-b border-white/5 mb-1.5 leading-none">
-                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Select Export Format</span>
+                                                        <div className="px-3 py-2 border-b border-border mb-1.5 leading-none">
+                                                            <span className="text-[10px] font-bold text-text-muted uppercase tracking-[0.1em]">Select Export Format</span>
                                                         </div>
                                                         <button
                                                             onClick={() => { handleDownloadSelected(); setShowExportMenu(false); }}
-                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
+                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-text hover:text-text hover:bg-surface-3 rounded-xl transition-all cursor-pointer group"
                                                         >
                                                             <div className="flex items-center gap-2.5">
                                                                 <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
-                                                                    <FileText className="w-4 h-4 text-indigo-400" />
+                                                                    <FileText className="w-4 h-4 text-indigo-500 [.light_&]:text-indigo-600" />
                                                                 </div>
                                                                 <span>PDF Document</span>
                                                             </div>
-                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
+                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-text-muted opacity-0 group-hover:opacity-100 transition-all" />
                                                         </button>
                                                         <button
                                                             onClick={() => { handleDownloadWordSelected(); setShowExportMenu(false); }}
-                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
+                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-text hover:text-text hover:bg-surface-3 rounded-xl transition-all cursor-pointer group"
                                                         >
                                                             <div className="flex items-center gap-2.5">
                                                                 <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
-                                                                    <FileText className="w-4 h-4 text-emerald-400" />
+                                                                    <FileText className="w-4 h-4 text-emerald-500 [.light_&]:text-emerald-600" />
                                                                 </div>
                                                                 <span>Word Document</span>
                                                             </div>
-                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
+                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-text-muted opacity-0 group-hover:opacity-100 transition-all" />
                                                         </button>
                                                         <button
                                                             onClick={() => { handleDownloadMarkdownSelected(); setShowExportMenu(false); }}
-                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
+                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-text hover:text-text hover:bg-surface-3 rounded-xl transition-all cursor-pointer group"
                                                         >
                                                             <div className="flex items-center gap-2.5">
                                                                 <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center group-hover:bg-orange-500/20 transition-colors">
-                                                                    <FileText className="w-4 h-4 text-orange-400" />
+                                                                    <FileText className="w-4 h-4 text-orange-500 [.light_&]:text-orange-600" />
                                                                 </div>
                                                                 <span>Markdown File</span>
                                                             </div>
-                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
+                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-text-muted opacity-0 group-hover:opacity-100 transition-all" />
                                                         </button>
                                                     </div>
                                                 )}
@@ -3772,17 +3772,17 @@ const SubjectDetail = () => {
                                             <button
                                                 onClick={() => { setConfirmBulkDelete({ open: true, type: 'notes', count: selectedItems.size }); setShowExportMenu(false); }}
                                                 disabled={selectedItems.size === 0}
-                                                className="flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:text-white hover:bg-rose-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:text-text hover:bg-rose-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                                 <span className="text-[12px] font-medium hidden md:inline">Delete</span>
                                             </button>
 
-                                            <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
+                                            <div className="w-px h-6 bg-surface-2 mx-2"></div>
 
                                             <button
                                                 onClick={() => { setIsSelectionMode(false); setSelectedItems(new Set()); setShowExportMenu(false); }}
-                                                className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
+                                                className="w-10 h-10 flex items-center justify-center rounded-xl text-text-muted hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
                                                 title="Cancel Selection"
                                             >
                                                 <X className="w-4 h-4" />
@@ -3791,18 +3791,18 @@ const SubjectDetail = () => {
                                     ) : (
                                         <div className="flex items-center gap-3">
                                             <div className="relative group flex-1 sm:min-w-[280px]">
-                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-indigo-400 transition-colors" />
                                                 <input
                                                     type="text"
                                                     value={noteSearchQuery}
                                                     onChange={(e) => setNoteSearchQuery(e.target.value)}
                                                     placeholder="Search notes..."
-                                                    className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                                                    className="w-full bg-surface-2/50 border border-border-hover rounded-xl py-2 pl-10 pr-4 text-[13px] text-text focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
                                                 />
                                                 {noteSearchQuery && (
                                                     <button
                                                         onClick={() => setNoteSearchQuery('')}
-                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
                                                     >
                                                         <X className="w-4 h-4" />
                                                     </button>
@@ -3812,7 +3812,7 @@ const SubjectDetail = () => {
                                                 <select
                                                     value={selectedNoteTag}
                                                     onChange={(e) => setSelectedNoteTag(e.target.value)}
-                                                    className="bg-surface-2/50 border border-white/[0.08] text-slate-200 rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all appearance-none cursor-pointer pr-10 hover:border-white/[0.15]"
+                                                    className="bg-surface-2/50 border border-border text-text rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all appearance-none cursor-pointer pr-10 hover:border-border-hover"
                                                     style={{
                                                         backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(148, 163, 184, 1)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
                                                         backgroundRepeat: 'no-repeat',
@@ -3826,17 +3826,17 @@ const SubjectDetail = () => {
                                                     ))}
                                                 </select>
                                             )}
-                                            <div className="flex bg-surface-2/50 p-1 rounded-xl border border-white/[0.06] shrink-0">
+                                            <div className="flex bg-surface-2/50 p-1 rounded-xl border border-border shrink-0">
                                                 <button
                                                     onClick={() => setNotesViewMode('grid')}
-                                                    className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                                    className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-text-muted hover:text-text'}`}
                                                     title="Grid View"
                                                 >
                                                     <LayoutGrid className="w-4 h-4" />
                                                 </button>
                                                 <button
                                                     onClick={() => setNotesViewMode('list')}
-                                                    className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                                    className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-text-muted hover:text-text'}`}
                                                     title="List View"
                                                 >
                                                     <List className="w-4 h-4" />
@@ -3857,12 +3857,12 @@ const SubjectDetail = () => {
 
                             <div className="w-full">
                                 {notes.length === 0 ? (
-                                    <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                        <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 -rotate-3">
+                                    <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-border-hover flex flex-col items-center">
+                                        <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-border -rotate-3">
                                             <FileText className="w-10 h-10 text-emerald-500/70" />
                                         </div>
-                                        <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No notes yet</h3>
-                                        <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                        <h3 className="text-2xl font-heading font-bold text-text mb-2 tracking-tight">No notes yet</h3>
+                                        <p className="text-text-muted text-sm max-w-sm leading-relaxed mb-8">
                                             Add your first note to start building your knowledge base.
                                         </p>
                                         <button
@@ -3883,9 +3883,9 @@ const SubjectDetail = () => {
 
                                             if (filtered.length === 0 && notes.length > 0) {
                                                 return (
-                                                    <div className="col-span-full py-12 flex flex-col items-center justify-center text-center glass-panel rounded-2xl border-dashed border-white/10">
-                                                        <Search className="w-8 h-8 text-slate-600 mb-3" />
-                                                        <p className="text-slate-400 font-medium">No notes match your search</p>
+                                                    <div className="col-span-full py-12 flex flex-col items-center justify-center text-center glass-panel rounded-2xl border-dashed border-border-hover">
+                                                        <Search className="w-8 h-8 text-text-muted mb-3" />
+                                                        <p className="text-text-muted font-medium">No notes match your search</p>
                                                         <button onClick={() => setNoteSearchQuery('')} className="mt-2 text-indigo-400 text-sm hover:underline">Clear search</button>
                                                     </div>
                                                 );
@@ -3895,7 +3895,7 @@ const SubjectDetail = () => {
                                                 <div
                                                     key={note.id}
                                                     id={`note-${note.id}`}
-                                                    className={`glass-panel rounded-2xl border transition-all flex group relative ${highlightedNoteId == note.id ? 'ring-4 ring-emerald-500 scale-[1.02] shadow-[0_0_40px_rgba(16,185,129,0.5)] z-[100] border-emerald-400 opacity-100' : ''} ${notesViewMode === 'list' ? 'items-center py-4 px-6 gap-6' : 'flex-col p-6'} ${activeNoteDropdown === note.id ? 'border-emerald-500/40 shadow-xl' : ''} ${isSelectionMode ? (selectedItems.has(note.id) ? 'border-indigo-400 bg-indigo-500/10 cursor-pointer shadow-[0_0_15px_rgba(99,102,241,0.2)]' : 'border-white/[0.06] hover:border-white/[0.1] cursor-pointer') : 'border-white/[0.06] hover:border-emerald-500/30 hover:bg-white/[0.015] cursor-pointer'}`}
+                                                    className={`glass-panel rounded-2xl border transition-all flex group relative ${highlightedNoteId == note.id ? 'ring-4 ring-emerald-500 scale-[1.02] shadow-[0_0_40px_rgba(16,185,129,0.5)] z-[100] border-emerald-400 opacity-100' : ''} ${notesViewMode === 'list' ? 'items-center py-4 px-6 gap-6' : 'flex-col p-6'} ${activeNoteDropdown === note.id ? 'border-emerald-500/40 shadow-xl' : ''} ${isSelectionMode ? (selectedItems.has(note.id) ? 'border-indigo-400 bg-indigo-500/10 cursor-pointer shadow-[0_0_15px_rgba(99,102,241,0.2)]' : 'border-border hover:border-border-hover cursor-pointer') : 'border-border hover:border-emerald-500/30 hover:bg-surface-2 cursor-pointer'}`}
                                                     onClick={() => handleOpenNote(note)}
                                                 >
                                                     {fetchingNoteContentId === note.id && (
@@ -3909,7 +3909,7 @@ const SubjectDetail = () => {
                                                     {isSelectionMode && (
                                                         <div className="absolute top-3 right-3 z-30">
                                                             <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(note.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-500 bg-surface-3/50'}`}>
-                                                                {selectedItems.has(note.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                                                                {selectedItems.has(note.id) && <CheckCircle className="w-3.5 h-3.5 text-text" />}
                                                             </div>
                                                         </div>
                                                     )}
@@ -3922,7 +3922,7 @@ const SubjectDetail = () => {
                                                             </div>
                                                             <div className="min-w-0 flex-1">
                                                                 <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                                                                    <span className="text-[10px] text-slate-500 font-bold tracking-wider uppercase opacity-80">
+                                                                    <span className="text-[10px] text-text-muted font-bold tracking-wider uppercase opacity-80">
                                                                         {new Date(note.created_at).toLocaleDateString(undefined, {
                                                                             day: 'numeric',
                                                                             month: 'short',
@@ -3941,7 +3941,7 @@ const SubjectDetail = () => {
                                                                         </span>
                                                                     )}
                                                                 </div>
-                                                                <h4 className={`font-heading font-bold text-white tracking-tight break-words group-hover:text-emerald-400 transition-colors ${notesViewMode === 'list' ? 'text-[16px]' : 'text-[18px]'}`}>
+                                                                <h4 className={`font-heading font-bold text-text tracking-tight break-words group-hover:text-emerald-400 transition-colors ${notesViewMode === 'list' ? 'text-[16px]' : 'text-[18px]'}`}>
                                                                     {note.title}
                                                                 </h4>
 
@@ -3955,7 +3955,7 @@ const SubjectDetail = () => {
                                                                 {(() => {
                                                                     const nTags = Array.isArray(note.tags) ? note.tags : (note.parsedTags || []);
                                                                     return nTags.slice(0, 2).map((tag, idx) => (
-                                                                        <span key={idx} className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-white/[0.03] text-slate-500 border border-white/[0.06] uppercase tracking-wider">
+                                                                        <span key={idx} className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-surface-2 text-text-muted border border-border uppercase tracking-wider">
                                                                             {tag}
                                                                         </span>
                                                                     ));
@@ -3965,7 +3965,7 @@ const SubjectDetail = () => {
                                                     </div>
 
                                                     {/* Actions Section */}
-                                                    <div className={`flex items-center relative z-10 ${notesViewMode === 'list' ? 'shrink-0 py-0 border-l border-white/[0.06] pl-5 ml-2 gap-4' : 'w-full pt-3 border-t border-white/[0.06] mt-auto justify-between'}`}>
+                                                    <div className={`flex items-center relative z-10 ${notesViewMode === 'list' ? 'shrink-0 py-0 border-l border-border pl-5 ml-2 gap-4' : 'w-full pt-3 border-t border-border mt-auto justify-between'}`}>
                                                         {notesViewMode === 'grid' && (
                                                             <div className="flex items-center gap-3 overflow-hidden flex-1 mr-2">
                                                                 {note.question_id && (
@@ -4004,7 +4004,7 @@ const SubjectDetail = () => {
                                                                         e.stopPropagation();
                                                                         navigateToQuestion(note.question_id);
                                                                     }}
-                                                                    className="p-1.5 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-md transition-all cursor-pointer"
+                                                                    className="p-1.5 text-text-muted hover:text-indigo-400 hover:bg-indigo-400/10 rounded-md transition-all cursor-pointer"
                                                                     title="Go to Source Question"
                                                                 >
                                                                     <LinkIcon className="w-3.5 h-3.5" />
@@ -4016,7 +4016,7 @@ const SubjectDetail = () => {
                                                                         e.stopPropagation();
                                                                         setActiveNoteDropdown(activeNoteDropdown === note.id ? null : note.id);
                                                                     }}
-                                                                    className={`p-1.5 rounded-md transition-all cursor-pointer ${activeNoteDropdown === note.id ? 'bg-white/10 text-emerald-400' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}
+                                                                    className={`p-1.5 rounded-md transition-all cursor-pointer ${activeNoteDropdown === note.id ? 'bg-surface-3 text-emerald-400' : 'text-text-muted hover:text-text hover:bg-surface-3'}`}
                                                                     title="More Options"
                                                                 >
                                                                     <MoreVertical className="w-3.5 h-3.5" />
@@ -4024,7 +4024,7 @@ const SubjectDetail = () => {
 
                                                                 {activeNoteDropdown === note.id && (
                                                                     <div
-                                                                        className="absolute right-0 bottom-full mb-2 w-36 glass rounded-xl border border-white/10 shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200"
+                                                                        className="absolute right-0 bottom-full mb-2 w-36 glass rounded-xl border border-border-hover shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200"
                                                                         onClick={(e) => e.stopPropagation()}
                                                                     >
                                                                         <button
@@ -4034,7 +4034,7 @@ const SubjectDetail = () => {
                                                                                 setSelectedItems(new Set([note.id]));
                                                                                 setActiveNoteDropdown(null);
                                                                             }}
-                                                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-text hover:text-text hover:bg-surface-3 transition-colors text-left"
                                                                         >
                                                                             <CheckCircle className="w-3.5 h-3.5 text-indigo-400" />
                                                                             <span>Select</span>
@@ -4045,7 +4045,7 @@ const SubjectDetail = () => {
                                                                                 setActiveNoteDropdown(null);
                                                                                 handleEditNote(note);
                                                                             }}
-                                                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-text hover:text-text hover:bg-surface-3 transition-colors text-left"
                                                                         >
                                                                             <Pencil className="w-3.5 h-3.5 text-emerald-400" />
                                                                             <span>Edit Note</span>
@@ -4056,7 +4056,7 @@ const SubjectDetail = () => {
                                                                                 setActiveNoteDropdown(null);
                                                                                 setConfirmDeleteNote({ open: true, note });
                                                                             }}
-                                                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-red-400 hover:bg-red-500/10 transition-colors text-left"
+                                                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-text hover:text-red-400 hover:bg-red-500/10 transition-colors text-left"
                                                                         >
                                                                             <Trash2 className="w-3.5 h-3.5 text-red-400" />
                                                                             <span>Delete Note</span>
@@ -4075,7 +4075,7 @@ const SubjectDetail = () => {
                                                 <button
                                                     onClick={() => setNotePage(prev => prev + 1)}
                                                     disabled={loadingMoreNotes}
-                                                    className="group relative flex items-center gap-3 px-10 py-4 bg-surface-2/40 hover:bg-emerald-500/10 border border-white/5 hover:border-emerald-500/30 rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                                    className="group relative flex items-center gap-3 px-10 py-4 bg-surface-2/40 hover:bg-emerald-500/10 border border-border hover:border-emerald-500/30 rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                                                 >
                                                     <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl blur-xl" />
                                                     {loadingMoreNotes ? (
@@ -4083,7 +4083,7 @@ const SubjectDetail = () => {
                                                     ) : (
                                                         <ChevronDown className="w-5 h-5 text-emerald-400 group-hover:translate-y-0.5 transition-transform" />
                                                     )}
-                                                    <span className="text-slate-300 group-hover:text-white font-semibold tracking-wide">
+                                                    <span className="text-text group-hover:text-text font-semibold tracking-wide">
                                                         {loadingMoreNotes ? 'Loading Notes...' : 'Load More Notes'}
                                                     </span>
                                                 </button>
@@ -4098,34 +4098,34 @@ const SubjectDetail = () => {
                     {activeTab === 'solutions' && (
                         <div className="fade-in pb-12">
                             {/* Header & Search */}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-border pb-4">
                                 <div className="flex items-center gap-2">
                                     <Lightbulb className="w-6 h-6 text-blue-400" />
-                                    <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Solutions Library</h3>
+                                    <h3 className="text-[20px] font-heading font-bold text-text tracking-tight">Solutions Library</h3>
                                 </div>
 
                                 <div className="flex items-center gap-3">
                                     <div className="relative group flex-1 sm:min-w-[280px]">
-                                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
+                                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-blue-400 transition-colors" />
                                         <input
                                             type="text"
                                             value={solutionSearchQuery}
                                             onChange={(e) => setSolutionSearchQuery(e.target.value)}
                                             placeholder="Search solutions..."
-                                            className="w-full bg-surface-2/50 border border-white/[0.08] rounded-xl py-2.5 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-blue-500/40 focus:bg-surface-2 transition-all"
+                                            className="w-full bg-surface-2/50 border border-border rounded-xl py-2.5 pl-10 pr-4 text-[13px] text-text focus:outline-none focus:border-blue-500/40 focus:bg-surface-2 transition-all"
                                         />
                                     </div>
-                                    <div className="flex bg-surface-2/80 p-1 rounded-xl border border-white/[0.06] shrink-0">
+                                    <div className="flex bg-surface-2/80 p-1 rounded-xl border border-border shrink-0">
                                         <button
                                             onClick={() => setSolutionsViewMode('grid')}
-                                            className={`p-1.5 rounded-lg transition-all ${solutionsViewMode === 'grid' ? 'bg-blue-500 text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                            className={`p-1.5 rounded-lg transition-all ${solutionsViewMode === 'grid' ? 'bg-blue-500 text-white shadow-sm' : 'text-text-muted hover:text-text'}`}
                                             title="Grid View"
                                         >
                                             <LayoutGrid className="w-4 h-4" />
                                         </button>
                                         <button
                                             onClick={() => setSolutionsViewMode('list')}
-                                            className={`p-1.5 rounded-lg transition-all ${solutionsViewMode === 'list' ? 'bg-blue-500 text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                            className={`p-1.5 rounded-lg transition-all ${solutionsViewMode === 'list' ? 'bg-blue-500 text-white shadow-sm' : 'text-text-muted hover:text-text'}`}
                                             title="List View"
                                         >
                                             <List className="w-4 h-4" />
@@ -4136,21 +4136,21 @@ const SubjectDetail = () => {
 
                             <div className="w-full">
                                 {solutions.length === 0 ? (
-                                    <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                        <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 rotate-3">
+                                    <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-border-hover flex flex-col items-center">
+                                        <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-border rotate-3">
                                             <Lightbulb className="w-10 h-10 text-blue-500/70" />
                                         </div>
-                                        <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No solutions yet</h3>
-                                        <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                        <h3 className="text-2xl font-heading font-bold text-text mb-2 tracking-tight">No solutions yet</h3>
+                                        <p className="text-text-muted text-sm max-w-sm leading-relaxed mb-8">
                                             Add solutions to questions to keep track of your learning path.
                                         </p>
                                     </div>
                                 ) : (
                                     <div className={`grid gap-5 ${solutionsViewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
                                         {filteredSolutions.length === 0 ? (
-                                            <div className="col-span-full py-12 flex flex-col items-center justify-center text-center glass-panel rounded-2xl border-dashed border-white/10">
-                                                <Search className="w-8 h-8 text-slate-600 mb-3" />
-                                                <p className="text-slate-400 font-medium">No solutions match your search</p>
+                                            <div className="col-span-full py-12 flex flex-col items-center justify-center text-center glass-panel rounded-2xl border-dashed border-border-hover">
+                                                <Search className="w-8 h-8 text-text-muted mb-3" />
+                                                <p className="text-text-muted font-medium">No solutions match your search</p>
                                                 <button onClick={() => setSolutionSearchQuery('')} className="mt-2 text-blue-400 text-sm hover:underline hover:text-blue-300 transition-colors">Clear search</button>
                                             </div>
                                         ) : (
@@ -4158,7 +4158,7 @@ const SubjectDetail = () => {
                                                 <div
                                                     key={solution.id}
                                                     id={`solution-${solution.id}`}
-                                                    className={`glass-panel rounded-xl border transition-all flex group relative overflow-hidden ${solutionsViewMode === 'list' ? 'items-center py-3 pr-5 pl-1' : 'flex-col p-5'} border-white/[0.06] hover:border-blue-500/30 hover:bg-white/[0.02] cursor-pointer`}
+                                                    className={`glass-panel rounded-xl border transition-all flex group relative overflow-hidden ${solutionsViewMode === 'list' ? 'items-center py-3 pr-5 pl-1' : 'flex-col p-5'} border-border hover:border-blue-500/30 hover:bg-surface-2 cursor-pointer`}
                                                     onClick={() => {
                                                         setViewingSolution(solution);
                                                         if (solution.source_image_id) {
@@ -4180,11 +4180,11 @@ const SubjectDetail = () => {
                                                                 <Lightbulb className={`${solutionsViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
                                                             </div>
                                                             <div className="min-w-0">
-                                                                <h4 className={`font-heading font-bold text-white tracking-tight break-words truncate group-hover:text-blue-400 transition-colors ${solutionsViewMode === 'list' ? 'text-[14px]' : 'text-[15px]'}`}>
+                                                                <h4 className={`font-heading font-bold text-text tracking-tight break-words truncate group-hover:text-blue-400 transition-colors ${solutionsViewMode === 'list' ? 'text-[14px]' : 'text-[15px]'}`}>
                                                                     {solution.title || 'Solution'}
                                                                 </h4>
                                                                 <div className="flex items-center gap-2 mt-1">
-                                                                    <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap">
+                                                                    <span className="text-[10px] text-text-muted font-medium whitespace-nowrap">
                                                                         {new Date(solution.created_at).toLocaleDateString(undefined, {
                                                                             day: 'numeric',
                                                                             month: 'short',
@@ -4193,7 +4193,7 @@ const SubjectDetail = () => {
                                                                     </span>
                                                                     {solutionsViewMode === 'list' && solution.question_id && (
                                                                         <>
-                                                                            <div className="w-1 h-1 rounded-full bg-slate-700" />
+                                                                            <div className="w-1 h-1 rounded-full bg-surface-2" />
                                                                             <span className="text-[10px] text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">Question Link</span>
                                                                         </>
                                                                     )}
@@ -4203,8 +4203,8 @@ const SubjectDetail = () => {
 
                                                         {/* Content Section */}
                                                         {solutionsViewMode === 'grid' ? (
-                                                            <div className="text-sm text-slate-300 leading-relaxed mb-4 relative z-10 overflow-hidden max-h-[140px] pointer-events-none [mask-image:linear-gradient(to_bottom,black_60%,transparent)]">
-                                                                <div className="prose prose-sm prose-invert max-w-none prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mt-0 prose-p:mb-2 prose-headings:font-bold prose-headings:text-white prose-headings:m-0 prose-headings:mb-1.5 prose-h1:text-[15px] prose-h2:text-[14px] prose-h3:text-[13px] prose-a:text-indigo-400 prose-code:text-slate-300 prose-code:bg-white/[0.06] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
+                                                            <div className="text-sm text-text leading-relaxed mb-4 relative z-10 overflow-hidden max-h-[140px] pointer-events-none [mask-image:linear-gradient(to_bottom,black_60%,transparent)]">
+                                                                <div className="prose prose-sm prose-invert max-w-none prose-p:text-text prose-p:leading-relaxed prose-p:mt-0 prose-p:mb-2 prose-headings:font-bold prose-headings:text-text prose-headings:m-0 prose-headings:mb-1.5 prose-h1:text-[15px] prose-h2:text-[14px] prose-h3:text-[13px] prose-a:text-indigo-400 prose-code:text-text prose-code:bg-surface-2 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
                                                                     <ReactMarkdown
                                                                         remarkPlugins={[remarkGfm, remarkMath]}
                                                                         rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
@@ -4215,7 +4215,7 @@ const SubjectDetail = () => {
                                                             </div>
                                                         ) : (
                                                             <div className="flex-1 min-w-0 relative z-10 hidden md:block">
-                                                                <p className="text-[12px] text-slate-400 truncate opacity-70 group-hover:opacity-100 transition-opacity">
+                                                                <p className="text-[12px] text-text-muted truncate opacity-70 group-hover:opacity-100 transition-opacity">
                                                                     {solution.content?.substring(0, 200).replace(/[#*`\n]/g, ' ')}...
                                                                 </p>
                                                             </div>
@@ -4231,7 +4231,7 @@ const SubjectDetail = () => {
                                                                         setViewingSolution(solution);
                                                                     }}
                                                                     disabled={fetchingImageId === `solution-${solution.id}`}
-                                                                    className={`flex items-center gap-2 rounded-xl font-bold bg-white/[0.04] text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 transition-all border border-white/[0.08] disabled:opacity-50 cursor-pointer ${solutionsViewMode === 'list' ? 'p-2' : 'px-4 py-2 text-[12px]'}`}
+                                                                    className={`flex items-center gap-2 rounded-xl font-bold bg-surface-2 text-text-muted hover:text-blue-400 hover:bg-blue-500/10 transition-all border border-border disabled:opacity-50 cursor-pointer ${solutionsViewMode === 'list' ? 'p-2' : 'px-4 py-2 text-[12px]'}`}
                                                                     title="View Source Image"
                                                                 >
                                                                     {fetchingImageId === `solution-${solution.id}` ? (
@@ -4246,7 +4246,7 @@ const SubjectDetail = () => {
                                                     </div>
 
                                                     {/* Actions Section */}
-                                                    <div className={`flex items-center relative z-10 ${solutionsViewMode === 'list' ? 'shrink-0 py-0 border-l border-white/[0.06] pl-5 ml-2 gap-4' : 'w-full pt-3 border-t border-white/[0.06] mt-auto justify-between'}`}>
+                                                    <div className={`flex items-center relative z-10 ${solutionsViewMode === 'list' ? 'shrink-0 py-0 border-l border-border pl-5 ml-2 gap-4' : 'w-full pt-3 border-t border-border mt-auto justify-between'}`}>
                                                         {solutionsViewMode === 'grid' && (
                                                             <div className="flex items-center gap-3 overflow-hidden flex-1 mr-2">
                                                                 {solution.question_id && (
@@ -4272,7 +4272,7 @@ const SubjectDetail = () => {
                                                                         e.stopPropagation();
                                                                         navigateToQuestion(solution.question_id);
                                                                     }}
-                                                                    className="p-1.5 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-md transition-all cursor-pointer"
+                                                                    className="p-1.5 text-text-muted hover:text-indigo-400 hover:bg-indigo-400/10 rounded-md transition-all cursor-pointer"
                                                                     title="Go to Source Question"
                                                                 >
                                                                     <LinkIcon className="w-3.5 h-3.5" />
@@ -4283,7 +4283,7 @@ const SubjectDetail = () => {
                                                                     e.stopPropagation();
                                                                     handleOpenEditSolution(solution);
                                                                 }}
-                                                                className="p-1.5 text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-md transition-all cursor-pointer"
+                                                                className="p-1.5 text-text-muted hover:text-emerald-400 hover:bg-emerald-400/10 rounded-md transition-all cursor-pointer"
                                                                 title="Edit Solution"
                                                             >
                                                                 <Pencil className="w-3.5 h-3.5" />
@@ -4293,7 +4293,7 @@ const SubjectDetail = () => {
                                                                     e.stopPropagation();
                                                                     setConfirmDeleteNote({ open: true, note: { ...solution, isSolution: true } });
                                                                 }}
-                                                                className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-md transition-all cursor-pointer"
+                                                                className="p-1.5 text-text-muted hover:text-red-400 hover:bg-red-400/10 rounded-md transition-all cursor-pointer"
                                                                 title="Delete Solution"
                                                             >
                                                                 <Trash2 className="w-3.5 h-3.5" />
@@ -4317,17 +4317,17 @@ const SubjectDetail = () => {
                             const progressPct = totalTopics > 0 ? Math.round((doneCount / totalTopics) * 100) : 0;
 
                             return (
-                                <div key={session.id} className="glass-panel rounded-2xl border border-white/[0.06] overflow-hidden mb-4">
+                                <div key={session.id} className="glass-panel rounded-2xl border border-border overflow-hidden mb-4">
                                     {/* Session Header */}
                                     <div
-                                        className={`p-4 flex items-center justify-between cursor-pointer transition-colors hover:bg-white/[0.02] ${isExpanded ? 'border-b border-white/[0.05] bg-white/[0.02]' : ''}`}
+                                        className={`p-4 flex items-center justify-between cursor-pointer transition-colors hover:bg-surface-2 ${isExpanded ? 'border-b border-border bg-surface-2' : ''}`}
                                         onClick={() => setActiveRevisionSessionId(isExpanded ? null : session.id)}
                                     >
                                         <div className="flex-1 flex flex-col md:flex-row md:items-center justify-between gap-4">
                                             <div className="flex flex-col gap-1.5">
                                                 <div className="flex items-center gap-3">
-                                                    <h4 className="text-base font-bold text-white tracking-tight">{session.name}</h4>
-                                                    <span className="text-[10px] text-slate-500 font-medium tracking-wide">
+                                                    <h4 className="text-base font-bold text-text tracking-tight">{session.name}</h4>
+                                                    <span className="text-[10px] text-text-muted font-medium tracking-wide">
                                                         {new Date(session.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
                                                     </span>
                                                 </div>
@@ -4338,31 +4338,31 @@ const SubjectDetail = () => {
                                                             style={{ width: `${progressPct}%` }}
                                                         />
                                                     </div>
-                                                    <span className="text-[11px] font-semibold text-slate-400">
+                                                    <span className="text-[11px] font-semibold text-text-muted">
                                                         {progressPct}%
                                                     </span>
                                                 </div>
                                             </div>
 
                                             <div className="flex items-center gap-4 mr-4">
-                                                <div className="flex items-center gap-2 bg-surface-2/80 px-3 py-1.5 rounded-lg border border-white/[0.05]">
+                                                <div className="flex items-center gap-2 bg-surface-2/80 px-3 py-1.5 rounded-lg border border-border">
                                                     <div className="flex flex-col text-right">
-                                                        <span className="text-xs font-bold text-white leading-tight">
+                                                        <span className="text-xs font-bold text-text leading-tight">
                                                             <span className={doneCount === totalTopics ? 'text-emerald-400' : 'text-violet-400'}>{doneCount}</span>
-                                                            <span className="text-slate-500 mx-1">/</span>
+                                                            <span className="text-text-muted mx-1">/</span>
                                                             <span>{totalTopics}</span>
                                                         </span>
-                                                        <span className="text-[9px] text-slate-500 uppercase tracking-wider font-bold">Topics Done</span>
+                                                        <span className="text-[9px] text-text-muted uppercase tracking-wider font-bold">Topics Done</span>
                                                     </div>
-                                                    <div className="w-1 h-8 rounded-full bg-white/[0.05]" />
+                                                    <div className="w-1 h-8 rounded-full bg-surface-2" />
                                                     {doneCount > 0 && doneCount === totalTopics ? (
                                                         <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400">
                                                             <CheckCircle className="w-4 h-4" />
                                                         </div>
                                                     ) : (
-                                                        <div className="w-8 h-8 rounded-full bg-surface-3 flex items-center justify-center text-slate-400 relative">
+                                                        <div className="w-8 h-8 rounded-full bg-surface-3 flex items-center justify-center text-text-muted relative">
                                                             <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 36 36">
-                                                                <path className="text-white/5" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
+                                                                <path className="text-text/5" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
                                                                 <path className="text-violet-500" strokeDasharray={`${progressPct}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
                                                             </svg>
                                                         </div>
@@ -4376,7 +4376,7 @@ const SubjectDetail = () => {
                                                     e.stopPropagation();
                                                     setEditingRevisionSession(session);
                                                 }}
-                                                className="p-2 rounded-lg text-slate-500 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                                                className="p-2 rounded-lg text-text-muted hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
                                                 title="Edit Session"
                                             >
                                                 <Pencil className="w-4 h-4" />
@@ -4386,12 +4386,12 @@ const SubjectDetail = () => {
                                                     e.stopPropagation();
                                                     setConfirmDeleteRevisionSession({ open: true, sessionId: session.id });
                                                 }}
-                                                className="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                                className="p-2 rounded-lg text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
                                                 title="Delete Session"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
-                                            <div className={`p-2 rounded-lg text-slate-500 transition-transform ${isExpanded ? 'rotate-180 text-white' : ''}`}>
+                                            <div className={`p-2 rounded-lg text-text-muted transition-transform ${isExpanded ? 'rotate-180 text-text' : ''}`}>
                                                 <ChevronDown className="w-5 h-5" />
                                             </div>
                                         </div>
@@ -4399,10 +4399,10 @@ const SubjectDetail = () => {
 
                                     {/* Session Content (Topics) */}
                                     {isExpanded && (
-                                        <div className="p-4 bg-surface-1/50">
+                                        <div className="p-4 bg-surface/50">
                                             <div className="flex flex-col gap-2">
                                                 {session.topics?.length === 0 ? (
-                                                    <p className="text-sm text-slate-500 italic py-2">No topics in this session.</p>
+                                                    <p className="text-sm text-text-muted italic py-2">No topics in this session.</p>
                                                 ) : (() => {
                                                     // Render topics
                                                     const allTopics = session.topics;
@@ -4424,8 +4424,8 @@ const SubjectDetail = () => {
                                                                 <div key={item.topicId} className="flex flex-col">
                                                                     <div
                                                                         className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all cursor-pointer group
-                                                                    ${isDone ? 'bg-emerald-500/[0.06] border-emerald-500/20' : 'bg-surface-2/50 border-white/[0.06]'}
-                                                                    hover:border-white/[0.12]`}
+                                                                    ${isDone ? 'bg-emerald-500/[0.06] border-emerald-500/20' : 'bg-surface-2/50 border-border'}
+                                                                    hover:border-border-hover`}
                                                                         onClick={() => setExpandedRevisionGroups(prev => ({ ...prev, [`${session.id}_${item.topicId}`]: !isGrpExpanded }))}
                                                                     >
                                                                         <button
@@ -4441,19 +4441,19 @@ const SubjectDetail = () => {
                                                                             }
                                                                         </button>
                                                                         <div className="flex-1 min-w-0">
-                                                                            <span className={`font-semibold text-[14px] ${isDone ? 'text-white' : 'text-slate-200'}`}>
+                                                                            <span className={`font-semibold text-[14px] ${isDone ? 'text-text' : 'text-text'}`}>
                                                                                 {item.topicName}
                                                                             </span>
-                                                                            <span className="ml-2 text-[11px] text-slate-500">{childDone}/{children.length} done</span>
+                                                                            <span className="ml-2 text-[11px] text-text-muted">{childDone}/{children.length} done</span>
                                                                         </div>
                                                                         <div className="flex items-center gap-2 shrink-0">
-                                                                            <div className={`p-1 rounded text-slate-500 transition-transform ${isGrpExpanded ? 'rotate-180' : ''}`}>
+                                                                            <div className={`p-1 rounded text-text-muted transition-transform ${isGrpExpanded ? 'rotate-180' : ''}`}>
                                                                                 <ChevronDown className="w-4 h-4" />
                                                                             </div>
                                                                         </div>
                                                                     </div>
                                                                     {isGrpExpanded && (
-                                                                        <div className="ml-6 border-l-2 border-white/[0.06] pl-3 flex flex-col gap-1.5 mt-1.5 mb-1">
+                                                                        <div className="ml-6 border-l-2 border-border pl-3 flex flex-col gap-1.5 mt-1.5 mb-1">
                                                                             {children.map(child => renderTopicRow(child))}
                                                                         </div>
                                                                     )}
@@ -4465,7 +4465,7 @@ const SubjectDetail = () => {
                                                             <div
                                                                 key={item.topicId}
                                                                 className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all group
-                                                            ${isDone ? 'bg-emerald-500/[0.06] border-emerald-500/20' : 'bg-surface-2/40 border-white/[0.05] hover:border-white/[0.1]'}`}
+                                                            ${isDone ? 'bg-emerald-500/[0.06] border-emerald-500/20' : 'bg-surface-2/40 border-border hover:border-border-hover'}`}
                                                             >
                                                                 <button
                                                                     onClick={() => handleRevisionToggle(session.id, item.topicId, item.status)}
@@ -4479,12 +4479,12 @@ const SubjectDetail = () => {
                                                                         : isDone && <CheckCircle className="w-3.5 h-3.5" />
                                                                     }
                                                                 </button>
-                                                                <span className={`flex-1 text-[13px] font-medium transition-colors ${isDone ? 'text-slate-400 line-through decoration-slate-600' : 'text-slate-200'}`}>
+                                                                <span className={`flex-1 text-[13px] font-medium transition-colors ${isDone ? 'text-text-muted line-through decoration-slate-600' : 'text-text'}`}>
                                                                     {item.topicName}
                                                                 </span>
                                                                 <div className="flex items-center gap-2 shrink-0 ml-auto">
                                                                     {item.completedAt && (
-                                                                        <span className="text-[10px] text-slate-600 font-medium hidden md:block">
+                                                                        <span className="text-[10px] text-text-muted font-medium hidden md:block">
                                                                             {new Date(item.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                                         </span>
                                                                     )}
@@ -4505,10 +4505,10 @@ const SubjectDetail = () => {
                         return (
                             <div className="fade-in">
                                 {/* Header */}
-                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-border pb-4">
                                     <div className="flex items-center gap-2">
                                         <RefreshCw className="w-6 h-6 text-indigo-400" />
-                                        <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Revision Tracker</h3>
+                                        <h3 className="text-[20px] font-heading font-bold text-text tracking-tight">Revision Tracker</h3>
                                     </div>
                                     <button
                                         onClick={() => setShowCreateRevisionSession(true)}
@@ -4520,12 +4520,12 @@ const SubjectDetail = () => {
                                 </div>
 
                                 {revisionSessions.length === 0 ? (
-                                    <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                        <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5">
+                                    <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-border-hover flex flex-col items-center">
+                                        <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-border">
                                             <RefreshCw className="w-10 h-10 text-violet-500/70" />
                                         </div>
-                                        <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No revision sessions</h3>
-                                        <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                        <h3 className="text-2xl font-heading font-bold text-text mb-2 tracking-tight">No revision sessions</h3>
+                                        <p className="text-text-muted text-sm max-w-sm leading-relaxed mb-8">
                                             Create a targeted session of specific topics from the syllabus to start your revision.
                                         </p>
                                         <button
@@ -4742,7 +4742,7 @@ const SubjectDetail = () => {
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') handleRenameFile();
                         }}
-                        className="w-full bg-white/[0.03] border border-white/[0.1] rounded-xl px-4 py-3.5 text-white text-[14px] focus:outline-none focus:border-primary/50 transition-all"
+                        className="w-full bg-surface-2 border border-border-hover rounded-xl px-4 py-3.5 text-text text-[14px] focus:outline-none focus:border-primary/50 transition-all"
                         placeholder="e.g. Biology Session 1"
                     />
                 </div>

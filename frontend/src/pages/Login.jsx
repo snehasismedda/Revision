@@ -60,7 +60,7 @@ const Login = () => {
     return (
         <div className="min-h-screen flex bg-surface selection:bg-primary/30">
             {/* Left Side: Branding & Visuals (Hidden on mobile) */}
-            <div className="hidden lg:flex lg:w-1/2 relative flex-col justify-center items-center p-16 overflow-hidden bg-[#0c0c14]">
+            <div className="hidden lg:flex lg:w-1/2 relative flex-col justify-center items-center p-16 overflow-hidden bg-surface">
                 {/* Background Decor */}
                 <div className="absolute inset-0 mesh-grid opacity-20" />
                 <div className="absolute top-[-10%] right-[-10%] w-[80%] h-[80%] rounded-full bg-primary/[0.08] blur-[140px]" />
@@ -77,10 +77,10 @@ const Login = () => {
 
                 <div className="relative z-10 fade-in text-center">
                     <div className="flex flex-col items-center group">
-                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center shadow-[0_0_60px_rgba(139,92,246,0.3)] mb-8 transition-all duration-500 group-hover:scale-110 group-hover:rotate-3 border border-white/10">
-                            <Activity className="w-10 h-10 text-white" />
+                        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center shadow-[0_0_60px_rgba(139,92,246,0.3)] mb-8 transition-all duration-500 group-hover:scale-110 group-hover:rotate-3 border border-border">
+                            <Activity className="w-10 h-10 text-text" />
                         </div>
-                        <h1 className="text-6xl font-heading font-black tracking-tighter text-white mb-2">
+                        <h1 className="text-6xl font-heading font-black tracking-tighter text-text mb-2">
                             Prep<span className="text-primary">Tracker</span>
                         </h1>
                     </div>
@@ -88,7 +88,7 @@ const Login = () => {
             </div>
 
             {/* Right Side: Auth Form */}
-            <div className="w-full lg:w-1/2 flex items-center justify-center p-6 md:p-12 relative overflow-hidden bg-[#0c0c14]">
+            <div className="w-full lg:w-1/2 flex items-center justify-center p-6 md:p-12 relative overflow-hidden bg-surface">
                 {/* Background Detailing */}
                 <div className="absolute inset-0 dot-grid opacity-40" />
                 <div className="absolute inset-0 bg-vignette" />
@@ -100,14 +100,14 @@ const Login = () => {
                 <div className="w-full max-w-[420px] fade-in relative z-10">
                     <div className="lg:hidden text-center mb-8">
                         <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-primary-dark mb-4 shadow-xl shadow-primary/20">
-                            <Activity className="w-7 h-7 text-white" />
+                            <Activity className="w-7 h-7 text-text" />
                         </div>
-                        <h1 className="text-3xl font-heading font-bold text-white mb-1">PrepTracker</h1>
+                        <h1 className="text-3xl font-heading font-bold text-text mb-1">PrepTracker</h1>
                     </div>
 
                     <div className="mb-10 text-center lg:text-left">
-                        <h2 className="text-3xl font-heading font-bold text-white mb-2">Welcome back</h2>
-                        <p className="text-slate-500 font-medium">Please enter your details to sign in.</p>
+                        <h2 className="text-3xl font-heading font-bold text-text mb-2">Welcome back</h2>
+                        <p className="text-text-muted font-medium">Please enter your details to sign in.</p>
                     </div>
 
                     {error && (
@@ -118,19 +118,19 @@ const Login = () => {
 
                     <form onSubmit={handleSubmit} className="space-y-5">
                         <div className="stagger-1 group/field">
-                            <label className="block text-[11px] font-bold text-slate-500 group-focus-within/field:text-primary transition-colors uppercase tracking-wider mb-2.5 ml-1">
+                            <label className="block text-[11px] font-bold text-text-muted group-focus-within/field:text-primary transition-colors uppercase tracking-wider mb-2.5 ml-1">
                                 Email Address
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <Mail className="w-[18px] h-[18px] text-slate-600 transition-colors group-focus-within/field:text-primary/70" />
+                                    <Mail className="w-[18px] h-[18px] text-text-muted/60 transition-colors group-focus-within/field:text-primary/70" />
                                 </div>
                                 <input
                                     type="email"
                                     required
                                     value={form.email}
                                     onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                                    className="w-full bg-slate-900/60 border border-white/[0.06] rounded-xl pl-11 pr-4 py-3.5 text-slate-100 text-sm transition-all focus:border-primary/40 focus:bg-slate-900/60 focus:ring-4 focus:ring-primary/10 outline-none placeholder:text-slate-600/60"
+                                    className="w-full bg-surface-2 border border-border rounded-xl pl-11 pr-4 py-3.5 text-text text-sm transition-all focus:border-primary/40 focus:bg-surface-2 focus:ring-4 focus:ring-primary/10 outline-none placeholder:text-text-muted/60"
                                     placeholder="name@company.com"
                                 />
                             </div>
@@ -138,7 +138,7 @@ const Login = () => {
 
                         <div className="stagger-2 group/field">
                             <div className="flex justify-between items-center mb-2.5 ml-1">
-                                <label className="block text-[11px] font-bold text-slate-500 group-focus-within/field:text-primary transition-colors uppercase tracking-wider">
+                                <label className="block text-[11px] font-bold text-text-muted group-focus-within/field:text-primary transition-colors uppercase tracking-wider">
                                     Password
                                 </label>
                                 <button
@@ -152,20 +152,20 @@ const Login = () => {
                             </div>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <Lock className="w-[18px] h-[18px] text-slate-600 transition-colors group-focus-within/field:text-primary/70" />
+                                    <Lock className="w-[18px] h-[18px] text-text-muted/60 transition-colors group-focus-within/field:text-primary/70" />
                                 </div>
                                 <input
                                     type={showPassword ? 'text' : 'password'}
                                     required
                                     value={form.password}
                                     onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                                    className="w-full bg-slate-900/60 border border-white/[0.06] rounded-xl pl-11 pr-12 py-3.5 text-slate-100 text-sm transition-all focus:border-primary/40 focus:bg-slate-900/60 focus:ring-4 focus:ring-primary/10 outline-none placeholder:text-slate-600/60"
+                                    className="w-full bg-surface-2 border border-border rounded-xl pl-11 pr-12 py-3.5 text-text text-sm transition-all focus:border-primary/40 focus:bg-surface-2 focus:ring-4 focus:ring-primary/10 outline-none placeholder:text-text-muted/60"
                                     placeholder="••••••••"
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-600 hover:text-slate-400 transition-colors"
+                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-text-muted/60 hover:text-text transition-colors"
                                 >
                                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                 </button>
@@ -188,8 +188,8 @@ const Login = () => {
                         </button>
                     </form>
 
-                    <div className="mt-8 pt-8 border-t border-white/[0.05] text-center stagger-4">
-                        <p className="text-sm text-slate-500">
+                    <div className="mt-8 pt-8 border-t border-border text-center stagger-4">
+                        <p className="text-sm text-text-muted">
                             New to PrepTracker?{' '}
                             <Link to="/register" className="text-primary font-bold hover:text-primary-light transition-colors">
                                 Create an account

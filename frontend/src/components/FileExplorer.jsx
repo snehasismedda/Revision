@@ -431,19 +431,19 @@ const FileExplorer = ({
 
 
     return (
-        <div className="flex flex-col h-[70vh] min-h-[600px] border border-white/[0.08] rounded-2xl bg-[#0f0f13] overflow-hidden">
+        <div className="flex flex-col h-[70vh] min-h-[600px] border border-border rounded-2xl bg-surface overflow-hidden">
             {/* Toolbar */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08] bg-[#121217]">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-surface-2">
                 <div className="flex items-center gap-4 flex-1">
                     {/* Navigation */}
-                    <div className="flex items-center gap-1 bg-white/[0.03] p-1 rounded-xl border border-white/[0.06]">
+                    <div className="flex items-center gap-1 bg-surface-2 p-1 rounded-xl border border-border">
                         <button
                             disabled={!currentFolderId && !searchQuery}
                             onClick={() => {
                                 if (searchQuery) setSearchQuery('');
                                 else if (breadcrumbs.length > 1) handleNavigate(breadcrumbs[breadcrumbs.length - 2].id);
                             }}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                            className="p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-surface-2 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                         >
                             <ArrowLeft className="w-4 h-4" />
                         </button>
@@ -453,10 +453,10 @@ const FileExplorer = ({
                     <div className="flex items-center text-[13px] font-medium hidden md:flex">
                         {breadcrumbs.map((crumb, idx) => (
                             <React.Fragment key={crumb.id || 'root'}>
-                                {idx > 0 && <span className="mx-2 text-slate-600">/</span>}
+                                {idx > 0 && <span className="mx-2 text-text-muted">/</span>}
                                 <button
                                     onClick={() => handleNavigate(crumb.id)}
-                                    className={`hover:underline transition-colors ${idx === breadcrumbs.length - 1 ? 'text-white font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+                                    className={`hover:underline transition-colors ${idx === breadcrumbs.length - 1 ? 'text-text font-bold' : 'text-text-muted hover:text-text'}`}
                                 >
                                     {crumb.name}
                                 </button>
@@ -468,25 +468,25 @@ const FileExplorer = ({
                 <div className="flex items-center gap-3 flex-1 justify-end">
                     {/* Search */}
                     <div className="relative group max-w-[240px] w-full hidden sm:block">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-indigo-400" />
                         <input
                             type="text"
                             placeholder="Search library..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-[#1c1c24] border border-white/[0.06] rounded-xl pl-9 pr-4 py-2 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 transition-all placeholder:text-slate-500"
+                            className="w-full bg-surface-3 border border-border rounded-xl pl-9 pr-4 py-2 text-[13px] text-text focus:outline-none focus:border-indigo-500/50 transition-all placeholder:text-text-muted"
                         />
                         {searchQuery && (
-                            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"><X size={14} /></button>
+                            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"><X size={14} /></button>
                         )}
                     </div>
 
-                    <div className="w-px h-6 bg-white/10 mx-1" />
+                    <div className="w-px h-6 bg-surface-3 mx-1" />
 
                     {/* Actions */}
                     <button
                         onClick={() => setCreateFolderModal({ open: true, name: '' })}
-                        className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.08] transition-all cursor-pointer border border-transparent hover:border-white/[0.05]"
+                        className="p-2 rounded-xl text-text-muted hover:text-text hover:bg-surface-2 transition-all cursor-pointer border border-transparent hover:border-border"
                         title="New Folder"
                     >
                         <FolderPlus className="w-4 h-4" />
@@ -494,7 +494,7 @@ const FileExplorer = ({
 
                     <button
                         onClick={() => onFileUpload(currentFolderId)}
-                        className="flex items-center gap-2 text-[12px] font-bold px-4 py-2 rounded-xl transition-all cursor-pointer border border-indigo-500/20 bg-indigo-500/10 text-indigo-400 hover:text-white hover:bg-indigo-500/20 group"
+                        className="flex items-center gap-2 text-[12px] font-bold px-4 py-2 rounded-xl transition-all cursor-pointer border border-indigo-500/20 bg-indigo-500/10 text-indigo-400 hover:text-text hover:bg-indigo-500/20 group"
                     >
                         <Plus className="w-4 h-4" strokeWidth={2.5} />
                         <span className="hidden sm:inline">Upload</span>
@@ -503,7 +503,7 @@ const FileExplorer = ({
             </div>
 
             {/* Sub-toolbar (Views & Sort) */}
-            <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.04] bg-[#121217]/50">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-surface-2/50">
                 <div className="flex items-center flex-1 gap-4">
                     {isSelectionMode ? (
                         <div className="flex items-center gap-3">
@@ -514,26 +514,26 @@ const FileExplorer = ({
                                 const currIds = new Set(displayItems.filter(i => !i._isFolder).map(i => i.id));
                                 if (selectedIds.size === currIds.size) setSelectedIds(new Set());
                                 else setSelectedIds(currIds);
-                            }} className="text-[12px] text-slate-400 hover:text-white underline">
+                            }} className="text-[12px] text-text-muted hover:text-text underline">
                                 Select All Files
                             </button>
-                            <div className="w-px h-4 bg-white/10 mx-2" />
+                            <div className="w-px h-4 bg-surface-3 mx-2" />
                             <button onClick={() => setDeleteModal({ open: true, multiple: true })} className="text-[12px] text-rose-400 hover:text-rose-300 font-bold flex items-center gap-1">
                                 <Trash className="w-3.5 h-3.5" /> Delete
                             </button>
-                            <div className="w-px h-4 bg-white/10 mx-2" />
+                            <div className="w-px h-4 bg-surface-3 mx-2" />
                             <button onClick={handleBulkDownload} className="text-[12px] text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1">
                                 <Download className="w-3.5 h-3.5" /> Download
                             </button>
-                            <button onClick={() => { setIsSelectionMode(false); setSelectedIds(new Set()); }} className="text-[12px] text-slate-500 hover:text-white ml-2">Cancel</button>
+                            <button onClick={() => { setIsSelectionMode(false); setSelectedIds(new Set()); }} className="text-[12px] text-text-muted hover:text-text ml-2">Cancel</button>
                         </div>
                     ) : (
-                        <div className="flex items-center gap-3 text-[12px] text-slate-500">
+                        <div className="flex items-center gap-3 text-[12px] text-text-muted">
                             <span>Sort by:</span>
                             <select
                                 value={sortBy}
                                 onChange={e => setSortBy(e.target.value)}
-                                className="bg-transparent text-white font-medium focus:outline-none cursor-pointer"
+                                className="bg-transparent text-text font-medium focus:outline-none cursor-pointer"
                             >
                                 <option value="name-asc">Name (A-Z)</option>
                                 <option value="name-desc">Name (Z-A)</option>
@@ -545,11 +545,11 @@ const FileExplorer = ({
                     )}
                 </div>
 
-                <div className="flex items-center bg-white/[0.03] p-1 rounded-lg border border-white/[0.06]">
-                    <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded transition-all ${viewMode === 'grid' ? 'bg-white/10 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}>
+                <div className="flex items-center bg-surface-2 p-1 rounded-lg border border-border">
+                    <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded transition-all ${viewMode === 'grid' ? 'bg-surface-3 text-text shadow-sm' : 'text-text-muted hover:text-text'}`}>
                         <LayoutGrid className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => setViewMode('list')} className={`p-1.5 rounded transition-all ${viewMode === 'list' ? 'bg-white/10 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}>
+                    <button onClick={() => setViewMode('list')} className={`p-1.5 rounded transition-all ${viewMode === 'list' ? 'bg-surface-3 text-text shadow-sm' : 'text-text-muted hover:text-text'}`}>
                         <List className="w-3.5 h-3.5" />
                     </button>
                 </div>
@@ -566,9 +566,9 @@ const FileExplorer = ({
                         <div className="w-8 h-8 rounded-full border-2 border-indigo-500/30 border-t-indigo-500 animate-spin" />
                     </div>
                 ) : displayItems.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-slate-500">
+                    <div className="h-full flex flex-col items-center justify-center text-text-muted">
                         <Folder className="w-16 h-16 opacity-20 mb-4" />
-                        <p className="text-[14px] font-medium text-slate-300 mb-1">This folder is empty</p>
+                        <p className="text-[14px] font-medium text-text mb-1">This folder is empty</p>
                         <p className="text-[12px]">Upload files or create subfolders to get started</p>
                     </div>
                 ) : viewMode === 'grid' ? (
@@ -577,6 +577,7 @@ const FileExplorer = ({
                             <ItemCard
                                 key={item.id}
                                 item={item}
+                                folders={folders}
                                 isSelected={selectedIds.has(item.id)}
                                 isSelectionMode={isSelectionMode}
                                 activeDropdown={activeDropdown}
@@ -597,14 +598,14 @@ const FileExplorer = ({
                         ))}
                     </div>
                 ) : (
-                    <div className="border border-white/[0.06] rounded-xl bg-[#16161c]">
+                    <div className="border border-border rounded-xl bg-surface-2">
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="border-b border-white/[0.06] bg-white/[0.02]">
+                                <tr className="border-b border-border bg-surface-2">
                                     <th className="w-10 px-4 py-3"><div className="w-3 h-3" /></th>
-                                    <th className="px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Name</th>
-                                    <th className="px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider hidden sm:table-cell">Date Modified</th>
-                                    <th className="px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider hidden md:table-cell">Type</th>
+                                    <th className="px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-wider">Name</th>
+                                    <th className="px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-wider hidden sm:table-cell">Date Modified</th>
+                                    <th className="px-4 py-3 text-[11px] font-bold text-text-muted uppercase tracking-wider hidden md:table-cell">Type</th>
                                     <th className="w-20 px-4 py-3"></th>
                                 </tr>
                             </thead>
@@ -613,6 +614,7 @@ const FileExplorer = ({
                                     <ItemRow
                                         key={item.id}
                                         item={item}
+                                        folders={folders}
                                         isSelected={selectedIds.has(item.id)}
                                         isSelectionMode={isSelectionMode}
                                         activeDropdown={activeDropdown}
@@ -638,7 +640,7 @@ const FileExplorer = ({
             </div>
 
             {/* Status Bar */}
-            <div className="px-4 py-2 border-t border-white/[0.06] bg-[#0c0c10] text-[11px] text-slate-500 font-medium flex justify-between">
+            <div className="px-4 py-2 border-t border-border bg-surface-2 text-[11px] text-text-muted font-medium flex justify-between">
                 <div>
                     {displayItems.length} item{displayItems.length !== 1 ? 's' : ''}
                     {searchQuery && ` found for "${searchQuery}"`}
@@ -666,7 +668,7 @@ const FileExplorer = ({
                         value={createFolderModal.name} 
                         onChange={e => setCreateFolderModal({ ...createFolderModal, name: e.target.value })} 
                         placeholder="e.g. Session Notes" 
-                        className="w-full bg-white/[0.03] border border-white/[0.1] rounded-xl px-4 py-3.5 text-white text-[14px] focus:outline-none focus:border-primary/50 transition-all" 
+                        className="w-full bg-surface-2 border border-border-hover rounded-xl px-4 py-3.5 text-text text-[14px] focus:outline-none focus:border-primary/50 transition-all" 
                         onKeyDown={e => e.key === 'Enter' && handleCreateFolder(e)} 
                     />
                 </div>
@@ -681,7 +683,7 @@ const FileExplorer = ({
                 onConfirm={handleRename} 
                 onCancel={() => setRenameModal({ open: false, id: null, type: null, name: '' })}
             >
-                <input autoFocus type="text" value={renameModal.name} onChange={e => setRenameModal({ ...renameModal, name: e.target.value })} className="w-full mt-4 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-indigo-500/50" onKeyDown={e => e.key === 'Enter' && handleRename(e)} />
+                <input autoFocus type="text" value={renameModal.name} onChange={e => setRenameModal({ ...renameModal, name: e.target.value })} className="w-full mt-4 bg-surface-2 border border-border-hover rounded-lg px-4 py-2 text-text focus:outline-none focus:border-indigo-500/50" onKeyDown={e => e.key === 'Enter' && handleRename(e)} />
             </ConfirmDialog>
  
             <ConfirmDialog 
@@ -696,12 +698,12 @@ const FileExplorer = ({
 
             <ConfirmDialog isOpen={folderDeleteCascadeModal.open} title={`Delete "${folderDeleteCascadeModal.folder?.name}"`} confirmText="Delete Folder" danger onConfirm={() => handleDelete(true)} onCancel={() => setFolderDeleteCascadeModal({ open: false, folder: null })}>
                 <div className="mt-4 space-y-4">
-                    <p className="text-[13px] text-slate-300">What should happen to the files inside this folder?</p>
+                    <p className="text-[13px] text-text">What should happen to the files inside this folder?</p>
                     <div className="flex flex-col gap-2">
                         <button onClick={() => { handleDelete(true); }} className="w-full text-left px-4 py-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20 transition-all font-medium text-[13px]">
                             Delete folder AND all files inside
                         </button>
-                        <button onClick={() => { handleDelete(false); }} className="w-full text-left px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all font-medium text-[13px]">
+                        <button onClick={() => { handleDelete(false); }} className="w-full text-left px-4 py-3 rounded-xl bg-surface-2 border border-border-hover text-text hover:bg-surface-3 transition-all font-medium text-[13px]">
                             Keep files, just move them to root
                         </button>
                     </div>
@@ -715,7 +717,7 @@ const FileExplorer = ({
 
 // ------ Subcomponents ------
 
-const ItemCard = ({ item, isSelected, isSelectionMode, activeDropdown, onToggleSelect, onClick, onMenuClick, onAction, onDrop }) => {
+const ItemCard = ({ item, folders, isSelected, isSelectionMode, activeDropdown, onToggleSelect, onClick, onMenuClick, onAction, onDrop }) => {
     const isFolder = item._isFolder;
 
     return (
@@ -738,23 +740,24 @@ const ItemCard = ({ item, isSelected, isSelectionMode, activeDropdown, onToggleS
                     if (fileId && fileId !== item.id) onDrop(fileId);
                 }
             }}
-            className={`group relative aspect-square rounded-xl bg-[#1c1c1f] transition-all cursor-pointer border user-select-none flex flex-col hover:bg-[#25252a]
-                ${isSelectionMode && isSelected ? 'border-indigo-500/50 ring-2 ring-indigo-500/20 bg-indigo-500/10' : 'border-white/[0.04] hover:border-white/[0.1]'}
+            className={`group relative aspect-square rounded-xl bg-surface transition-all cursor-pointer border user-select-none flex flex-col hover:bg-surface-2
+                ${isSelectionMode && isSelected ? 'border-indigo-500/50 ring-2 ring-indigo-500/20 bg-indigo-500/10' : 'border-border hover:border-border-hover'}
                 ${activeDropdown?.id === item.id ? 'z-[100] border-indigo-500/40 shadow-2xl' : 'z-10'}
             `}
         >
             {/* Context/Select Overlay */}
             <div className="absolute top-2 left-2 z-20">
                 {isSelectionMode ? (
-                    <div onClick={onToggleSelect} className={`w-5 h-5 rounded-md border flex flex-col items-center justify-center transition-colors shadow-xl ${isSelected ? 'bg-indigo-500 border-indigo-500' : 'border-white/30 bg-black/40 backdrop-blur-sm'}`}>
-                        {isSelected && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                    <div onClick={onToggleSelect} className={`w-5 h-5 rounded-md border flex flex-col items-center justify-center transition-colors shadow-xl ${isSelected ? 'bg-indigo-500 border-indigo-500' : 'border-white/30 bg-surface-2/40 backdrop-blur-sm'}`}>
+                        {isSelected && <CheckCircle className="w-3.5 h-3.5 text-text" />}
                     </div>
                 ) : !isFolder ? (
                     <div className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border backdrop-blur-md shadow-lg
-                        ${item.file_type === 'pdf' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' :
-                            item.file_type === 'xlsx' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
-                                item.file_type === 'doc' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
-                                    'bg-indigo-500/20 text-indigo-400 border-indigo-500/30'}`}>
+                        ${item.file_type === 'pdf' ? 'bg-rose-500/20 text-rose-600 [.light_&]:text-rose-700 border-rose-500/30' :
+                            item.file_type === 'xlsx' ? 'bg-emerald-500/20 text-emerald-600 [.light_&]:text-emerald-700 border-emerald-500/30' :
+                                item.file_type === 'doc' ? 'bg-blue-500/20 text-blue-600 [.light_&]:text-blue-700 border-blue-500/30' :
+                                    item.file_type === 'html' ? 'bg-orange-500/20 text-orange-600 [.light_&]:text-orange-700 border-orange-500/30' :
+                                        'bg-indigo-500/20 text-indigo-600 [.light_&]:text-indigo-700 border-indigo-500/30'}`}>
                         {item.file_type || 'IMG'}
                     </div>
                 ) : null}
@@ -766,7 +769,7 @@ const ItemCard = ({ item, isSelected, isSelectionMode, activeDropdown, onToggleS
                     <div className="relative">
                         <Folder className="w-16 h-16 text-indigo-400/80 group-hover:scale-105 transition-transform duration-300" strokeWidth={1} style={{ fill: 'currentColor' }} />
                         {item.is_system && (
-                            <div className="absolute -bottom-1 -right-1 bg-[#1c1c1f] p-1 rounded-full border border-white/10 text-indigo-400 shadow-xl">
+                            <div className="absolute -bottom-1 -right-1 bg-surface p-1 rounded-full border border-border-hover text-indigo-400 shadow-xl">
                                 <Lock className="w-3.5 h-3.5" />
                             </div>
                         )}
@@ -774,25 +777,25 @@ const ItemCard = ({ item, isSelected, isSelectionMode, activeDropdown, onToggleS
                 ) : item.thumbnail ? (
                     <img src={item.thumbnail} alt={item.file_name} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy" draggable={false} />
                 ) : item.file_type === 'image' ? (
-                    <ImageIcon className="w-12 h-12 text-white/10" />
+                    <ImageIcon className="w-12 h-12 text-text/10" />
                 ) : (
-                    <div className={`p-4 rounded-xl shadow-lg transform group-hover:scale-105 transition-transform ${item.file_type === 'pdf' ? 'bg-rose-500/20 text-rose-500' : item.file_type === 'xlsx' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-500'}`}>
+                    <div className={`p-4 rounded-xl shadow-lg transform group-hover:scale-105 transition-transform ${item.file_type === 'pdf' ? 'bg-rose-500/20 text-rose-600 [.light_&]:text-rose-700' : item.file_type === 'xlsx' ? 'bg-emerald-500/20 text-emerald-600 [.light_&]:text-emerald-700' : item.file_type === 'html' ? 'bg-orange-500/20 text-orange-600 [.light_&]:text-orange-700' : 'bg-blue-500/20 text-blue-600 [.light_&]:text-blue-700'}`}>
                         {item.file_type === 'xlsx' ? <Table size={32} /> : <FileText size={32} />}
                     </div>
                 )}
             </div>
 
             {/* Footer */}
-            <div className={`px-3 py-2 border-t bg-[#161618] border-white/[0.04] rounded-b-xl flex items-center justify-between gap-2 z-10 ${isSelectionMode && isSelected ? 'bg-transparent border-transparent' : ''}`}>
+            <div className={`px-3 py-2 border-t bg-surface-2 border-border rounded-b-xl flex items-center justify-between gap-2 z-10 ${isSelectionMode && isSelected ? 'bg-transparent border-transparent' : ''}`}>
                 <div className="min-w-0 flex-1">
-                    <p className={`text-[11px] font-medium truncate ${isFolder ? 'text-indigo-200 font-semibold' : 'text-slate-300'}`}>
+                    <p className={`text-[11px] font-medium truncate ${isFolder ? 'text-indigo-400 [.light_&]:text-indigo-700 font-semibold' : 'text-text'}`}>
                         {isFolder ? item.name : item.file_name || 'Untitled'}
                     </p>
                 </div>
 
                 {!isSelectionMode && (
                     <div className="relative shrink-0">
-                        <button onClick={onMenuClick} className={`p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors ${activeDropdown?.id === item.id ? 'bg-white/10 text-white' : ''}`}>
+                        <button onClick={onMenuClick} className={`p-1 rounded hover:bg-surface-3 text-text-muted hover:text-text transition-colors ${activeDropdown?.id === item.id ? 'bg-surface-3 text-text' : ''}`}>
                             <MoreHorizontal className="w-4 h-4" />
                         </button>
                         {activeDropdown?.id === item.id && (
@@ -810,7 +813,7 @@ const ItemCard = ({ item, isSelected, isSelectionMode, activeDropdown, onToggleS
     );
 };
 
-const ItemRow = ({ item, isSelected, isSelectionMode, activeDropdown, onToggleSelect, onClick, onMenuClick, onAction, onDrop }) => {
+const ItemRow = ({ item, folders, isSelected, isSelectionMode, activeDropdown, onToggleSelect, onClick, onMenuClick, onAction, onDrop }) => {
     const isFolder = item._isFolder;
 
     return (
@@ -828,25 +831,27 @@ const ItemRow = ({ item, isSelected, isSelectionMode, activeDropdown, onToggleSe
                     if (fileId && fileId !== item.id) onDrop(fileId);
                 }
             }}
-            className={`border-b border-white/[0.04] transition-colors cursor-pointer group hover:bg-white/[0.02] relative
+            className={`border-b border-border transition-colors cursor-pointer group hover:bg-surface-2 relative
                 ${isSelectionMode && isSelected ? 'bg-indigo-500/10' : ''}
-                ${activeDropdown?.id === item.id ? 'z-[60] bg-white/[0.04]' : 'z-0'}
+                ${activeDropdown?.id === item.id ? 'z-[60] bg-surface-2' : 'z-0'}
             `}
         >
             <td className="px-4 py-3" onClick={isSelectionMode ? onToggleSelect : undefined}>
                 {isSelectionMode ? (
                     <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-indigo-500 border-indigo-500' : 'border-white/30'}`}>
-                        {isSelected && <CheckCircle className="w-3 h-3 text-white" />}
+                        {isSelected && <CheckCircle className="w-3 h-3 text-text" />}
                     </div>
                 ) : (
                     <div className="relative inline-block">
-                        {isFolder ? <Folder className="w-4 h-4 text-indigo-400" style={{ fill: 'currentColor', fillOpacity: 0.2 }} /> :
-                            item.file_type === 'pdf' ? <FileText className="w-4 h-4 text-rose-400" /> :
-                                item.file_type === 'image' ? <ImageIcon className="w-4 h-4 text-amber-400" /> :
-                                    <File className="w-4 h-4 text-blue-400" />
+                        {isFolder ? <Folder className="w-4 h-4 text-indigo-500 [.light_&]:text-indigo-600" style={{ fill: 'currentColor', fillOpacity: 0.2 }} /> :
+                            item.file_type === 'pdf' ? <FileText className="w-4 h-4 text-rose-500 [.light_&]:text-rose-600" /> :
+                                item.file_type === 'xlsx' ? <Table className="w-4 h-4 text-emerald-500 [.light_&]:text-emerald-600" /> :
+                                    item.file_type === 'image' ? <ImageIcon className="w-4 h-4 text-amber-500 [.light_&]:text-amber-600" /> :
+                                        item.file_type === 'html' ? <FileText className="w-4 h-4 text-orange-500 [.light_&]:text-orange-600" /> :
+                                            <File className="w-4 h-4 text-blue-500 [.light_&]:text-blue-600" />
                         }
                         {item.is_system && (
-                            <div className="absolute -bottom-1.5 -right-1.5 bg-[#0f0f13] rounded-full p-0.5 border border-white/10">
+                            <div className="absolute -bottom-1.5 -right-1.5 bg-surface rounded-full p-0.5 border border-border-hover">
                                 <Lock className="w-2 h-2 text-indigo-400" />
                             </div>
                         )}
@@ -854,20 +859,20 @@ const ItemRow = ({ item, isSelected, isSelectionMode, activeDropdown, onToggleSe
                 )}
             </td>
             <td className="px-4 py-3 min-w-[200px]">
-                <p className={`text-[13px] font-medium truncate max-w-[300px] ${isFolder ? 'text-white font-semibold' : 'text-slate-200'}`}>
+                <p className={`text-[13px] font-medium truncate max-w-[300px] ${isFolder ? 'text-text font-semibold' : 'text-text'}`}>
                     {isFolder ? item.name : item.file_name || 'Untitled'}
                 </p>
             </td>
-            <td className="px-4 py-3 text-[12px] text-slate-500 hidden sm:table-cell">
+            <td className="px-4 py-3 text-[12px] text-text-muted hidden sm:table-cell">
                 {new Date(item.created_at).toLocaleDateString()}
             </td>
-            <td className="px-4 py-3 text-[12px] text-slate-500 uppercase tracking-wide hidden md:table-cell">
+            <td className="px-4 py-3 text-[12px] text-text-muted uppercase tracking-wide hidden md:table-cell">
                 {isFolder ? 'Folder' : (item.file_type || 'IMG')}
             </td>
             <td className="px-4 py-3 text-right relative">
                 {!isSelectionMode && (
                     <>
-                        <button onClick={onMenuClick} className={`p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors opacity-0 group-hover:opacity-100 ${activeDropdown?.id === item.id ? 'opacity-100 bg-white/10 text-white' : ''}`}>
+                        <button onClick={onMenuClick} className={`p-1.5 rounded-lg hover:bg-surface-3 text-text-muted hover:text-text transition-colors opacity-0 group-hover:opacity-100 ${activeDropdown?.id === item.id ? 'opacity-100 bg-surface-3 text-text' : ''}`}>
                             <MoreHorizontal className="w-4 h-4" />
                         </button>
                         {activeDropdown?.id === item.id && (
@@ -892,21 +897,21 @@ const ContextMenu = ({ type, item, onAction, alignRight, isParentSystem }) => {
     const isProtected = item.is_system || isParentSystem;
 
     return (
-        <div className={`absolute ${alignRight ? 'right-0 top-full mt-1' : 'right-0 top-full mt-2'} w-40 bg-[#1e1e24] border border-white/10 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.8)] py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100`} onClick={(e) => e.stopPropagation()}>
+        <div className={`absolute ${alignRight ? 'right-0 top-full mt-1' : 'right-0 top-full mt-2'} w-40 bg-surface-2 border border-border-hover rounded-xl shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100`} onClick={(e) => e.stopPropagation()}>
             {!item._isFolder && (
-                <button onClick={() => onAction('select')} className="w-full text-left px-3.5 py-2 text-[12px] text-slate-300 hover:bg-white/10 hover:text-white flex items-center gap-2">
+                <button onClick={() => onAction('select')} className="w-full text-left px-3.5 py-2 text-[12px] text-text hover:bg-surface-3 hover:text-text flex items-center gap-2">
                     <CheckCircle className="w-3.5 h-3.5 text-indigo-400" /> Select
                 </button>
             )}
             {!isProtected && (
-                <button onClick={() => onAction('rename')} className="w-full text-left px-3.5 py-2 text-[12px] text-slate-300 hover:bg-white/10 hover:text-white flex items-center gap-2">
+                <button onClick={() => onAction('rename')} className="w-full text-left px-3.5 py-2 text-[12px] text-text hover:bg-surface-3 hover:text-text flex items-center gap-2">
                     <Pencil className="w-3.5 h-3.5 text-emerald-400" /> Rename
                 </button>
             )}
-            <button onClick={() => onAction('download')} className="w-full text-left px-3.5 py-2 text-[12px] text-slate-300 hover:bg-white/10 hover:text-white flex items-center gap-2">
+            <button onClick={() => onAction('download')} className="w-full text-left px-3.5 py-2 text-[12px] text-text hover:bg-surface-3 hover:text-text flex items-center gap-2">
                 <Download className="w-3.5 h-3.5 text-indigo-400" /> Download
             </button>
-            {!isProtected && <div className="h-px bg-white/10 my-1.5 mx-2" />}
+            {!isProtected && <div className="h-px bg-surface-3 my-1.5 mx-2" />}
             {!isProtected && (
                 <button onClick={() => onAction('delete')} className="w-full text-left px-3.5 py-2 text-[12px] text-rose-400 hover:bg-rose-500/10 flex items-center gap-2">
                     <Trash className="w-3.5 h-3.5" /> Delete

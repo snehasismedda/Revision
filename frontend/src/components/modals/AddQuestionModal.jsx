@@ -211,13 +211,12 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
         <ModalPortal>
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop fade-in" onClick={onClose}>
                 <div
-                    className="w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-                    style={{ background: 'rgba(12, 12, 22, 0.95)', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(10px)' }}
+                    className="w-full max-w-2xl bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
                     onClick={e => e.stopPropagation()}
                 >
                     {/* Header */}
-                    <div className="flex items-center justify-between px-7 py-5 border-b border-white/[0.06] shrink-0">
-                        <h3 className="text-lg font-heading font-semibold text-white flex items-center gap-3">
+                    <div className="flex items-center justify-between px-7 py-5 border-b border-border shrink-0">
+                        <h3 className="text-lg font-heading font-semibold text-text flex items-center gap-3">
                             <div className="p-2 rounded-lg bg-primary/10 text-primary">
                                 <PlusCircle className="w-5 h-5" />
                             </div>
@@ -225,7 +224,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                         </h3>
                         <button
                             onClick={handleModalClose}
-                            className="p-2 text-slate-500 hover:text-white hover:bg-white/[0.06] rounded-lg transition-all cursor-pointer"
+                            className="p-2 text-text-muted hover:text-text hover:bg-surface-3/10 rounded-lg transition-all cursor-pointer"
                         >
                             <X className="w-5 h-5" />
                         </button>
@@ -234,25 +233,25 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                     {/* Body */}
                     <div className="px-7 py-6 overflow-y-auto custom-scrollbar">
                         {/* Type toggle */}
-                        <div className="flex p-1 bg-surface-2/80 rounded-xl mb-6 border border-white/[0.06]">
+                        <div className="flex p-0.5 bg-surface-3 rounded-lg border border-border mb-8 shadow-sm">
                             <button
                                 type="button"
                                 onClick={() => handleTabChange('text')}
-                                className={`flex-1 py-2.5 text-[13px] font-semibold rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer ${newQuestionType === 'text' ? 'bg-primary/[0.12] text-white border border-primary/20 shadow-sm' : 'text-slate-500 hover:text-slate-200 border border-transparent'}`}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-[12px] font-bold transition-all cursor-pointer ${newQuestionType === 'text' ? 'bg-surface text-primary shadow-sm border border-border' : 'text-text-muted hover:text-text'}`}
                             >
                                 <FileText className="w-4 h-4" /> Text
                             </button>
                             <button
                                 type="button"
                                 onClick={() => handleTabChange('image')}
-                                className={`flex-1 py-2.5 text-[13px] font-semibold rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer ${newQuestionType === 'image' ? 'bg-primary/[0.12] text-white border border-primary/20 shadow-sm' : 'text-slate-500 hover:text-slate-200 border border-transparent'}`}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-[12px] font-bold transition-all cursor-pointer ${newQuestionType === 'image' ? 'bg-surface text-primary shadow-sm border border-border' : 'text-text-muted hover:text-text'}`}
                             >
                                 <ImageIcon className="w-4 h-4" /> Upload
                             </button>
                             <button
                                 type="button"
                                 onClick={() => handleTabChange('camera')}
-                                className={`flex-1 py-2.5 text-[13px] font-semibold rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer ${newQuestionType === 'camera' ? 'bg-primary/[0.12] text-white border border-primary/20 shadow-sm' : 'text-slate-500 hover:text-slate-200 border border-transparent'}`}
+                                className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md text-[12px] font-bold transition-all cursor-pointer ${newQuestionType === 'camera' ? 'bg-surface text-primary shadow-sm border border-border' : 'text-text-muted hover:text-text'}`}
                             >
                                 <Camera className="w-4 h-4" /> Camera
                             </button>
@@ -261,20 +260,20 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                         <form id="add-question-form" onSubmit={handleAddQuestion} className="space-y-5">
                             {newQuestionType === 'text' ? (
                                 <div>
-                                    <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-2.5">Question Content</label>
+                                    <label className="block text-[10px] font-extrabold text-text-muted uppercase tracking-[0.18em] mb-2.5">Question Content</label>
                                     <textarea
                                         value={newQuestionText}
                                         onChange={(e) => setNewQuestionText(e.target.value)}
                                         placeholder="Paste or type your question here... e.g., 'What is the sum of the first 100 integers?'"
                                         rows={8}
-                                        className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 focus:bg-surface-2/70 transition-all placeholder:text-slate-600/80 resize-none"
+                                        className="w-full bg-surface-2 border border-border text-text rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 focus:bg-surface-2 transition-all placeholder:text-text-muted/60 shadow-inner resize-none"
                                     />
                                 </div>
                             ) : newQuestionType === 'image' ? (
                                 <div>
-                                    <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-2.5">Upload Image</label>
+                                    <label className="block text-[10px] font-extrabold text-text-muted uppercase tracking-[0.18em] mb-2.5">Upload Image</label>
                                     <div
-                                        className="relative border-2 border-dashed border-white/[0.08] rounded-xl p-12 flex flex-col items-center justify-center bg-surface-2/30 hover:bg-surface-2/50 hover:border-primary/30 transition-all cursor-pointer group"
+                                        className="w-full relative group border-2 border-dashed border-border rounded-2xl p-10 transition-all hover:bg-surface-2 hover:border-primary/40 cursor-pointer flex flex-col items-center justify-center min-h-[220px] bg-surface-2"
                                         onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                                         onDrop={(e) => {
                                             e.preventDefault();
@@ -313,8 +312,8 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                                         {newQuestionImage ? (
                                             <div className="w-full relative min-h-[200px] flex items-center justify-center">
                                                 <img src={newQuestionImage} alt="Preview" className="max-h-[300px] object-contain rounded-lg shadow-lg relative z-0" />
-                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center pointer-events-none">
-                                                    <span className="text-white font-medium bg-black/60 px-4 py-2 rounded-full text-[13px]">Click or Drag to change</span>
+                                                <div className="absolute inset-0 bg-surface-2/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center pointer-events-none">
+                                                    <span className="text-text font-medium bg-surface-3/60 px-4 py-2 rounded-full text-[13px]">Click or Drag to change</span>
                                                 </div>
                                             </div>
                                         ) : (
@@ -322,8 +321,8 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                                                 <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4 group-hover:scale-110 group-hover:bg-primary/20 transition-all">
                                                     <ImageIcon className="w-8 h-8" />
                                                 </div>
-                                                <h4 className="text-white font-semibold mb-1 text-[14px]">Click to upload or drag and drop</h4>
-                                                <p className="text-[13px] text-slate-500">SVG, PNG, JPG or GIF (max. 10MB)</p>
+                                                <h4 className="text-text font-semibold mb-1 text-[14px]">Click to upload or drag and drop</h4>
+                                                <p className="text-[13px] text-text-muted/60">SVG, PNG, JPG or GIF (max. 10MB)</p>
                                             </div>
                                         )}
                                     </div>
@@ -352,7 +351,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                             ) : (
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between mb-2">
-                                        <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em]">Native Camera</label>
+                                        <label className="block text-[10px] font-extrabold text-text-muted uppercase tracking-[0.18em]">Native Camera</label>
                                         <div className="flex items-center gap-3">
                                             <div className="relative group/sel min-w-[140px]">
                                                 <select
@@ -362,7 +361,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                                                         setSelectedCameraId(newId);
                                                         startCamera(newId);
                                                     }}
-                                                    className="w-full bg-surface-3/50 border border-white/10 rounded-lg py-1.5 pl-3 pr-8 text-[11px] text-slate-300 outline-none focus:border-primary/40 appearance-none cursor-pointer hover:bg-surface-3 transition-all shadow-sm"
+                                                    className="w-full bg-surface-2 border border-border rounded-lg py-1.5 pl-3 pr-8 text-[11px] text-text outline-none focus:border-primary/40 appearance-none cursor-pointer hover:bg-surface-3 transition-all shadow-sm"
                                                 >
                                                     {cameras.length > 0 ? (
                                                         cameras.map(camera => (
@@ -374,7 +373,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                                                         <option value="">No Camera Found</option>
                                                     )}
                                                 </select>
-                                                <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-slate-500 group-hover/sel:text-slate-300 transition-colors">
+                                                <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-text-muted group-hover/sel:text-text transition-colors">
                                                     <ChevronDown className="w-3.5 h-3.5" />
                                                 </div>
                                             </div>
@@ -382,7 +381,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                                             <button
                                                 type="button"
                                                 onClick={getCameras}
-                                                className="p-1.5 rounded-lg bg-surface-3/50 border border-white/10 text-slate-500 hover:text-white hover:border-white/20 transition-all active:scale-90"
+                                                className="p-1.5 rounded-lg bg-surface-3 border border-border text-text-muted hover:text-text hover:border-border transition-all active:scale-90"
                                                 title="Rescan Devices"
                                             >
                                                 <RefreshCcw className="w-3.5 h-3.5" />
@@ -390,7 +389,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                                         </div>
                                     </div>
 
-                                    <div className="relative aspect-video bg-black rounded-xl overflow-hidden border border-white/[0.08] shadow-2xl flex items-center justify-center group bg-[radial-gradient(circle_at_center,_#1a1a2e_0%,_#0a0a0f_100%)]">
+                                    <div className="relative aspect-video bg-black rounded-xl overflow-hidden border border-border shadow-2xl flex items-center justify-center group bg-[radial-gradient(circle_at_center,_#1a1a2e_0%,_#0a0a0f_100%)]">
                                         {isCameraLoading ? (
                                             <div className="flex flex-col items-center gap-4">
                                                 <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
@@ -423,7 +422,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                                                                     setSelectedCameraId(nextId);
                                                                     startCamera(nextId);
                                                                 }}
-                                                                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center border border-white/10 transition-all active:scale-90"
+                                                                className="w-10 h-10 rounded-full bg-surface-3/20 hover:bg-surface-3/40 text-text flex items-center justify-center border border-border transition-all active:scale-90"
                                                                 title="Switch Camera"
                                                             >
                                                                 <FlipHorizontal className="w-5 h-5" />
@@ -436,7 +435,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                                                             className="relative group cursor-pointer"
                                                         >
                                                             <div className="absolute -inset-4 bg-primary/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity animate-pulse" />
-                                                            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all group-hover:scale-110 group-active:scale-95 group-active:shadow-inner border-4 border-slate-200">
+                                                            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all group-hover:scale-110 group-active:scale-95 group-active:shadow-inner border-4 border-border">
                                                                 <div className="w-12 h-12 border-2 border-primary/40 rounded-full flex items-center justify-center">
                                                                     <div className="w-3 h-3 bg-primary rounded-full animate-ping" />
                                                                 </div>
@@ -446,7 +445,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                                                         <button
                                                             type="button"
                                                             onClick={() => startCamera(selectedCameraId)}
-                                                            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center border border-white/10 transition-all active:scale-90"
+                                                            className="w-10 h-10 rounded-full bg-surface-3/20 hover:bg-surface-3/40 text-text flex items-center justify-center border border-border transition-all active:scale-90"
                                                             title="Refresh Stream"
                                                         >
                                                             <RefreshCcw className="w-4 h-4" />
@@ -455,9 +454,9 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                                                 </div>
 
                                                 {/* Corner Decoration */}
-                                                <div className="absolute top-4 left-4 flex items-center gap-2 px-2 py-1 bg-black/40 rounded-md border border-white/10">
+                                                <div className="absolute top-4 left-4 flex items-center gap-2 px-2 py-1 bg-surface-2/40 rounded-md border border-border-hover">
                                                     <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-                                                    <span className="text-[10px] font-bold text-white uppercase tracking-wider">Live</span>
+                                                    <span className="text-[10px] font-bold text-text uppercase tracking-wider">Live</span>
                                                 </div>
                                             </>
                                         ) : (
@@ -465,8 +464,8 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                                                 <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
                                                     <Camera className="w-8 h-8" />
                                                 </div>
-                                                <h4 className="text-white font-semibold mb-2">Camera Permission Required</h4>
-                                                <p className="text-[13px] text-slate-500 mb-6">Click below to allow camera access to capture questions.</p>
+                                                <h4 className="text-text font-semibold mb-2">Camera Permission Required</h4>
+                                                <p className="text-[13px] text-text-muted mb-6">Click below to allow camera access to capture questions.</p>
                                                 <button
                                                     type="button"
                                                     onClick={() => startCamera(selectedCameraId)}
@@ -480,11 +479,11 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
 
                                     {newQuestionImage && !cameraStream && (
                                         <div className="flex items-center gap-3 p-3 bg-indigo-500/5 border border-indigo-500/10 rounded-xl">
-                                            <div className="w-12 h-12 rounded-lg overflow-hidden border border-white/10 shrink-0">
+                                            <div className="w-12 h-12 rounded-lg overflow-hidden border border-border-hover shrink-0">
                                                 <img src={newQuestionImage} className="w-full h-full object-cover" alt="Captured" />
                                             </div>
                                             <div className="flex-1">
-                                                <p className="text-[12px] text-slate-300 font-medium line-clamp-1">Last captured image</p>
+                                                <p className="text-[12px] text-text font-medium line-clamp-1">Last captured image</p>
                                                 <button
                                                     type="button"
                                                     onClick={() => { setImageToCrop(newQuestionImage); setIsCropping(true); }}
@@ -496,7 +495,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                                             <button
                                                 type="button"
                                                 onClick={() => setNewQuestionImage('')}
-                                                className="p-2 text-slate-500 hover:text-red-400 transition-colors"
+                                                className="p-2 text-text-muted hover:text-red-400 transition-colors"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
@@ -507,30 +506,30 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
 
                             <div>
                                 <div className="flex items-center justify-between mb-2.5">
-                                    <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] flex items-center gap-2 text-slate-400">
+                                    <label className="block text-[10px] font-extrabold text-text-muted uppercase tracking-[0.18em] flex items-center gap-2 text-text-muted">
                                         <Hash className="w-3 h-3" /> Topic Tags
                                     </label>
                                     <div className="relative w-48">
-                                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
+                                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-text-muted" />
                                         <input
                                             type="text"
                                             value={topicSearchQuery}
                                             onChange={(e) => setTopicSearchQuery(e.target.value)}
                                             placeholder="Search topics..."
-                                            className="w-full bg-surface-3/50 border border-white/5 rounded-lg py-1 pl-8 pr-3 text-[11px] text-slate-300 outline-none focus:border-primary/40 transition-all placeholder:text-slate-600"
+                                            className="w-full bg-surface-2 border border-border rounded-lg py-1 pl-8 pr-3 text-[11px] text-text outline-none focus:border-primary/40 transition-all placeholder:text-text-muted/60 shadow-inner"
                                         />
                                         {topicSearchQuery && (
                                             <button
                                                 type="button"
                                                 onClick={() => setTopicSearchQuery('')}
-                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
                                             >
                                                 <X className="w-2.5 h-2.5" />
                                             </button>
                                         )}
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-41 overflow-y-auto p-2 rounded-xl bg-surface-2/30 border border-white/[0.04]">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-41 overflow-y-auto p-2 rounded-xl bg-surface-2 border border-border">
                                     {filteredTopics.map(topic => {
                                         const isSelected = tags.includes(topic.name);
                                         return (
@@ -540,8 +539,8 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                                                 onClick={() => toggleTag(topic.name)}
                                                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[12px] font-medium transition-all border cursor-pointer
                                                     ${isSelected
-                                                        ? 'bg-primary/10 border-primary/30 text-primary shadow-[0_2px_8px_rgba(139,92,246,0.1)]'
-                                                        : 'bg-white/5 border-transparent text-slate-500 hover:bg-white/10 hover:text-slate-300'
+                                                        ? 'bg-primary/20 border-primary/30 text-primary shadow-[0_2px_8px_rgba(139,92,246,0.1)]'
+                                                        : 'bg-surface-3 border-transparent text-text-muted hover:bg-surface hover:text-text'
                                                     }`}
                                             >
                                                 {isSelected ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Circle className="w-3.5 h-3.5 opacity-40" />}
@@ -551,7 +550,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                                         );
                                     })}
                                     {filteredTopics.length === 0 && (
-                                        <div className="col-span-full py-4 text-center text-[12px] text-slate-500 italic">
+                                        <div className="col-span-full py-4 text-center text-[12px] text-text-muted italic">
                                             {topicSearchQuery ? 'No topics found matching your search' : 'No topics available. Add topics to regular syllabus first.'}
                                         </div>
                                     )}
@@ -561,7 +560,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                     </div>
 
                     {/* Footer */}
-                    <div className="px-7 py-5 border-t border-white/[0.06] shrink-0 flex items-center justify-between">
+                    <div className="px-7 py-5 border-t border-border shrink-0 flex items-center justify-between">
                         <div className="flex flex-col gap-1.5">
                             <button
                                 type="button"
@@ -587,7 +586,7 @@ const AddQuestionModal = ({ isOpen, onClose, subjectId, onQuestionAdded, topics 
                             <button
                                 type="button"
                                 onClick={handleModalClose}
-                                className="px-5 py-3 rounded-xl text-[13px] font-semibold text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer border border-transparent hover:border-white/[0.08]"
+                                className="px-5 py-3 rounded-xl text-[13px] font-semibold text-text-muted hover:text-text hover:bg-surface-3/10 transition-all cursor-pointer border border-transparent hover:border-border"
                             >
                                 Cancel
                             </button>

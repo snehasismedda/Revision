@@ -163,8 +163,7 @@ const ActivityDetailModal = ({ isOpen, onClose, month, year, initialDay }) => {
         <ModalPortal>
             <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 modal-backdrop fade-in" onClick={onClose}>
                 <div
-                    className="relative w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden rounded-[2.5rem] border border-white/[0.08] shadow-[0_32px_80px_-20px_rgba(0,0,0,0.6)]"
-                    style={{ background: 'rgba(10, 10, 18, 0.98)', backdropFilter: 'blur(24px)' }}
+                    className="relative w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden rounded-[2.5rem] bg-surface border border-border shadow-[0_32px_80px_-20px_rgba(0,0,0,0.4)]"
                     onClick={e => e.stopPropagation()}
                 >
                     {/* ─── Background Decor ─── */}
@@ -172,7 +171,7 @@ const ActivityDetailModal = ({ isOpen, onClose, month, year, initialDay }) => {
                     <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-600/5 blur-[120px] pointer-events-none translate-y-1/2 -translate-x-1/2" />
 
                     {/* ═══ Header ═══ */}
-                    <div className="flex items-center justify-between px-10 py-7 border-b border-white/[0.06] shrink-0 relative z-10 bg-white/[0.01]">
+                    <div className="flex items-center justify-between px-10 py-7 border-b border-border shrink-0 relative z-10 bg-surface-2/30">
                         <div className="flex items-center gap-5">
                             <div className="relative group">
                                 <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full group-hover:bg-primary/30 transition-all duration-500" />
@@ -181,17 +180,17 @@ const ActivityDetailModal = ({ isOpen, onClose, month, year, initialDay }) => {
                                 </div>
                             </div>
                             <div>
-                                <h3 className="text-2xl font-heading font-black text-white tracking-tight leading-none flex items-center gap-3">
-                                    Activity <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-light to-primary-dark">Audit</span>
+                                <h3 className="text-2xl font-heading font-black text-text tracking-tight leading-none flex items-center gap-3">
+                                    Activity <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-primary-dark">Audit</span>
                                 </h3>
                                 <div className="flex items-center gap-3 mt-2">
-                                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.06] text-[11px] font-bold text-slate-400">
+                                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-3/20 border border-border text-[11px] font-bold text-text-muted">
                                         <Calendar className="w-3 h-3 text-primary/60" />
                                         {monthNames[month]} {year}
                                     </div>
-                                    <div className="w-1 h-1 rounded-full bg-slate-700" />
-                                    <div className="text-[11px] font-bold text-slate-500 flex items-center gap-1.5">
-                                        <Clock className="w-3 h-3 text-slate-600" />
+                                    <div className="w-1 h-1 rounded-full bg-border" />
+                                    <div className="text-[11px] font-bold text-text-muted/60 flex items-center gap-1.5">
+                                        <Clock className="w-3 h-3 text-text-muted/40" />
                                         {selectedDay 
                                             ? formatDate(selectedDay, { day: 'numeric', month: 'long', year: 'numeric' }) 
                                             : 'Continuous Progress Tracking'
@@ -204,7 +203,7 @@ const ActivityDetailModal = ({ isOpen, onClose, month, year, initialDay }) => {
                             {selectedDay && (
                                 <button
                                     onClick={() => setSelectedDay(null)}
-                                    className="flex items-center gap-2 text-[12px] font-black text-white px-5 py-2.5 rounded-2xl bg-white/[0.05] border border-white/10 hover:bg-white/[0.08] hover:border-white/20 transition-all cursor-pointer shadow-sm active:scale-95 group"
+                                    className="flex items-center gap-2 text-[12px] font-black text-text px-5 py-2.5 rounded-2xl bg-surface-3/10 border border-border hover:bg-surface-3/20 hover:border-text-muted/20 transition-all cursor-pointer shadow-sm active:scale-95 group"
                                 >
                                     <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
                                     Full Month
@@ -212,7 +211,7 @@ const ActivityDetailModal = ({ isOpen, onClose, month, year, initialDay }) => {
                             )}
                             <button
                                 onClick={onClose}
-                                className="p-3 text-slate-500 hover:text-white hover:bg-white/[0.08] rounded-2xl transition-all cursor-pointer border border-transparent hover:border-white/10 group active:scale-90"
+                                className="p-3 text-text-muted hover:text-text hover:bg-surface-3/10 rounded-2xl transition-all cursor-pointer border border-transparent hover:border-border group active:scale-90"
                             >
                                 <X className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
                             </button>
@@ -223,21 +222,21 @@ const ActivityDetailModal = ({ isOpen, onClose, month, year, initialDay }) => {
                     <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative z-10">
 
                         {/* ─── Sidebar (Calendar & Tabs) ─── */}
-                        <div className="w-full lg:w-[340px] shrink-0 border-r border-white/5 flex flex-col overflow-hidden bg-white/[0.01]">
+                        <div className="w-full lg:w-[340px] shrink-0 border-r border-border flex flex-col overflow-hidden bg-surface-2/20">
                             <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-10">
                                 {/* Calendar Section */}
                                 <div className="space-y-5">
                                     <div className="flex items-center justify-between px-1">
-                                        <label className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] pointer-events-none">
+                                        <label className="text-[11px] font-black text-text-muted/60 uppercase tracking-[0.2em] pointer-events-none">
                                             Timeline Context
                                         </label>
-                                        <span className="text-[10px] font-black text-primary/60 uppercase">{monthNames[month].substring(0,3)}</span>
+                                        <span className="text-[10px] font-black text-primary uppercase">{monthNames[month].substring(0,3)}</span>
                                     </div>
 
-                                    <div className="p-4 rounded-[1.75rem] bg-black/20 border border-white/5 shadow-inner">
+                                    <div className="p-4 rounded-[1.75rem] bg-black/20 border border-border shadow-inner">
                                         <div className="grid grid-cols-7 gap-2 mb-3">
                                             {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
-                                                <div key={i} className="text-[10px] font-black text-slate-700 text-center">{d}</div>
+                                                <div key={i} className="text-[10px] font-black text-text-muted/40 text-center">{d}</div>
                                             ))}
                                         </div>
                                         <div className="grid grid-cols-7 gap-1.5">
@@ -252,10 +251,10 @@ const ActivityDetailModal = ({ isOpen, onClose, month, year, initialDay }) => {
                                                         key={day.date}
                                                         onClick={() => setSelectedDay(isSelected ? null : day.date)}
                                                         className={`aspect-square rounded-xl text-[11px] font-black transition-all flex items-center justify-center cursor-pointer border ${isSelected
-                                                                ? 'bg-primary text-white shadow-[0_8px_20px_-4px_rgba(139,92,246,0.6)] border-primary-light/40 scale-110 z-10'
+                                                                ? 'bg-primary text-white shadow-lg shadow-primary/40 border-primary scale-110 z-10'
                                                                 : hasActivity
-                                                                    ? 'bg-primary/10 text-primary-light border-primary/20 hover:bg-primary/20'
-                                                                    : 'bg-white/[0.03] border-white/5 text-slate-600 hover:text-slate-300 hover:bg-white/10 hover:border-white/20'
+                                                                    ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20'
+                                                                    : 'bg-surface-3/30 border-border text-text-muted/40 hover:text-text hover:bg-surface-3/50 hover:border-text-muted/20'
                                                             }`}
                                                     >
                                                         {day.day}
@@ -269,8 +268,8 @@ const ActivityDetailModal = ({ isOpen, onClose, month, year, initialDay }) => {
                                 {/* Category Navigation */}
                                 <div className="space-y-5">
                                     <div className="flex items-center justify-between px-1">
-                                        <label className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] pointer-events-none">Metric Filters</label>
-                                        <Filter className="w-3 h-3 text-slate-700" />
+                                        <label className="text-[11px] font-black text-text-muted/60 uppercase tracking-[0.2em] pointer-events-none">Metric Filters</label>
+                                        <Filter className="w-3 h-3 text-text-muted/40" />
                                     </div>
                                     <div className="space-y-2">
                                         {tabs.map((tab) => {
@@ -317,18 +316,18 @@ const ActivityDetailModal = ({ isOpen, onClose, month, year, initialDay }) => {
                                                     key={tab.id}
                                                     onClick={() => setActiveTab(tab.id)}
                                                     className={`w-full flex items-center gap-4 px-4.5 py-3.5 rounded-2xl transition-all cursor-pointer group/tab border ${isActive
-                                                            ? `${styles.active} shadow-lg shadow-black/20`
-                                                            : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.04] border-transparent'
+                                                            ? `${styles.active} shadow-lg shadow-black/5`
+                                                            : 'text-text-muted hover:text-text hover:bg-surface-3 border-transparent'
                                                         }`}
                                                 >
-                                                    <div className={`p-2 rounded-xl transition-all ${isActive ? styles.icon : 'bg-white/5 text-slate-600 group-hover/tab:text-slate-400 group-hover/tab:bg-white/10'}`}>
+                                                    <div className={`p-2 rounded-xl transition-all ${isActive ? styles.icon : 'bg-surface-2 text-text-muted group-hover/tab:text-text'}`}>
                                                         <tab.icon className={`w-4 h-4 ${isActive ? 'scale-110' : ''}`} />
                                                     </div>
-                                                    <span className={`flex-1 text-left text-[14px] font-bold tracking-tight ${isActive ? 'text-white' : ''}`}>{tab.label}</span>
+                                                    <span className={`flex-1 text-left text-[14px] font-bold tracking-tight ${isActive ? 'text-text' : 'text-text-muted'}`}>{tab.label}</span>
                                                     {count > 0 && (
                                                         <span className={`min-w-[28px] h-6 px-2.5 flex items-center justify-center rounded-xl text-[11px] font-black transition-all ${isActive
                                                                 ? styles.badge
-                                                                : 'bg-white/5 text-slate-600 border border-white/5'
+                                                                : 'bg-surface-2 text-text-muted/60 border border-border'
                                                             }`}>
                                                             {count}
                                                         </span>
@@ -342,14 +341,14 @@ const ActivityDetailModal = ({ isOpen, onClose, month, year, initialDay }) => {
                         </div>
 
                         {/* ─── Main Panel (Audit List) ─── */}
-                        <div className="flex-1 overflow-y-auto custom-scrollbar bg-black/10 relative active-scrollbar">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar bg-surface-2/10 relative active-scrollbar">
                             <div className="p-10 max-w-4xl mx-auto w-full relative z-10">
                                 <div className="mb-10 flex items-center justify-between">
                                     <div>
-                                        <h4 className="text-xs font-black text-slate-600 uppercase tracking-[0.3em] mb-2">Audit Log Analytics</h4>
+                                        <h4 className="text-xs font-black text-text-muted/40 uppercase tracking-[0.3em] mb-2">Audit Log Analytics</h4>
                                         <div className="h-1 w-16 bg-gradient-to-r from-primary/40 to-transparent rounded-full" />
                                     </div>
-                                    <div className="text-[10px] font-black text-slate-700 uppercase tracking-widest bg-white/[0.02] border border-white/5 px-3 py-1.5 rounded-full">
+                                    <div className="text-[10px] font-black text-text-muted uppercase tracking-widest bg-surface-3 border border-border px-3 py-1.5 rounded-full">
                                         {loading ? 'Refreshing...' : `${currentTabData.length} Entity Records`}
                                     </div>
                                 </div>
@@ -357,7 +356,7 @@ const ActivityDetailModal = ({ isOpen, onClose, month, year, initialDay }) => {
                                 {loading ? (
                                     <div className="space-y-4 pt-2">
                                         {Array(8).fill(0).map((_, i) => (
-                                            <div key={i} className="h-20 rounded-3xl bg-white/[0.02] border border-white/[0.04] animate-pulse" />
+                                            <div key={i} className="h-20 rounded-3xl bg-surface-2 border border-border animate-pulse" />
                                         ))}
                                     </div>
                                 ) : currentTabData.length > 0 ? (
@@ -365,7 +364,7 @@ const ActivityDetailModal = ({ isOpen, onClose, month, year, initialDay }) => {
                                         {currentTabData.map((item, i) => (
                                             <div
                                                 key={item.id}
-                                                className="flex items-center gap-6 px-7 py-5 rounded-[2rem] bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.05] hover:border-white/[0.12] transition-all duration-300 group cursor-pointer shadow-sm hover:shadow-2xl hover:-translate-y-1 block-reveal"
+                                                className="flex items-center gap-6 px-7 py-5 rounded-[2rem] bg-surface border border-border hover:bg-surface-2 hover:border-primary/30 transition-all duration-300 group cursor-pointer shadow-sm hover:shadow-xl hover:-translate-y-1 block-reveal"
                                                 style={{ animationDelay: `${i * 30}ms` }}
                                             >
                                                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-[15px] font-black shrink-0 transition-all group-hover:scale-105 shadow-xl ${item.isTest
@@ -376,13 +375,13 @@ const ActivityDetailModal = ({ isOpen, onClose, month, year, initialDay }) => {
                                                 </div>
 
                                                 <div className="flex-1 min-w-0">
-                                                    <h4 className="text-[17px] font-heading font-black text-slate-100 group-hover:text-white transition-colors truncate tracking-tight">
+                                                    <h4 className="text-[17px] font-heading font-black text-text group-hover:text-primary transition-colors truncate tracking-tight">
                                                         {item.name}
                                                     </h4>
                                                     <div className="flex items-center gap-4 mt-1.5">
-                                                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-black/20 border border-white/5">
-                                                             <Clock className="w-3 h-3 text-slate-600" />
-                                                             <span className="text-[10px] font-bold text-slate-500 uppercase">Tracked Action</span>
+                                                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-surface-2 border border-border">
+                                                             <Clock className="w-3 h-3 text-text-muted/40" />
+                                                             <span className="text-[10px] font-bold text-text-muted/60 uppercase">Tracked Action</span>
                                                         </div>
                                                         {item.topicsRevised > 0 && activeTab !== 'topicsRevised' && (
                                                             <p className="text-[11px] font-bold text-primary/50 flex items-center gap-1.5">
@@ -395,16 +394,16 @@ const ActivityDetailModal = ({ isOpen, onClose, month, year, initialDay }) => {
 
                                                 <div className="flex items-center gap-6 shrink-0">
                                                     <div className="flex flex-col items-end">
-                                                        <div className="px-5 py-2.5 rounded-2xl bg-black/40 border border-white/10 group-hover:border-primary/40 group-hover:bg-primary/10 transition-all flex flex-col items-center min-w-[100px]">
-                                                            <span className="text-2xl font-black text-white tabular-nums tracking-tighter leading-none">
+                                                        <div className="px-5 py-2.5 rounded-2xl bg-surface-2 border border-border group-hover:border-primary/40 group-hover:bg-primary/5 transition-all flex flex-col items-center min-w-[100px] shadow-inner">
+                                                            <span className="text-2xl font-black text-text tabular-nums tracking-tighter leading-none group-hover:text-primary transition-colors">
                                                                 {activeTab === 'tests' ? item.tests : item[activeTab]}
                                                             </span>
-                                                            <span className="mt-1 text-[9px] font-black text-slate-600 uppercase tracking-widest group-hover:text-primary-light/60 transition-colors">
+                                                            <span className="mt-1 text-[9px] font-black text-text-muted/40 uppercase tracking-widest group-hover:text-primary transition-colors">
                                                                 {activeTab === 'topicsRevised' ? 'REVISED' : activeTab === 'tests' ? 'COUNT' : activeTab}
                                                             </span>
                                                         </div>
                                                     </div>
-                                                    <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-center group-hover:bg-primary/20 group-hover:border-primary/40 group-hover:text-primary transition-all shadow-inner">
+                                                    <div className="w-12 h-12 rounded-2xl bg-surface-3 border border-border flex items-center justify-center group-hover:bg-primary group-hover:border-primary group-hover:text-text transition-all shadow-sm">
                                                         <ChevronRight className="w-6 h-6 transition-transform group-hover:translate-x-1" />
                                                     </div>
                                                 </div>
@@ -414,13 +413,13 @@ const ActivityDetailModal = ({ isOpen, onClose, month, year, initialDay }) => {
                                 ) : (
                                     <div className="py-24 flex flex-col items-center justify-center fade-in">
                                         <div className="relative mb-8">
-                                            <div className="absolute inset-0 bg-slate-500/10 blur-3xl rounded-full" />
-                                            <div className="relative w-20 h-20 rounded-[2rem] bg-white/[0.02] border border-white/[0.06] flex items-center justify-center shadow-2xl">
-                                                <Hash className="w-10 h-10 text-slate-800" strokeWidth={1} />
+                                            <div className="absolute inset-0 bg-primary/10 blur-3xl rounded-full" />
+                                            <div className="relative w-20 h-20 rounded-[2rem] bg-surface-3 border border-border flex items-center justify-center shadow-xl">
+                                                <Hash className="w-10 h-10 text-text-muted/20" strokeWidth={1} />
                                             </div>
                                         </div>
-                                        <h4 className="text-xl font-heading font-black text-slate-500 tracking-tight">Vortex of Silence</h4>
-                                        <p className="text-slate-700 text-[12px] font-bold mt-2 uppercase tracking-widest">No {activeTab} activity recorded {selectedDay ? 'on this specific day' : 'for this period'}</p>
+                                        <h4 className="text-xl font-heading font-black text-text-muted/40 tracking-tight">Vortex of Silence</h4>
+                                        <p className="text-text-muted/20 text-[12px] font-bold mt-2 uppercase tracking-widest">No {activeTab} activity recorded {selectedDay ? 'on this specific day' : 'for this period'}</p>
                                     </div>
                                 )}
                             </div>

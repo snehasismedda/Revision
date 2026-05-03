@@ -38,11 +38,11 @@ const accPill = (v) => v >= 75
 const ChartTip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
     return (
-        <div className="bg-[#13132a]/95 border border-white/10 rounded-xl p-3 shadow-2xl text-[13px] min-w-[140px]">
-            <p className="text-slate-500 mb-1.5 text-[11px] font-medium uppercase tracking-wider">{payload[0]?.payload?.date || label}</p>
+        <div className="bg-[#13132a]/95 border border-border rounded-xl p-3 shadow-2xl text-[13px] min-w-[140px]">
+            <p className="text-text-muted mb-1.5 text-[11px] font-medium uppercase tracking-wider">{payload[0]?.payload?.date || label}</p>
             {payload.map((p, i) => (
                 <div key={i} className="flex items-center justify-between gap-4 py-0.5">
-                    <span className="text-slate-400 font-medium">{p.name}:</span>
+                    <span className="text-text-muted font-medium">{p.name}:</span>
                     <span style={{ color: p.color }} className="font-bold">
                         {p.value}{p.name.includes('Acc') || p.name === 'Accuracy' || p.name === 'Target' ? '%' : ''}
                     </span>
@@ -381,7 +381,7 @@ const TestSeriesDetail = () => {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {[1, 2, 3, 4, 5, 6].map(i => (
-                        <div key={i} className="glass p-8 animate-pulse h-[160px] rounded-xl border-white/5" />
+                        <div key={i} className="glass p-8 animate-pulse h-[160px] rounded-xl border-border" />
                     ))}
                 </div>
             </div>
@@ -401,7 +401,7 @@ const TestSeriesDetail = () => {
                     <div className="flex-1 flex justify-start">
                         <button
                             onClick={() => navigate('/tests')}
-                            className="flex items-center gap-2 text-[12.5px] font-bold text-slate-400 hover:text-white transition-all hover:bg-white/[0.06] pl-2.5 pr-4 py-2.5 rounded-xl border border-white/[0.04] hover:border-white/[0.1] group/back backdrop-blur-md whitespace-nowrap cursor-pointer"
+                            className="flex items-center gap-2 text-[12.5px] font-bold text-text-muted hover:text-text transition-all hover:bg-surface-3/10 pl-2.5 pr-4 py-2.5 rounded-xl border border-border hover:border-border-hover group/back backdrop-blur-md whitespace-nowrap cursor-pointer"
                         >
                             <ArrowLeft className="w-4 h-4 group-hover/back:-translate-x-0.5 transition-transform" />
                             <span>Back</span>
@@ -410,7 +410,7 @@ const TestSeriesDetail = () => {
 
                     {/* Center: Title (Maximum focus) */}
                     <div className="flex-[4] text-center min-w-0">
-                        <h1 className="text-[28px] md:text-[38px] lg:text-[46px] font-heading font-black text-white tracking-tighter leading-none truncate drop-shadow-2xl selection:bg-pink-500/30 py-1">
+                        <h1 className="text-[28px] md:text-[38px] lg:text-[46px] font-heading font-black text-text tracking-tighter leading-none truncate drop-shadow-2xl selection:bg-pink-500/30 py-1">
                             {series.name}
                         </h1>
                     </div>
@@ -419,7 +419,7 @@ const TestSeriesDetail = () => {
                     <div className="flex-1 flex justify-end gap-3">
                         <button
                             onClick={() => navigate(`/tests/${seriesId}/insights`)}
-                            className="flex items-center gap-2.5 text-[12px] font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer border border-purple-500/10 bg-purple-500/5 text-purple-400 hover:text-white hover:bg-purple-500/20 hover:border-purple-500/30 group/insights shadow-lg shadow-purple-500/5 backdrop-blur-sm whitespace-nowrap"
+                            className="flex items-center gap-2.5 text-[12px] font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer border border-purple-500/10 bg-purple-500/5 text-purple-400 hover:text-text hover:bg-purple-500/20 hover:border-purple-500/30 group/insights shadow-lg shadow-purple-500/5 backdrop-blur-sm whitespace-nowrap"
                         >
                             <BarChart3 className="w-3.5 h-3.5 text-purple-400 group-hover/insights:scale-110 transition-transform" strokeWidth={2.5} />
                             <span className="hidden sm:inline">Insights</span>
@@ -430,7 +430,7 @@ const TestSeriesDetail = () => {
                 {/* Description below title */}
                 {series.description && (
                     <div className="max-w-2xl mx-auto mt-2 pb-1 text-center">
-                        <p className="text-slate-400/80 text-[13px] md:text-[14px] font-medium leading-relaxed truncate px-4">
+                        <p className="text-text-muted/80 text-[13px] md:text-[14px] font-medium leading-relaxed truncate px-4">
                             {series.description}
                         </p>
                     </div>
@@ -440,22 +440,22 @@ const TestSeriesDetail = () => {
             {/* Divider and section Heading */}
             <div className="h-px bg-gradient-to-r from-white/[0.08] via-white/[0.06] to-transparent mb-4" />
 
-            <div className="flex items-center gap-4 mb-10 mt-6 border-b border-white/[0.06]">
+            <div className="flex items-center gap-4 mb-10 mt-6 border-b border-border">
                 <button
                     onClick={() => setActiveTab('tests')}
-                    className={`pb-5 px-4 text-[16px] font-black transition-all relative cursor-pointer ${activeTab === 'tests' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    className={`pb-5 px-4 text-[16px] font-black transition-all relative cursor-pointer ${activeTab === 'tests' ? 'text-text' : 'text-text-muted hover:text-text'}`}
                 >
                     <div className="flex items-center gap-3">
                         <Notebook className="w-5 h-5" />
                         <span>Tests</span>
-                        <span className="text-[11px] bg-white/5 px-2 py-0.5 rounded-full border border-white/10 font-bold">{tests.length}</span>
+                        <span className="text-[11px] bg-surface-3/10 px-2 py-0.5 rounded-full border border-border font-bold">{tests.length}</span>
                     </div>
                     {activeTab === 'tests' && <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-pink-500 rounded-t-full shadow-[0_-4px_12px_rgba(236,72,153,0.5)] fade-in" />}
                 </button>
-                <div className="w-px h-6 bg-white/[0.08] mb-5 shrink-0" />
+                <div className="w-px h-6 bg-surface-2 mb-5 shrink-0" />
                 <button
                     onClick={() => setActiveTab('library')}
-                    className={`pb-5 px-4 text-[16px] font-black transition-all relative cursor-pointer ${activeTab === 'library' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'}`}
+                    className={`pb-5 px-4 text-[16px] font-black transition-all relative cursor-pointer ${activeTab === 'library' ? 'text-indigo-400' : 'text-text-muted hover:text-text'}`}
                 >
                     <div className="flex items-center gap-3">
                         <LibraryBig className="w-5 h-5" />
@@ -467,16 +467,16 @@ const TestSeriesDetail = () => {
 
             {activeTab === 'tests' && (
                 <div className="fade-in">
-                    <div className="flex items-center justify-between mb-8 border-b border-white/[0.08] pb-4">
+                    <div className="flex items-center justify-between mb-8 border-b border-border pb-4">
                         <div className="flex items-center gap-3">
                             <div className="p-2 rounded-xl bg-pink-500/10 border border-pink-500/10 shadow-lg shadow-pink-500/5">
                                 <Notebook className="w-5 h-5 text-pink-400" />
                             </div>
-                            <h2 className="text-[20px] font-heading font-bold text-white tracking-tight">All Tests</h2>
+                            <h2 className="text-[20px] font-heading font-bold text-text tracking-tight">All Tests</h2>
                         </div>
                         <button
                             onClick={() => setIsCreateTestModalOpen(true)}
-                            className="flex items-center gap-2 text-[12px] font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer border border-pink-500/20 bg-pink-500/10 text-pink-400 hover:text-white hover:bg-pink-500/20 group shadow-lg shadow-pink-500/5"
+                            className="flex items-center gap-2 text-[12px] font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer border border-pink-500/20 bg-pink-500/10 text-pink-400 hover:text-text hover:bg-pink-500/20 group shadow-lg shadow-pink-500/5"
                         >
                             <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
                             <span>Create Test</span>
@@ -491,8 +491,8 @@ const TestSeriesDetail = () => {
                                 <div className="w-20 h-20 mx-auto bg-pink-500/10 rounded-full flex items-center justify-center mb-6 border border-pink-500/20 pulse-ring">
                                     <Calendar className="w-10 h-10 text-pink-400" strokeWidth={1.5} />
                                 </div>
-                                <h3 className="text-2xl font-heading font-bold text-white mb-3 tracking-tight">No tests yet</h3>
-                                <p className="text-slate-400 text-sm max-w-sm mx-auto mb-8 leading-relaxed">
+                                <h3 className="text-2xl font-heading font-bold text-text mb-3 tracking-tight">No tests yet</h3>
+                                <p className="text-text-muted text-sm max-w-sm mx-auto mb-8 leading-relaxed">
                                     Schedule your first test to start tracking scores against the subjects in this series.
                                 </p>
                                 <button
@@ -513,20 +513,20 @@ const TestSeriesDetail = () => {
                                     >
                                         <div className="flex items-start justify-between gap-3 mb-4">
                                             <div className="flex-1 min-w-0">
-                                                <h2 className="text-[17px] font-heading font-semibold text-slate-100 transition-colors truncate tracking-tight leading-tight mb-2">
+                                                <h2 className="text-[17px] font-heading font-semibold text-text transition-colors truncate tracking-tight leading-tight mb-2">
                                                     {test.name.toUpperCase()}
                                                 </h2>
                                                 <div className="flex items-center gap-3">
                                                     <div className="flex items-center gap-1.5">
                                                         <div className="w-1.5 h-1.5 rounded-full bg-pink-500/60 shadow-[0_0_8px_rgba(236,72,153,0.4)]" />
-                                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                                        <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
                                                             {test.subjects?.length || 0} Subjects
                                                         </span>
                                                     </div>
-                                                    <div className="h-3 w-px bg-white/10" />
+                                                    <div className="h-3 w-px bg-surface-3" />
                                                     <div className="flex items-center gap-1.5">
-                                                        <Calendar className="w-3 h-3 text-slate-600" />
-                                                        <span className="text-[10px] font-bold text-slate-600">
+                                                        <Calendar className="w-3 h-3 text-text-muted" />
+                                                        <span className="text-[10px] font-bold text-text-muted">
                                                             {new Date(test.test_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                                         </span>
                                                     </div>
@@ -535,31 +535,31 @@ const TestSeriesDetail = () => {
                                             <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
                                                 <button
                                                     onClick={(e) => handleEditTest(e, test)}
-                                                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-500 hover:text-pink-400 transition-colors"
+                                                    className="p-1.5 rounded-lg bg-surface-3/10 hover:bg-surface-3 text-text-muted hover:text-pink-400 transition-colors"
                                                     title="Edit Test"
                                                 >
                                                     <Edit2 className="w-3.5 h-3.5" />
                                                 </button>
                                                 <button
                                                     onClick={(e) => handleDeleteTest(e, test.id)}
-                                                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-500 hover:text-red-400 transition-colors"
+                                                    className="p-1.5 rounded-lg bg-surface-3/10 hover:bg-surface-3 text-text-muted hover:text-red-400 transition-colors"
                                                     title="Delete Test"
                                                 >
                                                     <Trash2 className="w-3.5 h-3.5" />
                                                 </button>
                                             </div>
                                         </div>
-                                        <div className="mt-auto pt-4 border-t border-white/[0.06] flex items-center gap-3">
+                                        <div className="mt-auto pt-4 border-t border-border flex items-center gap-3">
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); navigate(`/tests/${seriesId}/test/${test.id}`); }}
-                                                className="flex-1 h-10 px-3 rounded-lg bg-pink-500/10 hover:bg-pink-500 text-pink-400 hover:text-white border border-pink-500/10 flex items-center justify-center gap-2 text-[11px] font-bold uppercase tracking-widest transition-all"
+                                                className="flex-1 h-10 px-3 rounded-lg bg-pink-500/10 hover:bg-pink-500 text-pink-400 hover:text-text border border-pink-500/10 flex items-center justify-center gap-2 text-[11px] font-bold uppercase tracking-widest transition-all"
                                             >
                                                 <Plus className="w-3.5 h-3.5" />
                                                 Add Scores
                                             </button>
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); navigate(`/tests/${seriesId}/test/${test.id}/analytics`); }}
-                                                className="flex-1 h-10 px-3 rounded-lg bg-indigo-500/10 hover:bg-indigo-500 text-indigo-400 hover:text-white border border-indigo-500/10 flex items-center justify-center gap-2 text-[11px] font-bold uppercase tracking-widest transition-all"
+                                                className="flex-1 h-10 px-3 rounded-lg bg-indigo-500/10 hover:bg-indigo-500 text-indigo-400 hover:text-text border border-indigo-500/10 flex items-center justify-center gap-2 text-[11px] font-bold uppercase tracking-widest transition-all"
                                             >
                                                 <BarChart3 className="w-3.5 h-3.5" />
                                                 Analytics

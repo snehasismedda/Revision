@@ -209,13 +209,13 @@ const MonthCard = ({ grid, activityData, onCellHover, onCellLeave, isCurrentMont
             <div className="flex items-center justify-between mb-4 px-1">
                 <div className="flex flex-col gap-0.5">
                     <span className={`text-[16px] font-heading font-black tracking-tight transition-all duration-300 ${isCurrentMonth
-                        ? 'text-white'
-                        : 'text-slate-400 group-hover/month:text-slate-200'
+                        ? 'text-text'
+                        : 'text-text-muted group-hover/month:text-text'
                         }`}>
                         {grid.monthName}
                     </span>
                     <div className="flex items-center gap-1.5 opacity-60">
-                         <span className="text-[9px] font-black tracking-wider text-slate-500 uppercase">
+                         <span className="text-[9px] font-black tracking-wider text-text-muted uppercase">
                             {grid.year}
                         </span>
                     </div>
@@ -225,27 +225,27 @@ const MonthCard = ({ grid, activityData, onCellHover, onCellLeave, isCurrentMont
                     <div className="flex items-baseline gap-1">
                         <span className={`text-[14px] font-black tabular-nums transition-all duration-300 ${
                             activeDays > 0 
-                            ? (isCurrentMonth ? 'text-violet-400' : 'text-slate-200') 
-                            : 'text-slate-600'
+                            ? (isCurrentMonth ? 'text-violet-400' : 'text-text') 
+                            : 'text-text-muted'
                         }`}>
                             {activeDays}
                         </span>
-                        <span className="text-[10px] font-bold text-slate-500 opacity-40">/</span>
-                        <span className="text-[10px] font-bold text-slate-500">
+                        <span className="text-[10px] font-bold text-text-muted opacity-40">/</span>
+                        <span className="text-[10px] font-bold text-text-muted">
                             {totalDays}
                         </span>
                     </div>
                     <div className={`h-[2px] w-8 rounded-full transition-all duration-500 ${
                         activeDays > 0 
-                        ? (isCurrentMonth ? 'bg-violet-500 shadow-[0_0_8px_rgba(139,92,246,0.6)]' : 'bg-slate-600') 
-                        : 'bg-slate-800'
+                        ? (isCurrentMonth ? 'bg-violet-500 shadow-[0_0_8px_rgba(139,92,246,0.6)]' : 'bg-surface-2') 
+                        : 'bg-surface-2'
                     }`} />
                 </div>
             </div>
 
             {/* Grid Body */}
             <div
-                className="p-4.5 rounded-[1.25rem] transition-all duration-500 group-hover/month:border-white/10 group-hover/month:bg-white/[0.04] group-hover/month:shadow-2xl group-hover/month:shadow-black/40"
+                className="p-4.5 rounded-[1.25rem] transition-all duration-500 group-hover/month:border-border group-hover/month:bg-surface-3/10 group-hover/month:shadow-2xl group-hover/month:shadow-black/40"
                 style={{
                     background: isCurrentMonth
                         ? 'linear-gradient(180deg, rgba(139,92,246,0.08) 0%, rgba(20,20,30,0.4) 100%)'
@@ -260,7 +260,7 @@ const MonthCard = ({ grid, activityData, onCellHover, onCellLeave, isCurrentMont
                     <div className="flex flex-col gap-[4px] mr-3 opacity-30 pointer-events-none select-none">
                         {DAY_LABELS.map((label, i) => (
                             <div key={i} className="h-[14px] flex items-center justify-end w-4">
-                                <span className="text-[8px] font-black uppercase text-slate-400 leading-none">{label}</span>
+                                <span className="text-[8px] font-black uppercase text-text-muted leading-none">{label}</span>
                             </div>
                         ))}
                     </div>
@@ -271,7 +271,7 @@ const MonthCard = ({ grid, activityData, onCellHover, onCellLeave, isCurrentMont
                             <div key={wi} className="flex flex-col gap-[4px] flex-1">
                                 {week.map((date, di) => {
                                     if (!date) {
-                                        return <div key={di} className="h-[15px] rounded-[4px] bg-white/[0.015]" />;
+                                        return <div key={di} className="h-[15px] rounded-[4px] bg-surface-3/10" />;
                                     }
 
                                     const data = activityData[date];
@@ -314,7 +314,7 @@ const MonthCard = ({ grid, activityData, onCellHover, onCellLeave, isCurrentMont
                                         >
                                             <span 
                                                 className={`text-[7px] font-black select-none pointer-events-none transition-all duration-300
-                                                    ${intensity > 0 ? 'text-white/40 group-hover/cell:text-white' : 'text-transparent group-hover/cell:text-slate-500'}
+                                                    ${intensity > 0 ? 'text-text/40 group-hover/cell:text-text' : 'text-transparent group-hover/cell:text-text-muted'}
                                                 `}
                                             >
                                                 {dayNum}
@@ -412,17 +412,17 @@ const ActivityHeatmap = () => {
     const hasData = Object.keys(activityMap).length > 0;
     if (loadingActivity && !hasData) {
         return (
-            <div className="glass-card glass px-8 py-8 mb-8 fade-in relative overflow-hidden">
+            <div className="bg-surface border border-border px-8 py-8 mb-8 fade-in relative overflow-hidden rounded-2xl">
                 <div className="flex items-center gap-4 mb-8">
-                    <div className="w-12 h-12 rounded-2xl bg-white/[0.04] animate-pulse" />
+                    <div className="w-12 h-12 rounded-2xl bg-surface-3/10 animate-pulse" />
                     <div className="flex flex-col gap-2">
-                        <div className="w-32 h-4 rounded-lg bg-white/[0.06] animate-pulse" />
-                        <div className="w-48 h-3 rounded-lg bg-white/5 animate-pulse" />
+                        <div className="w-32 h-4 rounded-lg bg-surface-3/10 animate-pulse" />
+                        <div className="w-48 h-3 rounded-lg bg-surface-3/5 animate-pulse" />
                     </div>
                 </div>
                 <div className="flex gap-4">
                     {[0, 1, 2].map(i => (
-                        <div key={i} className="flex-1 h-52 rounded-[2rem] bg-white/[0.02] animate-pulse" />
+                        <div key={i} className="flex-1 h-52 rounded-[2rem] bg-surface-3/5 animate-pulse" />
                     ))}
                 </div>
             </div>
@@ -432,7 +432,7 @@ const ActivityHeatmap = () => {
     return (
         <div
             ref={containerRef}
-            className="glass-card glass px-8 pt-8 pb-8 mb-8 fade-in relative overflow-hidden group/main"
+            className="bg-surface border border-border px-8 pt-8 pb-8 mb-8 fade-in relative overflow-hidden group/main rounded-2xl"
         >
             {/* ── Background Decoration ── */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-violet-600/5 blur-[100px] pointer-events-none" />
@@ -461,7 +461,7 @@ const ActivityHeatmap = () => {
                                 Analysis
                             </span>
                         </h3>
-                        <p className="text-sm text-slate-500 font-medium mt-1">
+                        <p className="text-sm text-text-muted font-medium mt-1">
                             Your learning journey visualized over time
                         </p>
                     </div>
@@ -470,8 +470,8 @@ const ActivityHeatmap = () => {
                 {/* Header Stats Row */}
                 <div className="flex flex-wrap items-center gap-3">
                     {/* Activity Stats */}
-                    <div className="flex items-center bg-white/[0.03] border border-white/5 rounded-2xl p-1.5 pr-4 gap-4">
-                        <div className="flex items-center gap-4 border-white/10 pr-4 pl-1">
+                    <div className="flex items-center bg-surface-3/5 border border-border rounded-2xl p-1.5 pr-4 gap-4">
+                        <div className="flex items-center gap-4 border-border pr-4 pl-1">
                             {/* Streak Badge */}
                             <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-orange-500/10 border border-orange-500/20 shadow-[0_4px_12px_rgba(249,115,22,0.1)]">
                                 <Flame className="w-4 h-4 text-orange-400 fill-orange-400/20" />
@@ -488,39 +488,39 @@ const ActivityHeatmap = () => {
                                 <Trophy className="w-3.5 h-3.5 text-yellow-500" />
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-sm font-black text-slate-200 leading-none">{stats.bestDay}</span>
-                                <span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter">Peak Day</span>
+                                <span className="text-sm font-black text-text leading-none">{stats.bestDay}</span>
+                                <span className="text-[8px] font-black text-text-muted uppercase tracking-tighter">Peak Day</span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="hidden md:block w-px h-10 bg-white/5 mx-1" />
+                    <div className="hidden md:block w-px h-10 bg-border mx-1" />
 
                     {/* Navigation Controls */}
-                    <div className="flex items-center gap-2 bg-slate-900/40 p-1.5 rounded-2xl border border-white/5">
+                    <div className="flex items-center gap-2 bg-surface-3/5 p-1.5 rounded-2xl border border-border">
                         <button
                             onClick={refreshActivityMap}
                             disabled={loadingActivity}
-                            className="p-2.5 rounded-xl transition-all duration-200 hover:bg-white/5 text-slate-400 hover:text-white disabled:opacity-30 group/refresh relative"
+                            className="p-2.5 rounded-xl transition-all duration-200 hover:bg-surface-3/10 text-text-muted hover:text-text disabled:opacity-30 group/refresh relative"
                         >
                             <RefreshCw
                                 className={`w-4 h-4 transition-transform duration-700 ${loadingActivity ? 'animate-spin text-violet-400' : 'group-hover/refresh:rotate-180'}`}
                             />
                         </button>
                         
-                        <div className="w-px h-5 bg-white/10" />
+                        <div className="w-px h-5 bg-border" />
                         
                         <button
                             onClick={() => setMonthOffset(p => p + 1)}
                             disabled={!canGoBack}
-                            className="p-2.5 rounded-xl transition-all duration-200 hover:bg-white/5 text-slate-500 hover:text-slate-200 disabled:opacity-20"
+                            className="p-2.5 rounded-xl transition-all duration-200 hover:bg-surface-3/10 text-text-muted hover:text-text disabled:opacity-20"
                         >
                             <ChevronLeft className="w-4.5 h-4.5" />
                         </button>
                         <button
                             onClick={() => setMonthOffset(p => p - 1)}
                             disabled={!canGoForward}
-                            className="p-2.5 rounded-xl transition-all duration-200 hover:bg-white/5 text-slate-500 hover:text-slate-200 disabled:opacity-20"
+                            className="p-2.5 rounded-xl transition-all duration-200 hover:bg-surface-3/10 text-text-muted hover:text-text disabled:opacity-20"
                         >
                             <ChevronRight className="w-4.5 h-4.5" />
                         </button>
@@ -545,20 +545,20 @@ const ActivityHeatmap = () => {
             </div>
 
             {/* Hint Footer */}
-            <div className="mt-8 pt-6 border-top border-white/5 flex items-center justify-between">
+            <div className="mt-8 pt-6 border-top border-border flex items-center justify-between">
                 <div className="flex items-center gap-6">
                     <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Less</span>
+                        <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">Less</span>
                         <div className="flex gap-[3px]">
                             {CELL_COLORS.map((c, i) => (
                                 <div key={i} className="w-[10px] h-[10px] rounded-[2px]" style={{ background: c.bg, border: `1px solid ${c.border}` }} />
                             ))}
                         </div>
-                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">More</span>
+                        <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">More</span>
                     </div>
                 </div>
                 
-                <div className="flex items-center gap-2 text-slate-600">
+                <div className="flex items-center gap-2 text-text-muted">
                     <MousePointer2 className="w-3 h-3" />
                     <span className="text-[10px] font-black uppercase tracking-widest">Click month or day for details</span>
                 </div>
