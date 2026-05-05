@@ -25,6 +25,8 @@
   --color-danger: #ef4444;
   --color-danger-bg: rgba(239, 68, 68, 0.1);
   --color-warning: #f59e0b;
+
+  --animate-spin-slow: spin 3s linear infinite;
 }
 
 .light {
@@ -98,7 +100,7 @@ h6 {
 /* --- Premium Glass Cards --- */
 .glass {
   background: var(--color-surface-2);
-  background-opacity: 0.9;
+  opacity: 0.95;
   border: 1px solid var(--color-border);
   border-radius: 0.5rem;
   box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.1);

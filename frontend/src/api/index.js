@@ -309,3 +309,12 @@ export const systemPromptsApi = {
     update: (id, body) => request(`/system-prompts/${id}`, { method: 'PUT', body }),
     delete: (id) => request(`/system-prompts/${id}`, { method: 'DELETE' }),
 };
+
+// Quiz Sets
+export const quizSetsApi = {
+    list: () => request('/quiz-sets'),
+    getById: (id) => request(`/quiz-sets/${id}`),
+    create: (body) => request('/quiz-sets', { method: 'POST', body }),
+    delete: (id) => request(`/quiz-sets/${id}`, { method: 'DELETE' }),
+    update: (id, body) => request(`/quiz-sets/${id}`, { method: 'PUT', body }),
+};

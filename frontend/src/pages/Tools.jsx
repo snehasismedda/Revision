@@ -3,7 +3,8 @@ import { Wrench, Search, X, Zap, Code, Cpu, Sparkles, Youtube } from 'lucide-rea
 import ToolCard from '../components/tools/ToolCard.jsx';
 import ToolDetailsCard from '../components/tools/ToolDetailsCard.jsx';
 import YouTubeTranscriptTool from '../components/tools/YouTubeTranscriptTool.jsx';
-import { ArrowLeft } from 'lucide-react';
+import QuizGeneratorTool from '../components/tools/QuizGeneratorTool.jsx';
+import { ArrowLeft, FileQuestion } from 'lucide-react';
 
 const TOOLS = [
     {
@@ -11,6 +12,14 @@ const TOOLS = [
         name: "YouTube Transcript Generator",
         description: "Fetch transcripts from YouTube videos and format them for AI processing with custom system prompts.",
         icon: Youtube,
+        tag: "Utility",
+        isActive: true
+    },
+    {
+        id: 'quiz-generator',
+        name: "Quiz Generator",
+        description: "Upload Excel sheets to generate interactive GATE-style quizzes with question navigation.",
+        icon: FileQuestion,
         tag: "Utility",
         isActive: true
     },
@@ -37,7 +46,7 @@ const Tools = () => {
         return (
             <div className="fade-in">
                 {/* Tool Header */}
-                <div className="flex items-center justify-between mb-8">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
                     <div className="flex items-center gap-4">
                         <button 
                             onClick={() => setSelectedTool(null)}
@@ -50,12 +59,12 @@ const Tools = () => {
                                 <selectedTool.icon className="w-4 h-4 text-primary" />
                                 <span className="text-[10px] font-bold tracking-widest text-primary uppercase">Tool</span>
                             </div>
-                            <h1 className="text-2xl font-heading font-bold text-text tracking-tight">{selectedTool.name}</h1>
+                            <h1 className="text-xl sm:text-2xl font-heading font-bold text-text tracking-tight">{selectedTool.name}</h1>
                         </div>
                     </div>
                     
-                    <div className="hidden sm:block">
-                        <span className="px-3 py-1.5 rounded-lg bg-surface-2 border border-border text-[11px] font-bold text-text-muted uppercase tracking-wider">
+                    <div className="flex items-center gap-2 self-end sm:self-auto">
+                        <span className="px-3 py-1.5 rounded-lg bg-primary/5 border border-primary/20 text-[10px] font-black text-primary uppercase tracking-wider">
                             {selectedTool.tag}
                         </span>
                     </div>
@@ -65,6 +74,8 @@ const Tools = () => {
                 <div className="glass-panel rounded-3xl border border-border p-8 min-h-[70vh]">
                     {selectedTool.id === 'youtube-transcript' ? (
                         <YouTubeTranscriptTool />
+                    ) : selectedTool.id === 'quiz-generator' ? (
+                        <QuizGeneratorTool />
                     ) : (
                         <ToolDetailsCard 
                             tool={selectedTool} 
