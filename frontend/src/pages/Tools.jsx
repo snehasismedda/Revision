@@ -4,7 +4,8 @@ import ToolCard from '../components/tools/ToolCard.jsx';
 import ToolDetailsCard from '../components/tools/ToolDetailsCard.jsx';
 import YouTubeTranscriptTool from '../components/tools/YouTubeTranscriptTool.jsx';
 import QuizGeneratorTool from '../components/tools/QuizGeneratorTool.jsx';
-import { ArrowLeft, FileQuestion } from 'lucide-react';
+import TimeTablePlannerTool from '../components/tools/TimeTablePlannerTool.jsx';
+import { ArrowLeft, FileQuestion, CalendarClock } from 'lucide-react';
 
 const TOOLS = [
     {
@@ -24,6 +25,14 @@ const TOOLS = [
         isActive: true
     },
     {
+        id: 'time-table-planner',
+        name: "Time Table Planner",
+        description: "Organize your study sessions with a 24-hour visual gantt chart.",
+        icon: CalendarClock,
+        tag: "Utility",
+        isActive: true
+    },
+    {
         id: 'note-enhancer',
         name: "AI Note Enhancer",
         description: "Automatically structure, highlight, and summarize your raw notes into perfect study material.",
@@ -36,6 +45,8 @@ const TOOLS = [
 const Tools = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTool, setSelectedTool] = useState(null);
+    const [toolSubView, setToolSubView] = useState('list');
+    const [backSignal, setBackSignal] = useState(0);
 
     const filteredTools = TOOLS.filter(tool =>
         tool.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -49,7 +60,13 @@ const Tools = () => {
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
                     <div className="flex items-center gap-4">
                         <button 
-                            onClick={() => setSelectedTool(null)}
+                            onClick={() => {
+                                if (toolSubView === 'editor') {
+                                    setBackSignal(s => s + 1);
+                                } else {
+                                    setSelectedTool(null);
+                                }
+                            }}
                             className="p-2.5 rounded-xl bg-surface-2 border border-border text-text-muted hover:text-primary hover:border-primary/30 transition-all cursor-pointer group"
                         >
                             <ArrowLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
@@ -76,6 +93,8 @@ const Tools = () => {
                         <YouTubeTranscriptTool />
                     ) : selectedTool.id === 'quiz-generator' ? (
                         <QuizGeneratorTool />
+                    ) : selectedTool.id === 'time-table-planner' ? (
+                        <TimeTablePlannerTool onViewChange={setToolSubView} backSignal={backSignal} />
                     ) : (
                         <ToolDetailsCard 
                             tool={selectedTool} 

@@ -318,3 +318,14 @@ export const quizSetsApi = {
     delete: (id) => request(`/quiz-sets/${id}`, { method: 'DELETE' }),
     update: (id, body) => request(`/quiz-sets/${id}`, { method: 'PUT', body }),
 };
+
+// Time Tables
+export const timeTableApi = {
+    list: () => request('/timetables'),
+    getById: (id) => request(`/timetables/${id}`),
+    create: (body) => request('/timetables', { method: 'POST', body }),
+    update: (id, body) => request(`/timetables/${id}`, { method: 'PUT', body }),
+    delete: (id) => request(`/timetables/${id}`, { method: 'DELETE' }),
+    setActive: (id) => request(`/timetables/${id}/active`, { method: 'POST' }),
+    toggleActive: (id) => request(`/timetables/${id}/active`, { method: 'PATCH' }),
+};

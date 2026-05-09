@@ -45,7 +45,7 @@ export const register = async (req, res) => {
             .cookie('access_token', accessToken, { ...COOKIE_OPTS, maxAge: ACCESS_TOKEN_MAX_AGE })
             .cookie('refresh_token', refreshToken, { ...COOKIE_OPTS, maxAge: REFRESH_TOKEN_MAX_AGE })
             .status(201)
-            .json({ user: { id: user.id, name: user.name, email: user.email, profile_picture: user.profile_picture } });
+            .json({ user: { id: user.id, name: user.name, email: user.email, role: user.role, profile_picture: user.profile_picture } });
     } catch (error) {
         console.error('register error:', error);
         res.status(500).json({ error: 'Failed to register user' });
@@ -59,14 +59,33 @@ export const login = async (req, res) => {
             return res.status(400).json({ error: 'email and password are required' });
         }
 
-        const user = await userModel.findUserByEmail({ email });
-        if (!user) {
-            return res.status(401).json({ error: 'Invalid credentials' });
-        }
+        // Check for Admin Credentials from ENV
+        const isEnvAdmin = email === process.env.ADMIN_EMAIL && password === process.env.ADMIN_PASSWORD;
+        
+        let user;
+        if (isEnvAdmin) {
+            user = await userModel.findUserByEmail({ email });
+            if (!user) {
+                // Auto-create admin user if it doesn't exist
+                const passwordHash = await bcrypt.hash(password, 12);
+                user = await userModel.createUser({ 
+                    name: 'System Admin', 
+                    email, 
+                    passwordHash 
+                });
+                // Ensure role is admin (requires the role column we added/rolled back)
+                await userModel.updateUser(user.id, { role: 'admin' });
+            }
+        } else {
+            user = await userModel.findUserByEmail({ email });
+            if (!user) {
+                return res.status(401).json({ error: 'Invalid credentials' });
+            }
 
-        const valid = await bcrypt.compare(password, user.password_hash);
-        if (!valid) {
-            return res.status(401).json({ error: 'Invalid credentials' });
+            const valid = await bcrypt.compare(password, user.password_hash);
+            if (!valid) {
+                return res.status(401).json({ error: 'Invalid credentials' });
+            }
         }
 
         const { accessToken, refreshToken } = generateTokens(user.id);
@@ -75,7 +94,7 @@ export const login = async (req, res) => {
             .cookie('access_token', accessToken, { ...COOKIE_OPTS, maxAge: ACCESS_TOKEN_MAX_AGE })
             .cookie('refresh_token', refreshToken, { ...COOKIE_OPTS, maxAge: REFRESH_TOKEN_MAX_AGE })
             .status(200)
-            .json({ user: { id: user.id, name: user.name, email: user.email, profile_picture: user.profile_picture } });
+            .json({ user: { id: user.id, name: user.name, email: user.email, role: user.role, profile_picture: user.profile_picture } });
     } catch (error) {
         console.error('login error:', error);
         res.status(500).json({ error: 'Failed to login user' });
@@ -142,7 +161,7 @@ export const refresh = async (req, res) => {
             .cookie('access_token', accessToken, { ...COOKIE_OPTS, maxAge: ACCESS_TOKEN_MAX_AGE })
             .cookie('refresh_token', refreshToken, { ...COOKIE_OPTS, maxAge: REFRESH_TOKEN_MAX_AGE })
             .status(200)
-            .json({ user: { id: user.id, name: user.name, email: user.email, profile_picture: user.profile_picture } });
+            .json({ user: { id: user.id, name: user.name, email: user.email, role: user.role, profile_picture: user.profile_picture } });
     } catch (error) {
         res.status(401).json({ error: 'Invalid refresh token' });
     }
@@ -203,6 +222,7 @@ export const updateMe = async (req, res) => {
                 id: user.id, 
                 name: user.name, 
                 email: user.email, 
+                role: user.role,
                 profile_picture: user.profile_picture,
                 preferences: preferences || { font_size: 16, code_font_size: 15 }
             } 

@@ -7,6 +7,7 @@ import SubjectCard from '../components/SubjectCard.jsx';
 import SubjectModal from '../components/modals/SubjectModal.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import ActivityHeatmap from '../components/ActivityHeatmap.jsx';
+import ActiveTimeTableWidget from '../components/ActiveTimeTableWidget.jsx';
 import toast from 'react-hot-toast';
 import {
     BookOpen, Target, Activity, CheckCircle2,
@@ -216,6 +217,9 @@ const Dashboard = () => {
                     <p className="text-text-muted text-sm mt-2 leading-relaxed">Your learning performance at a glance.</p>
                 </div>
             </div>
+
+            {/* Active Time Table Widget */}
+            <ActiveTimeTableWidget />
 
             {/* Smart Activity Heatmap */}
             <ActivityHeatmap />

@@ -21,13 +21,15 @@ import solutionRoute from './routes/solutionRoute.js';
 import revisionTrackerRoute from './routes/revisionTrackerRoute.js';
 import systemPromptRoute from './routes/systemPromptRoute.js';
 import quizSetRoute from './routes/quizSetRoute.js';
+import userRoute from './routes/userRoute.js';
+import timeTableRoute from './routes/timeTableRoute.js';
 import { dateSerializationMiddleware } from './utils/serialization.js';
 
 const app = express();
 
 // --- Middleware ---
 app.use(cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: [process.env.CLIENT_URL || 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
     credentials: true,
 }));
 app.use(express.json({ limit: '50mb' }));
@@ -54,6 +56,8 @@ app.use('/api/subjects/:subjectId/revision-tracker', revisionTrackerRoute);
 app.use('/api/subjects/:subjectId/solutions', solutionRoute);
 app.use('/api/system-prompts', systemPromptRoute);
 app.use('/api/quiz-sets', quizSetRoute);
+app.use('/api/users', userRoute);
+app.use('/api/timetables', timeTableRoute);
 
 // --- Health Check ---
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
