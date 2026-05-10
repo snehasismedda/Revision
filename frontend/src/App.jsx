@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth, AuthProvider } from './context/AuthContext.jsx';
+import useTimeTableNotifications from './hooks/useTimeTableNotifications.js';
 import { SubjectProvider } from './context/SubjectContext.jsx';
 import { TestSeriesProvider } from './context/TestSeriesContext.jsx';
 import { TopicProvider } from './context/TopicContext.jsx';
@@ -42,6 +43,13 @@ const PublicRoute = ({ children }) => {
   const { user, loading } = useAuth();
   if (loading) return null;
   return user ? <Navigate to="/" replace /> : children;
+};
+
+/* Runs global side-effects that require auth context */
+const GlobalEffects = () => {
+  const { user } = useAuth();
+  useTimeTableNotifications(!!user);
+  return null;
 };
 
 const AppRoutes = () => (
@@ -94,6 +102,7 @@ const App = () => (
               <TopicProvider>
                 <AnalyticsProvider>
                   <FileProvider>
+                    <GlobalEffects />
                     <Toaster
                     position="top-right"
                     toastOptions={{

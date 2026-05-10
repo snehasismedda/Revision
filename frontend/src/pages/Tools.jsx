@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Wrench, Search, X, Zap, Code, Cpu, Sparkles, Youtube } from 'lucide-react';
+import { Wrench, Search, X, Zap, Code, Cpu, Youtube } from 'lucide-react';
 import ToolCard from '../components/tools/ToolCard.jsx';
 import ToolDetailsCard from '../components/tools/ToolDetailsCard.jsx';
 import YouTubeTranscriptTool from '../components/tools/YouTubeTranscriptTool.jsx';
@@ -31,14 +31,6 @@ const TOOLS = [
         icon: CalendarClock,
         tag: "Utility",
         isActive: true
-    },
-    {
-        id: 'note-enhancer',
-        name: "AI Note Enhancer",
-        description: "Automatically structure, highlight, and summarize your raw notes into perfect study material.",
-        icon: Sparkles,
-        tag: "AI Powered",
-        isActive: false
     }
 ];
 

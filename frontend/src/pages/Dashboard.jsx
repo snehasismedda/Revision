@@ -12,9 +12,11 @@ import toast from 'react-hot-toast';
 import {
     BookOpen, Target, Activity, CheckCircle2,
     AlertTriangle, PlusCircle, LayoutDashboard,
-    TrendingUp, ArrowUpRight, Sparkles, Wand2, Download,
+    TrendingUp, ArrowUpRight, Wand2, Download,
     Edit2, Save, CheckCircle, ArrowRight
 } from 'lucide-react';
+import StatCard from '../components/cards/StatCard.jsx';
+import TestSeriesCard from '../components/cards/TestSeriesCard.jsx';
 // import ReactMarkdown from 'react-markdown';
 // import remarkGfm from 'remark-gfm';
 // import remarkMath from 'remark-math';
@@ -37,47 +39,6 @@ const preprocessMarkdown = (text) => {
         .replace(/\\bottom([a-zA-Z])/g, '\\bot $1')
         .replace(/\\bottom/g, '\\bot');
 };
-
-/* ── Mini sparkline-style progress bar ─────────────────────── */
-const MiniProgressBar = ({ value, max, colorClass = 'bg-primary' }) => {
-    const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
-    return (
-        <div className="w-full h-1.5 bg-surface-3/10 rounded-full overflow-hidden mt-3">
-            <div
-                className={`h-full rounded-full transition-all duration-1000 ease-out ${colorClass}`}
-                style={{ width: `${pct}%` }}
-            />
-        </div>
-    );
-};
-
-/* ── Stat Card ─────────────────────────────────────────────── */
-// eslint-disable-next-line no-unused-vars
-const StatCard = ({ label, value, sub, icon: Icon, colorClass, delayClass, trend, progressValue, progressMax, progressColor, className = '' }) => (
-    <div className={`bg-surface-2 border border-border p-5 min-h-[140px] flex flex-col justify-between fade-in ${delayClass} relative overflow-hidden group hover:scale-[1.02] transition-all duration-300 rounded-2xl ${className}`}>
-        <div className="flex justify-between items-start mb-4 relative z-10">
-            <div className={`p-2.5 rounded-xl border border-border bg-surface-3/10 shadow-inner ${colorClass}`}>
-                <Icon className="w-5 h-5" strokeWidth={2.2} />
-            </div>
-            {trend && (
-                <div className={`flex items-center gap-0.5 text-[11px] font-bold px-2.5 py-1 rounded-lg ${trend.startsWith('+') ? 'text-emerald-500 bg-emerald-500/10 border border-emerald-500/20' : trend === '--' ? 'text-text-muted bg-surface-3/20 border border-border' : 'text-rose-600 bg-rose-500/10 border border-rose-500/20'}`}>
-                    {trend !== '--' && <ArrowUpRight className="w-3 h-3" />}
-                    {trend}
-                </div>
-            )}
-        </div>
-        <div className="relative z-10">
-            <p className="text-3xl font-heading font-black text-text tracking-tight leading-none">{value}</p>
-            <p className="text-[13px] font-bold text-text-muted mt-2">{label}</p>
-            {sub && <p className="text-[10px] font-bold text-text-muted/60 mt-1.5 uppercase tracking-widest">{sub}</p>}
-            {progressValue != null && progressMax != null && (
-                <MiniProgressBar value={progressValue} max={progressMax} colorClass={progressColor || 'bg-primary'} />
-            )}
-        </div>
-        {/* Subtle glow effect */}
-        <div className={`absolute -right-4 -bottom-4 w-24 h-24 rounded-full blur-3xl opacity-0 group-hover:opacity-20 transition-opacity pointer-events-none ${colorClass?.includes('text-primary') ? 'bg-primary' : colorClass?.includes('text-pink') ? 'bg-pink-500' : colorClass?.includes('text-blue') ? 'bg-blue-400' : 'bg-purple-400'}`} />
-    </div>
-);
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -581,45 +542,11 @@ const Dashboard = () => {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                         {testSeries.slice(0, 6).map((ts) => (
-                            <div key={ts.id}
-                                onClick={() => navigate(`/tests/${ts.id}`, { state: { series: ts } })}
-                                className="bg-surface border border-border-card bg-surface border border-border p-5 cursor-pointer group flex flex-col justify-between transition-all hover:border-pink-500/30 min-h-[160px]"
-                            >
-                                {/* Top: Icon + Title */}
-                                <div className="flex items-start justify-between gap-3 mb-3">
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2.5 mb-1">
-                                            <div className="p-1.5 rounded-lg border shrink-0 bg-pink-500/10 border-pink-500/20 text-pink-400 group-hover:scale-110 transition-transform">
-                                                <Target className="w-3.5 h-3.5" strokeWidth={2.2} />
-                                            </div>
-                                            <h3 className="text-[17px] font-heading font-semibold text-text group-hover:text-pink-400 transition-colors truncate tracking-tight leading-tight">
-                                                {ts.name}
-                                            </h3>
-                                        </div>
-                                        {ts.description && (
-                                            <p className="text-[11px] text-text-muted line-clamp-2 leading-relaxed mt-1 ml-[30px]">{ts.description}</p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Footer: Stats + Arrow */}
-                                <div className="mt-auto pt-3 border-t border-border flex items-center justify-between">
-                                    <div className="flex items-center gap-3 text-[10px] font-medium text-text-muted font-bold tracking-tight uppercase">
-                                        <div className="flex items-center gap-1.5">
-                                            <Activity className="w-3 h-3 text-pink-400" strokeWidth={2} />
-                                            <span>{ts.testCount || 0} Tests</span>
-                                        </div>
-                                        <div className="h-2.5 w-px bg-surface-3/10" />
-                                        <div className="flex items-center gap-1.5">
-                                            <BookOpen className="w-3 h-3 text-purple-400" strokeWidth={2} />
-                                            <span>{ts.subjects?.length || 0} Subjects</span>
-                                        </div>
-                                    </div>
-                                    <button className="w-7 h-7 rounded-full bg-surface-3/10 flex items-center justify-center text-text-muted group-hover:text-text transition-colors border border-border group-hover:bg-pink-500/20">
-                                        <ArrowRight className="w-3.5 h-3.5" />
-                                    </button>
-                                </div>
-                            </div>
+                            <TestSeriesCard
+                                key={ts.id}
+                                series={ts}
+                                onClick={(s) => navigate(`/tests/${s.id}`, { state: { series: s } })}
+                            />
                         ))}
                     </div>
                 )}

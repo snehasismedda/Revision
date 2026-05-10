@@ -201,6 +201,34 @@ const TimeTableGrid = ({ events, setEvents, type }) => {
         }));
     };
 
+    const handleMonthlyRepeat = (mode, startDay) => {
+        const until = 31; // default or from state
+        let nextDays = [startDay];
+        if (mode === 'daily') {
+            nextDays = Array.from({ length: until - startDay + 1 }, (_, i) => startDay + i);
+        } else if (mode === 'weekly') {
+            for (let d = startDay + 7; d <= until; d += 7) {
+                nextDays.push(d);
+            }
+        }
+        updateSelectedEvent('days', nextDays);
+    };
+
+    const handleRepeatUntil = (untilDay, startDay) => {
+        setEvents(prev => prev.map(e => {
+            if (e.id !== selectedEvent) return e;
+            const currentDays = [...e.days].sort((a, b) => a - b);
+            const start = currentDays[0] || startDay;
+            const gap = currentDays.length > 1 ? currentDays[1] - currentDays[0] : 1;
+            
+            let nextDays = [];
+            for (let d = start; d <= untilDay; d += gap) {
+                nextDays.push(d);
+            }
+            return { ...e, days: nextDays.length > 0 ? nextDays : [start] };
+        }));
+    };
+
     const handleRemoveRequest = (id) => {
         const ev = normalizedEvents.find(e => e.id === id);
         if (ev && ev.days.length > 1) {
@@ -406,6 +434,47 @@ const TimeTableGrid = ({ events, setEvents, type }) => {
                                             {d}
                                         </button>
                                     ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {type === 'monthly' && (
+                            <div className="bg-surface-2 p-3 rounded-xl border border-border space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-bold text-text-muted uppercase flex items-center gap-1">
+                                        <Repeat className="w-3 h-3" /> Repeat Every
+                                    </span>
+                                    <div className="flex bg-surface-3 rounded-lg p-0.5 border border-border">
+                                        {['daily', 'weekly'].map(m => {
+                                            const sortedDays = [...selectedEventObj.days].sort((a,b)=>a-b);
+                                            const gap = sortedDays.length > 1 ? sortedDays[1] - sortedDays[0] : 0;
+                                            const active = (m === 'daily' && gap === 1) || (m === 'weekly' && gap === 7);
+                                            
+                                            return (
+                                                <button
+                                                    key={m}
+                                                    onClick={() => handleMonthlyRepeat(m, sortedDays[0] || 1)}
+                                                    className={`px-3 py-1 rounded-md text-[10px] font-bold capitalize transition-all ${active ? 'bg-primary text-white' : 'text-text-muted'}`}
+                                                >
+                                                    {m}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between border-t border-border/50 pt-2">
+                                    <span className="text-[10px] font-bold text-text-muted uppercase">Repeat Until</span>
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="number"
+                                            min={selectedEventObj.days[0] || 1}
+                                            max={31}
+                                            value={Math.max(...selectedEventObj.days)}
+                                            onChange={(e) => handleRepeatUntil(parseInt(e.target.value), selectedEventObj.days[0] || 1)}
+                                            className="w-12 bg-surface-3 border border-border rounded-lg px-2 py-1 text-[11px] font-bold text-text outline-none focus:border-primary"
+                                        />
+                                        <span className="text-[10px] font-bold text-text-muted">Day</span>
+                                    </div>
                                 </div>
                             </div>
                         )}

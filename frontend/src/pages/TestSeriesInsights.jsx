@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Activity, TrendingUp, BarChart3, ChevronDown, BarChart2, Target, Info } from 'lucide-react';
+import { ArrowLeft, Activity, TrendingUp, BarChart3, ChevronDown, BarChart2, Target, Info, Award, Zap } from 'lucide-react';
 import { analyticsApi } from '../api';
 import * as testSeriesApi from '../api/testSeriesApi';
 import toast from 'react-hot-toast';
 import {
     AreaChart, Area, BarChart, Bar, LineChart, Line,
-    XAxis, YAxis, CartesianGrid, Tooltip,
+    XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine,
     ResponsiveContainer, Cell, Legend
 } from 'recharts';
 

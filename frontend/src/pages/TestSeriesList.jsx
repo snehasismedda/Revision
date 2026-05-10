@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Target, Plus, Search, Calendar, BookOpen, Trash2, Edit2, Activity, ArrowRight, X } from 'lucide-react';
+import { Trophy, Plus, Search, X } from 'lucide-react';
+import TestSeriesCard from '../components/cards/TestSeriesCard.jsx';
 import ConfirmDialog from '../components/ConfirmDialog';
 
 
@@ -68,7 +69,7 @@ const TestSeriesList = () => {
             <div className="flex items-end justify-between mb-8">
                 <div>
                     <div className="flex items-center gap-2 mb-2">
-                        <Target className="w-5 h-5 text-pink-500" />
+                        <Trophy className="w-5 h-5 text-pink-500" />
                         <span className="text-[11px] font-bold tracking-widest text-pink-500 uppercase">Preparation</span>
                     </div>
                     <h1 className="text-3xl font-heading font-bold text-text tracking-tight">Test Series</h1>
@@ -113,69 +114,20 @@ const TestSeriesList = () => {
             ) : filteredSeries.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {filteredSeries.map(s => (
-                        <div
+                        <TestSeriesCard
                             key={s.id}
-                            onClick={() => navigate(`/tests/${s.id}`, { state: { series: s } })}
-                            className="glass-card glass p-5 cursor-pointer group flex flex-col justify-between transition-all hover:border-pink-500/30 min-h-[160px]"
-                        >
-                            {/* Top: Icon + Title + Actions */}
-                            <div className="flex items-start justify-between gap-3 mb-3">
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2.5 mb-1">
-                                        <div className="p-1.5 rounded-lg border shrink-0 bg-pink-500/10 border-pink-500/20 text-pink-400 group-hover:scale-110 transition-transform">
-                                            <Target className="w-3.5 h-3.5" strokeWidth={2.2} />
-                                        </div>
-                                        <h3 className="text-[17px] font-heading font-semibold text-text group-hover:text-pink-400 transition-colors truncate tracking-tight leading-tight">
-                                            {s.name}
-                                        </h3>
-                                    </div>
-                                    {s.description && (
-                                        <p className="text-[11px] text-text-muted line-clamp-2 leading-relaxed mt-1 ml-[30px]">{s.description}</p>
-                                    )}
-                                </div>
-                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-200">
-                                    <button
-                                        onClick={(e) => handleEdit(e, s)}
-                                        className="p-1 text-text-muted hover:text-pink-400 transition-colors"
-                                        title="Edit Series"
-                                    >
-                                        <Edit2 className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                        onClick={(e) => handleDelete(e, s)}
-                                        className="p-1 text-text-muted hover:text-red-400 transition-colors"
-                                        title="Delete Series"
-                                    >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Footer: Stats + Arrow */}
-                            <div className="mt-auto pt-3 border-t border-border flex items-center justify-between">
-                                <div className="flex items-center gap-3 text-[10px] font-medium text-text-muted font-bold tracking-tight uppercase">
-                                    <div className="flex items-center gap-1.5">
-                                        <Activity className="w-3 h-3 text-pink-400" strokeWidth={2} />
-                                        <span>{s.testCount || 0} Tests</span>
-                                    </div>
-                                    <div className="h-2.5 w-px bg-surface-3/10" />
-                                    <div className="flex items-center gap-1.5">
-                                        <BookOpen className="w-3 h-3 text-purple-400" strokeWidth={2} />
-                                        <span>{s.subjects?.length || 0} Subjects</span>
-                                    </div>
-                                </div>
-                                <button className="w-7 h-7 rounded-full bg-surface-3/10 flex items-center justify-center text-text-muted group-hover:text-text transition-colors border border-border group-hover:bg-pink-500/20">
-                                    <ArrowRight className="w-3.5 h-3.5" />
-                                </button>
-                            </div>
-                        </div>
+                            series={s}
+                            onClick={(series) => navigate(`/tests/${series.id}`, { state: { series } })}
+                            onEdit={(_, series) => handleEdit(_, series)}
+                            onDelete={(_, series) => handleDelete(_, series)}
+                        />
                     ))}
                 </div>
             ) : (
                 <div className="glass-panel rounded-xl p-16 text-center border-dashed border-pink-500/20 w-full relative overflow-hidden group">
                     <div className="absolute inset-0 bg-gradient-to-br from-pink-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
                     <div className="w-20 h-20 mx-auto bg-pink-500/10 rounded-full flex items-center justify-center mb-6 border border-pink-500/20 pulse-ring">
-                        <Target className="w-10 h-10 text-pink-400" strokeWidth={1.5} />
+                        <Trophy className="w-10 h-10 text-pink-400" strokeWidth={1.5} />
                     </div>
                     <h3 className="text-2xl font-heading font-bold text-text mb-3 tracking-tight">No test series found</h3>
                     <p className="text-text-muted text-sm max-w-sm mx-auto mb-8 leading-relaxed">
