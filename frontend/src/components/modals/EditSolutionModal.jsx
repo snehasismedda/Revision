@@ -1,11 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { solutionsApi } from '../../api/index.js';
 import toast from 'react-hot-toast';
-import { X, Save, FileText, Image as ImageIcon, Camera, RefreshCcw, Check, RotateCw, Scissors } from 'lucide-react';
+import { X, Save, FileText, Image as ImageIcon, Camera, RefreshCcw, Check, RotateCw, Scissors, Maximize2, Minimize2, Sun, Moon } from 'lucide-react';
 import ModalPortal from '../ModalPortal.jsx';
 import ImageCropper from '../common/ImageCropper.jsx';
+import { useTheme } from '../../context/ThemeContext.jsx';
 
-const EditSolutionModal = ({ isOpen, onClose, subjectId, solution, onSolutionUpdated }) => {
+const EditSolutionModal = ({ isOpen, onClose, subjectId, solution, onSolutionUpdated, isFullscreen: initialFullscreen = false }) => {
+    const { theme } = useTheme();
+    const [isFullscreen, setIsFullscreen] = useState(initialFullscreen);
+    const [isLightMode, setIsLightMode] = useState(theme === 'light');
     const [mainType, setMainType] = useState('text'); // 'text' or 'image'
     const [imageMethod, setImageMethod] = useState('upload'); // 'upload' or 'camera'
     const [title, setTitle] = useState('');
@@ -33,6 +37,8 @@ const EditSolutionModal = ({ isOpen, onClose, subjectId, solution, onSolutionUpd
 
     useEffect(() => {
         if (isOpen && solution) {
+            setIsLightMode(theme === 'light');
+            setIsFullscreen(initialFullscreen);
             setTitle(solution.title || '');
             setContent(solution.content || '');
             
@@ -48,7 +54,7 @@ const EditSolutionModal = ({ isOpen, onClose, subjectId, solution, onSolutionUpd
         } else {
             stopCamera();
         }
-    }, [isOpen, solution]);
+    }, [isOpen, solution, theme, initialFullscreen]);
 
     const fetchImage = async () => {
         try {
@@ -176,28 +182,48 @@ const EditSolutionModal = ({ isOpen, onClose, subjectId, solution, onSolutionUpd
         setIsCropping(false);
         setImageToCrop(null);
         setSolutionImage('');
-        onClose();
+        onClose(isFullscreen);
     };
 
     if (!isOpen || !solution) return null;
 
     return (
         <ModalPortal>
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop fade-in" onClick={handleModalClose}>
+            <div className={`fixed inset-0 z-50 flex items-center justify-center modal-backdrop fade-in ${isFullscreen ? 'p-0' : 'p-0 md:p-6'}`} onClick={handleModalClose}>
                 <div
-                    className="w-full max-w-2xl bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+                    className={`w-full flex flex-col ${isFullscreen ? 'h-screen w-screen md:max-h-screen rounded-none border-none' : 'h-[90vh] md:h-auto md:max-h-[85vh] rounded-2xl shadow-2xl border'} overflow-hidden transition-all duration-300 ${isLightMode ? 'light bg-surface-2 border-border' : 'dark bg-surface-2 border-border'}`}
+                    style={{
+                        maxWidth: isFullscreen ? 'none' : '56rem',
+                    }}
                     onClick={e => e.stopPropagation()}
                 >
-                    <div className="flex items-center justify-between px-7 py-5 border-b border-border shrink-0">
-                        <h3 className="text-lg font-heading font-semibold text-text flex items-center gap-3">
-                            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
-                                <FileText className="w-5 h-5" />
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-5 py-3.5 border-b shrink-0 bg-surface/80 border-border text-text">
+                        <h3 className="text-[16px] font-heading font-bold text-text tracking-tight leading-snug flex items-center gap-3">
+                            <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500 border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.1)]">
+                                <FileText className="w-4 h-4" />
                             </div>
                             {isCropping ? 'Crop Solution Image' : 'Edit Solution'}
                         </h3>
-                        <button onClick={handleModalClose} className="p-2 text-text-muted hover:text-text hover:bg-surface-3 rounded-lg transition-all cursor-pointer">
-                            <X className="w-5 h-5" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                             <button
+                                    type="button"
+                                    onClick={() => setIsLightMode(!isLightMode)}
+                                    className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all cursor-pointer ${isLightMode ? 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20' : 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30'}`}
+                                >
+                                    {isLightMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsFullscreen(!isFullscreen)}
+                                    className={`hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-all cursor-pointer ${isLightMode ? 'bg-blue-500/10 text-blue-600 hover:bg-blue-500/20' : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'}`}
+                                >
+                                    {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                                </button>
+                            <button type="button" onClick={handleModalClose} className="p-1.5 rounded-lg transition-all text-text-muted hover:bg-surface-3 cursor-pointer">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
                     </div>
 
                     {!isCropping && (

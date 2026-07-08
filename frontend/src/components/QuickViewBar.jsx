@@ -48,10 +48,14 @@ const QuickViewBar = () => {
 
                             <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-sm border border-border ${(item.type === 'file' && item.data?.file_type?.toLowerCase() === 'pdf') ? 'bg-rose-500/10 text-rose-400' :
                                     item.type === 'file' ? 'bg-amber-500/10 text-amber-400' :
+                                    item.type === 'solution' ? 'bg-blue-500/10 text-blue-400' :
+                                    item.type === 'image' ? 'bg-purple-500/10 text-purple-400' :
                                         'bg-emerald-500/10 text-emerald-400'
                                 }`}>
                                 {(item.type === 'file' && item.data?.file_type?.toLowerCase() === 'pdf') ? <FileText size={14} /> :
                                     item.type === 'file' ? <ImageIcon size={14} /> :
+                                    item.type === 'solution' ? <FileText size={14} /> :
+                                    item.type === 'image' ? <ImageIcon size={14} /> :
                                         <FileText size={14} />}
                             </div>
 

@@ -41,6 +41,18 @@
   --color-border-hover: rgba(139, 92, 246, 0.2);
 }
 
+.dark {
+  --color-surface: #0f0f14;
+  --color-surface-2: #161620;
+  --color-surface-3: #1e1e2c;
+
+  --color-text: #e0e0e8;
+  --color-text-muted: #94a3b8;
+
+  --color-border: rgba(139, 92, 246, 0.12);
+  --color-border-hover: rgba(139, 92, 246, 0.28);
+}
+
 
 
 * {

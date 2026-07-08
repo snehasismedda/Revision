@@ -39,6 +39,7 @@ import AddSolutionModal from '../components/modals/AddSolutionModal.jsx';
 import ViewSolutionModal from '../components/modals/ViewSolutionModal.jsx';
 import EditSolutionModal from '../components/modals/EditSolutionModal.jsx';
 import FileViewerModal from '../components/modals/FileViewerModal.jsx';
+import ImageViewerModal from '../components/modals/ImageViewerModal.jsx';
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -151,6 +152,10 @@ const SubjectDetail = () => {
     const [editingSolution, setEditingSolution] = useState(null);
     const [showEditQuestionModal, setShowEditQuestionModal] = useState(false);
     const [showEditSolutionModal, setShowEditSolutionModal] = useState(false);
+    const [isSolutionFullscreen, setIsSolutionFullscreen] = useState(false);
+    const [reopenViewSolutionAfterEdit, setReopenViewSolutionAfterEdit] = useState(false);
+    const [viewingImageUrl, setViewingImageUrl] = useState(null);
+    const [viewingImageTitle, setViewingImageTitle] = useState('Question Image');
     const [fetchingImageId, setFetchingImageId] = useState(null);
     const [fetchingNoteContentId, setFetchingNoteContentId] = useState(null);
     const [fetchedImages, setFetchedImages] = useState({});
@@ -2144,8 +2149,10 @@ const SubjectDetail = () => {
         }
     };
 
-    const handleOpenEditSolution = (solution) => {
+    const handleOpenEditSolution = (solution, isFullscreen = false, fromViewModal = false) => {
         setEditingSolution(solution);
+        setIsSolutionFullscreen(isFullscreen);
+        setReopenViewSolutionAfterEdit(fromViewModal);
         setShowEditSolutionModal(true);
     };
 
@@ -2159,11 +2166,12 @@ const SubjectDetail = () => {
             return next;
         });
 
-        if (viewingSolution && viewingSolution.id === updated.id) {
+        if (reopenViewSolutionAfterEdit) {
             setViewingSolution(updated);
             if (updated.source_image_id) {
                 handleFetchSolutionImage(updated.id);
             }
+            setReopenViewSolutionAfterEdit(false);
         }
     };
 
@@ -3358,17 +3366,18 @@ const SubjectDetail = () => {
                                                                     <div className="mt-4 mb-6 relative group/img-container w-fit">
                                                                         {fetchedImages[q.id] || fetchedImages[q.source_image_id] ? (
                                                                             <div className="relative">
-                                                                                <div className="rounded-xl overflow-hidden border border-border-hover inline-block bg-surface-3 group/img relative shadow-lg">
+                                                                                <div 
+                                                                                    onClick={() => {
+                                                                                        setViewingImageUrl(fetchedImages[q.id] || fetchedImages[q.source_image_id]);
+                                                                                        setViewingImageTitle(`Question Image`);
+                                                                                    }}
+                                                                                    className="rounded-xl overflow-hidden border border-border-hover inline-block bg-surface-3 group/img relative shadow-lg cursor-pointer"
+                                                                                >
                                                                                     <img
                                                                                         src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
                                                                                         alt="Original Question"
-                                                                                        className="max-h-80 object-contain transition-all group-hover/img:opacity-50"
+                                                                                        className="max-h-80 object-contain transition-all"
                                                                                     />
-                                                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
-                                                                                        <span className="bg-surface-3 text-text text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-border-hover backdrop-blur-sm">
-                                                                                            Reference Image
-                                                                                        </span>
-                                                                                    </div>
                                                                                 </div>
                                                                                 <button
                                                                                     onClick={() => handleHideImage(q.id)}
@@ -3618,17 +3627,18 @@ const SubjectDetail = () => {
                                                                                     <div className="mt-4 mb-6 relative group/img-container w-fit">
                                                                                         {fetchedImages[q.id] || fetchedImages[q.source_image_id] ? (
                                                                                             <div className="relative">
-                                                                                                <div className="rounded-xl overflow-hidden border border-border-hover inline-block bg-surface-3 group/img relative shadow-lg">
+                                                                                                <div
+                                                                                                    onClick={() => {
+                                                                                                        setViewingImageUrl(fetchedImages[q.id] || fetchedImages[q.source_image_id]);
+                                                                                                        setViewingImageTitle(`Question Image`);
+                                                                                                    }}
+                                                                                                    className="rounded-xl overflow-hidden border border-border-hover inline-block bg-surface-3 group/img relative shadow-lg cursor-pointer"
+                                                                                                >
                                                                                                     <img
                                                                                                         src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
                                                                                                         alt="Original Question"
-                                                                                                        className="max-h-80 object-contain transition-all group-hover/img:opacity-50"
+                                                                                                        className="max-h-80 object-contain transition-all"
                                                                                                     />
-                                                                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
-                                                                                                        <span className="bg-surface-3 text-text text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-border-hover backdrop-blur-sm">
-                                                                                                            Shared Image
-                                                                                                        </span>
-                                                                                                    </div>
                                                                                                 </div>
                                                                                                 <button
                                                                                                     onClick={() => handleHideImage(q.id)}
@@ -4655,6 +4665,23 @@ const SubjectDetail = () => {
                     sourceImage={viewingSolution ? fetchedImages[`solution-${viewingSolution.id}`] : null}
                     isFetchingImage={fetchingImageId === (viewingSolution ? `solution-${viewingSolution.id}` : null)}
                     onEdit={handleOpenEditSolution}
+                    isFullscreen={isSolutionFullscreen}
+                    onMinimize={() => {
+                        globalMinimize({
+                            type: 'solution',
+                            id: viewingSolution.id,
+                            data: viewingSolution,
+                            title: viewingSolution.title || 'Solution',
+                            typeLabel: 'Solution',
+                            props: {
+                                sourceImage: viewingSolution ? fetchedImages[`solution-${viewingSolution.id}`] : null,
+                                isFetchingImage: fetchingImageId === (viewingSolution ? `solution-${viewingSolution.id}` : null),
+                                onEdit: handleOpenEditSolution,
+                                isFullscreen: isSolutionFullscreen,
+                            }
+                        });
+                        setViewingSolution(null);
+                    }}
                 />
             )}
 
@@ -4708,14 +4735,42 @@ const SubjectDetail = () => {
 
             <EditSolutionModal
                 isOpen={showEditSolutionModal}
-                onClose={() => {
+                onClose={(finalFullscreen) => {
                     setShowEditSolutionModal(false);
                     setEditingSolution(null);
+                    setIsSolutionFullscreen(finalFullscreen || false);
+                    if (reopenViewSolutionAfterEdit) {
+                        setViewingSolution(editingSolution);
+                        setReopenViewSolutionAfterEdit(false);
+                    }
                 }}
                 subjectId={id}
                 solution={editingSolution}
                 onSolutionUpdated={handleEditSolutionUpdated}
+                isFullscreen={isSolutionFullscreen}
             />
+
+            {viewingImageUrl && (
+                <ImageViewerModal
+                    isOpen={true}
+                    onClose={() => setViewingImageUrl(null)}
+                    imageUrl={viewingImageUrl}
+                    title={viewingImageTitle}
+                    onMinimize={(isFullscreen) => {
+                        globalMinimize({
+                            type: 'image',
+                            id: viewingImageUrl,
+                            data: { imageUrl: viewingImageUrl },
+                            title: viewingImageTitle,
+                            typeLabel: 'Image',
+                            props: {
+                                isFullscreen: isFullscreen
+                            }
+                        });
+                        setViewingImageUrl(null);
+                    }}
+                />
+            )}
 
             <TimeTraveler
                 isOpen={showTimeTraveler}

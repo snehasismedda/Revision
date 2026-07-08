@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, FileText, Link2 as LinkIcon, Maximize2, Minimize2, Sun, Moon, Loader2, Pencil, Check, Copy } from 'lucide-react';
+import { X, FileText, Link2 as LinkIcon, Maximize2, Minimize2, Sun, Moon, Loader2, Pencil, Check, Copy, Eye } from 'lucide-react';
 import ModalPortal from '../ModalPortal.jsx';
 import { formatDate } from '../../utils/dateUtils';
+import { useTheme } from '../../context/ThemeContext.jsx';
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -122,10 +123,18 @@ const SimpleCodeBlock = React.memo(({ children, isLightMode, fontSize = 16, prim
     );
 });
 
-const ViewSolutionModal = ({ isOpen, onClose, solution, sourceImage, isFetchingImage, onEdit }) => {
-    const [isFullscreen, setIsFullscreen] = useState(false);
-    const [isLightMode, setIsLightMode] = useState(false);
+const ViewSolutionModal = ({ isOpen, onClose, solution, sourceImage, isFetchingImage, onEdit, isFullscreen: initialFullscreen = false, onMinimize }) => {
+    const { theme } = useTheme();
+    const [isFullscreen, setIsFullscreen] = useState(initialFullscreen);
+    const [isLightMode, setIsLightMode] = useState(theme === 'light');
     const contentRef = useRef(null);
+
+    useEffect(() => {
+        if (isOpen) {
+            setIsLightMode(theme === 'light');
+            setIsFullscreen(initialFullscreen);
+        }
+    }, [isOpen, theme, initialFullscreen]);
 
     const processedContent = preprocessMarkdown(solution?.content || '');
 
@@ -170,30 +179,27 @@ const ViewSolutionModal = ({ isOpen, onClose, solution, sourceImage, isFetchingI
 
     return (
         <ModalPortal>
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-6 modal-backdrop fade-in" onClick={onClose}>
+            <div className={`fixed inset-0 z-50 flex items-center justify-center modal-backdrop fade-in ${isFullscreen ? 'p-0' : 'p-0 md:p-6'}`} onClick={onClose}>
                 <div
-                    className={`w-full flex flex-col ${isFullscreen ? 'h-screen md:max-h-screen rounded-none border-none' : 'h-[90vh] md:h-auto md:max-h-[85vh] rounded-2xl shadow-2xl border'} overflow-hidden transition-all duration-300`}
+                    className={`w-full flex flex-col ${isFullscreen ? 'h-screen w-screen md:max-h-screen rounded-none border-none' : 'h-[90vh] md:h-auto md:max-h-[85vh] rounded-2xl shadow-2xl border'} overflow-hidden transition-all duration-300 ${isLightMode ? 'light bg-surface-2 border-border' : 'dark bg-surface-2 border-border'}`}
                     style={{
-                        background: isLightMode ? '#ffffff' : '#12121a',
-                        borderColor: isLightMode ? '#e2e8f0' : 'rgba(255,255,255,0.08)',
                         maxWidth: isFullscreen ? 'none' : '56rem',
                     }}
                     onClick={e => e.stopPropagation()}
                 >
                     {/* Header */}
-                    <div className={`flex items-center justify-between px-5 py-3.5 border-b shrink-0 ${isLightMode ? 'bg-[#f8fafc] border-slate-200 text-text-muted' : 'bg-surface-2/80 border-border text-text'}`}>
+                    <div className="flex items-center justify-between px-5 py-3.5 border-b shrink-0 bg-surface/80 border-border text-text">
                         <div className="flex items-center gap-3">
                             <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500 border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.1)]">
                                 <FileText className="w-4 h-4" />
                             </div>
                             <div>
-                                <h3 className={`text-[16px] font-heading font-bold ${isLightMode ? 'text-text-muted' : 'text-text'} tracking-tight leading-snug`}>
+                                <h3 className="text-[16px] font-heading font-bold text-text tracking-tight leading-snug">
                                     {solution.title || 'Solution'}
                                 </h3>
                                 <div className="flex items-center gap-2 mt-0.5 opacity-80">
-                                    <span className={`text-[11px] font-medium ${isLightMode ? 'text-text-muted' : 'text-text-muted'}`}>
+                                    <span className="text-[11px] font-medium text-text-muted">
                                         Solution  ·  {formatDate(solution.created_at)}
-
                                     </span>
                                 </div>
                             </div>
@@ -201,7 +207,7 @@ const ViewSolutionModal = ({ isOpen, onClose, solution, sourceImage, isFetchingI
                         <div className="flex items-center gap-2">
                              <button
                                     onClick={() => setIsLightMode(!isLightMode)}
-                                    className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all ${isLightMode ? 'bg-white shadow-sm text-amber-500 hover:bg-amber-50' : 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30'}`}
+                                    className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all cursor-pointer ${isLightMode ? 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20' : 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30'}`}
                                 >
                                     {isLightMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
                                 </button>
@@ -209,9 +215,9 @@ const ViewSolutionModal = ({ isOpen, onClose, solution, sourceImage, isFetchingI
                                         <button
                                         onClick={() => {
                                             onClose();
-                                            onEdit(solution);
+                                            onEdit(solution, isFullscreen, true);
                                         }}
-                                        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all ${isLightMode ? 'bg-white shadow-sm text-blue-600 hover:bg-blue-50' : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'}`}
+                                        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all cursor-pointer ${isLightMode ? 'bg-blue-500/10 text-blue-600 hover:bg-blue-500/20' : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'}`}
                                         title="Edit Solution"
                                     >
                                         <Pencil className="w-4 h-4" />
@@ -219,24 +225,33 @@ const ViewSolutionModal = ({ isOpen, onClose, solution, sourceImage, isFetchingI
                                 )}
                                 <button
                                     onClick={() => setIsFullscreen(!isFullscreen)}
-                                    className={`hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-all ${isLightMode ? 'bg-white shadow-sm text-blue-600 hover:bg-blue-50' : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'}`}
+                                    className={`hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-all cursor-pointer ${isLightMode ? 'bg-blue-500/10 text-blue-600 hover:bg-blue-500/20' : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'}`}
                                 >
                                     {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                                 </button>
-                            <button onClick={onClose} className={`p-1.5 rounded-lg transition-all ${isLightMode ? 'text-text-muted hover:bg-black/5' : 'text-text-muted hover:bg-surface-3'}`}>
+                                {onMinimize && (
+                                    <button
+                                        onClick={() => onMinimize(true)}
+                                        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all cursor-pointer ${isLightMode ? 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20' : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'}`}
+                                        title="Minimize Mode"
+                                    >
+                                        <Eye className="w-4 h-4" />
+                                    </button>
+                                )}
+                            <button onClick={onClose} className="p-1.5 rounded-lg transition-all text-text-muted hover:bg-surface-3 cursor-pointer">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
                     </div>
 
                     {/* Content */}
-                    <div ref={contentRef} className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar scroll-smooth">
-                        <div className={`max-w-4xl mx-auto prose prose-invert prose-blue prose-sm md:prose-base transition-colors duration-300 ${isLightMode ? 'prose-slate' : ''}`}>
+                    <div ref={contentRef} className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar scroll-smooth bg-surface-2 text-text">
+                        <div className={`max-w-4xl mx-auto prose prose-blue prose-sm md:prose-base transition-colors duration-300 ${isLightMode ? 'prose-slate' : 'prose-invert'}`}>
                              {sourceImage && (
                                 <div className="mb-10 group relative rounded-2xl overflow-hidden border border-border shadow-2xl transition-all hover:scale-[1.01]">
                                     <img src={sourceImage} alt="Solution Original" className="w-full h-auto rounded-xl select-none" />
                                     <div className="absolute inset-0 bg-surface-2/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                        <button onClick={handleOpenOriginal} className="bg-surface-3 hover:bg-white/20 text-text border border-white/20 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all">
+                                        <button onClick={handleOpenOriginal} className="bg-surface-3 hover:bg-surface-2 text-text border border-border px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer">
                                             <Maximize2 className="w-4 h-4" /> View Original
                                         </button>
                                     </div>
@@ -256,15 +271,15 @@ const ViewSolutionModal = ({ isOpen, onClose, solution, sourceImage, isFetchingI
                                 remarkPlugins={[remarkGfm, remarkMath]}
                                 rehypePlugins={[rehypeRaw, rehypeKatex]}
                                 components={{
-                                    h1: ({ node, ...props }) => <h1 className={`font-heading font-extrabold tracking-tight ${isLightMode ? 'text-text-muted' : 'text-text'}`} {...props} />,
-                                    h2: ({ node, ...props }) => <h2 className={`font-heading font-bold tracking-tight ${isLightMode ? 'text-text-muted' : 'text-text'}`} {...props} />,
+                                    h1: ({ node, ...props }) => <h1 className="font-heading font-extrabold tracking-tight text-text" {...props} />,
+                                    h2: ({ node, ...props }) => <h2 className="font-heading font-bold tracking-tight text-text" {...props} />,
                                     table: ({ node, ...props }) => (
                                         <div className="overflow-x-auto my-6 rounded-xl border border-border shadow-xl">
                                             <table className="w-full border-collapse text-[13px]" {...props} />
                                         </div>
                                     ),
-                                    th: ({ node, ...props }) => <th className={`px-4 py-3 bg-surface-3/50 text-left font-bold ${isLightMode ? 'text-text-muted' : 'text-text'}`} {...props} />,
-                                    td: ({ node, ...props }) => <td className={`px-4 py-3 border-t border-border ${isLightMode ? 'text-text-muted' : 'text-text-muted'}`} {...props} />,
+                                    th: ({ node, ...props }) => <th className="px-4 py-3 bg-surface-3/50 text-left font-bold text-text" {...props} />,
+                                    td: ({ node, ...props }) => <td className="px-4 py-3 border-t border-border text-text-muted" {...props} />,
                                     pre: ({ children }) => children,
                                     code: ({ node, className, children, ...props }) => {
                                         const isBlock = /language-(\w+)/.exec(className || '') || String(children).includes('\n');
@@ -274,12 +289,7 @@ const ViewSolutionModal = ({ isOpen, onClose, solution, sourceImage, isFetchingI
                                             </SimpleCodeBlock>
                                         ) : (
                                             <code 
-                                                className={`px-1.5 py-0.5 rounded-md text-[0.85em] font-bold font-mono border transition-colors select-all`} 
-                                                style={{ 
-                                                    backgroundColor: isLightMode ? '#f1f5f9' : 'rgba(255,255,255,0.05)',
-                                                    color: '#3b82f6',
-                                                    borderColor: isLightMode ? '#e2e8f0' : 'rgba(255,255,255,0.1)'
-                                                }} 
+                                                className="px-1.5 py-0.5 rounded-md text-[0.85em] font-bold font-mono border transition-colors select-all bg-surface-3 text-primary border-border"
                                                 {...props}
                                             >
                                                 {children}
@@ -295,9 +305,9 @@ const ViewSolutionModal = ({ isOpen, onClose, solution, sourceImage, isFetchingI
                 </div>
             </div>
             <style>{`
-                .prose { max-width: 100%; color: ${isLightMode ? '#334155' : 'rgba(255,255,255,0.7)'}; }
-                .prose h1, .prose h2, .prose h3 { color: ${isLightMode ? '#0f172a' : 'white'}; }
-                .prose blockquote { border-left-color: #3b82f6; background: rgba(59,130,246,0.05); padding: 1rem; border-radius: 0 0.75rem 0.75rem 0; font-style: italic; }
+                .prose { max-width: 100%; color: var(--color-text-muted); }
+                .prose h1, .prose h2, .prose h3 { color: var(--color-text); }
+                .prose blockquote { border-left-color: var(--color-primary); background: rgba(139, 92, 246, 0.05); padding: 1rem; border-radius: 0 0.75rem 0.75rem 0; font-style: italic; }
             `}</style>
         </ModalPortal>
     );
