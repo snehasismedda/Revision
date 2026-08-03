@@ -6,7 +6,7 @@ export const getNotesBySubject = async (subjectId, limit, offset, includeContent
         .orderBy('created_at', 'desc');
 
     if (!includeContent) {
-        query = query.select('id', 'subject_id', 'question_id', 'parent_note_id', 'source_image_ids', 'title', 'tags', 'created_at', 'updated_at');
+        query = query.select('id', 'subject_id', 'question_id', 'parent_note_id', 'source_image_ids', 'title', 'tags', 'key_highlights', 'created_at', 'updated_at');
     }
 
     if (limit !== undefined) {
@@ -33,7 +33,7 @@ export const getNotesByQuestion = async (questionId) => {
         .orderBy('created_at', 'desc');
 };
 
-export const createNote = async (subjectId, questionId, title, content, sourceImageIds = [], parentNoteId, tags = []) => {
+export const createNote = async (subjectId, questionId, title, content, sourceImageIds = [], parentNoteId, tags = [], keyHighlights = []) => {
     const [note] = await db('revision.notes').insert({
         subject_id: subjectId,
         question_id: questionId || null,
@@ -41,7 +41,8 @@ export const createNote = async (subjectId, questionId, title, content, sourceIm
         parent_note_id: parentNoteId || null,
         title,
         content,
-        tags: JSON.stringify(tags || [])
+        tags: JSON.stringify(tags || []),
+        key_highlights: JSON.stringify(keyHighlights || [])
     }).returning('*');
     return note;
 };
@@ -70,6 +71,10 @@ export const updateNote = async (noteId, subjectId, data) => {
 
     if (data.source_image_ids !== undefined) {
         updateData.source_image_ids = data.source_image_ids || [];
+    }
+
+    if (data.key_highlights !== undefined) {
+        updateData.key_highlights = JSON.stringify(data.key_highlights || []);
     }
 
     const [updated] = await db('revision.notes')

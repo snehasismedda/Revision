@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { X, FileText, Link2 as LinkIcon, Pencil, ChevronLeft, ChevronRight, List, Copy, PanelLeftClose, PanelLeftOpen, Plus, ArrowLeft, Wand2, Check, XCircle, Loader2, Sun, Moon, Settings, Type, Palette, Trash2, Edit3, Maximize2, Minimize2, ExternalLink, Hash, Image as ImageIcon, Sparkles, RefreshCw, Type as TypeIcon, Layout, Eye, EyeOff } from 'lucide-react';
+import { X, FileText, Link2 as LinkIcon, Pencil, ChevronLeft, ChevronRight, List, Copy, PanelLeftClose, PanelLeftOpen, Plus, ArrowLeft, Wand2, Check, XCircle, Loader2, Sun, Moon, Settings, Type, Palette, Trash2, Edit3, Maximize2, Minimize2, ExternalLink, Hash, Image as ImageIcon, Sparkles, RefreshCw, Type as TypeIcon, Layout, Eye, EyeOff, Zap, ChevronDown } from 'lucide-react';
 import { authApi, notesApi } from '../../api/index.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { formatDate } from '../../utils/dateUtils';
@@ -539,6 +539,7 @@ const ViewNoteModal = ({
     const [aiInstruction, setAiInstruction] = useState('');
     const [aiResult, setAiResult] = useState('');
     const [aiLoading, setAiLoading] = useState(false);
+    const [highlightsCollapsed, setHighlightsCollapsed] = useState(false);
 
     const handleSafeAction = useCallback((action) => {
         if (editMode) {
@@ -1832,6 +1833,68 @@ const ViewNoteModal = ({
                                     )}
                                 </div>
                             )}
+
+                            {/* ⚡ Key Highlights Hero Card */}
+                            {(() => {
+                                let kh = note?.key_highlights || [];
+                                if (typeof kh === 'string') { try { kh = JSON.parse(kh); } catch { kh = []; } }
+                                if (!Array.isArray(kh) || kh.length === 0) return null;
+                                return (
+                                    <div className={`mb-8 rounded-2xl border overflow-hidden transition-all ${
+                                        isLightMode
+                                            ? 'bg-amber-50/80 border-amber-200 shadow-sm'
+                                            : 'border-amber-500/25 shadow-[0_0_30px_rgba(251,191,36,0.08)]'
+                                    }`}
+                                    style={isLightMode ? {} : { background: 'linear-gradient(135deg, rgba(251,191,36,0.06) 0%, rgba(245,158,11,0.04) 100%)' }}
+                                    >
+                                        {/* Glowing top border (dark mode only) */}
+                                        {!isLightMode && (
+                                            <div className="h-px w-full" style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(251,191,36,0.6) 30%, rgba(245,158,11,0.8) 50%, rgba(251,191,36,0.6) 70%, transparent 100%)' }} />
+                                        )}
+                                        {/* Header */}
+                                        <button
+                                            onClick={() => setHighlightsCollapsed(v => !v)}
+                                            className={`w-full flex items-center justify-between px-5 py-3.5 cursor-pointer transition-colors group ${
+                                                isLightMode ? 'hover:bg-amber-100/60' : 'hover:bg-amber-500/5'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2.5">
+                                                <div className={`p-1.5 rounded-lg ${isLightMode ? 'bg-amber-100 text-amber-600' : 'bg-amber-500/15 text-amber-400'}`}>
+                                                    <Zap className="w-3.5 h-3.5" fill="currentColor" />
+                                                </div>
+                                                <span className={`text-[11px] font-black uppercase tracking-[0.18em] ${isLightMode ? 'text-amber-700' : 'text-amber-400'}`}>
+                                                    Key Highlights
+                                                </span>
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isLightMode ? 'bg-amber-200 text-amber-700' : 'bg-amber-500/20 text-amber-400'}`}>
+                                                    {kh.length}
+                                                </span>
+                                            </div>
+                                            <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isLightMode ? 'text-amber-500' : 'text-amber-500'} ${highlightsCollapsed ? '-rotate-90' : ''}`} />
+                                        </button>
+
+                                        {/* Divider */}
+                                        {!highlightsCollapsed && (
+                                            <div className={`mx-5 h-px ${isLightMode ? 'bg-amber-200' : 'bg-amber-500/20'}`} />
+                                        )}
+
+                                        {/* Bullets */}
+                                        <div className={`overflow-hidden transition-all duration-300 ease-in-out ${highlightsCollapsed ? 'max-h-0' : 'max-h-[800px]'}`}>
+                                            <ul className="px-5 py-4 space-y-2.5">
+                                                {kh.map((hl, idx) => (
+                                                    <li key={idx} className="flex items-start gap-3">
+                                                        <span className={`mt-1 shrink-0 w-5 h-5 flex items-center justify-center rounded-md text-[10px] font-black ${
+                                                            isLightMode ? 'bg-amber-200 text-amber-700' : 'bg-amber-500/20 text-amber-400'
+                                                        }`}>{idx + 1}</span>
+                                                        <span className={`text-[14px] leading-relaxed font-medium ${isLightMode ? 'text-amber-900' : 'text-amber-100/90'}`}>
+                                                            {hl}
+                                                        </span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             <div className={`prose prose-base sm:prose-lg max-w-none break-words sm:break-normal 
                                     prose-headings:font-heading prose-headings:font-bold prose-headings:tracking-tight 

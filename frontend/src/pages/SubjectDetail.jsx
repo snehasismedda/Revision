@@ -18,8 +18,8 @@ import unidecode from 'unidecode';
 import autoTable from 'jspdf-autotable';
 import { marked } from 'marked';
 import { saveAs } from 'file-saver';
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, ImageRun, Table, TableRow, TableCell, WidthType, AlignmentType } from 'docx';
-import { ArrowLeft, PlusCircle, BarChart3, Wand2, BookOpen, Activity, Puzzle, FileText, Image as ImageIcon, Layers, Trash2, ChevronDown, Pencil, Hash, Search, X, Link2 as LinkIcon, Maximize2, Minimize2, LayoutGrid, List, CheckCircle, Download, ClipboardList, RotateCcw, Clock, RefreshCw, Notebook, MoreHorizontal, MoreVertical, History, Loader2, Lightbulb, LibraryBig } from 'lucide-react';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, ImageRun, Table, TableRow, TableCell, WidthType, AlignmentType, ExternalHyperlink } from 'docx';
+import { ArrowLeft, PlusCircle, BarChart3, Wand2, BookOpen, Activity, Puzzle, FileText, Image as ImageIcon, Layers, Trash2, ChevronDown, Pencil, Hash, Search, X, Link2 as LinkIcon, Maximize2, Minimize2, LayoutGrid, List, CheckCircle, Download, ClipboardList, RotateCcw, Clock, RefreshCw, Notebook, MoreHorizontal, MoreVertical, History, Loader2, Lightbulb, LibraryBig, Zap } from 'lucide-react';
 import FileExplorer from '../components/FileExplorer.jsx';
 import { foldersApi } from '../api/index.js';
 
@@ -40,6 +40,7 @@ import ViewSolutionModal from '../components/modals/ViewSolutionModal.jsx';
 import EditSolutionModal from '../components/modals/EditSolutionModal.jsx';
 import FileViewerModal from '../components/modals/FileViewerModal.jsx';
 import ImageViewerModal from '../components/modals/ImageViewerModal.jsx';
+import KeyHighlightsModal from '../components/modals/KeyHighlightsModal.jsx';
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -169,6 +170,8 @@ const SubjectDetail = () => {
     const [treeKey, setTreeKey] = useState(0);
     const [sessionsViewMode, setSessionsViewMode] = useState('grid'); // 'grid' or 'list'
     const [notesViewMode, setNotesViewMode] = useState('grid'); // 'grid' or 'list'
+    const [showHighlightsOnly, setShowHighlightsOnly] = useState(false);
+    const [viewingHighlightsNote, setViewingHighlightsNote] = useState(null); // note object
     const [solutionsViewMode, setSolutionsViewMode] = useState('grid');
     const [libraryViewMode, setLibraryViewMode] = useState('datewise'); // 'datewise' or 'categorywise'
 
@@ -591,14 +594,7 @@ const SubjectDetail = () => {
             doc.setFontSize(20);
             const titleText = sanitizeForPDF(subject?.name || 'Syllabus');
             doc.text(titleText, margin, y);
-            y += 10;
-
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(10);
-            doc.setTextColor(100, 100, 120);
-            doc.text(`Syllabus  ·  ${new Date().toLocaleDateString()}`, margin, y);
-            doc.setTextColor(0, 0, 0);
-            y += 3;
+            y += 8;
 
             // Thick decorative line under cover
             doc.setDrawColor(80, 80, 200);
@@ -745,14 +741,31 @@ const SubjectDetail = () => {
             .trim();
     };
 
-    // Flatten a marked inline token tree into styled segments [{text, bold, italic, code}]
+    // Helper to extract URLs from text segments if any raw URLs exist
+    const parseTextWithUrls = (rawText, segProps = { bold: false, italic: false, code: false }) => {
+        if (!rawText) return [];
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        const parts = rawText.split(urlRegex);
+        const res = [];
+        for (const part of parts) {
+            if (!part) continue;
+            if (part.match(/^https?:\/\//)) {
+                res.push({ text: part, ...segProps, link: part });
+            } else {
+                res.push({ text: part, ...segProps });
+            }
+        }
+        return res;
+    };
+
+    // Flatten a marked inline token tree into styled segments [{text, bold, italic, code, link}]
     const flattenInlineTokens = (tokens) => {
         if (!tokens) return [];
         const segs = [];
         for (const t of tokens) {
             if (t.type === 'text' || t.type === 'escape') {
                 const raw = stripLatexMath(t.text || t.raw || '');
-                if (raw) segs.push({ text: raw, bold: false, italic: false, code: false });
+                if (raw) segs.push(...parseTextWithUrls(raw, { bold: false, italic: false, code: false }));
             } else if (t.type === 'strong') {
                 for (const s of flattenInlineTokens(t.tokens)) segs.push({ ...s, bold: true });
             } else if (t.type === 'em') {
@@ -760,15 +773,20 @@ const SubjectDetail = () => {
             } else if (t.type === 'codespan') {
                 segs.push({ text: t.text || '', bold: false, italic: false, code: true });
             } else if (t.type === 'link') {
-                // Show link text only, not the URL
-                for (const s of flattenInlineTokens(t.tokens)) segs.push(s);
+                const href = t.href || '';
+                const innerSegs = flattenInlineTokens(t.tokens);
+                if (innerSegs.length > 0) {
+                    for (const s of innerSegs) segs.push({ ...s, link: href });
+                } else if (t.text || href) {
+                    segs.push({ text: t.text || href, bold: false, italic: false, code: false, link: href });
+                }
             } else if (t.type === 'image') {
                 // skip images in text flow
             } else if (t.type === 'br') {
                 segs.push({ text: ' ', bold: false, italic: false, code: false });
             } else if (t.raw) {
                 const raw = stripLatexMath(t.raw);
-                if (raw) segs.push({ text: raw, bold: false, italic: false, code: false });
+                if (raw) segs.push(...parseTextWithUrls(raw, { bold: false, italic: false, code: false }));
             }
         }
         return segs;
@@ -906,8 +924,26 @@ const SubjectDetail = () => {
                 const style = seg.bold && seg.italic ? 'bolditalic' : seg.bold ? 'bold' : seg.italic ? 'italic' : 'normal';
                 doc.setFont(seg.code ? 'courier' : 'helvetica', style);
                 doc.setFontSize(fontSize);
-                doc.text(seg.text, curX, baseline);
-                curX += doc.getTextWidth(seg.text);
+                const segW = doc.getTextWidth(seg.text);
+
+                if (seg.link) {
+                    doc.setTextColor(37, 99, 235); // Blue (#2563eb) for hyperlink
+                    doc.text(seg.text, curX, baseline, { url: seg.link });
+
+                    // Underline for link
+                    doc.setDrawColor(37, 99, 235);
+                    doc.setLineWidth(0.2);
+                    doc.line(curX, baseline + 0.5, curX + segW, baseline + 0.5);
+
+                    // Add PDF interactive hyperlink bounding rect
+                    const fontH = fontSize * PT_TO_MM;
+                    doc.link(curX, baseline - fontH * 0.8, segW, fontH * 1.1, { url: seg.link });
+
+                    doc.setTextColor(0, 0, 0); // Restore color
+                } else {
+                    doc.text(seg.text, curX, baseline);
+                }
+                curX += segW;
             }
         };
 
@@ -1126,15 +1162,7 @@ const SubjectDetail = () => {
             doc.setFontSize(20);
             const titleText = sanitizeForPDF(subject?.name || 'Export');
             doc.text(titleText, margin, y);
-            y += 10;
-
-            const tabLabel = activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(10);
-            doc.setTextColor(100, 100, 120);
-            doc.text(`${tabLabel} Export  ·  ${new Date().toLocaleDateString()}`, margin, y);
-            doc.setTextColor(0, 0, 0);
-            y += 3;
+            y += 8;
 
             // Thick decorative line under cover
             doc.setDrawColor(80, 80, 200);
@@ -1355,12 +1383,8 @@ const SubjectDetail = () => {
 
             const docChildren = [
                 new Paragraph({
-                    text: `${sanitizeForPDF(subject?.name || 'Export')} - ${tabLabel} Export`,
+                    text: sanitizeForPDF(subject?.name || 'Export'),
                     heading: HeadingLevel.HEADING_1,
-                }),
-                new Paragraph({
-                    text: `Generated on ${new Date().toLocaleDateString()}`,
-                    style: "wellSpaced"
                 }),
                 new Paragraph({ text: "" }), // Spacing
             ];
@@ -1437,6 +1461,24 @@ const SubjectDetail = () => {
                 const rawContent = item.content || '';
                 const tokens = tokenizeMarkdown(rawContent);
 
+                const renderSegmentToDocx = (seg) => {
+                    const textRun = new TextRun({
+                        text: seg.text || "",
+                        bold: seg.bold,
+                        italics: seg.italic,
+                        font: seg.code ? "Courier" : undefined,
+                        color: seg.link ? "2563EB" : undefined,
+                        underline: seg.link ? {} : undefined,
+                    });
+                    if (seg.link) {
+                        return new ExternalHyperlink({
+                            children: [textRun],
+                            link: seg.link,
+                        });
+                    }
+                    return textRun;
+                };
+
                 for (const token of tokens) {
                     if (token.type === 'heading') {
                         const headingMap = {
@@ -1455,12 +1497,7 @@ const SubjectDetail = () => {
                     } else if (token.type === 'paragraph' || token.type === 'blockquote') {
                         if (!token.segments || token.segments.length === 0) continue;
                         docChildren.push(new Paragraph({
-                            children: token.segments.map(seg => new TextRun({
-                                text: seg.text || "",
-                                bold: seg.bold,
-                                italics: seg.italic,
-                                font: seg.code ? "Courier" : undefined,
-                            })),
+                            children: token.segments.map(renderSegmentToDocx),
                             spacing: { before: 120, after: 120 },
                             indent: token.type === 'blockquote' ? { left: 720 } : undefined
                         }));
@@ -1471,12 +1508,7 @@ const SubjectDetail = () => {
                                 indent: { left: (li.indent + 1) * 720, hanging: 360 },
                                 children: [
                                     new TextRun({ text: prefix }),
-                                    ...(li.segments || []).map(seg => new TextRun({
-                                        text: seg.text || "",
-                                        bold: seg.bold,
-                                        italics: seg.italic,
-                                        font: seg.code ? "Courier" : undefined,
-                                    }))
+                                    ...(li.segments || []).map(renderSegmentToDocx)
                                 ],
                                 spacing: { before: 60, after: 60 }
                             }));
@@ -3852,6 +3884,19 @@ const SubjectDetail = () => {
                                                     <List className="w-4 h-4" />
                                                 </button>
                                             </div>
+                                            {/* Highlights Only Toggle */}
+                                            <button
+                                                onClick={() => setShowHighlightsOnly(v => !v)}
+                                                title={showHighlightsOnly ? 'Show Full Notes' : 'Highlights Only Mode'}
+                                                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-bold transition-all cursor-pointer shrink-0 ${
+                                                    showHighlightsOnly
+                                                        ? 'bg-amber-500/20 border-amber-500/40 text-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.15)]'
+                                                        : 'bg-surface-2/50 border-border text-text-muted hover:border-amber-500/30 hover:text-amber-400 hover:bg-amber-500/5'
+                                                }`}
+                                            >
+                                                <Zap className={`w-3.5 h-3.5 ${showHighlightsOnly ? 'fill-amber-400' : ''}`} />
+                                                <span className="hidden sm:inline">Highlights</span>
+                                            </button>
                                             <button
                                                 onClick={() => setShowNoteModal(true)}
                                                 className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98] shrink-0"
@@ -3889,23 +3934,96 @@ const SubjectDetail = () => {
                                 ) : (
                                     <div className={`grid gap-5 ${notesViewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
                                         {(() => {
-                                            const filtered = filteredNotes;
+                                            let filtered = filteredNotes;
+                                            if (showHighlightsOnly) {
+                                                filtered = filtered.filter(note => {
+                                                    let kh = note.key_highlights || [];
+                                                    if (typeof kh === 'string') { try { kh = JSON.parse(kh); } catch { kh = []; } }
+                                                    return Array.isArray(kh) && kh.length > 0;
+                                                });
+                                            }
 
                                             if (filtered.length === 0 && notes.length > 0) {
                                                 return (
                                                     <div className="col-span-full py-12 flex flex-col items-center justify-center text-center glass-panel rounded-2xl border-dashed border-border-hover">
                                                         <Search className="w-8 h-8 text-text-muted mb-3" />
-                                                        <p className="text-text-muted font-medium">No notes match your search</p>
-                                                        <button onClick={() => setNoteSearchQuery('')} className="mt-2 text-indigo-400 text-sm hover:underline">Clear search</button>
+                                                        <p className="text-text-muted font-medium">
+                                                            {showHighlightsOnly ? 'No notes with key highlights found' : 'No notes match your search'}
+                                                        </p>
+                                                        {(noteSearchQuery || selectedNoteTag) && (
+                                                            <button onClick={() => { setNoteSearchQuery(''); setSelectedNoteTag(''); }} className="mt-2 text-indigo-400 text-sm hover:underline">Clear filters</button>
+                                                        )}
                                                     </div>
                                                 );
                                             }
 
-                                            return filtered.map((note) => (
+                                            return filtered.map((note) => {
+                                                // Parse key_highlights
+                                                let kh = note.key_highlights || [];
+                                                if (typeof kh === 'string') { try { kh = JSON.parse(kh); } catch { kh = []; } }
+                                                const hasHighlights = Array.isArray(kh) && kh.length > 0;
+
+                                                // ── HIGHLIGHTS ONLY MODE ─────────────────────────────────────
+                                                if (showHighlightsOnly) {
+                                                    return (
+                                                        <div
+                                                            key={note.id}
+                                                            id={`note-${note.id}`}
+                                                            className={`glass-panel rounded-2xl border transition-all flex flex-col justify-between overflow-hidden relative group ${
+                                                                highlightedNoteId == note.id
+                                                                    ? 'ring-4 ring-amber-500 scale-[1.01] shadow-[0_0_30px_rgba(251,191,36,0.3)] border-amber-400'
+                                                                    : 'border-border hover:border-amber-500/30 hover:bg-surface-2'
+                                                            }`}
+                                                            onClick={() => handleOpenNote(note)}
+                                                        >
+                                                            {/* Glowing top line */}
+                                                            <div className="h-px w-full shrink-0" style={{ background: 'linear-gradient(90deg, transparent, rgba(251,191,36,0.5) 40%, rgba(245,158,11,0.7) 50%, rgba(251,191,36,0.5) 60%, transparent)' }} />
+
+                                                            {/* Card Header */}
+                                                            <div className="px-5 pt-4 pb-3 flex items-center justify-between gap-3 shrink-0">
+                                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                                    <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-400 shrink-0">
+                                                                        <Zap className="w-3.5 h-3.5" fill="currentColor" />
+                                                                    </div>
+                                                                    <h4 className="font-heading font-bold text-text text-[15px] truncate">{note.title}</h4>
+                                                                </div>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleOpenNote(note); }}
+                                                                    className="shrink-0 p-1.5 rounded-lg text-text-muted hover:text-emerald-400 hover:bg-emerald-500/10 transition-all cursor-pointer"
+                                                                    title="Open Full Note"
+                                                                >
+                                                                    <FileText className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            </div>
+
+                                                            {/* Divider */}
+                                                            <div className="mx-5 h-px bg-amber-500/15 shrink-0" />
+
+                                                            {/* Highlights list (Scrolls internally if > 3 highlights, shrink-wraps if fewer) */}
+                                                            <div className="p-5 flex-1 max-h-[210px] overflow-y-auto custom-scrollbar">
+                                                                {hasHighlights ? (
+                                                                    <ul className="space-y-2.5">
+                                                                        {kh.map((hl, idx) => (
+                                                                            <li key={idx} className="flex items-start gap-2.5 text-[13px] text-text-muted font-medium leading-relaxed">
+                                                                                <span className="mt-0.5 shrink-0 w-4.5 h-4.5 min-w-[18px] flex items-center justify-center rounded text-[9px] font-black bg-amber-500/20 text-amber-400">{idx + 1}</span>
+                                                                                <span>{hl}</span>
+                                                                            </li>
+                                                                        ))}
+                                                                    </ul>
+                                                                ) : (
+                                                                    <p className="text-[12px] text-text-muted italic">No highlights added yet.</p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }
+
+                                                // ── NORMAL CARD ───────────────────────────────────────────────
+                                                return (
                                                 <div
                                                     key={note.id}
                                                     id={`note-${note.id}`}
-                                                    className={`glass-panel rounded-2xl border transition-all flex group relative ${highlightedNoteId == note.id ? 'ring-4 ring-emerald-500 scale-[1.02] shadow-[0_0_40px_rgba(16,185,129,0.5)] z-[100] border-emerald-400 opacity-100' : ''} ${notesViewMode === 'list' ? 'items-center py-4 px-6 gap-6' : 'flex-col p-6'} ${activeNoteDropdown === note.id ? 'border-emerald-500/40 shadow-xl' : ''} ${isSelectionMode ? (selectedItems.has(note.id) ? 'border-indigo-400 bg-indigo-500/10 cursor-pointer shadow-[0_0_15px_rgba(99,102,241,0.2)]' : 'border-border hover:border-border-hover cursor-pointer') : 'border-border hover:border-emerald-500/30 hover:bg-surface-2 cursor-pointer'}`}
+                                                    className={`glass-panel rounded-2xl border transition-all flex group relative ${highlightedNoteId == note.id ? 'ring-4 ring-emerald-500 scale-[1.02] shadow-[0_0_40px_rgba(16,185,129,0.5)] z-[100] border-emerald-400 opacity-100' : ''} ${notesViewMode === 'list' ? 'items-center py-4 px-6 gap-6' : 'flex-col p-6 h-full justify-between min-h-[170px]'} ${activeNoteDropdown === note.id ? 'border-emerald-500/40 shadow-xl' : ''} ${isSelectionMode ? (selectedItems.has(note.id) ? 'border-indigo-400 bg-indigo-500/10 cursor-pointer shadow-[0_0_15px_rgba(99,102,241,0.2)]' : 'border-border hover:border-border-hover cursor-pointer') : 'border-border hover:border-emerald-500/30 hover:bg-surface-2 cursor-pointer'}`}
                                                     onClick={() => handleOpenNote(note)}
                                                 >
                                                     {fetchingNoteContentId === note.id && (
@@ -3950,12 +4068,30 @@ const SubjectDetail = () => {
                                                                             Media
                                                                         </span>
                                                                     )}
+                                                                    {hasHighlights && (
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                                                setViewingHighlightsNote({
+                                                                                    ...note,
+                                                                                    triggerRect: {
+                                                                                        centerX: rect.left + rect.width / 2,
+                                                                                        centerY: rect.top + rect.height / 2
+                                                                                    }
+                                                                                });
+                                                                            }}
+                                                                            className="text-[9px] text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 px-2 py-0.5 rounded-full font-black uppercase tracking-widest flex items-center gap-1 cursor-pointer transition-all hover:scale-105"
+                                                                            title="View Key Highlights"
+                                                                        >
+                                                                            <Zap className="w-2.5 h-2.5" fill="currentColor" />
+                                                                            <span>{kh.length} {kh.length === 1 ? 'Highlight' : 'Highlights'}</span>
+                                                                        </button>
+                                                                    )}
                                                                 </div>
                                                                 <h4 className={`font-heading font-bold text-text tracking-tight break-words group-hover:text-emerald-400 transition-colors ${notesViewMode === 'list' ? 'text-[16px]' : 'text-[18px]'}`}>
                                                                     {note.title}
                                                                 </h4>
-
-
                                                             </div>
                                                         </div>
 
@@ -4020,6 +4156,29 @@ const SubjectDetail = () => {
                                                                     <LinkIcon className="w-3.5 h-3.5" />
                                                                 </button>
                                                             )}
+
+                                                            {/* ⚡ Highlights Quick Preview Modal Button */}
+                                                            {hasHighlights && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        const rect = e.currentTarget.getBoundingClientRect();
+                                                                        setViewingHighlightsNote({
+                                                                            ...note,
+                                                                            triggerRect: {
+                                                                                centerX: rect.left + rect.width / 2,
+                                                                                centerY: rect.top + rect.height / 2
+                                                                            }
+                                                                        });
+                                                                        setActiveNoteDropdown(null);
+                                                                    }}
+                                                                    className="p-1.5 rounded-md transition-all cursor-pointer text-amber-500/70 hover:text-amber-400 hover:bg-amber-500/10"
+                                                                    title="View Key Highlights"
+                                                                >
+                                                                    <Zap className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
+
                                                             <div className="relative">
                                                                 <button
                                                                     onClick={(e) => {
@@ -4031,6 +4190,7 @@ const SubjectDetail = () => {
                                                                 >
                                                                     <MoreVertical className="w-3.5 h-3.5" />
                                                                 </button>
+
 
                                                                 {activeNoteDropdown === note.id && (
                                                                     <div
@@ -4077,7 +4237,8 @@ const SubjectDetail = () => {
                                                         </div>
                                                     </div>
                                                 </div>
-                                            ));
+                                                );
+                                            });
                                         })()}
 
                                         {hasMoreNotes && !noteSearchQuery && !selectedNoteTag && (
@@ -4802,6 +4963,13 @@ const SubjectDetail = () => {
                     />
                 </div>
             </ConfirmDialog>
+
+            {viewingHighlightsNote && (
+                <KeyHighlightsModal
+                    note={viewingHighlightsNote}
+                    onClose={() => setViewingHighlightsNote(null)}
+                />
+            )}
         </div>
     );
 };
