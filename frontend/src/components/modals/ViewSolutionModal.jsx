@@ -9,28 +9,11 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
-import 'katex/dist/katex.min.css';
+import { preprocessMarkdown } from '../../utils/markdownUtils';
 
 // Syntax Highlighting imports
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-
-const preprocessMarkdown = (text) => {
-    if (!text) return '';
-    return text
-        .replace(/\\\\\[/g, '\n$$\n')
-        .replace(/\\\\\]/g, '\n$$\n')
-        .replace(/\\\[/g, '\n$$\n')
-        .replace(/\\\]/g, '\n$$\n')
-        .replace(/\\\\\(*/g, '$')
-        .replace(/\\\\\)* /g, '$')
-        .replace(/\\\(/g, '$')
-        .replace(/\\\)/g, '$')
-        .replace(/\$\$\$\$/g, '$$\n$$')
-        .replace(/\$ \$/g, '$$')
-        .replace(/([^\n])\$\$/g, '$1\n$$')
-        .replace(/\$$([^\n])/g, '$$\n$1');
-};
 
 // Enhanced Code Block with Language Detection, Syntax Highlighting and Copy Button
 const SimpleCodeBlock = React.memo(({ children, isLightMode, fontSize = 16, primaryColor = '#3b82f6', className }) => {

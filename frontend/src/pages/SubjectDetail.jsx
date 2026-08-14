@@ -48,31 +48,7 @@ import remarkMath from 'remark-math';
 import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
 
-const preprocessMarkdown = (text) => {
-    if (!text) return '';
-    return text
-        // Handle escaped block brackets: \[ ... \] or \\[ ... \\]
-        .replace(/\\\\\[/g, '\n$$\n')
-        .replace(/\\\\\]/g, '\n$$\n')
-        .replace(/\\\[/g, '\n$$\n')
-        .replace(/\\\]/g, '\n$$\n')
-        // Handle escaped inline brackets: \( ... \) or \\( ... \\)
-        .replace(/\\\\\(*/g, '$')
-        .replace(/\\\\\)* /g, '$')
-        .replace(/\\\(/g, '$')
-        .replace(/\\\)/g, '$')
-        // Handle back-to-back block math or sloppy delimiters
-        .replace(/\$\$\$\$/g, '$$\n$$')
-        .replace(/\$ \$/g, '$$')
-        // Ensure standard double dollars have newlines if they are likely blocks
-        .replace(/([^\n])\$\$/g, '$1\n$$')
-        .replace(/\$\$([^\n])/g, '$$\n$1')
-        // Fix common quirk
-        .replace(/\\bottom([a-zA-Z])/g, '\\bot $1')
-        .replace(/\\bottom/g, '\\bot')
-        // Ensure single newlines become double newlines to prevent text collapsing horizontally
-        .replace(/([^\n])\n([^\n])/g, '$1\n\n$2');
-};
+import { preprocessMarkdown } from '../utils/markdownUtils';
 
 
 const SubjectDetail = () => {
@@ -4006,7 +3982,17 @@ const SubjectDetail = () => {
                                                                         {kh.map((hl, idx) => (
                                                                             <li key={idx} className="flex items-start gap-2.5 text-[13px] text-text-muted font-medium leading-relaxed">
                                                                                 <span className="mt-0.5 shrink-0 w-4.5 h-4.5 min-w-[18px] flex items-center justify-center rounded text-[9px] font-black bg-amber-500/20 text-amber-400">{idx + 1}</span>
-                                                                                <span>{hl}</span>
+                                                                                <div className="flex-1 min-w-0 overflow-x-auto">
+                                                                                    <ReactMarkdown
+                                                                                        remarkPlugins={[remarkGfm, remarkMath]}
+                                                                                        rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                                                                        components={{
+                                                                                            p: ({ children }) => <span className="inline">{children}</span>
+                                                                                        }}
+                                                                                    >
+                                                                                        {preprocessMarkdown(hl)}
+                                                                                    </ReactMarkdown>
+                                                                                </div>
                                                                             </li>
                                                                         ))}
                                                                     </ul>

@@ -1,6 +1,13 @@
 import React, { useEffect } from 'react';
 import { X, Zap } from 'lucide-react';
 import ModalPortal from '../ModalPortal.jsx';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeRaw from 'rehype-raw';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
+import { preprocessMarkdown } from '../../utils/markdownUtils';
 
 /**
  * A lightweight preview modal for Key Highlights of a note.
@@ -119,9 +126,17 @@ const KeyHighlightsModal = ({ note, onClose }) => {
                                         <span className="shrink-0 mt-0.5 w-5 h-5 rounded-lg bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center text-[10px] font-bold">
                                             {idx + 1}
                                         </span>
-                                        <span className="text-[14px] text-text font-medium leading-relaxed">
-                                            {hl}
-                                        </span>
+                                        <div className="text-[14px] text-text font-medium leading-relaxed flex-1 overflow-x-auto">
+                                            <ReactMarkdown
+                                                remarkPlugins={[remarkGfm, remarkMath]}
+                                                rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                                components={{
+                                                    p: ({ children }) => <span className="inline">{children}</span>
+                                                }}
+                                            >
+                                                {preprocessMarkdown(hl)}
+                                            </ReactMarkdown>
+                                        </div>
                                     </li>
                                 ))}
                             </ul>

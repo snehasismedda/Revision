@@ -19,22 +19,7 @@ import remarkMath from 'remark-math';
 import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
 
-const preprocessMarkdown = (text) => {
-    if (!text) return '';
-    return text
-        .replace(/\\\\\[/g, '\n$$\n')
-        .replace(/\\\\\]/g, '\n$$\n')
-        .replace(/\\\[/g, '\n$$\n')
-        .replace(/\\\]/g, '\n$$\n')
-        .replace(/\\\(/g, '$')
-        .replace(/\\\)/g, '$')
-        .replace(/\$\$\$\$/g, '$$\n$$')
-        .replace(/\$ \$/g, '$$')
-        .replace(/([^\n])\$\$/g, '$1\n$$')
-        .replace(/\$\$([^\n])/g, '$$\n$1')
-        .replace(/\\bottom([a-zA-Z])/g, '\\bot $1')
-        .replace(/\\bottom/g, '\\bot');
-};
+import { preprocessMarkdown } from '../utils/markdownUtils';
 
 const EMERALD = '#10b981';
 const AMBER = '#f59e0b';

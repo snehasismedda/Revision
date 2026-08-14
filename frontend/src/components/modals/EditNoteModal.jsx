@@ -4,6 +4,13 @@ import toast from 'react-hot-toast';
 import { X, Save, FileText, Image as ImageIcon, Camera, RefreshCcw, RefreshCw, ChevronDown, Scissors, Wand2, Sparkles, Tag, Type, LayoutGrid, Trash2, Sun, Moon, Plus, Eye, EyeOff, Zap } from 'lucide-react';
 import ModalPortal from '../ModalPortal.jsx';
 import ImageCropper from '../common/ImageCropper.jsx';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeRaw from 'rehype-raw';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
+import { preprocessMarkdown } from '../../utils/markdownUtils';
 
 const EditNoteModal = ({ isOpen, onClose, subjectId, note, onNoteUpdated, isMinimized, onMinimize }) => {
     const [mainType, setMainType] = useState('text'); // 'text' or 'image'
@@ -732,11 +739,21 @@ const EditNoteModal = ({ isOpen, onClose, subjectId, note, onNoteUpdated, isMini
                                         {showHighlightsSection && (
                                             <div className="animate-in fade-in duration-200">
                                                 {keyHighlights.length > 0 && (
-                                                    <div className="flex flex-col gap-1.5 mb-3">
+                                                    <div className="flex flex-col gap-1.5 mb-3 max-h-[200px] overflow-y-auto custom-scrollbar pr-1">
                                                         {keyHighlights.map((hl, idx) => (
-                                                            <div key={idx} className={`flex items-start gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] font-medium group ${isLightMode ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-amber-500/10 border-amber-500/20 text-amber-300'}`}>
+                                                            <div key={idx} className={`flex items-start gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] font-medium group min-w-0 max-w-full ${isLightMode ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-amber-500/10 border-amber-500/20 text-amber-300'}`}>
                                                                 <Zap className="w-3 h-3 shrink-0 mt-0.5 opacity-70" />
-                                                                <span className="flex-1 leading-snug break-words">{hl}</span>
+                                                                <span className="flex-1 min-w-0 leading-snug break-words overflow-x-auto custom-scrollbar">
+                                                                    <ReactMarkdown
+                                                                        remarkPlugins={[remarkGfm, remarkMath]}
+                                                                        rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                                                        components={{
+                                                                            p: ({ children }) => <span className="inline">{children}</span>
+                                                                        }}
+                                                                    >
+                                                                        {preprocessMarkdown(hl)}
+                                                                    </ReactMarkdown>
+                                                                </span>
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => setKeyHighlights(h => h.filter((_, i) => i !== idx))}

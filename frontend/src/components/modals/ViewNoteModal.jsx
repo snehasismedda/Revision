@@ -12,30 +12,11 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
-import 'katex/dist/katex.min.css';
+import { preprocessMarkdown } from '../../utils/markdownUtils';
 
 // Syntax Highlighting imports
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-
-const preprocessMarkdown = (text) => {
-    if (!text) return '';
-    return text
-        .replace(/\\\\\[/g, '\n$$\n')
-        .replace(/\\\\\]/g, '\n$$\n')
-        .replace(/\\\[/g, '\n$$\n')
-        .replace(/\\\]/g, '\n$$\n')
-        .replace(/\\\\\(*/g, '$')
-        .replace(/\\\\\)* /g, '$')
-        .replace(/\\\(/g, '$')
-        .replace(/\\\)/g, '$')
-        .replace(/\$\$\$\$/g, '$$\n$$')
-        .replace(/\$ \$/g, '$$')
-        .replace(/([^\n])\$\$/g, '$1\n$$')
-        .replace(/\$\$([^\n])/g, '$$\n$1')
-        .replace(/\\bottom([a-zA-Z])/g, '\\bot $1')
-        .replace(/\\bottom/g, '\\bot');
-};
 
 
 
@@ -1885,9 +1866,17 @@ const ViewNoteModal = ({
                                                         <span className={`mt-1 shrink-0 w-5 h-5 flex items-center justify-center rounded-md text-[10px] font-black ${
                                                             isLightMode ? 'bg-amber-200 text-amber-700' : 'bg-amber-500/20 text-amber-400'
                                                         }`}>{idx + 1}</span>
-                                                        <span className={`text-[14px] leading-relaxed font-medium ${isLightMode ? 'text-amber-900' : 'text-amber-100/90'}`}>
-                                                            {hl}
-                                                        </span>
+                                                        <div className={`text-[14px] leading-relaxed font-medium flex-1 overflow-x-auto ${isLightMode ? 'text-amber-900' : 'text-amber-100/90'}`}>
+                                                            <ReactMarkdown
+                                                                remarkPlugins={markdownPlugins}
+                                                                rehypePlugins={markdownRehypePlugins}
+                                                                components={{
+                                                                    p: ({ children }) => <span className="inline">{children}</span>
+                                                                }}
+                                                            >
+                                                                {preprocessMarkdown(hl)}
+                                                            </ReactMarkdown>
+                                                        </div>
                                                     </li>
                                                 ))}
                                             </ul>
