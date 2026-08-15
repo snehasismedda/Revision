@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { LayoutDashboard, LibraryBig, LogOut, Activity, ChevronLeft, ChevronRight, Settings, Layers, Target, BookMarked, Sun, Moon, Wrench } from 'lucide-react';
+import { LayoutDashboard, LibraryBig, LogOut, Activity, ChevronLeft, ChevronRight, Settings, Layers, Target, BookMarked, Sun, Moon, Wrench, BookOpen, Puzzle, FileText, Lightbulb, RefreshCw, CheckSquare } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext.jsx';
+import { useSubjects } from '../context/SubjectContext.jsx';
 
 import EditProfileModal from './modals/EditProfileModal.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
@@ -16,13 +17,33 @@ const navItems = [
     { to: '/tools', label: 'Tools', icon: Wrench },
 ];
 
+const subjectNavTabs = [
+    { id: 'topics', label: 'Topics', icon: BookOpen },
+    { id: 'sessions', label: 'Sessions', icon: Activity },
+    { id: 'questions', label: 'Questions', icon: Puzzle },
+    { id: 'notes', label: 'Notes', icon: FileText },
+    { id: 'solutions', label: 'Solutions', icon: Lightbulb },
+    { id: 'revision', label: 'Revision', icon: RefreshCw },
+    { id: 'todos', label: 'TODOs', icon: CheckSquare },
+    { id: 'library', label: 'Library', icon: LibraryBig },
+];
+
 const Sidebar = () => {
     const { user, logout } = useAuth();
     const { theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
+    const location = useLocation();
+    const [searchParams] = useSearchParams();
+    const { subjects } = useSubjects();
     const [isCollapsed, setIsCollapsed] = useState(() => window.innerWidth < 768);
     const [showEditProfile, setShowEditProfile] = useState(false);
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+    // Check if on /subjects/:id (and not /subjects)
+    const subjectMatch = location.pathname.match(/^\/subjects\/([a-zA-Z0-9_-]+)$/);
+    const currentSubjectId = subjectMatch ? subjectMatch[1] : null;
+    const currentTab = searchParams.get('tab') || 'topics';
+    const currentSubject = currentSubjectId ? (subjects || []).find(s => s.id === currentSubjectId) : null;
 
     useEffect(() => {
         const handleResize = () => {
@@ -103,56 +124,124 @@ const Sidebar = () => {
             </div>
 
             {/* Nav */}
-            <nav className={`flex-1 overflow-y-auto overflow-x-hidden pt-2 transition-all z-10 ${isCollapsed ? 'px-3' : 'px-4'}`}>
-                <div className="space-y-1.5 font-sans pb-4">
-                    {navItems.map((item) => {
-                        const Icon = item.icon;
-                        return (
-                            <NavLink
-                                key={item.to}
-                                title={isCollapsed ? item.label : ''}
-                                to={item.to}
-                                end={item.to === '/'}
-                                className={({ isActive }) =>
-                                    `flex items-center text-[13px] font-semibold transition-all duration-300 relative rounded-xl group/nav
-                                    ${isActive ? 'text-text' : 'text-text-muted hover:text-text'}
-                                    ${isCollapsed ? 'justify-center p-3' : 'gap-3.5 px-4 py-2.5 mx-1'}`
-                                }
-                                onClick={() => {
-                                    if (window.innerWidth < 768) setIsCollapsed(true);
-                                }}
+            <nav className="flex-1 overflow-y-auto overflow-x-hidden pt-1 z-10 px-3">
+                {currentSubjectId ? (
+                    <div className="font-sans pb-4">
+                        {/* Back button */}
+                        <Link
+                            to="/subjects"
+                            title="Back to Subjects"
+                            className="flex items-center gap-3 text-[12px] font-bold text-text-muted hover:text-primary transition-all duration-200 rounded-xl mb-3 group px-3 py-2.5 hover:bg-primary/8"
+                        >
+                            <ChevronLeft className="w-4 h-4 shrink-0 transition-transform group-hover:-translate-x-0.5" />
+                            <span
+                                className={`truncate transition-all duration-300 overflow-hidden whitespace-nowrap ${
+                                    isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
+                                }`}
                             >
-                                {({ isActive }) => (
-                                    <>
-                                        {/* Simple Selection Indicator */}
-                                        {isActive && (
-                                            <div
-                                                className="absolute inset-0 bg-primary/15 border border-primary/20 rounded-xl z-0 fade-in"
-                                            />
-                                        )}
+                                All Subjects
+                            </span>
+                        </Link>
 
-                                        {/* Glass Glow Edge */}
-                                        {isActive && (
-                                            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary-light/40 to-transparent z-10" />
-                                        )}
+                        {/* Divider */}
+                        <div className={`mx-2 mb-3 h-px bg-gradient-to-r from-transparent via-border to-transparent transition-all duration-300 ${isCollapsed ? 'opacity-0' : 'opacity-100'}`} />
 
+                        {/* Section label */}
+                        <p className={`text-[10px] font-black uppercase tracking-[0.12em] text-text-muted/50 px-3 mb-2 transition-all duration-300 overflow-hidden whitespace-nowrap ${isCollapsed ? 'h-0 opacity-0 mb-0' : 'h-4 opacity-100'}`}>
+                            Navigate
+                        </p>
+
+                        {/* Subject Tabs */}
+                        <div className="space-y-0.5">
+                            {subjectNavTabs.map((item) => {
+                                const Icon = item.icon;
+                                const isActive = currentTab === item.id;
+                                return (
+                                    <Link
+                                        key={item.id}
+                                        to={`/subjects/${currentSubjectId}?tab=${item.id}`}
+                                        title={isCollapsed ? item.label : ''}
+                                        className={`flex items-center gap-3 text-[13px] font-semibold transition-all duration-200 relative rounded-xl group/nav overflow-hidden px-3 py-2.5 ${
+                                            isActive ? 'text-white' : 'text-text-muted hover:text-text'
+                                        }`}
+                                        onClick={() => {
+                                            if (window.innerWidth < 768) setIsCollapsed(true);
+                                        }}
+                                    >
+                                        {isActive && (
+                                            <div className="absolute inset-0 bg-gradient-to-r from-primary to-primary-dark rounded-xl z-0 shadow-lg shadow-primary/20" />
+                                        )}
+                                        {!isActive && (
+                                            <div className="absolute inset-0 bg-surface-3/0 group-hover/nav:bg-surface-3/70 rounded-xl z-0 transition-all duration-200" />
+                                        )}
                                         <Icon
-                                            className={`shrink-0 w-[18px] h-[18px] transition-all duration-300 relative z-10 ${isActive ? 'text-primary-light' : 'group-hover/nav:text-primary-light'}`}
-                                            strokeWidth={isActive ? 2.4 : 1.8}
+                                            className={`shrink-0 w-[17px] h-[17px] transition-all duration-200 relative z-10 ${
+                                                isActive ? 'text-white' : 'text-text-muted group-hover/nav:text-primary-light'
+                                            }`}
+                                            strokeWidth={isActive ? 2.5 : 1.8}
                                         />
-                                        {!isCollapsed && (
-                                            <span className={`transition-colors duration-200 relative z-10 ${isActive ? 'tracking-tight text-text' : ''}`}>
+                                        <span
+                                            className={`relative z-10 transition-all duration-300 overflow-hidden whitespace-nowrap ${
+                                                isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
+                                            }`}
+                                        >
+                                            {item.label}
+                                        </span>
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="space-y-0.5 font-sans pb-4">
+                        <p className={`text-[10px] font-black uppercase tracking-[0.12em] text-text-muted/50 px-3 mb-2 mt-1 transition-all duration-300 overflow-hidden whitespace-nowrap ${isCollapsed ? 'h-0 opacity-0 mb-0' : 'h-4 opacity-100'}`}>
+                            Menu
+                        </p>
+                        {navItems.map((item) => {
+                            const Icon = item.icon;
+                            return (
+                                <NavLink
+                                    key={item.to}
+                                    title={isCollapsed ? item.label : ''}
+                                    to={item.to}
+                                    end={item.to === '/'}
+                                    className={({ isActive }) =>
+                                        `flex items-center gap-3 text-[13px] font-semibold transition-all duration-200 relative rounded-xl group/nav overflow-hidden px-3 py-2.5 ${
+                                            isActive ? 'text-white' : 'text-text-muted hover:text-text'
+                                        }`
+                                    }
+                                    onClick={() => {
+                                        if (window.innerWidth < 768) setIsCollapsed(true);
+                                    }}
+                                >
+                                    {({ isActive }) => (
+                                        <>
+                                            {isActive && (
+                                                <div className="absolute inset-0 bg-gradient-to-r from-primary to-primary-dark rounded-xl z-0 shadow-lg shadow-primary/20" />
+                                            )}
+                                            {!isActive && (
+                                                <div className="absolute inset-0 bg-surface-3/0 group-hover/nav:bg-surface-3/70 rounded-xl z-0 transition-all duration-200" />
+                                            )}
+                                            <Icon
+                                                className={`shrink-0 w-[17px] h-[17px] transition-all duration-200 relative z-10 ${isActive ? 'text-white' : 'text-text-muted group-hover/nav:text-primary-light'}`}
+                                                strokeWidth={isActive ? 2.5 : 1.8}
+                                            />
+                                            <span
+                                                className={`relative z-10 transition-all duration-300 overflow-hidden whitespace-nowrap ${
+                                                    isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
+                                                }`}
+                                            >
                                                 {item.label}
                                             </span>
-                                        )}
-
-                                    </>
-                                )}
-                            </NavLink>
-                        );
-                    })}
-                </div>
+                                        </>
+                                    )}
+                                </NavLink>
+                            );
+                        })}
+                    </div>
+                )}
             </nav>
+
 
             {/* User Profile Section */}
             <div className={`mt-auto transition-all duration-300 z-10 ${isCollapsed ? 'px-3 pb-4' : 'px-4 pb-4'}`}>

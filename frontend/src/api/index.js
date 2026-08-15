@@ -222,6 +222,19 @@ export const revisionApi = {
     analytics: (subjectId) => request(`/subjects/${subjectId}/revision-tracker/analytics`),
 };
 
+// TODOs & Groups API
+export const todosApi = {
+    list: (subjectId) => request(`/subjects/${subjectId}/todos`),
+    create: (subjectId, data) => request(`/subjects/${subjectId}/todos`, { method: 'POST', body: data }),
+    update: (subjectId, todoId, data) => request(`/subjects/${subjectId}/todos/${todoId}`, { method: 'PUT', body: data }),
+    toggleStatus: (subjectId, todoId, status) => request(`/subjects/${subjectId}/todos/${todoId}/status`, { method: 'PUT', body: { status } }),
+    delete: (subjectId, todoId) => request(`/subjects/${subjectId}/todos/${todoId}`, { method: 'DELETE' }),
+    listGroups: (subjectId) => request(`/subjects/${subjectId}/todos/groups`),
+    createGroup: (subjectId, data) => request(`/subjects/${subjectId}/todos/groups`, { method: 'POST', body: data }),
+    updateGroup: (subjectId, groupId, data) => request(`/subjects/${subjectId}/todos/groups/${groupId}`, { method: 'PUT', body: data }),
+    deleteGroup: (subjectId, groupId) => request(`/subjects/${subjectId}/todos/groups/${groupId}`, { method: 'DELETE' }),
+};
+
 // Solutions
 export const solutionsApi = {
     list: (subjectId) => request(`/subjects/${subjectId}/solutions`),

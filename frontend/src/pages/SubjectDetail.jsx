@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { sessionsApi, questionsApi, notesApi, filesApi, aiApi, revisionApi, solutionsApi } from '../api/index.js';
+import { sessionsApi, questionsApi, notesApi, filesApi, aiApi, revisionApi, solutionsApi, todosApi } from '../api/index.js';
 import { useTopics } from '../context/TopicContext.jsx';
 import { useSubjects } from '../context/SubjectContext.jsx';
 import { useFiles } from '../context/FileContext.jsx';
@@ -19,7 +19,7 @@ import autoTable from 'jspdf-autotable';
 import { marked } from 'marked';
 import { saveAs } from 'file-saver';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, ImageRun, Table, TableRow, TableCell, WidthType, AlignmentType, ExternalHyperlink } from 'docx';
-import { ArrowLeft, PlusCircle, BarChart3, Wand2, BookOpen, Activity, Puzzle, FileText, Image as ImageIcon, Layers, Trash2, ChevronDown, Pencil, Hash, Search, X, Link2 as LinkIcon, Maximize2, Minimize2, LayoutGrid, List, CheckCircle, Download, ClipboardList, RotateCcw, Clock, RefreshCw, Notebook, MoreHorizontal, MoreVertical, History, Loader2, Lightbulb, LibraryBig, Zap } from 'lucide-react';
+import { ArrowLeft, PlusCircle, BarChart3, Wand2, BookOpen, Activity, Puzzle, FileText, Image as ImageIcon, Layers, Trash2, ChevronDown, Pencil, Hash, Search, X, Link2 as LinkIcon, Maximize2, Minimize2, LayoutGrid, List, CheckCircle, Download, ClipboardList, RotateCcw, Clock, RefreshCw, Notebook, MoreHorizontal, MoreVertical, History, Loader2, Lightbulb, LibraryBig, Zap, CheckSquare, ListTodo, CheckCircle2, Filter } from 'lucide-react';
 import FileExplorer from '../components/FileExplorer.jsx';
 import { foldersApi } from '../api/index.js';
 
@@ -35,6 +35,10 @@ import AddFileModal from '../components/modals/AddFileModal.jsx';
 import TimeTraveler from '../components/TimeTraveler.jsx';
 import CreateRevisionSessionModal from '../components/modals/CreateRevisionSessionModal.jsx';
 import EditRevisionSessionModal from '../components/modals/EditRevisionSessionModal.jsx';
+import CreateTodoModal from '../components/modals/CreateTodoModal.jsx';
+import EditTodoModal from '../components/modals/EditTodoModal.jsx';
+import ManageTodoGroupsModal from '../components/modals/ManageTodoGroupsModal.jsx';
+import TodoCard from '../components/todos/TodoCard.jsx';
 import AddSolutionModal from '../components/modals/AddSolutionModal.jsx';
 import ViewSolutionModal from '../components/modals/ViewSolutionModal.jsx';
 import EditSolutionModal from '../components/modals/EditSolutionModal.jsx';
@@ -54,7 +58,15 @@ import { preprocessMarkdown } from '../utils/markdownUtils';
 const SubjectDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeTab = searchParams.get('tab') || 'topics';
+    const setActiveTab = (newTab) => {
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev);
+            next.set('tab', newTab);
+            return next;
+        }, { replace: true });
+    };
 
     const { subjects, statsMap, isLoaded: subjectsLoaded, loadSubjects, refreshStats, updateLocalStats, setSelectedSubjectId } = useSubjects();
 
@@ -70,8 +82,8 @@ const SubjectDetail = () => {
     // Derived from global state
     const topics = topicsBySubject[id] || [];
     const subject = subjects.find(s => s.id === id);
-    const overview = statsMap[id];
-    const loading = !subjectsLoaded || !subject || !overview;
+    const overview = statsMap[id] || {};
+    const loading = !subjectsLoaded;
     const [sessions, setSessions] = useState([]);
     const [questions, setQuestions] = useState([]);
     const [notes, setNotes] = useState([]);
@@ -88,6 +100,19 @@ const SubjectDetail = () => {
     const [loadedTabs, setLoadedTabs] = useState(new Set());
     const [tabLoading, setTabLoading] = useState(false);
 
+    // Reset loaded tabs and tab data when switching between subjects
+    useEffect(() => {
+        setLoadedTabs(new Set());
+        setSessions([]);
+        setQuestions([]);
+        setNotes([]);
+        setSolutions([]);
+        setRevisionSessions([]);
+        setTodos([]);
+        setTodoGroups([]);
+        setFiles([]);
+    }, [id]);
+
     // Pagination for files (Library)
     const [filePage, setFilePage] = useState(0);
     const [loadingMoreFiles, setLoadingMoreFiles] = useState(false);
@@ -99,8 +124,6 @@ const SubjectDetail = () => {
     const [loadingMoreNotes, setLoadingMoreNotes] = useState(false);
     const [hasMoreNotes, setHasMoreNotes] = useState(true);
     const NOTE_LIMIT = 50;
-
-    const [activeTab, setActiveTab] = useState('topics');
     const [showTopicModal, setShowTopicModal] = useState(false);
     const [showQuestionModal, setShowQuestionModal] = useState(false);
     const [showNoteModal, setShowNoteModal] = useState(false);
@@ -161,6 +184,18 @@ const SubjectDetail = () => {
     const [showCreateRevisionSession, setShowCreateRevisionSession] = useState(false);
     const [editingRevisionSession, setEditingRevisionSession] = useState(null);
     const [confirmDeleteRevisionSession, setConfirmDeleteRevisionSession] = useState({ open: false, sessionId: null });
+
+    // TODOs state
+    const [todos, setTodos] = useState([]);
+    const [todoGroups, setTodoGroups] = useState([]);
+    const [todoFilterGroup, setTodoFilterGroup] = useState('all');
+    const [todoFilterStatus, setTodoFilterStatus] = useState('all'); // 'all' | 'pending' | 'completed'
+    const [todoFilterPriority, setTodoFilterPriority] = useState('all'); // 'all' | 'urgent' | 'high' | 'medium' | 'low'
+    const [todoSearchQuery, setTodoSearchQuery] = useState('');
+    const [showCreateTodoModal, setShowCreateTodoModal] = useState(false);
+    const [editingTodo, setEditingTodo] = useState(null);
+    const [showManageGroupsModal, setShowManageGroupsModal] = useState(false);
+    const [confirmDeleteTodo, setConfirmDeleteTodo] = useState({ open: false, todoId: null });
 
 
     const { getFileData, clearFileCacheMany } = useFiles();
@@ -1706,22 +1741,27 @@ const SubjectDetail = () => {
     }, [id, notePage]);
 
     const fetchTabData = async (tab) => {
-        if (loadedTabs.has(tab) || !id) return;
+        if (!id) return;
         setTabLoading(true);
         try {
             switch (tab) {
                 case 'topics':
-                    await loadTopics(id);
+                    await loadTopics(id).catch(err => console.error('Failed to load topics:', err));
                     break;
                 case 'sessions': {
-                    const sesRes = await sessionsApi.list(id);
-                    setSessions(sesRes.sessions);
+                    const sesRes = await sessionsApi.list(id).catch(err => {
+                        console.error('Failed to load sessions:', err);
+                        return { sessions: [] };
+                    });
+                    setSessions(sesRes.sessions || []);
                     break;
                 }
                 case 'questions': {
-                    // Proactively fetch notes and solutions when questions tab is clicked to ensure icons/badges are accurate
                     const [qsRes, nRes, solRes] = await Promise.all([
-                        questionsApi.list(id),
+                        questionsApi.list(id).catch(err => {
+                            console.error('Failed to load questions:', err);
+                            return { questions: [] };
+                        }),
                         notesApi.list(id, NOTE_LIMIT, 0).catch(() => ({ notes: [] })),
                         solutionsApi.list(id).catch(() => ({ solutions: [] }))
                     ]);
@@ -1730,12 +1770,14 @@ const SubjectDetail = () => {
                     setSolutions(solRes.solutions || []);
                     setHasMoreNotes((nRes.notes || []).length === NOTE_LIMIT);
                     setNotePage(0);
-                    // Mark notes and solutions as loaded so their tabs don't refetch
                     setLoadedTabs(prev => new Set(prev).add('notes').add('solutions'));
                     break;
                 }
                 case 'notes': {
-                    const notesRes = await notesApi.list(id, NOTE_LIMIT, 0);
+                    const notesRes = await notesApi.list(id, NOTE_LIMIT, 0).catch(err => {
+                        console.error('Failed to load notes:', err);
+                        return { notes: [] };
+                    });
                     const initialNotes = notesRes.notes || [];
                     setNotes(initialNotes);
                     setHasMoreNotes(initialNotes.length === NOTE_LIMIT);
@@ -1743,21 +1785,40 @@ const SubjectDetail = () => {
                     break;
                 }
                 case 'solutions': {
-                    const solutionsRes = await solutionsApi.list(id);
+                    const solutionsRes = await solutionsApi.list(id).catch(err => {
+                        console.error('Failed to load solutions:', err);
+                        return { solutions: [] };
+                    });
                     setSolutions(solutionsRes.solutions || []);
                     break;
                 }
                 case 'revision': {
-                    const revRes = await revisionApi.listSessions(id).catch(() => ({ sessions: [] }));
+                    const revRes = await revisionApi.listSessions(id).catch(err => {
+                        console.error('Failed to load revision sessions:', err);
+                        return { sessions: [] };
+                    });
                     setRevisionSessions(revRes.sessions || []);
                     break;
                 }
+                case 'todos': {
+                    const todoRes = await todosApi.list(id).catch(err => {
+                        console.error('Failed to load todos:', err);
+                        return { groups: [], todos: [] };
+                    });
+                    setTodos(todoRes.todos || []);
+                    setTodoGroups(todoRes.groups || []);
+                    break;
+                }
                 case 'library': {
-                    // Load files and folders using the folder-aware API
-                    const res = await fetchFolderContents(id, 'subject', null, FILE_LIMIT, 0);
-                    setFiles(res.files || []);
-                    setHasMoreFiles((res.files || []).length === FILE_LIMIT);
-                    setFilePage(0);
+                    try {
+                        const res = await fetchFolderContents(id, 'subject', null, FILE_LIMIT, 0);
+                        setFiles(res?.files || []);
+                        setHasMoreFiles((res?.files || []).length === FILE_LIMIT);
+                        setFilePage(0);
+                    } catch (err) {
+                        console.error('Failed to load library:', err);
+                        setFiles([]);
+                    }
                     break;
                 }
                 default:
@@ -1766,7 +1827,6 @@ const SubjectDetail = () => {
             setLoadedTabs(prev => new Set(prev).add(tab));
         } catch (error) {
             console.error(`Failed to load ${tab}:`, error);
-            toast.error(`Failed to load ${tab} data`);
         } finally {
             setTabLoading(false);
         }
@@ -1828,29 +1888,22 @@ const SubjectDetail = () => {
     }, [id, subjectsLoaded]); // Only rerun if ID changes or we need to trigger initial load
 
 
-    // Handle deep linking from query params
+    // Handle deep linking for content IDs (noteId, questionId) from query params
     useEffect(() => {
         if (loading) return;
 
-        const tab = searchParams.get('tab');
+        const tab = searchParams.get('tab') || 'topics';
         const contentId = searchParams.get('id') || searchParams.get('questionId') || searchParams.get('noteId');
 
-        if (tab) {
-            setActiveTab(tab);
-
-            // If it's a question or note, we might need a small delay to ensure the tab's content is rendered
-            if (contentId) {
-                setTimeout(() => {
-                    if (tab === 'questions') {
-                        navigateToQuestion(contentId);
-                    } else if (tab === 'notes') {
-                        const note = notes.find(n => n.id.toString() === contentId.toString());
-                        if (note) {
-                            setViewingNote(note);
-                            if (note.source_image_id) handleFetchNoteImage(note.id);
-                        }
-                    }
-                }, 300);
+        if (contentId) {
+            if (tab === 'questions') {
+                navigateToQuestion(contentId);
+            } else if (tab === 'notes') {
+                const note = notes.find(n => n.id?.toString() === contentId.toString());
+                if (note) {
+                    setViewingNote(note);
+                    if (note.source_image_id) handleFetchNoteImage(note.id);
+                }
             }
         }
     }, [loading, searchParams, notes]);
@@ -1964,6 +2017,171 @@ const SubjectDetail = () => {
             refreshStats([id]);
         } catch {
             toast.error('Failed to delete session');
+        }
+    };
+
+    // ==================== TODO HANDLERS ====================
+    const handleCreateTodo = async (data) => {
+        try {
+            const res = await todosApi.create(id, data);
+            if (res.todo) {
+                setTodos(prev => [res.todo, ...prev]);
+            }
+            setShowCreateTodoModal(false);
+            toast.success('TODO created');
+        } catch (err) {
+            toast.error(err.response?.data?.error || 'Failed to create TODO');
+        }
+    };
+
+    const handleEditTodo = async (data) => {
+        try {
+            await todosApi.update(id, data.todoId, data);
+            const reload = await todosApi.list(id);
+            setTodos(reload.todos || []);
+            setEditingTodo(null);
+            toast.success('TODO updated');
+        } catch (err) {
+            toast.error(err.response?.data?.error || 'Failed to update TODO');
+        }
+    };
+
+    const handleDeleteTodo = async (todoId) => {
+        try {
+            await todosApi.delete(id, todoId);
+            setTodos(prev => prev.filter(t => t.id !== todoId));
+            setConfirmDeleteTodo({ open: false, todoId: null });
+            toast.success('TODO deleted');
+        } catch {
+            toast.error('Failed to delete TODO');
+        }
+    };
+
+    const handleToggleTodoStatus = async (todoId, newStatus) => {
+        // Optimistic update
+        setTodos(prev => prev.map(t => {
+            if (t.id !== todoId) return t;
+            const isDone = newStatus === 'completed';
+            return {
+                ...t,
+                status: newStatus,
+                completedAt: isDone ? new Date().toISOString() : null,
+                subTodos: (t.subTodos || []).map(s => ({
+                    ...s,
+                    status: newStatus,
+                    completedAt: isDone ? new Date().toISOString() : null
+                })),
+                subTodosDone: isDone ? (t.subTodos?.length || 0) : 0,
+                progressPct: isDone ? 100 : 0
+            };
+        }));
+
+        try {
+            await todosApi.toggleStatus(id, todoId, newStatus);
+        } catch {
+            const reload = await todosApi.list(id);
+            setTodos(reload.todos || []);
+            toast.error('Failed to update status');
+        }
+    };
+
+    const handleToggleSubTodo = async (subTodoId, newStatus) => {
+        // Optimistic update
+        setTodos(prev => prev.map(parent => {
+            if (!parent.subTodos?.some(s => s.id === subTodoId)) return parent;
+            const updatedSub = parent.subTodos.map(s =>
+                s.id === subTodoId ? { ...s, status: newStatus, completedAt: newStatus === 'completed' ? new Date().toISOString() : null } : s
+            );
+            const total = updatedSub.length;
+            const done = updatedSub.filter(s => s.status === 'completed').length;
+            const allDone = total > 0 && done === total;
+            return {
+                ...parent,
+                subTodos: updatedSub,
+                subTodosTotal: total,
+                subTodosDone: done,
+                progressPct: Math.round((done / total) * 100),
+                status: allDone ? 'completed' : 'pending',
+                completedAt: allDone ? new Date().toISOString() : null,
+            };
+        }));
+
+        try {
+            await todosApi.toggleStatus(id, subTodoId, newStatus);
+        } catch {
+            const reload = await todosApi.list(id);
+            setTodos(reload.todos || []);
+            toast.error('Failed to update sub-task status');
+        }
+    };
+
+    const handleAddSubTodo = async (parentId, subTitle) => {
+        try {
+            await todosApi.create(id, { parentId, title: subTitle });
+            const reload = await todosApi.list(id);
+            setTodos(reload.todos || []);
+        } catch {
+            toast.error('Failed to add sub-task');
+        }
+    };
+
+    const handleDeleteSubTodo = async (subTodoId) => {
+        try {
+            await todosApi.delete(id, subTodoId);
+            setTodos(prev => prev.map(parent => {
+                if (!parent.subTodos?.some(s => s.id === subTodoId)) return parent;
+                const updatedSub = parent.subTodos.filter(s => s.id !== subTodoId);
+                const total = updatedSub.length;
+                const done = updatedSub.filter(s => s.status === 'completed').length;
+                return {
+                    ...parent,
+                    subTodos: updatedSub,
+                    subTodosTotal: total,
+                    subTodosDone: done,
+                    progressPct: total > 0 ? Math.round((done / total) * 100) : (parent.status === 'completed' ? 100 : 0)
+                };
+            }));
+        } catch {
+            toast.error('Failed to delete sub-task');
+        }
+    };
+
+    const handleQuickCreateGroup = async (name, color) => {
+        try {
+            const res = await todosApi.createGroup(id, { name, color });
+            if (res.group) {
+                setTodoGroups(prev => [...prev, res.group]);
+                return res.group;
+            }
+        } catch {
+            toast.error('Failed to create group');
+        }
+    };
+
+    const handleUpdateGroup = async (groupId, data) => {
+        try {
+            const res = await todosApi.updateGroup(id, groupId, data);
+            if (res.group) {
+                setTodoGroups(prev => prev.map(g => g.id === groupId ? res.group : g));
+                const reload = await todosApi.list(id);
+                setTodos(reload.todos || []);
+                toast.success('Group updated');
+            }
+        } catch {
+            toast.error('Failed to update group');
+        }
+    };
+
+    const handleDeleteGroup = async (groupId) => {
+        try {
+            await todosApi.deleteGroup(id, groupId);
+            setTodoGroups(prev => prev.filter(g => g.id !== groupId));
+            const reload = await todosApi.list(id);
+            setTodos(reload.todos || []);
+            if (todoFilterGroup === groupId) setTodoFilterGroup('all');
+            toast.success('Group deleted');
+        } catch {
+            toast.error('Failed to delete group');
         }
     };
 
@@ -2778,9 +2996,9 @@ const SubjectDetail = () => {
 
 
 
-            {/* Controls (Sub-Nav) — Glass background wrapper */}
-            <div className="relative mb-10">
-                <div className="flex items-center gap-1 p-2 bg-surface-2/60 backdrop-blur-sm border border-border-hover rounded-[22px] overflow-x-auto no-scrollbar shadow-2xl">
+            {/* Mobile Tab Bar (Visible on mobile/tablet screens when global sidebar is collapsed) */}
+            <div className="lg:hidden relative mb-6">
+                <div className="flex items-center gap-1.5 p-1.5 bg-surface-2/70 backdrop-blur-md border border-border rounded-2xl overflow-x-auto no-scrollbar shadow-md">
                     {[
                         { id: 'topics', label: 'Topics', icon: BookOpen },
                         { id: 'sessions', label: 'Sessions', icon: Activity },
@@ -2788,8 +3006,9 @@ const SubjectDetail = () => {
                         { id: 'notes', label: 'Notes', icon: FileText },
                         { id: 'solutions', label: 'Solutions', icon: Lightbulb },
                         { id: 'revision', label: 'Revision', icon: RefreshCw },
+                        { id: 'todos', label: 'TODOs', icon: CheckSquare },
                         { id: 'library', label: 'Library', icon: LibraryBig },
-                    ].map(({ id, label, icon: Icon }, index, array) => {
+                    ].map(({ id, label, icon: Icon }) => {
                         let count;
                         switch (id) {
                             case 'topics': count = overview?.totalTopics ?? topics.length; break;
@@ -2798,39 +3017,30 @@ const SubjectDetail = () => {
                             case 'notes': count = overview?.totalNotes ?? notes.length; break;
                             case 'solutions': count = overview?.totalSolutions ?? solutions.length; break;
                             case 'revision': count = overview?.totalRevisionSessions ?? revisionSessions.length; break;
+                            case 'todos': count = todos.filter(t => t.status === 'pending').length || (todos.length > 0 ? 0 : undefined); break;
                             case 'library': count = overview?.total_files ?? overview?.totalFiles ?? files?.length ?? 0; break;
                         }
                         const isActive = activeTab === id;
                         return (
-                            <React.Fragment key={id}>
-                                <button
-                                    onClick={() => setActiveTab(id)}
-                                    className={`relative flex items-center gap-2 px-[18px] py-4 rounded-xl text-[14px] font-bold transition-all duration-200 cursor-pointer whitespace-nowrap shrink-0 group
-                                        ${isActive
-                                            ? 'bg-surface-2 text-text shadow-sm'
-                                            : 'text-text-muted hover:text-text hover:bg-surface-2'
-                                        }`}
-                                >
-                                    <Icon className={`w-4 h-4 transition-colors ${isActive ? 'text-primary' : 'text-text-muted group-hover:text-text-muted'}`} />
-                                    <span>{label}</span>
-                                    {count !== undefined && count !== null && (
-                                        <span className={`min-w-[20px] h-[20px] px-1.5 flex items-center justify-center rounded-full text-[10px] font-black leading-none transition-all
-                                            ${isActive
-                                                ? 'bg-primary/20 text-primary'
-                                                : 'bg-surface-2 text-text-muted group-hover:bg-surface-2 group-hover:text-text-muted'
-                                            }`}
-                                        >
-                                            {count}
-                                        </span>
-                                    )}
-                                    {isActive && (
-                                        <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-primary rounded-full" />
-                                    )}
-                                </button>
-                                {index < array.length - 1 && (
-                                    <div className="w-px h-5 bg-surface-2 shrink-0" />
+                            <button
+                                key={id}
+                                onClick={() => setActiveTab(id)}
+                                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                                    isActive
+                                        ? 'bg-primary text-white shadow-sm'
+                                        : 'text-text-muted hover:text-text hover:bg-surface-3/60'
+                                }`}
+                            >
+                                <Icon className="w-3.5 h-3.5" />
+                                <span>{label}</span>
+                                {count !== undefined && count !== null && (
+                                    <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-black ${
+                                        isActive ? 'bg-white/20 text-white' : 'bg-surface-3 text-text-muted'
+                                    }`}>
+                                        {count}
+                                    </span>
                                 )}
-                            </React.Fragment>
+                            </button>
                         );
                     })}
                 </div>
@@ -4702,6 +4912,171 @@ const SubjectDetail = () => {
                         );
                     })()}
 
+                    {activeTab === 'todos' && (() => {
+                        const totalTodosCount = todos.length;
+                        const pendingTodosCount = todos.filter(t => t.status === 'pending').length;
+                        const completedTodosCount = todos.filter(t => t.status === 'completed').length;
+
+                        // Filtered todos
+                        const filteredTodos = todos.filter(t => {
+                            if (todoFilterGroup !== 'all') {
+                                if (todoFilterGroup === 'ungrouped' && t.groupId) return false;
+                                if (todoFilterGroup !== 'ungrouped' && t.groupId !== todoFilterGroup) return false;
+                            }
+                            if (todoFilterStatus === 'pending' && t.status !== 'pending') return false;
+                            if (todoFilterStatus === 'completed' && t.status !== 'completed') return false;
+                            if (todoFilterPriority !== 'all' && t.priority !== todoFilterPriority) return false;
+                            if (todoSearchQuery.trim()) {
+                                const q = todoSearchQuery.toLowerCase();
+                                const matchTitle = (t.title || '').toLowerCase().includes(q);
+                                const matchDesc = (t.description || '').toLowerCase().includes(q);
+                                const matchSub = (t.subTodos || []).some(s => (s.title || '').toLowerCase().includes(q));
+                                if (!matchTitle && !matchDesc && !matchSub) return false;
+                            }
+                            return true;
+                        });
+
+                        return (
+                            <div className="fade-in pb-12">
+                                {/* Header */}
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-border pb-4">
+                                    <div className="flex items-center gap-2">
+                                        <CheckSquare className="w-6 h-6 text-indigo-400" />
+                                        <h3 className="text-[20px] font-heading font-bold text-text tracking-tight">TODO Tracker</h3>
+                                    </div>
+                                    <div className="flex items-center gap-3 ml-auto flex-wrap sm:flex-nowrap">
+                                        {/* Search */}
+                                        <div className="relative group flex-1 sm:min-w-[240px]">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-indigo-400 transition-colors" />
+                                            <input
+                                                type="text"
+                                                value={todoSearchQuery}
+                                                onChange={(e) => setTodoSearchQuery(e.target.value)}
+                                                placeholder="Search TODOs..."
+                                                className="w-full bg-surface-2/50 border border-border-hover rounded-xl py-2 pl-10 pr-4 text-[13px] text-text focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                                            />
+                                            {todoSearchQuery && (
+                                                <button
+                                                    onClick={() => setTodoSearchQuery('')}
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Group Filter */}
+                                        {todoGroups.length > 0 && (
+                                            <select
+                                                value={todoFilterGroup}
+                                                onChange={(e) => setTodoFilterGroup(e.target.value)}
+                                                className="bg-surface-2/50 border border-border text-text rounded-xl px-3 py-2 text-[13px] focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all cursor-pointer hover:border-border-hover"
+                                            >
+                                                <option value="all">All Groups</option>
+                                                {todoGroups.map(g => (
+                                                    <option key={g.id} value={g.id}>{g.name}</option>
+                                                ))}
+                                            </select>
+                                        )}
+
+                                        {/* Priority Filter */}
+                                        <select
+                                            value={todoFilterPriority}
+                                            onChange={(e) => setTodoFilterPriority(e.target.value)}
+                                            className="bg-surface-2/50 border border-border text-text rounded-xl px-3 py-2 text-[13px] focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all cursor-pointer hover:border-border-hover"
+                                        >
+                                            <option value="all">All Priorities</option>
+                                            <option value="urgent">Urgent</option>
+                                            <option value="high">High</option>
+                                            <option value="medium">Medium</option>
+                                            <option value="low">Low</option>
+                                        </select>
+
+                                        {/* Status Filter */}
+                                        <select
+                                            value={todoFilterStatus}
+                                            onChange={(e) => setTodoFilterStatus(e.target.value)}
+                                            className="bg-surface-2/50 border border-border text-text rounded-xl px-3 py-2 text-[13px] focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all cursor-pointer hover:border-border-hover"
+                                        >
+                                            <option value="all">All Status ({totalTodosCount})</option>
+                                            <option value="pending">Pending ({pendingTodosCount})</option>
+                                            <option value="completed">Completed ({completedTodosCount})</option>
+                                        </select>
+
+                                        {/* Manage Groups Button */}
+                                        <button
+                                            onClick={() => setShowManageGroupsModal(true)}
+                                            className="bg-surface-2/50 text-text-muted hover:text-text border border-border hover:border-border-hover flex items-center gap-1.5 text-[13px] font-semibold px-3 py-2 rounded-xl transition-all shadow-sm cursor-pointer shrink-0"
+                                            title="Manage Groups"
+                                        >
+                                            <Layers className="w-4 h-4" />
+                                            <span className="hidden md:inline">Groups</span>
+                                        </button>
+
+                                        {/* New TODO Button */}
+                                        <button
+                                            onClick={() => setShowCreateTodoModal(true)}
+                                            className="bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 hover:border-violet-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98] shrink-0 ml-auto"
+                                        >
+                                            <PlusCircle className="w-4 h-4" strokeWidth={2} />
+                                            <span>New TODO</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* List of TODO Cards */}
+                                {todos.length === 0 ? (
+                                    <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-border-hover flex flex-col items-center">
+                                        <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-border">
+                                            <CheckSquare className="w-10 h-10 text-violet-500/70" />
+                                        </div>
+                                        <h3 className="text-2xl font-heading font-bold text-text mb-2 tracking-tight">No TODOs</h3>
+                                        <p className="text-text-muted text-sm max-w-sm leading-relaxed mb-8">
+                                            Create tasks, sub-todos, study goals, links & notes for this subject.
+                                        </p>
+                                        <button
+                                            onClick={() => setShowCreateTodoModal(true)}
+                                            className="bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 hover:border-violet-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
+                                        >
+                                            <PlusCircle className="w-4 h-4" />
+                                            <span>Create TODO</span>
+                                        </button>
+                                    </div>
+                                ) : filteredTodos.length === 0 ? (
+                                    <div className="glass-panel p-12 text-center rounded-2xl border border-border flex flex-col items-center">
+                                        <p className="text-text-muted text-sm mb-4">No TODOs match your active filters.</p>
+                                        <button
+                                            onClick={() => {
+                                                setTodoFilterGroup('all');
+                                                setTodoFilterStatus('all');
+                                                setTodoFilterPriority('all');
+                                                setTodoSearchQuery('');
+                                            }}
+                                            className="px-4 py-2 rounded-xl bg-surface-2 border border-border text-text hover:bg-surface-3 font-semibold text-xs transition-all cursor-pointer"
+                                        >
+                                            Reset Filters
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col gap-2">
+                                        {filteredTodos.map(todo => (
+                                            <TodoCard
+                                                key={todo.id}
+                                                todo={todo}
+                                                onToggleStatus={handleToggleTodoStatus}
+                                                onToggleSubTodo={handleToggleSubTodo}
+                                                onAddSubTodo={handleAddSubTodo}
+                                                onDeleteSubTodo={handleDeleteSubTodo}
+                                                onEdit={(t) => setEditingTodo(t)}
+                                                onDelete={(todoId) => setConfirmDeleteTodo({ open: true, todoId })}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
+
                     {activeTab === 'library' && (
                         <div className="fade-in pb-12">
                             <FileExplorer
@@ -4750,6 +5125,41 @@ const SubjectDetail = () => {
                 onSubmit={handleEditRevisionSession}
                 session={editingRevisionSession}
                 topics={topics}
+            />
+
+            <CreateTodoModal
+                isOpen={showCreateTodoModal}
+                onClose={() => setShowCreateTodoModal(false)}
+                onSubmit={handleCreateTodo}
+                groups={todoGroups}
+                onQuickCreateGroup={handleQuickCreateGroup}
+            />
+
+            <EditTodoModal
+                isOpen={!!editingTodo}
+                onClose={() => setEditingTodo(null)}
+                onSubmit={handleEditTodo}
+                todo={editingTodo}
+                groups={todoGroups}
+            />
+
+            <ManageTodoGroupsModal
+                isOpen={showManageGroupsModal}
+                onClose={() => setShowManageGroupsModal(false)}
+                groups={todoGroups}
+                onCreateGroup={handleQuickCreateGroup}
+                onUpdateGroup={handleUpdateGroup}
+                onDeleteGroup={handleDeleteGroup}
+            />
+
+            <ConfirmDialog
+                isOpen={confirmDeleteTodo.open}
+                title="Delete TODO"
+                message="Are you sure you want to delete this TODO and all of its sub-tasks? This action cannot be undone."
+                onConfirm={() => handleDeleteTodo(confirmDeleteTodo.todoId)}
+                onCancel={() => setConfirmDeleteTodo({ open: false, todoId: null })}
+                confirmText="Delete TODO"
+                danger
             />
 
             <ConfirmDialog

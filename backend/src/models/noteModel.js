@@ -1,6 +1,6 @@
 import db from '../knex/db.js';
 
-export const getNotesBySubject = async (subjectId, limit, offset, includeContent = false) => {
+export const getNotesBySubject = async (subjectId, limit, offset, includeContent = true) => {
     let query = db('revision.notes')
         .where({ subject_id: subjectId, is_deleted: false })
         .orderBy('created_at', 'desc');
