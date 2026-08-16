@@ -14,6 +14,14 @@ import { preprocessMarkdown } from '../../utils/markdownUtils';
  * Features a projection animation where the modal projects out directly from the note card origin.
  */
 const KeyHighlightsModal = ({ note, onClose }) => {
+    // Close on Escape key
+    useEffect(() => {
+        if (!note) return;
+        const handler = (e) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [note, onClose]);
+
     if (!note) return null;
 
     let kh = note.key_highlights || [];
@@ -21,13 +29,6 @@ const KeyHighlightsModal = ({ note, onClose }) => {
     if (!Array.isArray(kh)) kh = [];
 
     const triggerRect = note.triggerRect;
-
-    // Close on Escape key
-    useEffect(() => {
-        const handler = (e) => { if (e.key === 'Escape') onClose(); };
-        document.addEventListener('keydown', handler);
-        return () => document.removeEventListener('keydown', handler);
-    }, [onClose]);
 
     return (
         <ModalPortal>

@@ -420,7 +420,7 @@ export const getSessionInsights = async (req, res) => {
             notes: session.notes
         });
 
-        const model = process.env.OLLAMA_TEXT_MODEL;
+        const model = models.TEXT;
 
         const response = await ollama.chat({
             model,
@@ -464,7 +464,7 @@ export const getGlobalInsights = async (req, res) => {
             globalWeakAreas,
         });
 
-        const model = process.env.OLLAMA_TEXT_MODEL;
+        const model = models.TEXT;
 
         const response = await ollama.chat({
             model,

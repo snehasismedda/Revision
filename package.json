@@ -1,0 +1,11 @@
+{
+  "name": "revision-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "tunnel": "npm --prefix backend run tunnel",
+    "tunnel:kill": "npm --prefix backend run tunnel:kill"
+  }
+}

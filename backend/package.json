@@ -15,7 +15,9 @@
         "db:up": "docker compose up -d",
         "db:down": "docker compose down",
         "db:backup": "docker compose exec revision-db-backup /backup.sh",
-        "db:restore": "docker compose exec revision-db-backup /restore.sh"
+        "db:restore": "docker compose exec revision-db-backup /restore.sh",
+        "tunnel": "ngrok http --url=resume-zips-unfixable.ngrok-free.dev 3001",
+        "tunnel:kill": "killall ngrok 2>/dev/null || true"
     },
     "dependencies": {
         "bcryptjs": "^2.4.3",

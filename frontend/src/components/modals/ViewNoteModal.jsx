@@ -831,8 +831,6 @@ const ViewNoteModal = ({
                 // Progress bar
                 const scrollHeight = container.scrollHeight - container.clientHeight;
                 setReadingProgress(scrollHeight > 0 ? (container.scrollTop / scrollHeight) * 100 : 0);
-
-                lastScrollTop = container.scrollTop;
             });
         };
 

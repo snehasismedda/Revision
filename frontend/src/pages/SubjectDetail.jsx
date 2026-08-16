@@ -1182,6 +1182,7 @@ const SubjectDetail = () => {
             doc.setLineWidth(0.3);
             y += 8;
 
+            const tabLabel = activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
             const itemIds = Array.from(selectedItems);
             let items = [];
             if (activeTab === 'notes') {

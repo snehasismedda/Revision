@@ -24,6 +24,7 @@ import systemPromptRoute from './routes/systemPromptRoute.js';
 import quizSetRoute from './routes/quizSetRoute.js';
 import userRoute from './routes/userRoute.js';
 import timeTableRoute from './routes/timeTableRoute.js';
+import chatgptRoute from './integrations/chatgpt/chatgptRoute.js';
 import { dateSerializationMiddleware } from './utils/serialization.js';
 
 const app = express();
@@ -60,6 +61,7 @@ app.use('/api/system-prompts', systemPromptRoute);
 app.use('/api/quiz-sets', quizSetRoute);
 app.use('/api/users', userRoute);
 app.use('/api/timetables', timeTableRoute);
+app.use('/api/integrations/chatgpt', chatgptRoute);
 
 // --- Health Check ---
 app.get('/health', (req, res) => res.json({ status: 'ok' }));

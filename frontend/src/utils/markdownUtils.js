@@ -119,8 +119,14 @@ function _applyOutsideMathBlocks(text, fn) {
  *   - Optional trailing ']' possibly on its own line after the closing brace
  *   - Stray inner '$' signs that break KaTeX math mode
  *   - Multi-line body content collapsed to single line
+ *
+ * SKIPS \boxed{...} that are already inside valid $...$ or $$...$$ math delimiters —
+ * those are already valid KaTeX and must not be double-wrapped.
  */
 function _cleanBoxedBlocks(text) {
+    // Build a map of math ranges so we can skip \boxed already inside math fences.
+    const mathRanges = _findMathRanges(text);
+
     let result = '';
     let i = 0;
 
@@ -131,6 +137,13 @@ function _cleanBoxedBlocks(text) {
         if (boxedIdx === -1) {
             result += text.slice(i);
             break;
+        }
+
+        // If this \boxed is already inside a math fence, pass through as-is.
+        if (_isInsideMathRange(boxedIdx, mathRanges)) {
+            result += text.slice(i, boxedIdx + boxedKeyword.length);
+            i = boxedIdx + boxedKeyword.length;
+            continue;
         }
 
         // Scan backwards through whitespace/newlines to check for optional leading '['
@@ -196,4 +209,48 @@ function _cleanBoxedBlocks(text) {
     }
 
     return result;
+}
+
+/**
+ * Returns an array of [start, end] index ranges that correspond to math fences
+ * ($...$ and $$...$$) in the text. Used to detect if a position is inside math.
+ */
+function _findMathRanges(text) {
+    const ranges = [];
+    let i = 0;
+
+    while (i < text.length) {
+        if (text[i] === '$') {
+            if (text[i + 1] === '$') {
+                // Display math $$...$$
+                const end = text.indexOf('$$', i + 2);
+                if (end !== -1) {
+                    ranges.push([i, end + 2]);
+                    i = end + 2;
+                    continue;
+                }
+            } else {
+                // Inline math $...$  (must not span newlines)
+                const end = text.indexOf('$', i + 1);
+                if (end !== -1 && !text.slice(i + 1, end).includes('\n')) {
+                    ranges.push([i, end + 1]);
+                    i = end + 1;
+                    continue;
+                }
+            }
+        }
+        i++;
+    }
+
+    return ranges;
+}
+
+/**
+ * Returns true if the given position falls inside any of the math ranges.
+ */
+function _isInsideMathRange(pos, ranges) {
+    for (const [start, end] of ranges) {
+        if (pos > start && pos < end) return true;
+    }
+    return false;
 }

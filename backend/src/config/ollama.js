@@ -7,6 +7,8 @@ export const ollama = new Ollama({
 });
 
 export const models = {
-    TEXT: process.env.OLLAMA_TEXT_MODEL || 'qwen2.5:7b',
+    TEXT: process.env.OLLAMA_TEXT_MODEL || 'qwen3:8b',
     IMAGE: process.env.OLLAMA_VL_MODEL || 'qwen2.5vl:latest',
 };
+
+export default ollama;
