@@ -1,4 +1,4 @@
-import ollama from '../../../config/ollama.js';
+import { ollama, models } from '../../../config/ollama.js';
 import { toolDefinitions, toolRegistry } from '../tools/index.js';
 
 /**
@@ -21,7 +21,7 @@ const convertToolsToOllamaFormat = (definitions) => {
  * Returns final text response after all tool calls are resolved.
  */
 export const generateQwenResponse = async (data, conversationsToSave = []) => {
-    const model = process.env.OLLAMA_MODEL || 'qwen2.5:7b';
+    const model = process.env.OLLAMA_MODEL || process.env.OLLAMA_TEXT_MODEL || models.TEXT || 'qwen3:8b';
 
     const messages = [
         ...(data.systemPrompt ? [{ role: 'system', content: data.systemPrompt }] : []),

@@ -20,22 +20,7 @@ import remarkMath from 'remark-math';
 import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
 
-const preprocessMarkdown = (text) => {
-    if (!text) return '';
-    return text
-        .replace(/\\\\\[/g, '\n$$\n')
-        .replace(/\\\\\]/g, '\n$$\n')
-        .replace(/\\\[/g, '\n$$\n')
-        .replace(/\\\]/g, '\n$$\n')
-        .replace(/\\\(/g, '$')
-        .replace(/\\\)/g, '$')
-        .replace(/\$\$\$\$/g, '$$\n$$')
-        .replace(/\$ \$/g, '$$')
-        .replace(/([^\n])\$\$/g, '$1\n$$')
-        .replace(/\$\$([^\n])/g, '$$\n$1')
-        .replace(/\\bottom([a-zA-Z])/g, '\\bot $1')
-        .replace(/\\bottom/g, '\\bot');
-};
+import { preprocessMarkdown } from '../utils/markdownUtils';
 
 const PURPLE = '#8b5cf6';
 const EMERALD = '#10b981';
@@ -45,16 +30,16 @@ const RED = '#ef4444';
 const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
     return (
-        <div className="glass p-3 border border-white/10 rounded-lg shadow-xl  text-sm">
-            <p className="text-slate-200 font-heading font-bold mb-2 pb-2 border-b border-white/5">{label}</p>
+        <div className="bg-surface-2/95 p-3 border border-border rounded-lg shadow-xl text-sm">
+            <p className="text-text-muted font-heading font-bold mb-2 pb-2 border-b border-border">{label}</p>
             <div className="space-y-2">
                 {payload.map((p) => (
                     <div key={p.name} className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
-                            <span className="text-slate-400 text-xs font-medium">{p.name}</span>
+                            <span className="text-text-muted text-xs font-medium">{p.name}</span>
                         </div>
-                        <span className="font-bold text-white text-xs">
+                        <span className="font-bold text-text text-xs">
                             {p.name.includes('Count') ? p.value : `${p.value}%`}
                         </span>
                     </div>
@@ -141,7 +126,7 @@ const Reports = () => {
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
-                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                <div className="w-8 h-8 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
             </div>
         );
     }
@@ -151,16 +136,16 @@ const Reports = () => {
         return (
             <div className="fade-in max-w-5xl mx-auto pb-12">
                 <div className="flex items-center gap-3 mb-8">
-                    <Link to={`/subjects/${subjectId}`} className="flex items-center gap-1.5 text-sm font-medium text-slate-400 hover:text-primary transition-colors bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg">
+                    <Link to={`/subjects/${subjectId}`} className="flex items-center gap-1.5 text-sm font-medium text-text-muted hover:text-primary transition-colors bg-surface-3/10 hover:bg-surface-3/10 px-3 py-1.5 rounded-lg">
                         <ArrowLeft className="w-4 h-4" /> Back to Subject
                     </Link>
                 </div>
-                <div className="glass-panel p-16 text-center rounded-xl border-dashed border-white/10 max-w-2xl mx-auto">
-                    <div className="w-20 h-20 rounded-xl bg-surface-3 mx-auto flex items-center justify-center mb-6 shadow-inner border border-white/5">
-                        <BarChart3 className="w-8 h-8 text-slate-500" />
+                <div className="bg-surface border border-border p-16 text-center rounded-xl border-dashed border-border max-w-2xl mx-auto">
+                    <div className="w-20 h-20 rounded-xl bg-surface-3 mx-auto flex items-center justify-center mb-6 shadow-inner border border-border">
+                        <BarChart3 className="w-8 h-8 text-text-muted" />
                     </div>
-                    <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No analytics data</h3>
-                    <p className="text-slate-400 text-sm max-w-md mx-auto">
+                    <h3 className="text-2xl font-heading font-bold text-text mb-2 tracking-tight">No analytics data</h3>
+                    <p className="text-text-muted text-sm max-w-md mx-auto">
                         Your performance reports will appear here once you record study sessions and tag correct/incorrect topics.
                     </p>
                 </div>
@@ -174,7 +159,7 @@ const Reports = () => {
             <div className="flex items-center gap-3 mb-8">
                 <Link
                     to={`/subjects/${subjectId}`}
-                    className="flex items-center gap-1.5 text-sm font-medium text-slate-400 hover:text-primary transition-colors bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg"
+                    className="flex items-center gap-1.5 text-sm font-medium text-text-muted hover:text-primary transition-colors bg-surface-3/10 hover:bg-surface-3/10 px-3 py-1.5 rounded-lg"
                 >
                     <ArrowLeft className="w-4 h-4" />
                     Back to Subject
@@ -187,8 +172,8 @@ const Reports = () => {
                     <BarChart3 className="w-6 h-6" />
                 </div>
                 <div>
-                    <h1 className="text-3xl font-heading font-bold text-white tracking-tight leading-tight">Analytics & Reports</h1>
-                    <p className="text-slate-400 text-sm mt-1">{subject?.name} · All-time performance data</p>
+                    <h1 className="text-3xl font-heading font-bold text-text tracking-tight leading-tight">Analytics & Reports</h1>
+                    <p className="text-text-muted text-sm mt-1">{subject?.name} · All-time performance data</p>
                 </div>
             </div>
 
@@ -201,9 +186,9 @@ const Reports = () => {
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6 relative z-10">
                         {/* Net Accuracy — Hero */}
-                        <div className="col-span-2 md:col-span-1 flex flex-col items-center justify-center py-4 border-r border-white/5 md:border-r-white/5">
-                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Accuracy</p>
-                            <div className={`text-5xl font-heading font-bold tracking-tight ${overview.accuracy >= 75 ? 'text-emerald-400' : overview.accuracy >= 50 ? 'text-amber-400' : 'text-red-400'
+                        <div className="col-span-2 md:col-span-1 flex flex-col items-center justify-center py-4 border-r border-border md:border-r-border/30">
+                            <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-3">Accuracy</p>
+                            <div className={`text-5xl font-heading font-bold tracking-tight ${overview.accuracy >= 75 ? 'text-emerald-500 [.dark_&]:text-emerald-400' : overview.accuracy >= 50 ? 'text-amber-600 [.dark_&]:text-amber-400' : 'text-rose-600 [.dark_&]:text-rose-400'
                                 }`}>
                                 {overview.accuracy}%
                             </div>
@@ -215,11 +200,11 @@ const Reports = () => {
                         {/* Total Questions */}
                         <div className="flex flex-col justify-center py-2">
                             <div className="flex items-center gap-2 mb-1.5">
-                                <Target className="w-4 h-4 text-slate-500" />
-                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Questions</span>
+                                <Target className="w-4 h-4 text-text-muted" />
+                                <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Questions</span>
                             </div>
-                            <p className="text-3xl font-heading font-bold text-white">{overview.totalQuestions}</p>
-                            <p className="text-xs text-slate-500 mt-1">{(overview.totalSessions || 0) + (overview.totalRevisionSessions || 0)} sessions</p>
+                            <p className="text-3xl font-heading font-bold text-text">{overview.totalQuestions}</p>
+                            <p className="text-xs text-text-muted mt-1">{(overview.totalSessions || 0) + (overview.totalRevisionSessions || 0)} sessions</p>
                         </div>
 
                         {/* Correct */}
@@ -228,8 +213,8 @@ const Reports = () => {
                                 <CheckCircle2 className="w-4 h-4 text-emerald-500/70" />
                                 <span className="text-[10px] font-bold text-emerald-500/70 uppercase tracking-widest">Correct</span>
                             </div>
-                            <p className="text-3xl font-heading font-bold text-emerald-400">{overview.totalCorrect}</p>
-                            <div className="w-full bg-white/5 rounded-full h-1.5 mt-2.5 overflow-hidden">
+                            <p className="text-3xl font-heading font-bold text-emerald-500 [.dark_&]:text-emerald-400">{overview.totalCorrect}</p>
+                            <div className="w-full bg-surface-3/10 rounded-full h-1.5 mt-2.5 overflow-hidden">
                                 <div className="bg-emerald-500 h-full rounded-full transition-all duration-1000" style={{ width: `${overview.totalQuestions ? (overview.totalCorrect / overview.totalQuestions) * 100 : 0}%` }} />
                             </div>
                         </div>
@@ -237,12 +222,12 @@ const Reports = () => {
                         {/* Incorrect */}
                         <div className="flex flex-col justify-center py-2">
                             <div className="flex items-center gap-2 mb-1.5">
-                                <XCircle className="w-4 h-4 text-red-500/70" />
-                                <span className="text-[10px] font-bold text-red-500/70 uppercase tracking-widest">Incorrect</span>
+                                <XCircle className="w-4 h-4 text-rose-500/70" />
+                                <span className="text-[10px] font-bold text-rose-500/70 uppercase tracking-widest">Incorrect</span>
                             </div>
-                            <p className="text-3xl font-heading font-bold text-red-400">{overview.totalIncorrect}</p>
-                            <div className="w-full bg-white/5 rounded-full h-1.5 mt-2.5 overflow-hidden">
-                                <div className="bg-red-500/60 h-full rounded-full transition-all duration-1000" style={{ width: `${overview.totalQuestions ? (overview.totalIncorrect / overview.totalQuestions) * 100 : 0}%` }} />
+                            <p className="text-3xl font-heading font-bold text-rose-600 [.dark_&]:text-rose-400">{overview.totalIncorrect}</p>
+                            <div className="w-full bg-surface-3/10 rounded-full h-1.5 mt-2.5 overflow-hidden">
+                                <div className="bg-rose-500/60 h-full rounded-full transition-all duration-1000" style={{ width: `${overview.totalQuestions ? (overview.totalIncorrect / overview.totalQuestions) * 100 : 0}%` }} />
                             </div>
                         </div>
                     </div>
@@ -259,22 +244,22 @@ const Reports = () => {
                         <div>
                             <div className="flex items-center gap-2 mb-1">
                                 <TrendingUp className="w-5 h-5 text-primary" />
-                                <h2 className="text-lg font-heading font-bold text-white tracking-tight">Performance Trend</h2>
+                                <h2 className="text-lg font-heading font-bold text-text tracking-tight">Performance Trend</h2>
                             </div>
-                            <p className="text-[10px] text-slate-500 font-medium uppercase tracking-widest">Accuracy vs Intensity (Session Volume)</p>
+                            <p className="text-[10px] text-text-muted font-medium uppercase tracking-widest">Accuracy vs Intensity (Session Volume)</p>
                         </div>
                         <div className="flex items-center gap-4">
                             <div className="flex items-center gap-1.5">
                                 <div className="w-2 h-2 rounded-full bg-primary" />
-                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Accuracy</span>
+                                <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Accuracy</span>
                             </div>
                             <div className="flex items-center gap-1.5">
                                 <div className="w-2 h-0.5 bg-amber-400" />
-                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Moving Avg</span>
+                                <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Moving Avg</span>
                             </div>
                             <div className="flex items-center gap-1.5">
-                                <div className="w-2 h-2 rounded-sm bg-white/10" />
-                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Volume</span>
+                                <div className="w-2 h-2 rounded-sm bg-surface-3/10" />
+                                <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Volume</span>
                             </div>
                         </div>
                     </div>
@@ -288,10 +273,11 @@ const Reports = () => {
                                         <stop offset="100%" stopColor={PURPLE} stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border/20" vertical={false} />
                                 <XAxis
                                     dataKey="title"
-                                    tick={{ fill: '#475569', fontSize: 10, fontWeight: 500 }}
+                                    tick={{ fill: 'currentColor', fontSize: 10, fontWeight: 500 }}
+                                    className="text-text-muted/50"
                                     tickLine={false}
                                     axisLine={false}
                                     dy={10}
@@ -299,7 +285,8 @@ const Reports = () => {
                                 <YAxis
                                     yAxisId="left"
                                     domain={[0, 100]}
-                                    tick={{ fill: '#64748b', fontSize: 10 }}
+                                    tick={{ fill: 'currentColor', fontSize: 10 }}
+                                    className="text-text-muted/50"
                                     tickLine={false}
                                     axisLine={false}
                                     tickFormatter={(v) => `${v}%`}
@@ -308,7 +295,8 @@ const Reports = () => {
                                     yAxisId="right"
                                     orientation="right"
                                     domain={[0, 'auto']}
-                                    tick={{ fill: '#475569', fontSize: 10 }}
+                                    tick={{ fill: 'currentColor', fontSize: 10 }}
+                                    className="text-text-muted/50"
                                     tickLine={false}
                                     axisLine={false}
                                     hide={window.innerWidth < 768}
@@ -323,7 +311,8 @@ const Reports = () => {
                                     yAxisId="right"
                                     dataKey="total"
                                     name="Question Count"
-                                    fill="rgba(255,255,255,0.05)"
+                                    fill="currentColor"
+                                    className="text-surface-3/20"
                                     radius={[4, 4, 0, 0]}
                                     barSize={20}
                                 />
@@ -363,12 +352,14 @@ const Reports = () => {
                                     <ReferenceLine
                                         yAxisId="left"
                                         y={overview.accuracy}
-                                        stroke="rgba(255,255,255,0.2)"
+                                        stroke="currentColor"
+                                        className="text-text-muted/30"
                                         strokeWidth={1}
                                         label={{
                                             value: `Avg: ${overview.accuracy}%`,
                                             position: 'insideBottomRight',
-                                            fill: '#94a3b8',
+                                            fill: 'currentColor',
+                                            className: 'text-text-muted/60',
                                             fontSize: 9,
                                             fontWeight: 700
                                         }}
@@ -379,17 +370,17 @@ const Reports = () => {
                     </div>
 
                     {/* Trend Insights Footer */}
-                    <div className="mt-6 flex flex-wrap items-center gap-4 py-3 px-4 rounded-xl bg-white/[0.02] border border-white/5 relative z-10">
+                    <div className="mt-6 flex flex-wrap items-center gap-4 py-3 px-4 rounded-xl bg-surface-3/10 border border-border relative z-10">
                         <div className="flex items-center gap-2">
                             <Activity className="w-4 h-4 text-primary" />
-                            <span className="text-[11px] font-semibold text-slate-300">Trend Insight:</span>
+                            <span className="text-[11px] font-semibold text-text-muted">Trend Insight:</span>
                         </div>
                         {(() => {
                             const first = trends[0].trend;
                             const last = trends[trends.length - 1].trend;
                             const diff = last - first;
                             return (
-                                <p className="text-[11px] text-slate-400">
+                                <p className="text-[11px] text-text-muted">
                                     {diff > 0 ? (
                                         <>Your performance is <span className="text-emerald-400 font-bold">improving (+{diff}%)</span> based on the 3-session moving average.</>
                                     ) : diff < 0 ? (
@@ -401,7 +392,7 @@ const Reports = () => {
                             );
                         })()}
                         <div className="ml-auto flex items-center gap-3">
-                            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                            <div className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
                                 Best Session: <span className="text-emerald-400">{Math.max(...trends.map(t => t.accuracy))}%</span>
                             </div>
                         </div>
@@ -417,19 +408,19 @@ const Reports = () => {
                     <div className="absolute top-0 right-0 w-64 h-64 bg-violet-400/[0.03] rounded-full blur-3xl pointer-events-none" />
                     <div className="flex flex-col gap-6">
                         {/* Header & Tabs */}
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-white/[0.06] pb-6">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-border pb-6">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center border border-violet-500/20">
                                     <ClipboardList className="w-5 h-5 text-violet-400" />
                                 </div>
                                 <div>
-                                    <h2 className="text-xl font-heading font-bold text-white tracking-tight">Revision Tracker</h2>
-                                    <p className="text-[10px] text-slate-500 font-medium uppercase tracking-widest mt-0.5">Topical Revision History</p>
+                                    <h2 className="text-xl font-heading font-bold text-text tracking-tight">Revision Tracker</h2>
+                                    <p className="text-[10px] text-text-muted font-medium uppercase tracking-widest mt-0.5">Topical Revision History</p>
                                 </div>
                             </div>
 
                             <div className="flex flex-wrap items-center gap-4">
-                                <div className="flex gap-1 p-1 bg-surface-2/60 rounded-xl border border-white/[0.06]">
+                                <div className="flex gap-1 p-1 bg-surface-3/10 rounded-xl border border-border">
                                     {[
                                         { id: 'most', label: 'Most Revised' },
                                         { id: 'least', label: 'Least Revised' },
@@ -438,7 +429,7 @@ const Reports = () => {
                                         <button
                                             key={tab.id}
                                             onClick={() => setRevisionDetailTab(tab.id)}
-                                            className={`px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${revisionDetailTab === tab.id ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/20' : 'text-slate-500 hover:text-slate-300'}`}
+                                            className={`px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${revisionDetailTab === tab.id ? 'bg-violet-500/20 text-violet-600 [.dark_&]:text-violet-400' : 'text-text-muted hover:text-text'}`}
                                         >
                                             {tab.label}
                                         </button>
@@ -446,13 +437,13 @@ const Reports = () => {
                                 </div>
 
                                 <div className="relative min-w-[200px]">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
                                     <input
                                         type="text"
                                         placeholder="Search..."
                                         value={revSearchQuery}
                                         onChange={(e) => setRevSearchQuery(e.target.value)}
-                                        className="w-full bg-white/[0.03] border border-white/[0.08] rounded-lg py-1.5 pl-9 pr-4 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-violet-500/40 transition-all"
+                                        className="w-full bg-surface-3/10 border border-border rounded-lg py-1.5 pl-9 pr-4 text-xs text-text placeholder:text-text-muted focus:outline-none focus:border-violet-500/40 transition-all"
                                     />
                                 </div>
                             </div>
@@ -495,10 +486,10 @@ const Reports = () => {
 
                                             return (
                                                 <div className={`${depth > 0 ? 'ml-6' : ''}`}>
-                                                    <div className={`group flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-white/[0.03] transition-all ${depth === 0 ? 'border-b border-white/[0.03] mb-1' : ''}`}>
+                                                    <div className={`group flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-surface-3/10 transition-all ${depth === 0 ? 'border-b border-border mb-1' : ''}`}>
                                                         <button
                                                             onClick={() => setIsExpanded(!isExpanded)}
-                                                            className={`p-1 rounded text-slate-600 transition-all ${hasChildren ? 'hover:text-violet-400 hover:bg-violet-400/10' : 'opacity-0 pointer-events-none'}`}
+                                                            className={`p-1 rounded text-text-muted transition-all ${hasChildren ? 'hover:text-violet-400 hover:bg-violet-400/10' : 'opacity-0 pointer-events-none'}`}
                                                         >
                                                             {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                                                         </button>
@@ -506,14 +497,14 @@ const Reports = () => {
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center justify-between gap-4">
                                                                 <div className="flex flex-col min-w-0">
-                                                                    <span className={`text-sm tracking-tight truncate ${depth === 0 ? 'text-slate-100 font-bold' : 'text-slate-300 font-medium'}`}>
+                                                                    <span className={`text-sm tracking-tight truncate ${depth === 0 ? 'text-text-muted font-bold' : 'text-text-muted font-medium'}`}>
                                                                         {node.name}
                                                                     </span>
                                                                     {node.last_revised_at && (
-                                                                        <span className="text-[9px] text-slate-600 font-medium">Last: {new Date(node.last_revised_at).toLocaleDateString()}</span>
+                                                                        <span className="text-[9px] text-text-muted font-medium">Last: {new Date(node.last_revised_at).toLocaleDateString()}</span>
                                                                     )}
                                                                 </div>
-                                                                <div className={`flex items-center justify-center min-w-[28px] h-6 rounded-md text-[11px] font-black ${node.revised_count > 0 ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20' : 'bg-white/5 text-slate-500'
+                                                                <div className={`flex items-center justify-center min-w-[28px] h-6 rounded-md text-[11px] font-black ${node.revised_count > 0 ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20' : 'bg-surface-3/10 text-text-muted'
                                                                     }`}>
                                                                     {node.revised_count}
                                                                 </div>
@@ -523,7 +514,7 @@ const Reports = () => {
 
                                                     {isExpanded && hasChildren && (
                                                         <div className="relative">
-                                                            <div className="absolute left-[15px] top-0 bottom-3 w-px bg-white/[0.04]" />
+                                                            <div className="absolute left-[15px] top-0 bottom-3 w-px bg-surface-2" />
                                                             {node.children.map(child => (
                                                                 <RevisionNode key={child.id} node={child} depth={depth + 1} />
                                                             ))}
@@ -536,7 +527,7 @@ const Reports = () => {
                                         return treeData.length > 0 ? (
                                             treeData.map(root => <RevisionNode key={root.id} node={root} />)
                                         ) : (
-                                            <div className="py-20 text-center text-slate-500 text-sm">No topics match your search.</div>
+                                            <div className="py-20 text-center text-text-muted text-sm">No topics match your search.</div>
                                         );
                                     })()}
                                 </div>
@@ -571,19 +562,19 @@ const Reports = () => {
                                         return items
                                             .filter(t => t.name.toLowerCase().includes(revSearchQuery.toLowerCase()))
                                             .map((t, idx) => (
-                                                <div key={t.id} className="flex items-center justify-between gap-3 p-3 bg-white/[0.02] border border-white/[0.04] rounded-xl hover:bg-white/[0.05] transition-all group">
+                                                <div key={t.id} className="flex items-center justify-between gap-3 p-3 bg-surface-3/10 border border-border rounded-xl hover:bg-surface-3/10 transition-all group">
                                                     <div className="flex items-center gap-3 min-w-0">
-                                                        <span className="text-[10px] font-black text-slate-600 group-hover:text-violet-500/50 w-4">#{idx + 1}</span>
+                                                        <span className="text-[10px] font-black text-text-muted group-hover:text-violet-500/50 w-4">#{idx + 1}</span>
                                                         <div className="min-w-0">
-                                                            <p className="text-xs text-slate-200 font-bold truncate leading-tight mb-0.5">{t.name}</p>
+                                                            <p className="text-xs text-text-muted font-bold truncate leading-tight mb-0.5">{t.name}</p>
                                                             {t.last_revised_at && (
-                                                                <p className="text-[9px] text-slate-500 truncate font-medium">
+                                                                <p className="text-[9px] text-text-muted truncate font-medium">
                                                                     {new Date(t.last_revised_at).toLocaleDateString()}
                                                                 </p>
                                                             )}
                                                         </div>
                                                     </div>
-                                                    <div className={`px-2 py-1 rounded-lg text-[11px] font-black ${t.revised_count > 0 ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20' : 'bg-slate-800 text-slate-500'
+                                                    <div className={`px-2 py-1 rounded-lg text-[11px] font-black ${t.revised_count > 0 ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20' : 'bg-surface-2 text-text-muted'
                                                         }`}>
                                                         {t.revised_count}
                                                     </div>
@@ -604,19 +595,19 @@ const Reports = () => {
                 <div className="glass p-8 rounded-2xl mb-8 relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-400/[0.03] rounded-full blur-3xl pointer-events-none" />
                     <div className="flex flex-col gap-6">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-white/[0.06] pb-6">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-border pb-6">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
                                     <BookOpen className="w-5 h-5 text-emerald-400" />
                                 </div>
                                 <div>
-                                    <h2 className="text-xl font-heading font-bold text-white tracking-tight">Most Questions Asked</h2>
-                                    <p className="text-[10px] text-slate-500 font-medium uppercase tracking-widest mt-0.5">Topical Question Density</p>
+                                    <h2 className="text-xl font-heading font-bold text-text tracking-tight">Most Questions Asked</h2>
+                                    <p className="text-[10px] text-text-muted font-medium uppercase tracking-widest mt-0.5">Topical Question Density</p>
                                 </div>
                             </div>
 
                             <div className="flex flex-wrap items-center gap-4">
-                                <div className="flex gap-1 p-1 bg-surface-2/60 rounded-xl border border-white/[0.06]">
+                                <div className="flex gap-1 p-1 bg-surface-3/10 rounded-xl border border-border">
                                     {[
                                         { id: 'most', label: 'Most Asked' },
                                         { id: 'all', label: 'All Topics' }
@@ -624,7 +615,7 @@ const Reports = () => {
                                         <button
                                             key={tab.id}
                                             onClick={() => setTopicTab(tab.id)}
-                                            className={`px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${topicTab === tab.id ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-500 hover:text-slate-300'}`}
+                                            className={`px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${topicTab === tab.id ? 'bg-emerald-500/20 text-emerald-600 [.dark_&]:text-emerald-400' : 'text-text-muted hover:text-text'}`}
                                         >
                                             {tab.label}
                                         </button>
@@ -632,13 +623,13 @@ const Reports = () => {
                                 </div>
 
                                 <div className="relative min-w-[200px]">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
                                     <input
                                         type="text"
                                         placeholder="Search..."
                                         value={topicSearchQuery}
                                         onChange={(e) => setTopicSearchQuery(e.target.value)}
-                                        className="w-full bg-white/[0.03] border border-white/[0.08] rounded-lg py-1.5 pl-9 pr-4 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/40 transition-all"
+                                        className="w-full bg-surface-3/10 border border-border rounded-lg py-1.5 pl-9 pr-4 text-xs text-text placeholder:text-text-muted focus:outline-none focus:border-emerald-500/40 transition-all"
                                     />
                                 </div>
                             </div>
@@ -679,10 +670,10 @@ const Reports = () => {
 
                                             return (
                                                 <div className={`${depth > 0 ? 'ml-6' : ''}`}>
-                                                    <div className={`group flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-white/[0.03] transition-all ${depth === 0 ? 'border-b border-white/[0.03] mb-1' : ''}`}>
+                                                    <div className={`group flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-surface-3/10 transition-all ${depth === 0 ? 'border-b border-border mb-1' : ''}`}>
                                                         <button
                                                             onClick={() => setIsExpanded(!isExpanded)}
-                                                            className={`p-1 rounded text-slate-600 transition-all ${hasChildren ? 'hover:text-emerald-400 hover:bg-emerald-400/10' : 'opacity-0 pointer-events-none'}`}
+                                                            className={`p-1 rounded text-text-muted transition-all ${hasChildren ? 'hover:text-emerald-400 hover:bg-emerald-400/10' : 'opacity-0 pointer-events-none'}`}
                                                         >
                                                             {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                                                         </button>
@@ -690,12 +681,12 @@ const Reports = () => {
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center justify-between gap-4">
                                                                 <div className="flex flex-col min-w-0">
-                                                                    <span className={`text-sm tracking-tight truncate ${depth === 0 ? 'text-slate-100 font-bold' : 'text-slate-300 font-medium'}`}>
+                                                                    <span className={`text-sm tracking-tight truncate ${depth === 0 ? 'text-text-muted font-bold' : 'text-text-muted font-medium'}`}>
                                                                         {node.topicName}
                                                                     </span>
-                                                                    <span className="text-[9px] text-slate-600 font-medium">{node.accuracy}% Accuracy</span>
+                                                                    <span className="text-[9px] text-text-muted font-medium">{node.accuracy}% Accuracy</span>
                                                                 </div>
-                                                                <div className={`px-2.5 py-1 rounded-lg text-[11px] font-black ${node.total > 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-white/5 text-slate-500'}`}>
+                                                                <div className={`px-2.5 py-1 rounded-lg text-[11px] font-black ${node.total > 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-surface-3/10 text-text-muted'}`}>
                                                                     {node.total}
                                                                 </div>
                                                             </div>
@@ -704,7 +695,7 @@ const Reports = () => {
 
                                                     {isExpanded && hasChildren && (
                                                         <div className="relative">
-                                                            <div className="absolute left-[15px] top-0 bottom-3 w-px bg-white/[0.04]" />
+                                                            <div className="absolute left-[15px] top-0 bottom-3 w-px bg-surface-2" />
                                                             {node.children.map(child => (
                                                                 <TopicPerformanceNode key={child.topicId} node={child} depth={depth + 1} />
                                                             ))}
@@ -717,7 +708,7 @@ const Reports = () => {
                                         return treeData.length > 0 ? (
                                             treeData.map(root => <TopicPerformanceNode key={root.topicId} node={root} />)
                                         ) : (
-                                            <div className="py-20 text-center text-slate-500 text-sm">No topics match your search.</div>
+                                            <div className="py-20 text-center text-text-muted text-sm">No topics match your search.</div>
                                         );
                                     })()}
                                 </div>
@@ -728,17 +719,17 @@ const Reports = () => {
                                         .sort((a, b) => b.total - a.total)
                                         .slice(0, 15)
                                         .map((t, idx) => (
-                                            <div key={t.topicId} className="flex items-center justify-between gap-3 p-3 bg-white/[0.02] border border-white/[0.04] rounded-xl hover:bg-white/[0.05] transition-all group">
+                                            <div key={t.topicId} className="flex items-center justify-between gap-3 p-3 bg-surface-3/10 border border-border rounded-xl hover:bg-surface-3/10 transition-all group">
                                                 <div className="flex items-center gap-3 min-w-0">
-                                                    <span className="text-[10px] font-black text-slate-600 group-hover:text-emerald-500/50 w-4">#{idx + 1}</span>
+                                                    <span className="text-[10px] font-black text-text-muted group-hover:text-emerald-500/50 w-4">#{idx + 1}</span>
                                                     <div className="min-w-0">
-                                                        <p className="text-xs text-slate-200 font-bold truncate leading-tight mb-0.5">{t.topicName}</p>
-                                                        <p className="text-[9px] text-slate-500 truncate font-medium">
+                                                        <p className="text-xs text-text-muted font-bold truncate leading-tight mb-0.5">{t.topicName}</p>
+                                                        <p className="text-[9px] text-text-muted truncate font-medium">
                                                             {t.accuracy}% Accuracy
                                                         </p>
                                                     </div>
                                                 </div>
-                                                <div className={`px-2.5 py-1 rounded-lg text-[11px] font-black ${t.total > 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-500'}`}>
+                                                <div className={`px-2.5 py-1 rounded-lg text-[11px] font-black ${t.total > 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-surface-2 text-text-muted'}`}>
                                                     {t.total}
                                                 </div>
                                             </div>
@@ -768,7 +759,7 @@ const Reports = () => {
                                 <div className="flex items-center justify-between mb-5 relative z-10">
                                     <div className="flex items-center gap-2">
                                         <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                                        <h2 className="text-lg font-heading font-bold text-white tracking-tight">Best Areas</h2>
+                                        <h2 className="text-lg font-heading font-bold text-text tracking-tight">Best Areas</h2>
                                     </div>
                                     {bestAreas.length > 0 && (
                                         <span className="text-[10px] font-bold text-emerald-500/50 uppercase tracking-widest">{bestAreas.length} topics</span>
@@ -777,16 +768,16 @@ const Reports = () => {
                                 {bestAreas.length > 0 ? (
                                     <div className="space-y-2 relative z-10 max-h-[360px] overflow-y-auto pr-1">
                                         {bestAreas.map((t, i) => (
-                                            <div key={t.topicId} className="flex items-center gap-3 p-3 rounded-lg hover:bg-emerald-500/[0.03] transition-colors border border-white/[0.04] group">
+                                            <div key={t.topicId} className="flex items-center gap-3 p-3 rounded-lg hover:bg-emerald-500/[0.03] transition-colors border border-border group">
                                                 <div className={`w-7 h-7 shrink-0 rounded-lg flex items-center justify-center text-xs font-bold ${i === 0 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/25'
                                                     : i < 3 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15'
-                                                        : 'bg-white/5 text-slate-500 border border-white/5'
+                                                        : 'bg-surface-3/10 text-text-muted border border-border'
                                                     }`}>
                                                     {i + 1}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-semibold text-slate-200 truncate">{t.topicName}</p>
-                                                    <p className="text-[11px] text-slate-500 mt-0.5">{t.correct || (t.total - (t.incorrect || 0))}/{t.total} correct</p>
+                                                    <p className="text-sm font-semibold text-text-muted truncate">{t.topicName}</p>
+                                                    <p className="text-[11px] text-text-muted mt-0.5">{t.correct || (t.total - (t.incorrect || 0))}/{t.total} correct</p>
                                                 </div>
                                                 <div className="shrink-0">
                                                     <PerformanceBadge accuracy={t.accuracy} />
@@ -796,7 +787,7 @@ const Reports = () => {
                                     </div>
                                 ) : (
                                     <div className="p-6 rounded-lg border border-dashed border-emerald-500/10 text-center">
-                                        <p className="text-slate-500 text-sm">No topics with ≥75% accuracy yet. Keep practicing!</p>
+                                        <p className="text-text-muted text-sm">No topics with ≥75% accuracy yet. Keep practicing!</p>
                                     </div>
                                 )}
                             </div>
@@ -807,7 +798,7 @@ const Reports = () => {
                                 <div className="flex items-center justify-between mb-5 relative z-10">
                                     <div className="flex items-center gap-2">
                                         <AlertTriangle className="w-5 h-5 text-amber-500" />
-                                        <h2 className="text-lg font-heading font-bold text-white tracking-tight">Weak Areas</h2>
+                                        <h2 className="text-lg font-heading font-bold text-text tracking-tight">Weak Areas</h2>
                                     </div>
                                     {weakAreas.length > 0 && (
                                         <span className="text-[10px] font-bold text-amber-500/50 uppercase tracking-widest">{weakAreas.length} topics</span>
@@ -816,16 +807,16 @@ const Reports = () => {
                                 {weakAreas.length > 0 ? (
                                     <div className="space-y-2 relative z-10 max-h-[360px] overflow-y-auto pr-1">
                                         {weakAreas.map((t, i) => (
-                                            <div key={t.topicId} className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/[0.03] transition-colors border border-white/[0.04] group">
+                                            <div key={t.topicId} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-3/10 transition-colors border border-border group">
                                                 <div className={`w-7 h-7 shrink-0 rounded-lg flex items-center justify-center text-xs font-bold ${i === 0 ? 'bg-red-500/15 text-red-400 border border-red-500/20'
                                                     : i < 3 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/15'
-                                                        : 'bg-white/5 text-slate-500 border border-white/5'
+                                                        : 'bg-surface-3/10 text-text-muted border border-border'
                                                     }`}>
                                                     {i + 1}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-semibold text-slate-200 truncate">{t.topicName}</p>
-                                                    <p className="text-[11px] text-slate-500 mt-0.5">{t.incorrect}/{t.total} incorrect</p>
+                                                    <p className="text-sm font-semibold text-text-muted truncate">{t.topicName}</p>
+                                                    <p className="text-[11px] text-text-muted mt-0.5">{t.incorrect}/{t.total} incorrect</p>
                                                 </div>
                                                 <div className="shrink-0">
                                                     <PerformanceBadge accuracy={t.accuracy} />
@@ -834,8 +825,8 @@ const Reports = () => {
                                         ))}
                                     </div>
                                 ) : (
-                                    <div className="p-6 rounded-lg border border-dashed border-white/5 text-center">
-                                        <p className="text-slate-500 text-sm">No weak areas detected yet. Keep studying!</p>
+                                    <div className="p-6 rounded-lg border border-dashed border-border text-center">
+                                        <p className="text-text-muted text-sm">No weak areas detected yet. Keep studying!</p>
                                     </div>
                                 )}
                             </div>
@@ -904,8 +895,8 @@ const Reports = () => {
                     <div className="glass p-6 rounded-xl relative overflow-hidden">
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-2">
-                                <BookOpen className="w-5 h-5 text-slate-400" />
-                                <h2 className="text-lg font-heading font-bold text-white tracking-tight">Topic-wise Accuracy</h2>
+                                <BookOpen className="w-5 h-5 text-text-muted" />
+                                <h2 className="text-lg font-heading font-bold text-text tracking-tight">Topic-wise Accuracy</h2>
                             </div>
                             <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-widest">
                                 <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500" /> ≥75%</span>

@@ -2,7 +2,8 @@ import React from 'react';
 import { useQuickView } from '../context/QuickViewContext.jsx';
 import FileViewerModal from './modals/FileViewerModal.jsx';
 import ViewNoteModal from './modals/ViewNoteModal.jsx';
-// Import others as needed...
+import ViewSolutionModal from './modals/ViewSolutionModal.jsx';
+import ImageViewerModal from './modals/ImageViewerModal.jsx';
 
 const GlobalQuickViewModal = () => {
     const { activeItem, setActiveItem, minimize } = useQuickView();
@@ -37,6 +38,32 @@ const GlobalQuickViewModal = () => {
                 onMinimize={onMinimize}
                 isMinimized={false}
                 {...activeItem.props}
+            />
+        );
+    }
+
+    if (activeItem.type === 'solution') {
+        return (
+            <ViewSolutionModal 
+                isOpen={true}
+                onClose={onClose}
+                solution={activeItem.data}
+                onMinimize={onMinimize}
+                isMinimized={false}
+                {...activeItem.props}
+            />
+        );
+    }
+
+    if (activeItem.type === 'image') {
+        return (
+            <ImageViewerModal
+                isOpen={true}
+                onClose={onClose}
+                imageUrl={activeItem.data?.imageUrl || activeItem.data}
+                title={activeItem.title || 'Image Viewer'}
+                onMinimize={onMinimize}
+                isFullscreen={activeItem.props?.isFullscreen}
             />
         );
     }

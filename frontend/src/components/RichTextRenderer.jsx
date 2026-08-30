@@ -76,7 +76,7 @@ const RichTextRenderer = ({ content }) => {
                 const Tag = node.tag || 'h2'; // default to h2 if missing
                 const sizeClass = Tag === 'h1' ? 'text-2xl' : Tag === 'h2' ? 'text-xl' : 'text-lg';
                 return (
-                    <Tag key={index} className={`font-heading font-bold text-white mb-3 mt-4 ${sizeClass}`}>
+                    <Tag key={index} className={`font-heading font-bold text-text mb-3 mt-4 ${sizeClass}`}>
                         {node.children?.map((child, i) => renderNode(child, i))}
                     </Tag>
                 );
@@ -84,7 +84,7 @@ const RichTextRenderer = ({ content }) => {
             case 'text': {
                 let element = <TextWithMath text={node.text} />;
                 // Lexical text format bitwise flags
-                if (node.format & 1) element = <strong className="font-bold text-white">{element}</strong>; // Bold
+                if (node.format & 1) element = <strong className="font-bold text-text">{element}</strong>; // Bold
                 if (node.format & 2) element = <em className="italic">{element}</em>; // Italic
                 if (node.format & 4) element = <del className="line-through opacity-70">{element}</del>; // Strikethrough
                 if (node.format & 8) element = <u className="underline decoration-indigo-500/50">{element}</u>; // Underline
@@ -102,7 +102,7 @@ const RichTextRenderer = ({ content }) => {
             }
             case 'listItem':
                 return (
-                    <li key={index} className="mb-1.5 pl-1 text-slate-300">
+                    <li key={index} className="mb-1.5 pl-1 text-text/90">
                         {node.children?.map((child, i) => renderNode(child, i))}
                     </li>
                 );

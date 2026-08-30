@@ -7,7 +7,7 @@ export const createUser = async (data) => {
             email: data.email,
             password_hash: data.passwordHash,
         })
-        .returning(['id', 'name', 'email', 'profile_picture', 'created_at']);
+        .returning(['id', 'name', 'email', 'role', 'profile_picture', 'created_at']);
     return user;
 };
 
@@ -22,7 +22,7 @@ export const findUserById = async (data) => {
     return db('revision.users')
         .where('id', data.id)
         .where('is_deleted', false)
-        .select(['id', 'name', 'email', 'profile_picture', 'created_at'])
+        .select(['id', 'name', 'email', 'role', 'profile_picture', 'created_at'])
         .first();
 };
 
@@ -32,11 +32,18 @@ export const softDeleteUser = async (data) => {
         .update({ is_deleted: true, deleted_at: new Date() });
 };
 
+export const getUsers = async () => {
+    return db('revision.users')
+        .where('is_deleted', false)
+        .select(['id', 'name', 'email', 'role', 'profile_picture', 'created_at'])
+        .orderBy('created_at', 'desc');
+};
+
 export const updateUser = async (id, data) => {
     const updateData = { ...data, updated_at: db.fn.now() };
     const [user] = await db('revision.users')
         .where('id', id)
         .update(updateData)
-        .returning(['id', 'name', 'email', 'profile_picture', 'created_at']);
+        .returning(['id', 'name', 'email', 'role', 'profile_picture', 'created_at']);
     return user;
 };

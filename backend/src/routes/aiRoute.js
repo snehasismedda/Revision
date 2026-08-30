@@ -1,5 +1,5 @@
 import express from 'express';
-import { parseSyllabus, getInsights, getSessionInsights, getGlobalInsights, parseNote, describeImage, enhanceNote, formatNote, editSection } from '../controllers/aiController.js';
+import { parseSyllabus, getInsights, getSessionInsights, getGlobalInsights, parseNote, describeImage, enhanceNote, formatNote, editSection, getYouTubeTranscript, processTranscript } from '../controllers/aiController.js';
 import authenticate from '../middlewares/authenticate.js';
 
 const router = express.Router();
@@ -12,6 +12,8 @@ router.post('/enhance-note', enhanceNote);
 router.post('/format-note', formatNote);
 router.post('/edit-section', editSection);
 router.post('/describe-image', describeImage);
+router.post('/youtube-transcript', getYouTubeTranscript);
+router.post('/process-transcript', processTranscript);
 router.get('/global-insights', getGlobalInsights);
 router.get('/insights/:subjectId', getInsights);
 router.get('/insights/:subjectId/sessions/:sessionId', getSessionInsights);

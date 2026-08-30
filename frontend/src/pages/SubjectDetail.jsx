@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { sessionsApi, questionsApi, notesApi, filesApi, aiApi, revisionApi, solutionsApi } from '../api/index.js';
+import { sessionsApi, questionsApi, notesApi, filesApi, aiApi, revisionApi, solutionsApi, todosApi } from '../api/index.js';
 import { useTopics } from '../context/TopicContext.jsx';
 import { useSubjects } from '../context/SubjectContext.jsx';
 import { useFiles } from '../context/FileContext.jsx';
 import { useQuickView } from '../context/QuickViewContext.jsx';
+import { useFolders } from '../context/FolderContext.jsx';
 import TopicTree from '../components/TopicTree.jsx';
 import SessionCard from '../components/SessionCard.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
@@ -17,8 +18,10 @@ import unidecode from 'unidecode';
 import autoTable from 'jspdf-autotable';
 import { marked } from 'marked';
 import { saveAs } from 'file-saver';
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, ImageRun, Table, TableRow, TableCell, WidthType, AlignmentType } from 'docx';
-import { ArrowLeft, PlusCircle, BarChart3, Wand2, BookOpen, Activity, ListChecks, FileText, Image as ImageIcon, Layers, Trash2, ChevronDown, Pencil, Hash, Search, X, Link2 as LinkIcon, Maximize2, Minimize2, LayoutGrid, List, CheckCircle, Download, ClipboardList, RotateCcw, Clock, RefreshCw, Notebook, MoreHorizontal, MoreVertical, History, Loader2 } from 'lucide-react';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, ImageRun, Table, TableRow, TableCell, WidthType, AlignmentType, ExternalHyperlink } from 'docx';
+import { ArrowLeft, PlusCircle, BarChart3, Wand2, BookOpen, Activity, Puzzle, FileText, Image as ImageIcon, Layers, Trash2, ChevronDown, Pencil, Hash, Search, X, Link2 as LinkIcon, Maximize2, Minimize2, LayoutGrid, List, CheckCircle, Download, ClipboardList, RotateCcw, Clock, RefreshCw, Notebook, MoreHorizontal, MoreVertical, History, Loader2, Lightbulb, LibraryBig, Zap, CheckSquare, ListTodo, CheckCircle2, Filter } from 'lucide-react';
+import FileExplorer from '../components/FileExplorer.jsx';
+import { foldersApi } from '../api/index.js';
 
 import ManageSyllabusModal from '../components/modals/ManageSyllabusModal.jsx';
 import AddQuestionModal from '../components/modals/AddQuestionModal.jsx';
@@ -32,10 +35,16 @@ import AddFileModal from '../components/modals/AddFileModal.jsx';
 import TimeTraveler from '../components/TimeTraveler.jsx';
 import CreateRevisionSessionModal from '../components/modals/CreateRevisionSessionModal.jsx';
 import EditRevisionSessionModal from '../components/modals/EditRevisionSessionModal.jsx';
+import CreateTodoModal from '../components/modals/CreateTodoModal.jsx';
+import EditTodoModal from '../components/modals/EditTodoModal.jsx';
+import ManageTodoGroupsModal from '../components/modals/ManageTodoGroupsModal.jsx';
+import TodoCard from '../components/todos/TodoCard.jsx';
 import AddSolutionModal from '../components/modals/AddSolutionModal.jsx';
 import ViewSolutionModal from '../components/modals/ViewSolutionModal.jsx';
 import EditSolutionModal from '../components/modals/EditSolutionModal.jsx';
 import FileViewerModal from '../components/modals/FileViewerModal.jsx';
+import ImageViewerModal from '../components/modals/ImageViewerModal.jsx';
+import KeyHighlightsModal from '../components/modals/KeyHighlightsModal.jsx';
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -43,37 +52,21 @@ import remarkMath from 'remark-math';
 import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
 
-const preprocessMarkdown = (text) => {
-    if (!text) return '';
-    return text
-        // Handle escaped block brackets: \[ ... \] or \\[ ... \\]
-        .replace(/\\\\\[/g, '\n$$\n')
-        .replace(/\\\\\]/g, '\n$$\n')
-        .replace(/\\\[/g, '\n$$\n')
-        .replace(/\\\]/g, '\n$$\n')
-        // Handle escaped inline brackets: \( ... \) or \\( ... \\)
-        .replace(/\\\\\(*/g, '$')
-        .replace(/\\\\\)* /g, '$')
-        .replace(/\\\(/g, '$')
-        .replace(/\\\)/g, '$')
-        // Handle back-to-back block math or sloppy delimiters
-        .replace(/\$\$\$\$/g, '$$\n$$')
-        .replace(/\$ \$/g, '$$')
-        // Ensure standard double dollars have newlines if they are likely blocks
-        .replace(/([^\n])\$\$/g, '$1\n$$')
-        .replace(/\$\$([^\n])/g, '$$\n$1')
-        // Fix common quirk
-        .replace(/\\bottom([a-zA-Z])/g, '\\bot $1')
-        .replace(/\\bottom/g, '\\bot')
-        // Ensure single newlines become double newlines to prevent text collapsing horizontally
-        .replace(/([^\n])\n([^\n])/g, '$1\n\n$2');
-};
+import { preprocessMarkdown } from '../utils/markdownUtils';
 
 
 const SubjectDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeTab = searchParams.get('tab') || 'topics';
+    const setActiveTab = (newTab) => {
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev);
+            next.set('tab', newTab);
+            return next;
+        }, { replace: true });
+    };
 
     const { subjects, statsMap, isLoaded: subjectsLoaded, loadSubjects, refreshStats, updateLocalStats, setSelectedSubjectId } = useSubjects();
 
@@ -89,29 +82,48 @@ const SubjectDetail = () => {
     // Derived from global state
     const topics = topicsBySubject[id] || [];
     const subject = subjects.find(s => s.id === id);
-    const overview = statsMap[id];
-    const loading = !subjectsLoaded || !subject || !overview;
+    const overview = statsMap[id] || {};
+    const loading = !subjectsLoaded;
     const [sessions, setSessions] = useState([]);
     const [questions, setQuestions] = useState([]);
     const [notes, setNotes] = useState([]);
     const [files, setFiles] = useState([]);
     const [solutions, setSolutions] = useState([]);
+    const [uploadFolderId, setUploadFolderId] = useState(null);
+    const [currentFolderId, setCurrentFolderId] = useState(null);
+    const {
+        folders,
+        fetchFolderContents,
+        setFolders,
+    } = useFolders();
+
     const [loadedTabs, setLoadedTabs] = useState(new Set());
     const [tabLoading, setTabLoading] = useState(false);
+
+    // Reset loaded tabs and tab data when switching between subjects
+    useEffect(() => {
+        setLoadedTabs(new Set());
+        setSessions([]);
+        setQuestions([]);
+        setNotes([]);
+        setSolutions([]);
+        setRevisionSessions([]);
+        setTodos([]);
+        setTodoGroups([]);
+        setFiles([]);
+    }, [id]);
 
     // Pagination for files (Library)
     const [filePage, setFilePage] = useState(0);
     const [loadingMoreFiles, setLoadingMoreFiles] = useState(false);
     const [hasMoreFiles, setHasMoreFiles] = useState(true);
-    const FILE_LIMIT = 20;
+    const FILE_LIMIT = 50;
 
     // Pagination for notes
     const [notePage, setNotePage] = useState(0);
     const [loadingMoreNotes, setLoadingMoreNotes] = useState(false);
     const [hasMoreNotes, setHasMoreNotes] = useState(true);
-    const NOTE_LIMIT = 12;
-
-    const [activeTab, setActiveTab] = useState('topics');
+    const NOTE_LIMIT = 50;
     const [showTopicModal, setShowTopicModal] = useState(false);
     const [showQuestionModal, setShowQuestionModal] = useState(false);
     const [showNoteModal, setShowNoteModal] = useState(false);
@@ -140,6 +152,10 @@ const SubjectDetail = () => {
     const [editingSolution, setEditingSolution] = useState(null);
     const [showEditQuestionModal, setShowEditQuestionModal] = useState(false);
     const [showEditSolutionModal, setShowEditSolutionModal] = useState(false);
+    const [isSolutionFullscreen, setIsSolutionFullscreen] = useState(false);
+    const [reopenViewSolutionAfterEdit, setReopenViewSolutionAfterEdit] = useState(false);
+    const [viewingImageUrl, setViewingImageUrl] = useState(null);
+    const [viewingImageTitle, setViewingImageTitle] = useState('Question Image');
     const [fetchingImageId, setFetchingImageId] = useState(null);
     const [fetchingNoteContentId, setFetchingNoteContentId] = useState(null);
     const [fetchedImages, setFetchedImages] = useState({});
@@ -153,6 +169,8 @@ const SubjectDetail = () => {
     const [treeKey, setTreeKey] = useState(0);
     const [sessionsViewMode, setSessionsViewMode] = useState('grid'); // 'grid' or 'list'
     const [notesViewMode, setNotesViewMode] = useState('grid'); // 'grid' or 'list'
+    const [showHighlightsOnly, setShowHighlightsOnly] = useState(false);
+    const [viewingHighlightsNote, setViewingHighlightsNote] = useState(null); // note object
     const [solutionsViewMode, setSolutionsViewMode] = useState('grid');
     const [libraryViewMode, setLibraryViewMode] = useState('datewise'); // 'datewise' or 'categorywise'
 
@@ -166,6 +184,18 @@ const SubjectDetail = () => {
     const [showCreateRevisionSession, setShowCreateRevisionSession] = useState(false);
     const [editingRevisionSession, setEditingRevisionSession] = useState(null);
     const [confirmDeleteRevisionSession, setConfirmDeleteRevisionSession] = useState({ open: false, sessionId: null });
+
+    // TODOs state
+    const [todos, setTodos] = useState([]);
+    const [todoGroups, setTodoGroups] = useState([]);
+    const [todoFilterGroup, setTodoFilterGroup] = useState('all');
+    const [todoFilterStatus, setTodoFilterStatus] = useState('all'); // 'all' | 'pending' | 'completed'
+    const [todoFilterPriority, setTodoFilterPriority] = useState('all'); // 'all' | 'urgent' | 'high' | 'medium' | 'low'
+    const [todoSearchQuery, setTodoSearchQuery] = useState('');
+    const [showCreateTodoModal, setShowCreateTodoModal] = useState(false);
+    const [editingTodo, setEditingTodo] = useState(null);
+    const [showManageGroupsModal, setShowManageGroupsModal] = useState(false);
+    const [confirmDeleteTodo, setConfirmDeleteTodo] = useState({ open: false, todoId: null });
 
 
     const { getFileData, clearFileCacheMany } = useFiles();
@@ -199,9 +229,9 @@ const SubjectDetail = () => {
 
     const handleNextFile = useCallback(async () => {
         if (!hasMoreFiles && fileIndex >= files.length - 1) return;
-        
+
         const nextIndex = fileIndex + 1;
-        
+
         if (nextIndex >= files.length) {
             // Should we load more?
             if (hasMoreFiles) {
@@ -575,14 +605,7 @@ const SubjectDetail = () => {
             doc.setFontSize(20);
             const titleText = sanitizeForPDF(subject?.name || 'Syllabus');
             doc.text(titleText, margin, y);
-            y += 10;
-
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(10);
-            doc.setTextColor(100, 100, 120);
-            doc.text(`Syllabus  ·  ${new Date().toLocaleDateString()}`, margin, y);
-            doc.setTextColor(0, 0, 0);
-            y += 3;
+            y += 8;
 
             // Thick decorative line under cover
             doc.setDrawColor(80, 80, 200);
@@ -729,14 +752,31 @@ const SubjectDetail = () => {
             .trim();
     };
 
-    // Flatten a marked inline token tree into styled segments [{text, bold, italic, code}]
+    // Helper to extract URLs from text segments if any raw URLs exist
+    const parseTextWithUrls = (rawText, segProps = { bold: false, italic: false, code: false }) => {
+        if (!rawText) return [];
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        const parts = rawText.split(urlRegex);
+        const res = [];
+        for (const part of parts) {
+            if (!part) continue;
+            if (part.match(/^https?:\/\//)) {
+                res.push({ text: part, ...segProps, link: part });
+            } else {
+                res.push({ text: part, ...segProps });
+            }
+        }
+        return res;
+    };
+
+    // Flatten a marked inline token tree into styled segments [{text, bold, italic, code, link}]
     const flattenInlineTokens = (tokens) => {
         if (!tokens) return [];
         const segs = [];
         for (const t of tokens) {
             if (t.type === 'text' || t.type === 'escape') {
                 const raw = stripLatexMath(t.text || t.raw || '');
-                if (raw) segs.push({ text: raw, bold: false, italic: false, code: false });
+                if (raw) segs.push(...parseTextWithUrls(raw, { bold: false, italic: false, code: false }));
             } else if (t.type === 'strong') {
                 for (const s of flattenInlineTokens(t.tokens)) segs.push({ ...s, bold: true });
             } else if (t.type === 'em') {
@@ -744,15 +784,20 @@ const SubjectDetail = () => {
             } else if (t.type === 'codespan') {
                 segs.push({ text: t.text || '', bold: false, italic: false, code: true });
             } else if (t.type === 'link') {
-                // Show link text only, not the URL
-                for (const s of flattenInlineTokens(t.tokens)) segs.push(s);
+                const href = t.href || '';
+                const innerSegs = flattenInlineTokens(t.tokens);
+                if (innerSegs.length > 0) {
+                    for (const s of innerSegs) segs.push({ ...s, link: href });
+                } else if (t.text || href) {
+                    segs.push({ text: t.text || href, bold: false, italic: false, code: false, link: href });
+                }
             } else if (t.type === 'image') {
                 // skip images in text flow
             } else if (t.type === 'br') {
                 segs.push({ text: ' ', bold: false, italic: false, code: false });
             } else if (t.raw) {
                 const raw = stripLatexMath(t.raw);
-                if (raw) segs.push({ text: raw, bold: false, italic: false, code: false });
+                if (raw) segs.push(...parseTextWithUrls(raw, { bold: false, italic: false, code: false }));
             }
         }
         return segs;
@@ -890,8 +935,26 @@ const SubjectDetail = () => {
                 const style = seg.bold && seg.italic ? 'bolditalic' : seg.bold ? 'bold' : seg.italic ? 'italic' : 'normal';
                 doc.setFont(seg.code ? 'courier' : 'helvetica', style);
                 doc.setFontSize(fontSize);
-                doc.text(seg.text, curX, baseline);
-                curX += doc.getTextWidth(seg.text);
+                const segW = doc.getTextWidth(seg.text);
+
+                if (seg.link) {
+                    doc.setTextColor(37, 99, 235); // Blue (#2563eb) for hyperlink
+                    doc.text(seg.text, curX, baseline, { url: seg.link });
+
+                    // Underline for link
+                    doc.setDrawColor(37, 99, 235);
+                    doc.setLineWidth(0.2);
+                    doc.line(curX, baseline + 0.5, curX + segW, baseline + 0.5);
+
+                    // Add PDF interactive hyperlink bounding rect
+                    const fontH = fontSize * PT_TO_MM;
+                    doc.link(curX, baseline - fontH * 0.8, segW, fontH * 1.1, { url: seg.link });
+
+                    doc.setTextColor(0, 0, 0); // Restore color
+                } else {
+                    doc.text(seg.text, curX, baseline);
+                }
+                curX += segW;
             }
         };
 
@@ -1110,15 +1173,7 @@ const SubjectDetail = () => {
             doc.setFontSize(20);
             const titleText = sanitizeForPDF(subject?.name || 'Export');
             doc.text(titleText, margin, y);
-            y += 10;
-
-            const tabLabel = activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(10);
-            doc.setTextColor(100, 100, 120);
-            doc.text(`${tabLabel} Export  ·  ${new Date().toLocaleDateString()}`, margin, y);
-            doc.setTextColor(0, 0, 0);
-            y += 3;
+            y += 8;
 
             // Thick decorative line under cover
             doc.setDrawColor(80, 80, 200);
@@ -1127,6 +1182,7 @@ const SubjectDetail = () => {
             doc.setLineWidth(0.3);
             y += 8;
 
+            const tabLabel = activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
             const itemIds = Array.from(selectedItems);
             let items = [];
             if (activeTab === 'notes') {
@@ -1339,12 +1395,8 @@ const SubjectDetail = () => {
 
             const docChildren = [
                 new Paragraph({
-                    text: `${sanitizeForPDF(subject?.name || 'Export')} - ${tabLabel} Export`,
+                    text: sanitizeForPDF(subject?.name || 'Export'),
                     heading: HeadingLevel.HEADING_1,
-                }),
-                new Paragraph({
-                    text: `Generated on ${new Date().toLocaleDateString()}`,
-                    style: "wellSpaced"
                 }),
                 new Paragraph({ text: "" }), // Spacing
             ];
@@ -1421,6 +1473,24 @@ const SubjectDetail = () => {
                 const rawContent = item.content || '';
                 const tokens = tokenizeMarkdown(rawContent);
 
+                const renderSegmentToDocx = (seg) => {
+                    const textRun = new TextRun({
+                        text: seg.text || "",
+                        bold: seg.bold,
+                        italics: seg.italic,
+                        font: seg.code ? "Courier" : undefined,
+                        color: seg.link ? "2563EB" : undefined,
+                        underline: seg.link ? {} : undefined,
+                    });
+                    if (seg.link) {
+                        return new ExternalHyperlink({
+                            children: [textRun],
+                            link: seg.link,
+                        });
+                    }
+                    return textRun;
+                };
+
                 for (const token of tokens) {
                     if (token.type === 'heading') {
                         const headingMap = {
@@ -1439,12 +1509,7 @@ const SubjectDetail = () => {
                     } else if (token.type === 'paragraph' || token.type === 'blockquote') {
                         if (!token.segments || token.segments.length === 0) continue;
                         docChildren.push(new Paragraph({
-                            children: token.segments.map(seg => new TextRun({
-                                text: seg.text || "",
-                                bold: seg.bold,
-                                italics: seg.italic,
-                                font: seg.code ? "Courier" : undefined,
-                            })),
+                            children: token.segments.map(renderSegmentToDocx),
                             spacing: { before: 120, after: 120 },
                             indent: token.type === 'blockquote' ? { left: 720 } : undefined
                         }));
@@ -1455,12 +1520,7 @@ const SubjectDetail = () => {
                                 indent: { left: (li.indent + 1) * 720, hanging: 360 },
                                 children: [
                                     new TextRun({ text: prefix }),
-                                    ...(li.segments || []).map(seg => new TextRun({
-                                        text: seg.text || "",
-                                        bold: seg.bold,
-                                        italics: seg.italic,
-                                        font: seg.code ? "Courier" : undefined,
-                                    }))
+                                    ...(li.segments || []).map(renderSegmentToDocx)
                                 ],
                                 spacing: { before: 60, after: 60 }
                             }));
@@ -1649,8 +1709,8 @@ const SubjectDetail = () => {
         const loadMore = async () => {
             setLoadingMoreFiles(true);
             try {
-                const res = await filesApi.listBySubject(id, FILE_LIMIT, filePage * FILE_LIMIT, null, true);
-                const newFiles = res.images || res.files || [];
+                const res = await fetchFolderContents(id, 'subject', currentFolderId, FILE_LIMIT, filePage * FILE_LIMIT);
+                const newFiles = res.files || [];
                 setHasMoreFiles(newFiles.length === FILE_LIMIT);
                 setFiles(prev => [...prev, ...newFiles]);
             } catch {
@@ -1660,7 +1720,8 @@ const SubjectDetail = () => {
             }
         };
         loadMore();
-    }, [id, filePage]);
+    }, [id, filePage, currentFolderId]);
+
 
     useEffect(() => {
         if (notePage === 0) return;
@@ -1681,22 +1742,27 @@ const SubjectDetail = () => {
     }, [id, notePage]);
 
     const fetchTabData = async (tab) => {
-        if (loadedTabs.has(tab) || !id) return;
+        if (!id) return;
         setTabLoading(true);
         try {
             switch (tab) {
                 case 'topics':
-                    await loadTopics(id);
+                    await loadTopics(id).catch(err => console.error('Failed to load topics:', err));
                     break;
                 case 'sessions': {
-                    const sesRes = await sessionsApi.list(id);
-                    setSessions(sesRes.sessions);
+                    const sesRes = await sessionsApi.list(id).catch(err => {
+                        console.error('Failed to load sessions:', err);
+                        return { sessions: [] };
+                    });
+                    setSessions(sesRes.sessions || []);
                     break;
                 }
                 case 'questions': {
-                    // Proactively fetch notes and solutions when questions tab is clicked to ensure icons/badges are accurate
                     const [qsRes, nRes, solRes] = await Promise.all([
-                        questionsApi.list(id),
+                        questionsApi.list(id).catch(err => {
+                            console.error('Failed to load questions:', err);
+                            return { questions: [] };
+                        }),
                         notesApi.list(id, NOTE_LIMIT, 0).catch(() => ({ notes: [] })),
                         solutionsApi.list(id).catch(() => ({ solutions: [] }))
                     ]);
@@ -1705,12 +1771,14 @@ const SubjectDetail = () => {
                     setSolutions(solRes.solutions || []);
                     setHasMoreNotes((nRes.notes || []).length === NOTE_LIMIT);
                     setNotePage(0);
-                    // Mark notes and solutions as loaded so their tabs don't refetch
                     setLoadedTabs(prev => new Set(prev).add('notes').add('solutions'));
                     break;
                 }
                 case 'notes': {
-                    const notesRes = await notesApi.list(id, NOTE_LIMIT, 0);
+                    const notesRes = await notesApi.list(id, NOTE_LIMIT, 0).catch(err => {
+                        console.error('Failed to load notes:', err);
+                        return { notes: [] };
+                    });
                     const initialNotes = notesRes.notes || [];
                     setNotes(initialNotes);
                     setHasMoreNotes(initialNotes.length === NOTE_LIMIT);
@@ -1718,22 +1786,40 @@ const SubjectDetail = () => {
                     break;
                 }
                 case 'solutions': {
-                    const solutionsRes = await solutionsApi.list(id);
+                    const solutionsRes = await solutionsApi.list(id).catch(err => {
+                        console.error('Failed to load solutions:', err);
+                        return { solutions: [] };
+                    });
                     setSolutions(solutionsRes.solutions || []);
                     break;
                 }
                 case 'revision': {
-                    const revRes = await revisionApi.listSessions(id).catch(() => ({ sessions: [] }));
+                    const revRes = await revisionApi.listSessions(id).catch(err => {
+                        console.error('Failed to load revision sessions:', err);
+                        return { sessions: [] };
+                    });
                     setRevisionSessions(revRes.sessions || []);
                     break;
                 }
+                case 'todos': {
+                    const todoRes = await todosApi.list(id).catch(err => {
+                        console.error('Failed to load todos:', err);
+                        return { groups: [], todos: [] };
+                    });
+                    setTodos(todoRes.todos || []);
+                    setTodoGroups(todoRes.groups || []);
+                    break;
+                }
                 case 'library': {
-                    // We only load page 0 initially when the tab is clicked
-                    const fileRes = await filesApi.listBySubject(id, FILE_LIMIT, 0, null, true);
-                    const initialFiles = fileRes.images || fileRes.files || [];
-                    setFiles(initialFiles);
-                    setHasMoreFiles(initialFiles.length === FILE_LIMIT);
-                    setFilePage(0);
+                    try {
+                        const res = await fetchFolderContents(id, 'subject', null, FILE_LIMIT, 0);
+                        setFiles(res?.files || []);
+                        setHasMoreFiles((res?.files || []).length === FILE_LIMIT);
+                        setFilePage(0);
+                    } catch (err) {
+                        console.error('Failed to load library:', err);
+                        setFiles([]);
+                    }
                     break;
                 }
                 default:
@@ -1742,7 +1828,6 @@ const SubjectDetail = () => {
             setLoadedTabs(prev => new Set(prev).add(tab));
         } catch (error) {
             console.error(`Failed to load ${tab}:`, error);
-            toast.error(`Failed to load ${tab} data`);
         } finally {
             setTabLoading(false);
         }
@@ -1804,29 +1889,22 @@ const SubjectDetail = () => {
     }, [id, subjectsLoaded]); // Only rerun if ID changes or we need to trigger initial load
 
 
-    // Handle deep linking from query params
+    // Handle deep linking for content IDs (noteId, questionId) from query params
     useEffect(() => {
         if (loading) return;
 
-        const tab = searchParams.get('tab');
+        const tab = searchParams.get('tab') || 'topics';
         const contentId = searchParams.get('id') || searchParams.get('questionId') || searchParams.get('noteId');
 
-        if (tab) {
-            setActiveTab(tab);
-
-            // If it's a question or note, we might need a small delay to ensure the tab's content is rendered
-            if (contentId) {
-                setTimeout(() => {
-                    if (tab === 'questions') {
-                        navigateToQuestion(contentId);
-                    } else if (tab === 'notes') {
-                        const note = notes.find(n => n.id.toString() === contentId.toString());
-                        if (note) {
-                            setViewingNote(note);
-                            if (note.source_image_id) handleFetchNoteImage(note.id);
-                        }
-                    }
-                }, 300);
+        if (contentId) {
+            if (tab === 'questions') {
+                navigateToQuestion(contentId);
+            } else if (tab === 'notes') {
+                const note = notes.find(n => n.id?.toString() === contentId.toString());
+                if (note) {
+                    setViewingNote(note);
+                    if (note.source_image_id) handleFetchNoteImage(note.id);
+                }
             }
         }
     }, [loading, searchParams, notes]);
@@ -1943,6 +2021,171 @@ const SubjectDetail = () => {
         }
     };
 
+    // ==================== TODO HANDLERS ====================
+    const handleCreateTodo = async (data) => {
+        try {
+            const res = await todosApi.create(id, data);
+            if (res.todo) {
+                setTodos(prev => [res.todo, ...prev]);
+            }
+            setShowCreateTodoModal(false);
+            toast.success('TODO created');
+        } catch (err) {
+            toast.error(err.response?.data?.error || 'Failed to create TODO');
+        }
+    };
+
+    const handleEditTodo = async (data) => {
+        try {
+            await todosApi.update(id, data.todoId, data);
+            const reload = await todosApi.list(id);
+            setTodos(reload.todos || []);
+            setEditingTodo(null);
+            toast.success('TODO updated');
+        } catch (err) {
+            toast.error(err.response?.data?.error || 'Failed to update TODO');
+        }
+    };
+
+    const handleDeleteTodo = async (todoId) => {
+        try {
+            await todosApi.delete(id, todoId);
+            setTodos(prev => prev.filter(t => t.id !== todoId));
+            setConfirmDeleteTodo({ open: false, todoId: null });
+            toast.success('TODO deleted');
+        } catch {
+            toast.error('Failed to delete TODO');
+        }
+    };
+
+    const handleToggleTodoStatus = async (todoId, newStatus) => {
+        // Optimistic update
+        setTodos(prev => prev.map(t => {
+            if (t.id !== todoId) return t;
+            const isDone = newStatus === 'completed';
+            return {
+                ...t,
+                status: newStatus,
+                completedAt: isDone ? new Date().toISOString() : null,
+                subTodos: (t.subTodos || []).map(s => ({
+                    ...s,
+                    status: newStatus,
+                    completedAt: isDone ? new Date().toISOString() : null
+                })),
+                subTodosDone: isDone ? (t.subTodos?.length || 0) : 0,
+                progressPct: isDone ? 100 : 0
+            };
+        }));
+
+        try {
+            await todosApi.toggleStatus(id, todoId, newStatus);
+        } catch {
+            const reload = await todosApi.list(id);
+            setTodos(reload.todos || []);
+            toast.error('Failed to update status');
+        }
+    };
+
+    const handleToggleSubTodo = async (subTodoId, newStatus) => {
+        // Optimistic update
+        setTodos(prev => prev.map(parent => {
+            if (!parent.subTodos?.some(s => s.id === subTodoId)) return parent;
+            const updatedSub = parent.subTodos.map(s =>
+                s.id === subTodoId ? { ...s, status: newStatus, completedAt: newStatus === 'completed' ? new Date().toISOString() : null } : s
+            );
+            const total = updatedSub.length;
+            const done = updatedSub.filter(s => s.status === 'completed').length;
+            const allDone = total > 0 && done === total;
+            return {
+                ...parent,
+                subTodos: updatedSub,
+                subTodosTotal: total,
+                subTodosDone: done,
+                progressPct: Math.round((done / total) * 100),
+                status: allDone ? 'completed' : 'pending',
+                completedAt: allDone ? new Date().toISOString() : null,
+            };
+        }));
+
+        try {
+            await todosApi.toggleStatus(id, subTodoId, newStatus);
+        } catch {
+            const reload = await todosApi.list(id);
+            setTodos(reload.todos || []);
+            toast.error('Failed to update sub-task status');
+        }
+    };
+
+    const handleAddSubTodo = async (parentId, subTitle) => {
+        try {
+            await todosApi.create(id, { parentId, title: subTitle });
+            const reload = await todosApi.list(id);
+            setTodos(reload.todos || []);
+        } catch {
+            toast.error('Failed to add sub-task');
+        }
+    };
+
+    const handleDeleteSubTodo = async (subTodoId) => {
+        try {
+            await todosApi.delete(id, subTodoId);
+            setTodos(prev => prev.map(parent => {
+                if (!parent.subTodos?.some(s => s.id === subTodoId)) return parent;
+                const updatedSub = parent.subTodos.filter(s => s.id !== subTodoId);
+                const total = updatedSub.length;
+                const done = updatedSub.filter(s => s.status === 'completed').length;
+                return {
+                    ...parent,
+                    subTodos: updatedSub,
+                    subTodosTotal: total,
+                    subTodosDone: done,
+                    progressPct: total > 0 ? Math.round((done / total) * 100) : (parent.status === 'completed' ? 100 : 0)
+                };
+            }));
+        } catch {
+            toast.error('Failed to delete sub-task');
+        }
+    };
+
+    const handleQuickCreateGroup = async (name, color) => {
+        try {
+            const res = await todosApi.createGroup(id, { name, color });
+            if (res.group) {
+                setTodoGroups(prev => [...prev, res.group]);
+                return res.group;
+            }
+        } catch {
+            toast.error('Failed to create group');
+        }
+    };
+
+    const handleUpdateGroup = async (groupId, data) => {
+        try {
+            const res = await todosApi.updateGroup(id, groupId, data);
+            if (res.group) {
+                setTodoGroups(prev => prev.map(g => g.id === groupId ? res.group : g));
+                const reload = await todosApi.list(id);
+                setTodos(reload.todos || []);
+                toast.success('Group updated');
+            }
+        } catch {
+            toast.error('Failed to update group');
+        }
+    };
+
+    const handleDeleteGroup = async (groupId) => {
+        try {
+            await todosApi.deleteGroup(id, groupId);
+            setTodoGroups(prev => prev.filter(g => g.id !== groupId));
+            const reload = await todosApi.list(id);
+            setTodos(reload.todos || []);
+            if (todoFilterGroup === groupId) setTodoFilterGroup('all');
+            toast.success('Group deleted');
+        } catch {
+            toast.error('Failed to delete group');
+        }
+    };
+
     const handleFileAdded = (newRes) => {
         if (newRes.note) {
             setNotes(prev => [newRes.note, ...prev]);
@@ -1951,13 +2194,12 @@ const SubjectDetail = () => {
             setQuestions(prev => [...newRes.questions, ...prev]);
         }
 
-        // Refetch files to be thorough
+        // Refetch files to be thorough, respecting current folder navigation
         const refreshFiles = async () => {
             setFilePage(0);
-            const res = await filesApi.listBySubject(id, FILE_LIMIT, 0, null, true);
-            const newFiles = res.images || res.files || [];
-            setFiles(newFiles);
-            setHasMoreFiles(newFiles.length === FILE_LIMIT);
+            const res = await fetchFolderContents(id, 'subject', currentFolderId, FILE_LIMIT, 0);
+            setFiles(res.files || []);
+            setHasMoreFiles((res.files || []).length === FILE_LIMIT);
         };
         refreshFiles();
         refreshStats([id]);
@@ -2134,13 +2376,15 @@ const SubjectDetail = () => {
         }
     };
 
-    const handleOpenEditSolution = (solution) => {
+    const handleOpenEditSolution = (solution, isFullscreen = false, fromViewModal = false) => {
         setEditingSolution(solution);
+        setIsSolutionFullscreen(isFullscreen);
+        setReopenViewSolutionAfterEdit(fromViewModal);
         setShowEditSolutionModal(true);
     };
 
     const handleEditSolutionUpdated = (updated) => {
-            setSolutions(prev => prev.map(s => s.id === updated.id ? updated : s));
+        setSolutions(prev => prev.map(s => s.id === updated.id ? updated : s));
 
         // Clear old image cache for this solution so it reloads if viewing/next time
         setFetchedImages(prev => {
@@ -2149,11 +2393,12 @@ const SubjectDetail = () => {
             return next;
         });
 
-        if (viewingSolution && viewingSolution.id === updated.id) {
+        if (reopenViewSolutionAfterEdit) {
             setViewingSolution(updated);
             if (updated.source_image_id) {
                 handleFetchSolutionImage(updated.id);
             }
+            setReopenViewSolutionAfterEdit(false);
         }
     };
 
@@ -2388,7 +2633,7 @@ const SubjectDetail = () => {
             <div className="max-w-6xl mx-auto animate-pulse">
                 {/* Skeleton Header Navigation */}
                 <div className="flex items-center gap-3 mb-6">
-                    <div className="w-24 h-9 bg-surface-2 rounded-lg border border-white/[0.06]" />
+                    <div className="w-24 h-9 bg-surface-2 rounded-lg border border-border" />
                 </div>
 
                 {/* Skeleton Subject Header */}
@@ -2403,11 +2648,11 @@ const SubjectDetail = () => {
                 </div>
 
                 {/* Skeleton Gradient separator */}
-                <div className="h-px bg-white/[0.08] mb-8" />
+                <div className="h-px bg-surface-2 mb-8" />
 
                 {/* Skeleton Tabs Area */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                    <div className="flex gap-1 p-1 bg-surface-2/50 rounded-xl border border-white/[0.06] w-fit">
+                    <div className="flex gap-1 p-1 bg-surface-2/50 rounded-xl border border-border w-fit">
                         <div className="w-32 h-10 bg-surface-3/50 rounded-lg" />
                         <div className="w-32 h-10 bg-surface-3/50 rounded-lg" />
                         <div className="w-32 h-10 bg-surface-3/50 rounded-lg" />
@@ -2419,9 +2664,9 @@ const SubjectDetail = () => {
                 <div className="flex flex-col gap-5">
                     <div className="h-8 bg-surface-2 rounded-lg w-24 mb-4" />
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                        <div className="h-48 bg-surface-2/40 rounded-2xl border border-white/[0.06]" />
-                        <div className="h-48 bg-surface-2/40 rounded-2xl border border-white/[0.06]" />
-                        <div className="h-48 bg-surface-2/40 rounded-2xl border border-white/[0.06]" />
+                        <div className="h-48 bg-surface-2/40 rounded-2xl border border-border" />
+                        <div className="h-48 bg-surface-2/40 rounded-2xl border border-border" />
+                        <div className="h-48 bg-surface-2/40 rounded-2xl border border-border" />
                     </div>
                 </div>
             </div>
@@ -2434,8 +2679,8 @@ const SubjectDetail = () => {
                 <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6">
                     <X className="w-10 h-10 text-rose-500/70" />
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-2">Subject not found</h2>
-                <p className="text-slate-400 mb-8">The subject you're looking for doesn't exist or you don't have access.</p>
+                <h2 className="text-2xl font-bold text-text mb-2">Subject not found</h2>
+                <p className="text-text-muted mb-8">The subject you're looking for doesn't exist or you don't have access.</p>
                 <Link to="/subjects" className="btn-primary px-8 py-3 rounded-xl">Back to Subjects</Link>
             </div>
         );
@@ -2504,11 +2749,15 @@ const SubjectDetail = () => {
             {showFileModal && (
                 <AddFileModal
                     isOpen={true}
-                    onClose={() => setShowFileModal(false)}
+                    onClose={() => { setShowFileModal(false); setUploadFolderId(null); }}
                     subjectId={id}
                     onFileSaved={handleFileAdded}
+                    folders={folders}
+                    initialFolderId={uploadFolderId}
+                    isLibrary={true}
                 />
             )}
+
 
             {(showNoteModal || !!addToNoteData) && (
                 <AddNoteModal
@@ -2707,7 +2956,7 @@ const SubjectDetail = () => {
                     <div className="flex-1 flex justify-start">
                         <Link
                             to="/subjects"
-                            className="flex items-center gap-2 text-[12.5px] font-bold text-slate-400 hover:text-white transition-all hover:bg-white/[0.06] pl-2.5 pr-4 py-2.5 rounded-xl border border-white/[0.04] hover:border-white/[0.1] group/back backdrop-blur-md whitespace-nowrap"
+                            className="flex items-center gap-2 text-[12.5px] font-bold text-text-muted hover:text-text transition-all hover:bg-surface-2 pl-2.5 pr-4 py-2.5 rounded-xl border border-border hover:border-border-hover group/back backdrop-blur-md whitespace-nowrap"
                         >
                             <ArrowLeft className="w-4 h-4 group-hover/back:-translate-x-0.5 transition-transform" />
                             <span>Back</span>
@@ -2716,7 +2965,7 @@ const SubjectDetail = () => {
 
                     {/* Center: Title (Maximum focus) */}
                     <div className="flex-[4] text-center min-w-0">
-                        <h1 className="text-[28px] md:text-[38px] lg:text-[46px] font-heading font-black text-white tracking-tighter leading-none truncate drop-shadow-2xl selection:bg-primary/30 py-1">
+                        <h1 className="text-[28px] md:text-[38px] lg:text-[46px] font-heading font-black text-text tracking-tighter leading-none truncate drop-shadow-2xl selection:bg-primary/30 py-1">
                             {subject?.name}
                         </h1>
                     </div>
@@ -2725,7 +2974,7 @@ const SubjectDetail = () => {
                     <div className="flex-1 flex justify-end">
                         <Link
                             to={`/subjects/${id}/reports`}
-                            className="flex items-center gap-2.5 text-[12px] font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer border border-indigo-500/10 bg-indigo-500/5 text-indigo-400 hover:text-white hover:bg-indigo-500/20 hover:border-indigo-500/30 group/anal shadow-lg shadow-indigo-500/5 backdrop-blur-sm whitespace-nowrap"
+                            className="flex items-center gap-2.5 text-[12px] font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer border border-indigo-500/10 bg-indigo-500/5 text-indigo-400 hover:text-text hover:bg-indigo-500/20 hover:border-indigo-500/30 group/anal shadow-lg shadow-indigo-500/5 backdrop-blur-sm whitespace-nowrap"
                         >
                             <BarChart3 className="w-3.5 h-3.5 text-indigo-400 group-hover/anal:scale-110 transition-transform" strokeWidth={2.5} />
                             <span className="hidden sm:inline">Analytics</span>
@@ -2737,7 +2986,7 @@ const SubjectDetail = () => {
                 {/* Optional small description below to keep the row height minimal */}
                 {subject?.description && (
                     <div className="max-w-2xl mx-auto mt-2 pb-1 text-center">
-                        <p className="text-slate-400/80 text-[13px] md:text-[14px] font-medium leading-relaxed truncate px-4">
+                        <p className="text-text-muted/80 text-[13px] md:text-[14px] font-medium leading-relaxed truncate px-4">
                             {subject.description}
                         </p>
                     </div>
@@ -2748,140 +2997,63 @@ const SubjectDetail = () => {
 
 
 
-            {/* Controls (Sub-Nav + Action) — Glass background wrapper */}
-            <div className="relative p-2 rounded-2xl bg-surface-2/80 border border-white/[0.04] mb-8 ring-1 ring-white/[0.02]">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-50">
-                    {/* Segmented Tabs */}
-                    <div className="flex gap-1 p-1 bg-black/20 rounded-xl border border-white/[0.06] overflow-x-auto no-scrollbar max-w-full" >
-                        {
-                            ['topics', 'sessions', 'questions', 'notes', 'solutions', 'revision', 'library'].map((tab) => {
-                                let count;
-                                switch (tab) {
-                                    case 'topics': count = overview?.totalTopics ?? topics.length; break;
-                                    case 'sessions': count = overview?.totalSessions ?? sessions.length; break;
-                                    case 'questions': count = overview?.availableQuestions ?? questions.length; break;
-                                    case 'notes': count = overview?.totalNotes ?? notes.length; break;
-                                    case 'solutions': count = overview?.totalSolutions ?? solutions.length; break;
-                                    case 'library': count = overview?.total_files ?? overview?.totalFiles ?? files?.length ?? 0; break;
-                                    case 'revision': count = overview?.totalRevisionSessions ?? revisionSessions.length; break;
-                                }
-                                return (
-                                    <button
-                                        key={tab}
-                                        onClick={() => setActiveTab(tab)}
-                                        className={`flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-[13px] font-bold capitalize transition-all duration-300 cursor-pointer whitespace-nowrap
-                                            ${activeTab === tab
-                                                ? 'bg-primary text-white shadow-[0_4px_16px_rgba(139,92,246,0.4)] scale-[1.02]'
-                                                : 'text-slate-500 hover:text-slate-200 hover:bg-white/[0.04]'
-                                            }`}
-                                    >
-                                        {tab}
-
-                                        <span className={`min-w-5 h-5 px-1.5 flex items-center justify-center rounded-full text-[10px] font-black leading-none
-                                            ${activeTab === tab
-                                                ? 'bg-white/20 text-white'
-                                                : 'bg-white/[0.06] text-slate-500'
-                                            }`}
-                                        >
-                                            {count}
-                                        </span>
-                                    </button>
-                                );
-                            })
+            {/* Mobile Tab Bar (Visible on mobile/tablet screens when global sidebar is collapsed) */}
+            <div className="lg:hidden relative mb-6">
+                <div className="flex items-center gap-1.5 p-1.5 bg-surface-2/70 backdrop-blur-md border border-border rounded-2xl overflow-x-auto no-scrollbar shadow-md">
+                    {[
+                        { id: 'topics', label: 'Topics', icon: BookOpen },
+                        { id: 'sessions', label: 'Sessions', icon: Activity },
+                        { id: 'questions', label: 'Questions', icon: Puzzle },
+                        { id: 'notes', label: 'Notes', icon: FileText },
+                        { id: 'solutions', label: 'Solutions', icon: Lightbulb },
+                        { id: 'revision', label: 'Revision', icon: RefreshCw },
+                        { id: 'todos', label: 'TODOs', icon: CheckSquare },
+                        { id: 'library', label: 'Library', icon: LibraryBig },
+                    ].map(({ id, label, icon: Icon }) => {
+                        let count;
+                        switch (id) {
+                            case 'topics': count = overview?.totalTopics ?? topics.length; break;
+                            case 'sessions': count = overview?.totalSessions ?? sessions.length; break;
+                            case 'questions': count = overview?.availableQuestions ?? questions.length; break;
+                            case 'notes': count = overview?.totalNotes ?? notes.length; break;
+                            case 'solutions': count = overview?.totalSolutions ?? solutions.length; break;
+                            case 'revision': count = overview?.totalRevisionSessions ?? revisionSessions.length; break;
+                            case 'todos': count = todos.filter(t => t.status === 'pending').length || (todos.length > 0 ? 0 : undefined); break;
+                            case 'library': count = overview?.total_files ?? overview?.totalFiles ?? files?.length ?? 0; break;
                         }
-                    </div >
-
-                    {/* Action Bar — same row height as tabs */}
-                    < div className="flex items-center gap-3" >
-                        {activeTab === 'sessions' && (
+                        const isActive = activeTab === id;
+                        return (
                             <button
-                                onClick={() => setShowSessionModal(true)}
-                                className="bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 hover:border-violet-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
+                                key={id}
+                                onClick={() => setActiveTab(id)}
+                                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                                    isActive
+                                        ? 'bg-primary text-white shadow-sm'
+                                        : 'text-text-muted hover:text-text hover:bg-surface-3/60'
+                                }`}
                             >
-                                <PlusCircle className="w-4 h-4" strokeWidth={2} />
-                                <span>New Session</span>
+                                <Icon className="w-3.5 h-3.5" />
+                                <span>{label}</span>
+                                {count !== undefined && count !== null && (
+                                    <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-black ${
+                                        isActive ? 'bg-white/20 text-white' : 'bg-surface-3 text-text-muted'
+                                    }`}>
+                                        {count}
+                                    </span>
+                                )}
                             </button>
-                        )}
-
-                        {
-                            activeTab === 'questions' && (
-                                <button
-                                    onClick={() => setShowQuestionModal(true)}
-                                    className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
-                                >
-                                    <PlusCircle className="w-4 h-4" strokeWidth={2} />
-                                    <span>Add Question</span>
-                                </button>
-                            )
-                        }
-
-                        {
-                            activeTab === 'notes' && (
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => setNotesViewMode(notesViewMode === 'grid' ? 'list' : 'grid')}
-                                        className="bg-white/[0.03] text-slate-400 border border-white/[0.08] hover:bg-white/[0.08] hover:text-white p-2.5 rounded-lg transition-all shadow-sm cursor-pointer"
-                                        title={`Switch to ${notesViewMode === 'grid' ? 'List' : 'Grid'} View`}
-                                    >
-                                        {notesViewMode === 'grid' ? <List className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
-                                    </button>
-                                    <button
-                                        onClick={() => setShowNoteModal(true)}
-                                        className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
-                                    >
-                                        <PlusCircle className="w-4 h-4" strokeWidth={2} />
-                                        <span>Add Note</span>
-                                    </button>
-                                </div>
-                            )
-                        }
-
-                        {
-                            activeTab === 'library' && (
-                                <button
-                                    onClick={() => setShowFileModal(true)}
-                                    className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
-                                >
-                                    <PlusCircle className="w-4 h-4" strokeWidth={2} />
-                                    <span>Add File</span>
-                                </button>
-                            )
-                        }
-
-                        {
-                            activeTab === 'topics' && (
-                                <button
-                                    onClick={() => setShowTopicModal(true)}
-                                    className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
-                                >
-                                    <PlusCircle className="w-4 h-4" strokeWidth={2} />
-                                    <span>Manage Syllabus</span>
-                                </button>
-                            )
-                        }
-
-                        {
-                            activeTab === 'revision' && (
-                                <button
-                                    onClick={() => setShowCreateRevisionSession(true)}
-                                    className="bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 hover:border-violet-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98]"
-                                >
-                                    <PlusCircle className="w-4 h-4" strokeWidth={2} />
-                                    <span>New Session</span>
-                                </button>
-                            )
-                        }
-                    </div >
-                </div >
-            </div >
+                        );
+                    })}
+                </div>
+            </div>
 
             {/* Main Content Area */}
             {tabLoading && !loadedTabs.has(activeTab) ? (
                 <div className="fade-in space-y-6">
-                    <div className="h-12 w-full bg-white/[0.04] rounded-xl animate-pulse" />
+                    <div className="h-12 w-full bg-surface-2 rounded-xl animate-pulse" />
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {[...Array(3)].map((_, i) => (
-                            <div key={i} className="h-48 bg-white/[0.04] rounded-2xl animate-pulse" />
+                            <div key={i} className="h-48 bg-surface-2 rounded-2xl animate-pulse" />
                         ))}
                     </div>
                 </div>
@@ -2890,12 +3062,12 @@ const SubjectDetail = () => {
 
                     {activeTab === 'topics' && (
                         <div className="fade-in">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-border pb-4">
                                 <div className="flex items-center gap-2">
                                     <BookOpen className="w-6 h-6 text-indigo-400" />
-                                    <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Syllabus</h3>
+                                    <h3 className="text-[20px] font-heading font-bold text-text tracking-tight">Syllabus</h3>
                                 </div>
-                                <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2 ml-auto">
                                     <button
                                         onClick={handleDownloadSyllabus}
                                         disabled={isDownloadingSyllabus}
@@ -2914,7 +3086,7 @@ const SubjectDetail = () => {
                                             setTopicsDefaultExpanded(true);
                                             setTreeKey(prev => prev + 1);
                                         }}
-                                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-400 hover:text-primary hover:bg-primary/10 border border-white/5 transition-all cursor-pointer uppercase tracking-wider"
+                                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-text-muted hover:text-primary hover:bg-primary/10 border border-border transition-all cursor-pointer uppercase tracking-wider"
                                         title="Expand all"
                                     >
                                         <Maximize2 className="w-3.5 h-3.5" />
@@ -2925,30 +3097,30 @@ const SubjectDetail = () => {
                                             setTopicsDefaultExpanded(false);
                                             setTreeKey(prev => prev + 1);
                                         }}
-                                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white hover:bg-white/10 border border-white/5 transition-all cursor-pointer uppercase tracking-wider"
+                                        className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-text-muted hover:text-text hover:bg-surface-3 border border-border transition-all cursor-pointer uppercase tracking-wider"
                                         title="Collapse all"
                                     >
                                         <Minimize2 className="w-3.5 h-3.5" />
                                         <span>Collapse All</span>
                                     </button>
+                                    <button
+                                        onClick={() => setShowTopicModal(true)}
+                                        className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98] shrink-0 ml-auto"
+                                    >
+                                        <PlusCircle className="w-4 h-4" strokeWidth={2} />
+                                        <span>Manage Syllabus</span>
+                                    </button>
                                 </div>
                             </div>
                             {topics.length === 0 ? (
-                                <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                    <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5">
+                                <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-border-hover flex flex-col items-center">
+                                    <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-border">
                                         <BookOpen className="w-10 h-10 text-indigo-500/70" />
                                     </div>
-                                    <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No topics yet</h3>
-                                    <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                    <h3 className="text-2xl font-heading font-bold text-text mb-2 tracking-tight">No topics yet</h3>
+                                    <p className="text-text-muted text-sm max-w-sm leading-relaxed">
                                         Build your syllabus by adding topics and subtopics to organize your study material.
                                     </p>
-                                    <button
-                                        onClick={() => setShowTopicModal(true)}
-                                        className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
-                                    >
-                                        <PlusCircle className="w-4 h-4" />
-                                        <span>Manage Syllabus</span>
-                                    </button>
                                 </div>
                             ) : (
                                 <TopicTree
@@ -2963,57 +3135,64 @@ const SubjectDetail = () => {
 
                     {activeTab === 'sessions' && (
                         <div className="fade-in">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-border pb-4">
                                 <div className="flex items-center gap-2">
                                     <Activity className="w-6 h-6 text-indigo-400" />
-                                    <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Study Sessions</h3>
+                                    <h3 className="text-[20px] font-heading font-bold text-text tracking-tight">Study Sessions</h3>
                                 </div>
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-3 ml-auto">
                                     <div className="relative group flex-1 sm:min-w-[280px]">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-indigo-400 transition-colors" />
                                         <input
                                             type="text"
                                             value={sessionSearchQuery}
                                             onChange={(e) => setSessionSearchQuery(e.target.value)}
                                             placeholder="Search sessions..."
-                                            className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                                            className="w-full bg-surface-2/50 border border-border-hover rounded-xl py-2 pl-10 pr-4 text-[13px] text-text focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
                                         />
                                         {sessionSearchQuery && (
                                             <button
                                                 onClick={() => setSessionSearchQuery('')}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
                                             >
                                                 <X className="w-4 h-4" />
                                             </button>
                                         )}
                                     </div>
-                                    <div className="flex bg-surface-2/50 p-1 rounded-xl border border-white/[0.06] shrink-0">
+                                    <div className="flex bg-surface-2/50 p-1 rounded-xl border border-border shrink-0">
                                         <button
                                             onClick={() => setSessionsViewMode('grid')}
-                                            className={`p-1.5 rounded-lg transition-all ${sessionsViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                            className={`p-1.5 rounded-lg transition-all ${sessionsViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-text-muted hover:text-text'}`}
                                             title="Grid View"
                                         >
                                             <LayoutGrid className="w-4 h-4" />
                                         </button>
                                         <button
                                             onClick={() => setSessionsViewMode('list')}
-                                            className={`p-1.5 rounded-lg transition-all ${sessionsViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                            className={`p-1.5 rounded-lg transition-all ${sessionsViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-text-muted hover:text-text'}`}
                                             title="List View"
                                         >
                                             <List className="w-4 h-4" />
                                         </button>
                                     </div>
+                                    <button
+                                        onClick={() => setShowSessionModal(true)}
+                                        className="bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 hover:border-violet-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98] shrink-0 ml-auto"
+                                    >
+                                        <PlusCircle className="w-4 h-4" strokeWidth={2} />
+                                        <span className="hidden sm:inline">New Session</span>
+                                    </button>
                                 </div>
                             </div>
 
 
                             {sessions.length === 0 ? (
-                                <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                    <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5">
+                                <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-border-hover flex flex-col items-center">
+                                    <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-border">
                                         <Activity className="w-10 h-10 text-violet-500/70" />
                                     </div>
-                                    <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No learning sessions</h3>
-                                    <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                    <h3 className="text-2xl font-heading font-bold text-text mb-2 tracking-tight">No learning sessions</h3>
+                                    <p className="text-text-muted text-sm max-w-sm leading-relaxed mb-8">
                                         You haven't recorded any sessions for this subject yet. Start a session to log your correct and incorrect topics.
                                     </p>
                                     <button
@@ -3029,9 +3208,9 @@ const SubjectDetail = () => {
                                     {(() => {
                                         if (filteredSessions.length === 0 && sessions.length > 0) {
                                             return (
-                                                <div className="col-span-full py-12 flex flex-col items-center justify-center text-center glass-panel rounded-2xl border-dashed border-white/10">
-                                                    <Search className="w-8 h-8 text-slate-600 mb-3" />
-                                                    <p className="text-slate-400 font-medium">No sessions match your search</p>
+                                                <div className="col-span-full py-12 flex flex-col items-center justify-center text-center glass-panel rounded-2xl border-dashed border-border-hover">
+                                                    <Search className="w-8 h-8 text-text-muted mb-3" />
+                                                    <p className="text-text-muted font-medium">No sessions match your search</p>
                                                     <button onClick={() => setSessionSearchQuery('')} className="mt-2 text-indigo-400 text-sm hover:underline">Clear search</button>
                                                 </div>
                                             );
@@ -3057,129 +3236,138 @@ const SubjectDetail = () => {
                     {activeTab === 'questions' && (
                         <div className="fade-in">
                             {/* Header for Questions */}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-border pb-4">
                                 <div className="flex items-center gap-2">
-                                    <ListChecks className="w-6 h-6 text-indigo-400" />
-                                    <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Question Bank</h3>
+                                    <Puzzle className="w-6 h-6 text-indigo-400" />
+                                    <h3 className="text-[20px] font-heading font-bold text-text tracking-tight">Question Bank</h3>
                                 </div>
-                                {isSelectionMode ? (
-                                    <div className="flex items-center h-[50px] bg-[#1a1a1e] border border-white/[0.12] rounded-2xl px-2 shadow-[0_12px_40px_rgba(0,0,0,0.8)] transition-all animate-in fade-in zoom-in-95 duration-300 w-full sm:w-auto relative z-[999]">
-                                        <div className="flex items-center pl-3 pr-2 border-r border-white/[0.08] mr-2">
-                                            <div className="w-6 h-6 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center text-[12px] font-bold mr-2">
-                                                {selectedItems.size}
+                                <div className="flex items-center gap-3 ml-auto">
+                                    {isSelectionMode ? (
+                                        <div className="flex items-center h-[50px] bg-surface border border-border-hover rounded-2xl px-2 shadow-[0_12px_40px_rgba(0,0,0,0.8)] transition-all animate-in fade-in zoom-in-95 duration-300 w-full sm:w-auto relative z-[999]">
+                                            <div className="flex items-center pl-3 pr-2 border-r border-border mr-2">
+                                                <div className="w-6 h-6 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center text-[12px] font-bold mr-2">
+                                                    {selectedItems.size}
+                                                </div>
+                                                <span className="text-[13px] text-text font-medium hidden sm:inline">selected</span>
                                             </div>
-                                            <span className="text-[13px] text-slate-300 font-medium hidden sm:inline">selected</span>
-                                        </div>
 
-                                        <button
-                                            onClick={handleSelectAll}
-                                            className="text-[12px] font-medium text-slate-300 hover:text-white px-4 py-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
-                                        >
-                                            {selectedItems.size > 0 && selectedItems.size === groupedQuestions.flatMap(g => g.questions).length ? 'Clear' : 'Select All'}
-                                        </button>
-
-                                        <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
-
-                                        <div className="flex items-center gap-1 relative">
                                             <button
-                                                onClick={(e) => { e.stopPropagation(); setShowExportMenu(!showExportMenu); }}
-                                                disabled={selectedItems.size === 0}
-                                                className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all cursor-pointer ${showExportMenu ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
+                                                onClick={handleSelectAll}
+                                                className="text-[12px] font-medium text-text hover:text-text px-4 py-2 rounded-xl hover:bg-surface-3 transition-colors cursor-pointer"
                                             >
-                                                <Download className="w-4 h-4" />
-                                                <span className="text-[12px] font-medium hidden md:inline">Export</span>
-                                                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${showExportMenu ? 'rotate-180' : ''}`} />
+                                                {selectedItems.size > 0 && selectedItems.size === groupedQuestions.flatMap(g => g.questions).length ? 'Clear' : 'Select All'}
                                             </button>
 
-                                            {showExportMenu && selectedItems.size > 0 && (
-                                                <div
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="absolute top-full right-0 mt-3 w-60 bg-[#1e1e22] border border-white/15 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in slide-in-from-top-3 z-[1000] backdrop-blur-2xl transition-all p-2 space-y-1 block"
+                                            <div className="w-px h-6 bg-surface-2 mx-2"></div>
+
+                                            <div className="flex items-center gap-1 relative">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setShowExportMenu(!showExportMenu); }}
+                                                    disabled={selectedItems.size === 0}
+                                                    className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all cursor-pointer ${showExportMenu ? 'bg-indigo-500 text-white shadow-lg' : 'text-text hover:bg-surface-3 hover:text-text'}`}
                                                 >
-                                                    <div className="px-3 py-2 border-b border-white/5 mb-1.5 leading-none">
-                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Select Export Format</span>
+                                                    <Download className="w-4 h-4" />
+                                                    <span className="text-[12px] font-medium hidden md:inline">Export</span>
+                                                    <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${showExportMenu ? 'rotate-180' : ''}`} />
+                                                </button>
+
+                                                {showExportMenu && selectedItems.size > 0 && (
+                                                    <div
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="absolute top-full right-0 mt-3 w-60 bg-surface-2 border border-border-hover rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in slide-in-from-top-3 z-[1000] backdrop-blur-2xl transition-all p-2 space-y-1 block"
+                                                    >
+                                                        <div className="px-3 py-2 border-b border-border mb-1.5 leading-none">
+                                                            <span className="text-[10px] font-bold text-text-muted uppercase tracking-[0.1em]">Select Export Format</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => { handleDownloadSelected(); setShowExportMenu(false); }}
+                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-text hover:text-text hover:bg-surface-3 rounded-xl transition-all cursor-pointer group"
+                                                        >
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
+                                                                    <FileText className="w-4 h-4 text-indigo-500 [.light_&]:text-indigo-600" />
+                                                                </div>
+                                                                <span>PDF Document</span>
+                                                            </div>
+                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-text-muted opacity-0 group-hover:opacity-100 transition-all" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => { handleDownloadWordSelected(); setShowExportMenu(false); }}
+                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-text hover:text-text hover:bg-surface-3 rounded-xl transition-all cursor-pointer group"
+                                                        >
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
+                                                                    <FileText className="w-4 h-4 text-emerald-500 [.light_&]:text-emerald-600" />
+                                                                </div>
+                                                                <span>Word Document</span>
+                                                            </div>
+                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-text-muted opacity-0 group-hover:opacity-100 transition-all" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => { handleDownloadMarkdownSelected(); setShowExportMenu(false); }}
+                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-text hover:text-text hover:bg-surface-3 rounded-xl transition-all cursor-pointer group"
+                                                        >
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center group-hover:bg-orange-500/20 transition-colors">
+                                                                    <FileText className="w-4 h-4 text-orange-500 [.light_&]:text-orange-600" />
+                                                                </div>
+                                                                <span>Markdown File</span>
+                                                            </div>
+                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-text-muted opacity-0 group-hover:opacity-100 transition-all" />
+                                                        </button>
                                                     </div>
-                                                    <button
-                                                        onClick={() => { handleDownloadSelected(); setShowExportMenu(false); }}
-                                                        className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
-                                                    >
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
-                                                                <FileText className="w-4 h-4 text-indigo-400" />
-                                                            </div>
-                                                            <span>PDF Document</span>
-                                                        </div>
-                                                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => { handleDownloadWordSelected(); setShowExportMenu(false); }}
-                                                        className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
-                                                    >
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
-                                                                <FileText className="w-4 h-4 text-emerald-400" />
-                                                            </div>
-                                                            <span>Word Document</span>
-                                                        </div>
-                                                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => { handleDownloadMarkdownSelected(); setShowExportMenu(false); }}
-                                                        className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
-                                                    >
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center group-hover:bg-orange-500/20 transition-colors">
-                                                                <FileText className="w-4 h-4 text-orange-400" />
-                                                            </div>
-                                                            <span>Markdown File</span>
-                                                        </div>
-                                                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
+                                                )}
+                                            </div>
 
-                                        <button
-                                            onClick={() => {
-                                                setConfirmBulkDelete({ open: true, type: 'questions', count: selectedItems.size });
-                                            }}
-                                            disabled={selectedItems.size === 0}
-                                            className="flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:text-white hover:bg-rose-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                            <span className="text-[12px] font-medium hidden md:inline">Delete</span>
-                                        </button>
-
-                                        <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
-
-                                        <button
-                                            onClick={() => { setIsSelectionMode(false); setSelectedItems(new Set()); }}
-                                            className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
-                                            title="Cancel Selection"
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="relative group w-full sm:min-w-[300px] sm:w-auto">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
-                                        <input
-                                            type="text"
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            placeholder="Search content or tags..."
-                                            className="w-full sm:w-[300px] bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
-                                        />
-                                        {searchQuery && (
                                             <button
-                                                onClick={() => setSearchQuery('')}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                                onClick={() => { setConfirmBulkDelete({ open: true, type: 'questions', count: selectedItems.size }); }}
+                                                disabled={selectedItems.size === 0}
+                                                className="flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:text-text hover:bg-rose-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                                <span className="text-[12px] font-medium hidden md:inline">Delete</span>
+                                            </button>
+
+                                            <div className="w-px h-6 bg-surface-2 mx-2"></div>
+
+                                            <button
+                                                onClick={() => { setIsSelectionMode(false); setSelectedItems(new Set()); }}
+                                                className="w-10 h-10 flex items-center justify-center rounded-xl text-text-muted hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
+                                                title="Cancel Selection"
                                             >
                                                 <X className="w-4 h-4" />
                                             </button>
-                                        )}
-                                    </div>
-                                )}
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-3">
+                                            <div className="relative group w-full sm:min-w-[280px] sm:w-auto">
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-indigo-400 transition-colors" />
+                                                <input
+                                                    type="text"
+                                                    value={searchQuery}
+                                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                                    placeholder="Search content or tags..."
+                                                    className="w-full sm:w-[280px] bg-surface-2/50 border border-border-hover rounded-xl py-2 pl-10 pr-4 text-[13px] text-text focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                                                />
+                                                {searchQuery && (
+                                                    <button
+                                                        onClick={() => setSearchQuery('')}
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={() => setShowQuestionModal(true)}
+                                                className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 hover:border-indigo-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98] shrink-0"
+                                            >
+                                                <PlusCircle className="w-4 h-4" strokeWidth={2} />
+                                                <span>Add Question</span>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 gap-6 items-start">
@@ -3188,12 +3376,12 @@ const SubjectDetail = () => {
                                 {/* Questions List (Full Width) */}
                                 <div className="w-full">
                                     {questions.length === 0 ? (
-                                        <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                            <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 rotate-3">
-                                                <ListChecks className="w-10 h-10 text-indigo-500/70" />
+                                        <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-border-hover flex flex-col items-center">
+                                            <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-border rotate-3">
+                                                <Puzzle className="w-10 h-10 text-indigo-500/70" />
                                             </div>
-                                            <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">Your question bank is empty</h3>
-                                            <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                            <h3 className="text-2xl font-heading font-bold text-text mb-2 tracking-tight">Your question bank is empty</h3>
+                                            <p className="text-text-muted text-sm max-w-sm leading-relaxed mb-8">
                                                 Start adding questions from your books or notes. AI will automatically format them for better readability.
                                             </p>
                                             <button
@@ -3205,12 +3393,12 @@ const SubjectDetail = () => {
                                             </button>
                                         </div>
                                     ) : groupedQuestions.length === 0 ? (
-                                        <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                            <div className="w-16 h-16 rounded-2xl bg-surface-2 flex items-center justify-center mb-4 border border-white/5">
-                                                <Search className="w-8 h-8 text-slate-600" />
+                                        <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-border-hover flex flex-col items-center">
+                                            <div className="w-16 h-16 rounded-2xl bg-surface-2 flex items-center justify-center mb-4 border border-border">
+                                                <Search className="w-8 h-8 text-text-muted" />
                                             </div>
-                                            <h4 className="text-lg font-bold text-white mb-1">No matching questions</h4>
-                                            <p className="text-slate-500 text-sm">Try adjusting your search query or tags</p>
+                                            <h4 className="text-lg font-bold text-text mb-1">No matching questions</h4>
+                                            <p className="text-text-muted text-sm">Try adjusting your search query or tags</p>
                                             <button
                                                 onClick={() => setSearchQuery('')}
                                                 className="mt-6 text-indigo-400 hover:text-indigo-300 text-sm font-semibold"
@@ -3232,7 +3420,7 @@ const SubjectDetail = () => {
                                                         <div
                                                             key={q.id}
                                                             id={`question-${q.id}`}
-                                                            className={`question-card group relative transition-all overflow-visible ${activeQuestionDropdown === q.id ? 'border-indigo-500/40 shadow-xl' : ''} ${isSelectionMode ? (selectedItems.has(q.id) ? 'ring-2 ring-indigo-500 cursor-pointer bg-indigo-500/5' : 'cursor-pointer hover:bg-white/[0.02]') : ''}`}
+                                                            className={`question-card group relative transition-all overflow-visible ${activeQuestionDropdown === q.id ? 'active' : ''} ${isSelectionMode ? (selectedItems.has(q.id) ? 'selected-item' : 'cursor-pointer') : ''}`}
                                                             onClick={() => {
                                                                 if (isSelectionMode) {
                                                                     const next = new Set(selectedItems);
@@ -3242,37 +3430,100 @@ const SubjectDetail = () => {
                                                                 }
                                                             }}
                                                         >
-                                                            {isSelectionMode && (
-                                                                <div className="absolute top-4 right-4 z-20">
-                                                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(q.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-500 bg-surface-3/50'}`}>
-                                                                        {selectedItems.has(q.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
-                                                                    </div>
+
+                                                            <div className="question-card-header">
+                                                                <div className="question-number-badge font-bold">Q</div>
+                                                                <div className="flex flex-col mr-4">
+                                                                    <span className="flex items-center gap-1.5 px-2 py-0.5 bg-indigo-500/10 text-indigo-300 rounded-md text-[10px] font-bold uppercase tracking-wider border border-indigo-500/20 w-fit">
+                                                                        {q.type === 'image' ? <ImageIcon className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
+                                                                        {q.type === 'image' ? 'Image' : 'Text'}
+                                                                    </span>
+                                                                    <span className="text-[10px] text-text-muted font-medium mt-1">
+                                                                        {new Date(q.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                                                                    </span>
                                                                 </div>
-                                                            )}
-                                                            {/* Card Header — question number + metadata */}
-                                                            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-white/[0.06]">
-                                                                <span className="text-[15px] font-heading font-bold text-primary tracking-tight">
-                                                                    Q
-                                                                </span>
-                                                                <span className="flex items-center gap-1.5 px-2.5 py-1 bg-surface-3/80 text-slate-300 rounded-md text-[12px] font-semibold border border-white/5">
-                                                                    {q.type === 'image' ? <ImageIcon className="w-4 h-4 text-indigo-400" /> : <FileText className="w-4 h-4 text-emerald-400" />}
-                                                                    {q.type === 'image' ? 'Image' : 'Text'}
-                                                                </span>
-                                                                <div className="flex items-center gap-1 ml-auto relative" ref={activeQuestionDropdown === q.id ? questionDropdownRef : null}>
+
+                                                                <div className="flex items-center gap-2 ml-auto">
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleGenerateAINote(q.id);
+                                                                        }}
+                                                                        disabled={generatingAINoteId === q.id}
+                                                                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${existingAINote ? 'bg-purple-500/10 border-purple-500/20 text-purple-400 hover:bg-purple-500/20' : 'bg-amber-500/5 border-amber-500/10 text-amber-500/70 hover:bg-amber-500/10 hover:text-amber-500'} disabled:opacity-50 cursor-pointer uppercase tracking-tight`}
+                                                                    >
+                                                                        {generatingAINoteId === q.id ? (
+                                                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                                                        ) : existingAINote ? (
+                                                                            <BookOpen className="w-3 h-3" />
+                                                                        ) : (
+                                                                            <Wand2 className="w-3 h-3" />
+                                                                        )}
+                                                                        <span>{existingAINote ? "AI Note" : "AI Note"}</span>
+                                                                    </button>
+
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            const existingRes = solutions.find(s => s.question_id === q.id);
+                                                                            if (existingRes) {
+                                                                                setViewingSolution(existingRes);
+                                                                                if (existingRes.source_image_id) handleFetchSolutionImage(existingRes.id);
+                                                                            } else {
+                                                                                setSelectedQuestionIdForSolution(q.id);
+                                                                                setShowSolutionModal(true);
+                                                                            }
+                                                                        }}
+                                                                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${solutions.some(s => s.question_id === q.id) ? 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20' : 'bg-surface-2 border-border text-text-muted hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/5'} cursor-pointer uppercase tracking-tight`}
+                                                                    >
+                                                                        <Puzzle className="w-3 h-3" />
+                                                                        <span>{solutions.some(s => s.question_id === q.id) ? "Solution" : "Solution"}</span>
+                                                                    </button>
+
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setSelectedQuestionIdForNote(q.id);
+                                                                            setShowNoteModal(true);
+                                                                        }}
+                                                                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border bg-surface-2 border-border text-text-muted hover:text-emerald-400 hover:border-emerald-500/30 hover:bg-emerald-500/5 cursor-pointer uppercase tracking-tight"
+                                                                    >
+                                                                        <PlusCircle className="w-3 h-3" />
+                                                                        <span>Note</span>
+                                                                    </button>
+                                                                </div>
+
+                                                                <div className="flex items-center justify-center w-9 h-9 relative" ref={activeQuestionDropdown === q.id ? questionDropdownRef : null}>
+                                                                    {isSelectionMode && (
+                                                                        <div
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                const next = new Set(selectedItems);
+                                                                                if (next.has(q.id)) next.delete(q.id);
+                                                                                else next.add(q.id);
+                                                                                setSelectedItems(next);
+                                                                            }}
+                                                                            className="absolute inset-0 flex items-center justify-center z-20 cursor-pointer"
+                                                                        >
+                                                                            <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${selectedItems.has(q.id) ? 'bg-indigo-500 border-indigo-500 scale-110 shadow-lg shadow-indigo-500/20' : 'border-slate-500 bg-surface-2 hover:border-indigo-400'}`}>
+                                                                                {selectedItems.has(q.id) && <CheckCircle className="w-3.5 h-3.5 text-text" />}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
                                                                     <button
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
                                                                             setActiveQuestionDropdown(activeQuestionDropdown === q.id ? null : q.id);
                                                                         }}
-                                                                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${activeQuestionDropdown === q.id ? 'bg-white/10 text-indigo-400' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}
+                                                                        className={`w-full h-full flex items-center justify-center rounded-lg transition-all cursor-pointer ${activeQuestionDropdown === q.id ? 'bg-surface-3 text-indigo-400' : 'text-text-muted hover:text-text hover:bg-surface-3'} ${isSelectionMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
                                                                         title="More Options"
                                                                     >
-                                                                        <MoreVertical className="w-4.5 h-4.5" />
+                                                                        <MoreVertical className="w-4 h-4" />
                                                                     </button>
-
+                                                                    {/* ... dropdown content same as before ... */}
                                                                     {activeQuestionDropdown === q.id && (
                                                                         <div
-                                                                            className="absolute right-0 top-full mt-2 w-44 glass rounded-xl border border-white/10 shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+                                                                            className="absolute right-0 top-full mt-2 w-48 glass rounded-xl border border-border-hover shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
                                                                             onClick={(e) => e.stopPropagation()}
                                                                         >
                                                                             <button
@@ -3282,9 +3533,9 @@ const SubjectDetail = () => {
                                                                                     setSelectedItems(new Set([q.id]));
                                                                                     setActiveQuestionDropdown(null);
                                                                                 }}
-                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-text hover:text-text hover:bg-surface-3 transition-colors text-left"
                                                                             >
-                                                                                <CheckCircle className="w-3.5 h-3.5 text-indigo-400" />
+                                                                                <CheckCircle className="w-5 h-5 text-indigo-400" />
                                                                                 <span>Select Question</span>
                                                                             </button>
                                                                             <button
@@ -3294,69 +3545,21 @@ const SubjectDetail = () => {
                                                                                     setEditingQuestion(q);
                                                                                     setShowEditQuestionModal(true);
                                                                                 }}
-                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-text hover:text-text hover:bg-surface-3 transition-colors text-left"
                                                                             >
-                                                                                <Pencil className="w-3.5 h-3.5 text-indigo-400" />
+                                                                                <Pencil className="w-5 h-5 text-indigo-400" />
                                                                                 <span>Edit Question</span>
                                                                             </button>
-                                                                            <button
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    setActiveQuestionDropdown(null);
-                                                                                    setSelectedQuestionIdForNote(q.id);
-                                                                                    setShowNoteModal(true);
-                                                                                }}
-                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
-                                                                            >
-                                                                                <FileText className="w-3.5 h-3.5 text-emerald-400" />
-                                                                                <span>Manual Note</span>
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    setActiveQuestionDropdown(null);
-                                                                                    const existingRes = solutions.find(s => s.question_id === q.id);
-                                                                                    if (existingRes) {
-                                                                                        setViewingSolution(existingRes);
-                                                                                        if (existingRes.source_image_id) handleFetchSolutionImage(existingRes.id);
-                                                                                    } else {
-                                                                                        setSelectedQuestionIdForSolution(q.id);
-                                                                                        setShowSolutionModal(true);
-                                                                                    }
-                                                                                }}
-                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
-                                                                            >
-                                                                                <ListChecks className="w-3.5 h-3.5 text-blue-400" />
-                                                                                <span>{solutions.some(s => s.question_id === q.id) ? "View Solution" : "Add Solution"}</span>
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    setActiveQuestionDropdown(null);
-                                                                                    handleGenerateAINote(q.id);
-                                                                                }}
-                                                                                disabled={generatingAINoteId === q.id}
-                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left disabled:opacity-50"
-                                                                            >
-                                                                                {generatingAINoteId === q.id ? (
-                                                                                    <div className="w-3.5 h-3.5 border border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
-                                                                                ) : existingAINote ? (
-                                                                                    <BookOpen className="w-3.5 h-3.5 text-purple-400" />
-                                                                                ) : (
-                                                                                    <Wand2 className="w-3.5 h-3.5 text-amber-400" />
-                                                                                )}
-                                                                                <span>{existingAINote ? "View AI Note" : "AI Note"}</span>
-                                                                            </button>
-                                                                            <div className="h-px bg-white/5 my-1" />
+                                                                            <div className="h-px bg-surface-3 my-1" />
                                                                             <button
                                                                                 onClick={(e) => {
                                                                                     e.stopPropagation();
                                                                                     setActiveQuestionDropdown(null);
                                                                                     setConfirmDeleteQuestion({ open: true, questionId: q.id });
                                                                                 }}
-                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-red-400 hover:bg-red-500/10 transition-colors text-left"
+                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-text hover:text-red-400 hover:bg-red-500/10 transition-colors text-left"
                                                                             >
-                                                                                <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                                                                                <Trash2 className="w-5 h-5 text-red-400" />
                                                                                 <span>Delete Question</span>
                                                                             </button>
                                                                         </div>
@@ -3364,122 +3567,121 @@ const SubjectDetail = () => {
                                                                 </div>
                                                             </div>
 
-                                                            {/* Card Body — question content */}
-                                                            <div className="prose prose-invert prose-lg max-w-none text-slate-200 text-[15px] leading-[1.7]">
-                                                                {q.formatted_content && q.formatted_content.root ? (
-                                                                    <RichTextRenderer content={q.formatted_content} />
-                                                                ) : (
-                                                                    <ReactMarkdown
-                                                                        remarkPlugins={[remarkGfm, remarkMath]}
-                                                                        rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
-                                                                    >
-                                                                        {preprocessMarkdown(q.content)}
-                                                                    </ReactMarkdown>
+                                                            <div className="question-card-body">
+                                                                <div className="prose prose-invert prose-lg max-w-none text-text text-[15px] leading-[1.7] mb-6">
+                                                                    {q.formatted_content && q.formatted_content.root ? (
+                                                                        <RichTextRenderer content={q.formatted_content} />
+                                                                    ) : (
+                                                                        <ReactMarkdown
+                                                                            remarkPlugins={[remarkGfm, remarkMath]}
+                                                                            rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                                                        >
+                                                                            {preprocessMarkdown(q.content)}
+                                                                        </ReactMarkdown>
+                                                                    )}
+                                                                </div>
+
+                                                                {q.type === 'image' && (
+                                                                    <div className="mt-4 mb-6 relative group/img-container w-fit">
+                                                                        {fetchedImages[q.id] || fetchedImages[q.source_image_id] ? (
+                                                                            <div className="relative">
+                                                                                <div 
+                                                                                    onClick={() => {
+                                                                                        setViewingImageUrl(fetchedImages[q.id] || fetchedImages[q.source_image_id]);
+                                                                                        setViewingImageTitle(`Question Image`);
+                                                                                    }}
+                                                                                    className="rounded-xl overflow-hidden border border-border-hover inline-block bg-surface-3 group/img relative shadow-lg cursor-pointer"
+                                                                                >
+                                                                                    <img
+                                                                                        src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
+                                                                                        alt="Original Question"
+                                                                                        className="max-h-80 object-contain transition-all"
+                                                                                    />
+                                                                                </div>
+                                                                                <button
+                                                                                    onClick={() => handleHideImage(q.id)}
+                                                                                    className="absolute -top-2 -right-2 p-1.5 bg-surface-2 text-text-muted hover:text-text rounded-full border border-border-hover shadow-xl opacity-0 group-hover/img-container:opacity-100 transition-all cursor-pointer z-10"
+                                                                                    title="Hide Image"
+                                                                                >
+                                                                                    <X className="w-3.5 h-3.5" />
+                                                                                </button>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <button
+                                                                                onClick={() => handleFetchImage(q.id)}
+                                                                                disabled={fetchingImageId === q.id}
+                                                                                className="flex items-center gap-2.5 px-4 py-2 rounded-xl text-[12px] font-bold bg-indigo-500/5 text-text-muted hover:text-indigo-400 hover:bg-indigo-500/10 transition-all border border-indigo-500/10 shadow-sm disabled:opacity-50 cursor-pointer uppercase tracking-tight"
+                                                                            >
+                                                                                {fetchingImageId === q.id ? (
+                                                                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                                                ) : (
+                                                                                    <ImageIcon className="w-4 h-4" />
+                                                                                )}
+                                                                                <span>
+                                                                                    {fetchingImageId === q.id ? 'Processing...' : 'View Original Capture'}
+                                                                                </span>
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+
+                                                                {q.parsedTags && q.parsedTags.length > 0 && (
+                                                                    <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+                                                                        {q.parsedTags.map((tag, idx) => (
+                                                                            <span key={idx} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-3/50 border border-border text-[10px] font-semibold text-text-muted lowercase tracking-tight">
+                                                                                <Hash className="w-2.5 h-2.5 text-indigo-500/50" />
+                                                                                {tag}
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
                                                                 )}
                                                             </div>
 
-                                                            {/* Tags display */}
-                                                            {q.parsedTags && q.parsedTags.length > 0 && (
-                                                                <div className="mt-4 flex flex-wrap gap-2">
-                                                                    {q.parsedTags.map((tag, idx) => (
-                                                                        <span key={idx} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                                                            <Hash className="w-2.5 h-2.5" />
-                                                                            {tag}
-                                                                        </span>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-
-                                                            {q.type === 'image' && (
-                                                                <div className="mt-5 relative group/img-container w-fit">
-                                                                    {fetchedImages[q.id] || fetchedImages[q.source_image_id] ? (
-                                                                        <div className="relative">
-                                                                            <div className="rounded-xl overflow-hidden border border-white/10 inline-block bg-black/40 group/img relative">
-                                                                                <img
-                                                                                    src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
-                                                                                    alt="Original Question"
-                                                                                    className="max-h-80 object-contain transition-all group-hover/img:opacity-50"
-                                                                                />
-                                                                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
-                                                                                    <span className="bg-black/60 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/10">
-                                                                                        Original Attachment
-                                                                                    </span>
-                                                                                </div>
-                                                                            </div>
-                                                                            <button
-                                                                                onClick={() => handleHideImage(q.id)}
-                                                                                className="absolute -top-2 -right-2 p-1.5 bg-slate-800/90 text-slate-400 hover:text-white rounded-full border border-white/10 shadow-lg opacity-0 group-hover/img-container:opacity-100 transition-all cursor-pointer z-10"
-                                                                                title="Hide Image"
-                                                                            >
-                                                                                <X className="w-3.5 h-3.5" />
-                                                                            </button>
-                                                                        </div>
-                                                                    ) : (
-                                                                        <button
-                                                                            onClick={() => handleFetchImage(q.id)}
-                                                                            disabled={fetchingImageId === q.id}
-                                                                            className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-surface-3/80 text-slate-300 hover:text-white hover:bg-surface-3 transition-all border border-white/5 shadow-sm disabled:opacity-50 cursor-pointer"
-                                                                        >
-                                                                            {fetchingImageId === q.id ? (
-                                                                                <div className="w-3.5 h-3.5 border border-white/30 border-t-white rounded-full animate-spin" />
-                                                                            ) : (
-                                                                                <ImageIcon className="w-4 h-4 text-indigo-400" />
-                                                                            )}
-                                                                            <span>
-                                                                                {fetchingImageId === q.id ? 'Loading...' : 'Show Source Image'}
-                                                                            </span>
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            )}
-
-
                                                         </div>
                                                     );
+
                                                 }
 
                                                 return (
                                                     <div key={group.rootId} className="flex flex-col gap-3">
-                                                        {/* Group Header */}
                                                         <div
                                                             onClick={() => toggleGroup(group.rootId)}
-                                                            className="flex items-center justify-between p-4 rounded-xl bg-surface-2 border border-white/[0.06] cursor-pointer hover:bg-surface-3 transition-colors group/header"
+                                                            className="flex items-center justify-between p-4 rounded-xl bg-surface-2 border border-border cursor-pointer hover:bg-surface-3 transition-colors group/header"
                                                         >
                                                             <div className="flex items-center gap-4">
                                                                 <div className="p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
-                                                                    {rootQ.type === 'image' ? <ImageIcon className="w-5 h-5 text-indigo-400" /> : <FileText className="w-5 h-5 text-emerald-400" />}
+                                                                    {rootQ.type === 'image' ? <ImageIcon className="w-5 h-5 text-indigo-500 [.light_&]:text-indigo-600" /> : <FileText className="w-5 h-5 text-emerald-500 [.light_&]:text-emerald-600" />}
                                                                 </div>
                                                                 <div>
                                                                     <div className="flex items-center gap-3">
-                                                                        <h4 className="text-[15px] font-heading font-bold text-white tracking-tight">
+                                                                        <h4 className="text-[15px] font-heading font-bold text-text tracking-tight">
                                                                             {rootQ.type === 'image' ? 'Image' : 'Text'} Collection
                                                                         </h4>
-                                                                        <span className="px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                                                                        <span className="px-2 py-0.5 rounded-full bg-surface-2 border border-border text-[11px] font-bold text-text-muted uppercase tracking-widest">
                                                                             {group.questions.length} Items
                                                                         </span>
                                                                     </div>
-                                                                    <p className="text-[12px] text-slate-500 mt-0.5">
+                                                                    <p className="text-[12px] text-text-muted mt-0.5">
                                                                         Uploaded {new Date(group.newestAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
                                                                     </p>
                                                                 </div>
                                                             </div>
                                                             <div className="flex items-center gap-3">
-                                                                <div className={`p-2 rounded-lg bg-white/[0.03] text-slate-500 group-hover/header:text-white transition-all ${isExpanded ? 'rotate-180' : ''}`}>
+                                                                <div className={`p-2 rounded-lg bg-surface-2 text-text-muted group-hover/header:text-text transition-all ${isExpanded ? 'rotate-180' : ''}`}>
                                                                     <ChevronDown className="w-4 h-4" />
                                                                 </div>
                                                             </div>
                                                         </div>
 
-                                                        {/* Group Content */}
                                                         {isExpanded && (
-                                                            <div className="flex flex-col gap-5 pl-8 border-l-2 border-white/[0.06] mt-2 mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                            <div className="flex flex-col gap-5 pl-8 border-l-2 border-border mt-2 mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
                                                                 {group.questions.map((q, qidx) => {
                                                                     const existingAINote = notes.find(n => n.question_id === q.id && n.title?.startsWith('AI Note'));
                                                                     return (
                                                                         <div
                                                                             key={q.id}
                                                                             id={`question-${q.id}`}
-                                                                            className={`question-card group relative transition-all overflow-visible ${activeQuestionDropdown === q.id ? 'border-indigo-500/40 shadow-xl' : ''} ${isSelectionMode ? (selectedItems.has(q.id) ? 'ring-2 ring-indigo-500 cursor-pointer bg-indigo-500/5' : 'cursor-pointer hover:bg-white/[0.02]') : ''}`}
+                                                                            className={`question-card group relative transition-all overflow-visible ${activeQuestionDropdown === q.id ? 'active' : ''} ${isSelectionMode ? (selectedItems.has(q.id) ? 'selected-item' : 'cursor-pointer') : ''}`}
                                                                             onClick={() => {
                                                                                 if (isSelectionMode) {
                                                                                     const next = new Set(selectedItems);
@@ -3489,37 +3691,100 @@ const SubjectDetail = () => {
                                                                                 }
                                                                             }}
                                                                         >
-                                                                            {isSelectionMode && (
-                                                                                <div className="absolute top-4 right-4 z-20">
-                                                                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(q.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-500 bg-surface-3/50'}`}>
-                                                                                        {selectedItems.has(q.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
-                                                                                    </div>
-                                                                                </div>
-                                                                            )}
-                                                                            {/* Card Header — question number + metadata */}
-                                                                            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-white/[0.06]">
-                                                                                <span className="text-[15px] font-heading font-bold text-primary tracking-tight">
-                                                                                    #{qidx + 1}
-                                                                                </span>
-                                                                                <span className="text-[12px] text-slate-500 ml-auto font-medium">
-                                                                                    {new Date(q.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                                                </span>
 
-                                                                                <div className="flex items-center gap-1 ml-2 relative" ref={activeQuestionDropdown === q.id ? questionDropdownRef : null}>
+                                                                            <div className="question-card-header">
+                                                                                <div className="question-number-badge font-bold">Q{qidx + 1}</div>
+                                                                                <div className="flex flex-col mr-4">
+                                                                                    <span className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 text-emerald-400 rounded-md text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20 w-fit">
+                                                                                        {q.type === 'image' ? <ImageIcon className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
+                                                                                        {q.type === 'image' ? 'Image' : 'Text'}
+                                                                                    </span>
+                                                                                    <span className="text-[10px] text-text-muted font-medium mt-1">
+                                                                                        {new Date(q.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                                                                                    </span>
+                                                                                </div>
+
+                                                                                <div className="flex items-center gap-2 ml-auto">
+                                                                                    <button
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            handleGenerateAINote(q.id);
+                                                                                        }}
+                                                                                        disabled={generatingAINoteId === q.id}
+                                                                                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${existingAINote ? 'bg-purple-500/10 border-purple-500/20 text-purple-400 hover:bg-purple-500/20' : 'bg-amber-500/5 border-amber-500/10 text-amber-500/70 hover:bg-amber-500/10 hover:text-amber-500'} disabled:opacity-50 cursor-pointer uppercase tracking-tight`}
+                                                                                    >
+                                                                                        {generatingAINoteId === q.id ? (
+                                                                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                                                                        ) : existingAINote ? (
+                                                                                            <BookOpen className="w-3 h-3" />
+                                                                                        ) : (
+                                                                                            <Wand2 className="w-3 h-3" />
+                                                                                        )}
+                                                                                        <span>{existingAINote ? "AI Note" : "AI"}</span>
+                                                                                    </button>
+
+                                                                                    <button
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            const existingRes = solutions.find(s => s.question_id === q.id);
+                                                                                            if (existingRes) {
+                                                                                                setViewingSolution(existingRes);
+                                                                                                if (existingRes.source_image_id) handleFetchSolutionImage(existingRes.id);
+                                                                                            } else {
+                                                                                                setSelectedQuestionIdForSolution(q.id);
+                                                                                                setShowSolutionModal(true);
+                                                                                            }
+                                                                                        }}
+                                                                                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${solutions.some(s => s.question_id === q.id) ? 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20' : 'bg-surface-2 border-border text-text-muted hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/5'} cursor-pointer uppercase tracking-tight`}
+                                                                                    >
+                                                                                        <Puzzle className="w-3 h-3" />
+                                                                                        <span>{solutions.some(s => s.question_id === q.id) ? "Ans" : "Ans"}</span>
+                                                                                    </button>
+
+                                                                                    <button
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            setSelectedQuestionIdForNote(q.id);
+                                                                                            setShowNoteModal(true);
+                                                                                        }}
+                                                                                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border bg-surface-2 border-border text-text-muted hover:text-emerald-400 hover:border-emerald-500/30 hover:bg-emerald-500/5 cursor-pointer uppercase tracking-tight"
+                                                                                    >
+                                                                                        <PlusCircle className="w-3 h-3" />
+                                                                                        <span>Note</span>
+                                                                                    </button>
+                                                                                </div>
+
+                                                                                <div className="flex items-center justify-center w-9 h-9 relative" ref={activeQuestionDropdown === q.id ? questionDropdownRef : null}>
+                                                                                    {isSelectionMode && (
+                                                                                        <div
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation();
+                                                                                                const next = new Set(selectedItems);
+                                                                                                if (next.has(q.id)) next.delete(q.id);
+                                                                                                else next.add(q.id);
+                                                                                                setSelectedItems(next);
+                                                                                            }}
+                                                                                            className="absolute inset-0 flex items-center justify-center z-20 cursor-pointer"
+                                                                                        >
+                                                                                            <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${selectedItems.has(q.id) ? 'bg-indigo-500 border-indigo-500 scale-110 shadow-lg shadow-indigo-500/20' : 'border-slate-500 bg-surface-2 hover:border-indigo-400'}`}>
+                                                                                                {selectedItems.has(q.id) && <CheckCircle className="w-3.5 h-3.5 text-text" />}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    )}
                                                                                     <button
                                                                                         onClick={(e) => {
                                                                                             e.stopPropagation();
                                                                                             setActiveQuestionDropdown(activeQuestionDropdown === q.id ? null : q.id);
                                                                                         }}
-                                                                                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${activeQuestionDropdown === q.id ? 'bg-white/10 text-indigo-400' : 'text-slate-500 hover:text-white hover:bg-white/5 opacity-0 group-hover:opacity-100'}`}
+                                                                                        className={`w-full h-full flex items-center justify-center rounded-lg transition-all cursor-pointer ${activeQuestionDropdown === q.id ? 'bg-surface-3 text-indigo-400' : 'text-text-muted hover:text-text hover:bg-surface-3'} ${isSelectionMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
                                                                                         title="More Options"
                                                                                     >
-                                                                                        <MoreVertical className="w-4.5 h-4.5" />
+                                                                                        <MoreVertical className="w-4 h-4" />
                                                                                     </button>
 
                                                                                     {activeQuestionDropdown === q.id && (
                                                                                         <div
-                                                                                            className="absolute right-0 top-full mt-2 w-44 glass rounded-xl border border-white/10 shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+                                                                                            className="absolute right-0 top-full mt-2 w-48 glass rounded-xl border border-border-hover shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
                                                                                             onClick={(e) => e.stopPropagation()}
                                                                                         >
                                                                                             <button
@@ -3529,9 +3794,9 @@ const SubjectDetail = () => {
                                                                                                     setSelectedItems(new Set([q.id]));
                                                                                                     setActiveQuestionDropdown(null);
                                                                                                 }}
-                                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-text hover:text-text hover:bg-surface-3 transition-colors text-left"
                                                                                             >
-                                                                                                <CheckCircle className="w-3.5 h-3.5 text-indigo-400" />
+                                                                                                <CheckCircle className="w-5 h-5 text-indigo-400" />
                                                                                                 <span>Select Question</span>
                                                                                             </button>
                                                                                             <button
@@ -3541,69 +3806,21 @@ const SubjectDetail = () => {
                                                                                                     setEditingQuestion(q);
                                                                                                     setShowEditQuestionModal(true);
                                                                                                 }}
-                                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-text hover:text-text hover:bg-surface-3 transition-colors text-left"
                                                                                             >
-                                                                                                <Pencil className="w-3.5 h-3.5 text-indigo-400" />
-                                                                                                <span>Edit Question</span>
+                                                                                                <Pencil className="w-5 h-5 text-indigo-400" />
+                                                                                                <span>Edit Details</span>
                                                                                             </button>
-                                                                                            <button
-                                                                                                onClick={(e) => {
-                                                                                                    e.stopPropagation();
-                                                                                                    setActiveQuestionDropdown(null);
-                                                                                                    setSelectedQuestionIdForNote(q.id);
-                                                                                                    setShowNoteModal(true);
-                                                                                                }}
-                                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
-                                                                                            >
-                                                                                                <FileText className="w-3.5 h-3.5 text-emerald-400" />
-                                                                                                <span>Manual Note</span>
-                                                                                            </button>
-                                                                                            <button
-                                                                                                onClick={(e) => {
-                                                                                                    e.stopPropagation();
-                                                                                                    setActiveQuestionDropdown(null);
-                                                                                                    const existingRes = solutions.find(s => s.question_id === q.id);
-                                                                                                    if (existingRes) {
-                                                                                                        setViewingSolution(existingRes);
-                                                                                                        if (existingRes.source_image_id) handleFetchSolutionImage(existingRes.id);
-                                                                                                    } else {
-                                                                                                        setSelectedQuestionIdForSolution(q.id);
-                                                                                                        setShowSolutionModal(true);
-                                                                                                    }
-                                                                                                }}
-                                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
-                                                                                            >
-                                                                                                <ListChecks className="w-3.5 h-3.5 text-blue-400" />
-                                                                                                <span>{solutions.some(s => s.question_id === q.id) ? "View Solution" : "Add Solution"}</span>
-                                                                                            </button>
-                                                                                            <button
-                                                                                                onClick={(e) => {
-                                                                                                    e.stopPropagation();
-                                                                                                    setActiveQuestionDropdown(null);
-                                                                                                    handleGenerateAINote(q.id);
-                                                                                                }}
-                                                                                                disabled={generatingAINoteId === q.id}
-                                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left disabled:opacity-50"
-                                                                                            >
-                                                                                                {generatingAINoteId === q.id ? (
-                                                                                                    <div className="w-3.5 h-3.5 border border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
-                                                                                                ) : existingAINote ? (
-                                                                                                    <BookOpen className="w-3.5 h-3.5 text-purple-400" />
-                                                                                                ) : (
-                                                                                                    <Wand2 className="w-3.5 h-3.5 text-amber-400" />
-                                                                                                )}
-                                                                                                <span>{existingAINote ? "View AI Note" : "AI Note"}</span>
-                                                                                            </button>
-                                                                                            <div className="h-px bg-white/5 my-1" />
+                                                                                            <div className="h-px bg-surface-3 my-1" />
                                                                                             <button
                                                                                                 onClick={(e) => {
                                                                                                     e.stopPropagation();
                                                                                                     setActiveQuestionDropdown(null);
                                                                                                     setConfirmDeleteQuestion({ open: true, questionId: q.id });
                                                                                                 }}
-                                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-red-400 hover:bg-red-500/10 transition-colors text-left"
+                                                                                                className="w-full flex items-center gap-3.5 px-4 py-3 text-[13px] font-bold text-text hover:text-red-400 hover:bg-red-500/10 transition-colors text-left"
                                                                                             >
-                                                                                                <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                                                                                                <Trash2 className="w-5 h-5 text-red-400" />
                                                                                                 <span>Delete Question</span>
                                                                                             </button>
                                                                                         </div>
@@ -3611,75 +3828,75 @@ const SubjectDetail = () => {
                                                                                 </div>
                                                                             </div>
 
-                                                                            {/* Card Body — question content */}
-                                                                            <div className="prose prose-invert prose-lg max-w-none text-slate-200 text-[15px] leading-[1.7]">
-                                                                                {q.formatted_content && q.formatted_content.root ? (
-                                                                                    <RichTextRenderer content={q.formatted_content} />
-                                                                                ) : (
-                                                                                    <ReactMarkdown
-                                                                                        remarkPlugins={[remarkGfm, remarkMath]}
-                                                                                        rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
-                                                                                    >
-                                                                                        {preprocessMarkdown(q.content)}
-                                                                                    </ReactMarkdown>
-                                                                                )}
-                                                                            </div>
-
-                                                                            {/* Tags display */}
-                                                                            {q.parsedTags && q.parsedTags.length > 0 && (
-                                                                                <div className="mt-4 flex flex-wrap gap-2">
-                                                                                    {q.parsedTags.map((tag, idx) => (
-                                                                                        <span key={idx} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                                                                            <Hash className="w-2.5 h-2.5" />
-                                                                                            {tag}
-                                                                                        </span>
-                                                                                    ))}
-                                                                                </div>
-                                                                            )}
-
-                                                                            {q.type === 'image' && qidx === 0 && (
-                                                                                <div className="mt-5 relative group/img-container w-fit">
-                                                                                    {fetchedImages[q.id] || fetchedImages[q.source_image_id] ? (
-                                                                                        <div className="relative">
-                                                                                            <div className="rounded-xl overflow-hidden border border-white/10 inline-block bg-black/40 group/img relative">
-                                                                                                <img
-                                                                                                    src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
-                                                                                                    alt="Original Question"
-                                                                                                    className="max-h-80 object-contain transition-all group-hover/img:opacity-50"
-                                                                                                />
-                                                                                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
-                                                                                                    <span className="bg-black/60 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-white/10">
-                                                                                                        Source Image
-                                                                                                    </span>
-                                                                                                </div>
-                                                                                            </div>
-                                                                                            <button
-                                                                                                onClick={() => handleHideImage(q.id)}
-                                                                                                className="absolute -top-2 -right-2 p-1.5 bg-slate-800/90 text-slate-400 hover:text-white rounded-full border border-white/10 shadow-lg opacity-0 group-hover/img-container:opacity-100 transition-all cursor-pointer z-10"
-                                                                                                title="Hide Image"
-                                                                                            >
-                                                                                                <X className="w-3.5 h-3.5" />
-                                                                                            </button>
-                                                                                        </div>
+                                                                            <div className="question-card-body">
+                                                                                <div className="prose prose-invert prose-lg max-w-none text-text text-[15px] leading-[1.7] mb-6">
+                                                                                    {q.formatted_content && q.formatted_content.root ? (
+                                                                                        <RichTextRenderer content={q.formatted_content} />
                                                                                     ) : (
-                                                                                        <button
-                                                                                            onClick={() => handleFetchImage(q.id)}
-                                                                                            disabled={fetchingImageId === q.id}
-                                                                                            className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold bg-surface-3/80 text-slate-300 hover:text-white hover:bg-surface-3 transition-all border border-white/5 shadow-sm disabled:opacity-50 cursor-pointer"
+                                                                                        <ReactMarkdown
+                                                                                            remarkPlugins={[remarkGfm, remarkMath]}
+                                                                                            rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
                                                                                         >
-                                                                                            {fetchingImageId === q.id ? (
-                                                                                                <div className="w-3.5 h-3.5 border border-white/30 border-t-white rounded-full animate-spin" />
-                                                                                            ) : (
-                                                                                                <ImageIcon className="w-4 h-4 text-indigo-400" />
-                                                                                            )}
-                                                                                            <span>
-                                                                                                {fetchingImageId === q.id ? 'Loading...' : 'Show Shared Source Image'}
-                                                                                            </span>
-                                                                                        </button>
+                                                                                            {preprocessMarkdown(q.content)}
+                                                                                        </ReactMarkdown>
                                                                                     )}
                                                                                 </div>
-                                                                            )}
 
+                                                                                {q.type === 'image' && qidx === 0 && (
+                                                                                    <div className="mt-4 mb-6 relative group/img-container w-fit">
+                                                                                        {fetchedImages[q.id] || fetchedImages[q.source_image_id] ? (
+                                                                                            <div className="relative">
+                                                                                                <div
+                                                                                                    onClick={() => {
+                                                                                                        setViewingImageUrl(fetchedImages[q.id] || fetchedImages[q.source_image_id]);
+                                                                                                        setViewingImageTitle(`Question Image`);
+                                                                                                    }}
+                                                                                                    className="rounded-xl overflow-hidden border border-border-hover inline-block bg-surface-3 group/img relative shadow-lg cursor-pointer"
+                                                                                                >
+                                                                                                    <img
+                                                                                                        src={fetchedImages[q.id] || fetchedImages[q.source_image_id]}
+                                                                                                        alt="Original Question"
+                                                                                                        className="max-h-80 object-contain transition-all"
+                                                                                                    />
+                                                                                                </div>
+                                                                                                <button
+                                                                                                    onClick={() => handleHideImage(q.id)}
+                                                                                                    className="absolute -top-2 -right-2 p-1.5 bg-surface-2 text-text-muted hover:text-text rounded-full border border-border-hover shadow-xl opacity-0 group-hover/img-container:opacity-100 transition-all cursor-pointer z-10"
+                                                                                                    title="Hide Image"
+                                                                                                >
+                                                                                                    <X className="w-3.5 h-3.5" />
+                                                                                                </button>
+                                                                                            </div>
+                                                                                        ) : (
+                                                                                            <button
+                                                                                                onClick={() => handleFetchImage(q.id)}
+                                                                                                disabled={fetchingImageId === q.id}
+                                                                                                className="flex items-center gap-2.5 px-4 py-2 rounded-xl text-[12px] font-bold bg-indigo-500/5 text-text-muted hover:text-emerald-400 hover:bg-emerald-400/10 transition-all border border-emerald-500/10 shadow-sm disabled:opacity-50 cursor-pointer uppercase tracking-tight"
+                                                                                            >
+                                                                                                {fetchingImageId === q.id ? (
+                                                                                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                                                                ) : (
+                                                                                                    <ImageIcon className="w-4 h-4" />
+                                                                                                )}
+                                                                                                <span>
+                                                                                                    {fetchingImageId === q.id ? 'Processing...' : 'Fetch Base Image'}
+                                                                                                </span>
+                                                                                            </button>
+                                                                                        )}
+                                                                                    </div>
+                                                                                )}
+
+                                                                                {q.parsedTags && q.parsedTags.length > 0 && (
+                                                                                    <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+                                                                                        {q.parsedTags.map((tag, idx) => (
+                                                                                            <span key={idx} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-3/50 border border-border text-[10px] font-semibold text-text-muted lowercase tracking-tight">
+                                                                                                <Hash className="w-2.5 h-2.5 text-emerald-500/50" />
+                                                                                                {tag}
+                                                                                            </span>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
 
                                                                         </div>
                                                                     );
@@ -3698,181 +3915,196 @@ const SubjectDetail = () => {
 
                     {activeTab === 'notes' && (
                         <div className="fade-in">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-border pb-4">
                                 <div className="flex items-center gap-2">
-                                    <FileText className="w-6 h-6 text-indigo-400" />
-                                    <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Notes</h3>
+                                    <FileText className="w-6 h-6 text-indigo-500 [.light_&]:text-indigo-600" />
+                                    <h3 className="text-[20px] font-heading font-bold text-text tracking-tight">Notes</h3>
                                 </div>
-                                {isSelectionMode ? (
-                                    <div className="flex items-center h-[50px] bg-[#1a1a1e] border border-white/[0.12] rounded-2xl px-2 shadow-[0_12px_40px_rgba(0,0,0,0.8)] transition-all animate-in fade-in zoom-in-95 duration-300 w-full sm:w-auto relative z-[999]">
-                                        <div className="flex items-center pl-3 pr-2 border-r border-white/[0.08] mr-2">
-                                            <div className="w-6 h-6 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center text-[12px] font-bold mr-2">
-                                                {selectedItems.size}
+                                <div className="flex items-center gap-3 ml-auto">
+                                    {isSelectionMode ? (
+                                        <div className="flex items-center h-[50px] bg-surface border border-border-hover rounded-2xl px-2 shadow-[0_12px_40px_rgba(0,0,0,0.8)] transition-all animate-in fade-in zoom-in-95 duration-300 w-full sm:w-auto relative z-[999]">
+                                            <div className="flex items-center pl-3 pr-2 border-r border-border mr-2">
+                                                <div className="w-6 h-6 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center text-[12px] font-bold mr-2">
+                                                    {selectedItems.size}
+                                                </div>
+                                                <span className="text-[13px] text-text font-medium hidden sm:inline">selected</span>
                                             </div>
-                                            <span className="text-[13px] text-slate-300 font-medium hidden sm:inline">selected</span>
-                                        </div>
 
-                                        <button
-                                            onClick={handleSelectAll}
-                                            className="text-[12px] font-medium text-slate-300 hover:text-white px-4 py-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
-                                        >
-                                            {selectedItems.size > 0 && selectedItems.size === filteredNotes.length ? 'Clear' : 'Select All'}
-                                        </button>
-
-                                        <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
-
-                                        <div className="flex items-center gap-1 relative">
                                             <button
-                                                onClick={(e) => { e.stopPropagation(); setShowExportMenu(!showExportMenu); }}
-                                                disabled={selectedItems.size === 0}
-                                                className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all cursor-pointer ${showExportMenu ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
+                                                onClick={handleSelectAll}
+                                                className="text-[12px] font-medium text-text hover:text-text px-4 py-2 rounded-xl hover:bg-surface-3 transition-colors cursor-pointer"
                                             >
-                                                <Download className="w-4 h-4" />
-                                                <span className="text-[12px] font-medium hidden md:inline">Export</span>
-                                                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${showExportMenu ? 'rotate-180' : ''}`} />
+                                                {selectedItems.size > 0 && selectedItems.size === filteredNotes.length ? 'Clear' : 'Select All'}
                                             </button>
 
-                                            {showExportMenu && selectedItems.size > 0 && (
-                                                <div
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="absolute top-full right-0 mt-3 w-60 bg-[#1e1e22] border border-white/15 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in slide-in-from-top-3 z-[1000] backdrop-blur-2xl transition-all p-2 space-y-1 block"
-                                                >
-                                                    <div className="px-3 py-2 border-b border-white/5 mb-1.5 leading-none">
-                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Select Export Format</span>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => { handleDownloadSelected(); setShowExportMenu(false); }}
-                                                        className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
-                                                    >
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
-                                                                <FileText className="w-4 h-4 text-indigo-400" />
-                                                            </div>
-                                                            <span>PDF Document</span>
-                                                        </div>
-                                                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => { handleDownloadWordSelected(); setShowExportMenu(false); }}
-                                                        className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
-                                                    >
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
-                                                                <FileText className="w-4 h-4 text-emerald-400" />
-                                                            </div>
-                                                            <span>Word Document</span>
-                                                        </div>
-                                                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => { handleDownloadMarkdownSelected(); setShowExportMenu(false); }}
-                                                        className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer group"
-                                                    >
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center group-hover:bg-orange-500/20 transition-colors">
-                                                                <FileText className="w-4 h-4 text-orange-400" />
-                                                            </div>
-                                                            <span>Markdown File</span>
-                                                        </div>
-                                                        <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-slate-600 opacity-0 group-hover:opacity-100 transition-all" />
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
+                                            <div className="w-px h-6 bg-surface-2 mx-2"></div>
 
-                                        <button
-                                            onClick={() => {
-                                                setConfirmBulkDelete({ open: true, type: 'notes', count: selectedItems.size });
-                                                setShowExportMenu(false);
-                                            }}
-                                            disabled={selectedItems.size === 0}
-                                            className="flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:text-white hover:bg-rose-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                            <span className="text-[12px] font-medium hidden md:inline">Delete</span>
-                                        </button>
-
-                                        <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
-
-                                        <button
-                                            onClick={() => { setIsSelectionMode(false); setSelectedItems(new Set()); setShowExportMenu(false); }}
-                                            className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
-                                            title="Cancel Selection"
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col sm:flex-row sm:items-center items-stretch gap-3 w-full sm:w-auto">
-                                        <div className="relative group flex-1 sm:min-w-[280px]">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
-                                            <input
-                                                type="text"
-                                                value={noteSearchQuery}
-                                                onChange={(e) => setNoteSearchQuery(e.target.value)}
-                                                placeholder="Search notes..."
-                                                className="w-full bg-surface-2/50 border border-white/[0.1] rounded-xl py-2 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
-                                            />
-                                            {noteSearchQuery && (
+                                            <div className="flex items-center gap-1 relative">
                                                 <button
-                                                    onClick={() => setNoteSearchQuery('')}
-                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                                    onClick={(e) => { e.stopPropagation(); setShowExportMenu(!showExportMenu); }}
+                                                    disabled={selectedItems.size === 0}
+                                                    className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all cursor-pointer ${showExportMenu ? 'bg-indigo-500 text-white shadow-lg' : 'text-text hover:bg-surface-3 hover:text-text'}`}
                                                 >
-                                                    <X className="w-4 h-4" />
+                                                    <Download className="w-4 h-4" />
+                                                    <span className="text-[12px] font-medium hidden md:inline">Export</span>
+                                                    <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${showExportMenu ? 'rotate-180' : ''}`} />
                                                 </button>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            {allNoteTags.length > 0 && (
-                                                <div className="flex-1">
-                                                    <select
-                                                        value={selectedNoteTag}
-                                                        onChange={(e) => setSelectedNoteTag(e.target.value)}
-                                                        className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-200 rounded-xl px-4 py-2 text-[13px] focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all appearance-none cursor-pointer pr-10 hover:border-white/[0.15]"
-                                                        style={{
-                                                            backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(148, 163, 184, 1)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                                                            backgroundRepeat: 'no-repeat',
-                                                            backgroundPosition: 'right 0.75rem center',
-                                                            backgroundSize: '1em'
-                                                        }}
+
+                                                {showExportMenu && selectedItems.size > 0 && (
+                                                    <div
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="absolute top-full right-0 mt-3 w-60 bg-surface-2 border border-border-hover rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in slide-in-from-top-3 z-[1000] backdrop-blur-2xl transition-all p-2 space-y-1 block"
                                                     >
-                                                        <option value="">All Tags</option>
-                                                        {allNoteTags.map(tag => (
-                                                            <option key={tag} value={tag}>{tag}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
+                                                        <div className="px-3 py-2 border-b border-border mb-1.5 leading-none">
+                                                            <span className="text-[10px] font-bold text-text-muted uppercase tracking-[0.1em]">Select Export Format</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => { handleDownloadSelected(); setShowExportMenu(false); }}
+                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-text hover:text-text hover:bg-surface-3 rounded-xl transition-all cursor-pointer group"
+                                                        >
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
+                                                                    <FileText className="w-4 h-4 text-indigo-500 [.light_&]:text-indigo-600" />
+                                                                </div>
+                                                                <span>PDF Document</span>
+                                                            </div>
+                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-text-muted opacity-0 group-hover:opacity-100 transition-all" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => { handleDownloadWordSelected(); setShowExportMenu(false); }}
+                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-text hover:text-text hover:bg-surface-3 rounded-xl transition-all cursor-pointer group"
+                                                        >
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
+                                                                    <FileText className="w-4 h-4 text-emerald-500 [.light_&]:text-emerald-600" />
+                                                                </div>
+                                                                <span>Word Document</span>
+                                                            </div>
+                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-text-muted opacity-0 group-hover:opacity-100 transition-all" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => { handleDownloadMarkdownSelected(); setShowExportMenu(false); }}
+                                                            className="w-full flex items-center justify-between px-3 py-2.5 text-left text-[12px] font-semibold text-text hover:text-text hover:bg-surface-3 rounded-xl transition-all cursor-pointer group"
+                                                        >
+                                                            <div className="flex items-center gap-2.5">
+                                                                <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center group-hover:bg-orange-500/20 transition-colors">
+                                                                    <FileText className="w-4 h-4 text-orange-500 [.light_&]:text-orange-600" />
+                                                                </div>
+                                                                <span>Markdown File</span>
+                                                            </div>
+                                                            <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-text-muted opacity-0 group-hover:opacity-100 transition-all" />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <button
+                                                onClick={() => { setConfirmBulkDelete({ open: true, type: 'notes', count: selectedItems.size }); setShowExportMenu(false); }}
+                                                disabled={selectedItems.size === 0}
+                                                className="flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:text-text hover:bg-rose-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                                <span className="text-[12px] font-medium hidden md:inline">Delete</span>
+                                            </button>
+
+                                            <div className="w-px h-6 bg-surface-2 mx-2"></div>
+
+                                            <button
+                                                onClick={() => { setIsSelectionMode(false); setSelectedItems(new Set()); setShowExportMenu(false); }}
+                                                className="w-10 h-10 flex items-center justify-center rounded-xl text-text-muted hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
+                                                title="Cancel Selection"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-3">
+                                            <div className="relative group flex-1 sm:min-w-[280px]">
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-indigo-400 transition-colors" />
+                                                <input
+                                                    type="text"
+                                                    value={noteSearchQuery}
+                                                    onChange={(e) => setNoteSearchQuery(e.target.value)}
+                                                    placeholder="Search notes..."
+                                                    className="w-full bg-surface-2/50 border border-border-hover rounded-xl py-2 pl-10 pr-4 text-[13px] text-text focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                                                />
+                                                {noteSearchQuery && (
+                                                    <button
+                                                        onClick={() => setNoteSearchQuery('')}
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {allNoteTags.length > 0 && (
+                                                <select
+                                                    value={selectedNoteTag}
+                                                    onChange={(e) => setSelectedNoteTag(e.target.value)}
+                                                    className="bg-surface-2/50 border border-border text-text rounded-xl px-4 py-2.5 text-[14px] focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all appearance-none cursor-pointer pr-10 hover:border-border-hover"
+                                                    style={{
+                                                        backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(148, 163, 184, 1)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                                                        backgroundRepeat: 'no-repeat',
+                                                        backgroundPosition: 'right 0.75rem center',
+                                                        backgroundSize: '1em'
+                                                    }}
+                                                >
+                                                    <option value="">All Tags</option>
+                                                    {allNoteTags.map(tag => (
+                                                        <option key={tag} value={tag}>{tag}</option>
+                                                    ))}
+                                                </select>
                                             )}
-                                            <div className="flex bg-surface-2/50 p-1 rounded-xl border border-white/[0.06] shrink-0">
+                                            <div className="flex bg-surface-2/50 p-1 rounded-xl border border-border shrink-0">
                                                 <button
                                                     onClick={() => setNotesViewMode('grid')}
-                                                    className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                                    className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-text-muted hover:text-text'}`}
                                                     title="Grid View"
                                                 >
                                                     <LayoutGrid className="w-4 h-4" />
                                                 </button>
                                                 <button
                                                     onClick={() => setNotesViewMode('list')}
-                                                    className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                                    className={`p-1.5 rounded-lg transition-all ${notesViewMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-text-muted hover:text-text'}`}
                                                     title="List View"
                                                 >
                                                     <List className="w-4 h-4" />
                                                 </button>
                                             </div>
+                                            {/* Highlights Only Toggle */}
+                                            <button
+                                                onClick={() => setShowHighlightsOnly(v => !v)}
+                                                title={showHighlightsOnly ? 'Show Full Notes' : 'Highlights Only Mode'}
+                                                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[12px] font-bold transition-all cursor-pointer shrink-0 ${
+                                                    showHighlightsOnly
+                                                        ? 'bg-amber-500/20 border-amber-500/40 text-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.15)]'
+                                                        : 'bg-surface-2/50 border-border text-text-muted hover:border-amber-500/30 hover:text-amber-400 hover:bg-amber-500/5'
+                                                }`}
+                                            >
+                                                <Zap className={`w-3.5 h-3.5 ${showHighlightsOnly ? 'fill-amber-400' : ''}`} />
+                                                <span className="hidden sm:inline">Highlights</span>
+                                            </button>
+                                            <button
+                                                onClick={() => setShowNoteModal(true)}
+                                                className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98] shrink-0"
+                                            >
+                                                <PlusCircle className="w-4 h-4" strokeWidth={2} />
+                                                <span>Add Note</span>
+                                            </button>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
 
 
                             <div className="w-full">
                                 {notes.length === 0 ? (
-                                    <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                        <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 -rotate-3">
+                                    <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-border-hover flex flex-col items-center">
+                                        <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-border -rotate-3">
                                             <FileText className="w-10 h-10 text-emerald-500/70" />
                                         </div>
-                                        <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No notes yet</h3>
-                                        <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                        <h3 className="text-2xl font-heading font-bold text-text mb-2 tracking-tight">No notes yet</h3>
+                                        <p className="text-text-muted text-sm max-w-sm leading-relaxed mb-8">
                                             Add your first note to start building your knowledge base.
                                         </p>
                                         <button
@@ -3889,23 +4121,106 @@ const SubjectDetail = () => {
                                 ) : (
                                     <div className={`grid gap-5 ${notesViewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
                                         {(() => {
-                                            const filtered = filteredNotes;
+                                            let filtered = filteredNotes;
+                                            if (showHighlightsOnly) {
+                                                filtered = filtered.filter(note => {
+                                                    let kh = note.key_highlights || [];
+                                                    if (typeof kh === 'string') { try { kh = JSON.parse(kh); } catch { kh = []; } }
+                                                    return Array.isArray(kh) && kh.length > 0;
+                                                });
+                                            }
 
                                             if (filtered.length === 0 && notes.length > 0) {
                                                 return (
-                                                    <div className="col-span-full py-12 flex flex-col items-center justify-center text-center glass-panel rounded-2xl border-dashed border-white/10">
-                                                        <Search className="w-8 h-8 text-slate-600 mb-3" />
-                                                        <p className="text-slate-400 font-medium">No notes match your search</p>
-                                                        <button onClick={() => setNoteSearchQuery('')} className="mt-2 text-indigo-400 text-sm hover:underline">Clear search</button>
+                                                    <div className="col-span-full py-12 flex flex-col items-center justify-center text-center glass-panel rounded-2xl border-dashed border-border-hover">
+                                                        <Search className="w-8 h-8 text-text-muted mb-3" />
+                                                        <p className="text-text-muted font-medium">
+                                                            {showHighlightsOnly ? 'No notes with key highlights found' : 'No notes match your search'}
+                                                        </p>
+                                                        {(noteSearchQuery || selectedNoteTag) && (
+                                                            <button onClick={() => { setNoteSearchQuery(''); setSelectedNoteTag(''); }} className="mt-2 text-indigo-400 text-sm hover:underline">Clear filters</button>
+                                                        )}
                                                     </div>
                                                 );
                                             }
 
-                                            return filtered.map((note) => (
+                                            return filtered.map((note) => {
+                                                // Parse key_highlights
+                                                let kh = note.key_highlights || [];
+                                                if (typeof kh === 'string') { try { kh = JSON.parse(kh); } catch { kh = []; } }
+                                                const hasHighlights = Array.isArray(kh) && kh.length > 0;
+
+                                                // ── HIGHLIGHTS ONLY MODE ─────────────────────────────────────
+                                                if (showHighlightsOnly) {
+                                                    return (
+                                                        <div
+                                                            key={note.id}
+                                                            id={`note-${note.id}`}
+                                                            className={`glass-panel rounded-2xl border transition-all flex flex-col justify-between overflow-hidden relative group ${
+                                                                highlightedNoteId == note.id
+                                                                    ? 'ring-4 ring-amber-500 scale-[1.01] shadow-[0_0_30px_rgba(251,191,36,0.3)] border-amber-400'
+                                                                    : 'border-border hover:border-amber-500/30 hover:bg-surface-2'
+                                                            }`}
+                                                            onClick={() => handleOpenNote(note)}
+                                                        >
+                                                            {/* Glowing top line */}
+                                                            <div className="h-px w-full shrink-0" style={{ background: 'linear-gradient(90deg, transparent, rgba(251,191,36,0.5) 40%, rgba(245,158,11,0.7) 50%, rgba(251,191,36,0.5) 60%, transparent)' }} />
+
+                                                            {/* Card Header */}
+                                                            <div className="px-5 pt-4 pb-3 flex items-center justify-between gap-3 shrink-0">
+                                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                                    <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-400 shrink-0">
+                                                                        <Zap className="w-3.5 h-3.5" fill="currentColor" />
+                                                                    </div>
+                                                                    <h4 className="font-heading font-bold text-text text-[15px] truncate">{note.title}</h4>
+                                                                </div>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleOpenNote(note); }}
+                                                                    className="shrink-0 p-1.5 rounded-lg text-text-muted hover:text-emerald-400 hover:bg-emerald-500/10 transition-all cursor-pointer"
+                                                                    title="Open Full Note"
+                                                                >
+                                                                    <FileText className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            </div>
+
+                                                            {/* Divider */}
+                                                            <div className="mx-5 h-px bg-amber-500/15 shrink-0" />
+
+                                                            {/* Highlights list (Scrolls internally if > 3 highlights, shrink-wraps if fewer) */}
+                                                            <div className="p-5 flex-1 max-h-[210px] overflow-y-auto custom-scrollbar">
+                                                                {hasHighlights ? (
+                                                                    <ul className="space-y-2.5">
+                                                                        {kh.map((hl, idx) => (
+                                                                            <li key={idx} className="flex items-start gap-2.5 text-[13px] text-text-muted font-medium leading-relaxed">
+                                                                                <span className="mt-0.5 shrink-0 w-4.5 h-4.5 min-w-[18px] flex items-center justify-center rounded text-[9px] font-black bg-amber-500/20 text-amber-400">{idx + 1}</span>
+                                                                                <div className="flex-1 min-w-0 overflow-x-auto">
+                                                                                    <ReactMarkdown
+                                                                                        remarkPlugins={[remarkGfm, remarkMath]}
+                                                                                        rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                                                                        components={{
+                                                                                            p: ({ children }) => <span className="inline">{children}</span>
+                                                                                        }}
+                                                                                    >
+                                                                                        {preprocessMarkdown(hl)}
+                                                                                    </ReactMarkdown>
+                                                                                </div>
+                                                                            </li>
+                                                                        ))}
+                                                                    </ul>
+                                                                ) : (
+                                                                    <p className="text-[12px] text-text-muted italic">No highlights added yet.</p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }
+
+                                                // ── NORMAL CARD ───────────────────────────────────────────────
+                                                return (
                                                 <div
                                                     key={note.id}
                                                     id={`note-${note.id}`}
-                                                    className={`glass-panel rounded-2xl border transition-all flex group relative ${highlightedNoteId == note.id ? 'ring-4 ring-emerald-500 scale-[1.02] shadow-[0_0_40px_rgba(16,185,129,0.5)] z-[100] border-emerald-400 opacity-100' : ''} ${notesViewMode === 'list' ? 'items-center py-4 px-6 gap-6' : 'flex-col p-6'} ${activeNoteDropdown === note.id ? 'border-emerald-500/40 shadow-xl' : ''} ${isSelectionMode ? (selectedItems.has(note.id) ? 'border-indigo-400 bg-indigo-500/10 cursor-pointer shadow-[0_0_15px_rgba(99,102,241,0.2)]' : 'border-white/[0.06] hover:border-white/[0.1] cursor-pointer') : 'border-white/[0.06] hover:border-emerald-500/30 hover:bg-white/[0.015] cursor-pointer'}`}
+                                                    className={`glass-panel rounded-2xl border transition-all flex group relative ${highlightedNoteId == note.id ? 'ring-4 ring-emerald-500 scale-[1.02] shadow-[0_0_40px_rgba(16,185,129,0.5)] z-[100] border-emerald-400 opacity-100' : ''} ${notesViewMode === 'list' ? 'items-center py-4 px-6 gap-6' : 'flex-col p-6 h-full justify-between min-h-[170px]'} ${activeNoteDropdown === note.id ? 'border-emerald-500/40 shadow-xl' : ''} ${isSelectionMode ? (selectedItems.has(note.id) ? 'border-indigo-400 bg-indigo-500/10 cursor-pointer shadow-[0_0_15px_rgba(99,102,241,0.2)]' : 'border-border hover:border-border-hover cursor-pointer') : 'border-border hover:border-emerald-500/30 hover:bg-surface-2 cursor-pointer'}`}
                                                     onClick={() => handleOpenNote(note)}
                                                 >
                                                     {fetchingNoteContentId === note.id && (
@@ -3919,7 +4234,7 @@ const SubjectDetail = () => {
                                                     {isSelectionMode && (
                                                         <div className="absolute top-3 right-3 z-30">
                                                             <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(note.id) ? 'bg-indigo-500 border-indigo-500' : 'border-slate-500 bg-surface-3/50'}`}>
-                                                                {selectedItems.has(note.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                                                                {selectedItems.has(note.id) && <CheckCircle className="w-3.5 h-3.5 text-text" />}
                                                             </div>
                                                         </div>
                                                     )}
@@ -3932,7 +4247,7 @@ const SubjectDetail = () => {
                                                             </div>
                                                             <div className="min-w-0 flex-1">
                                                                 <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                                                                    <span className="text-[10px] text-slate-500 font-bold tracking-wider uppercase opacity-80">
+                                                                    <span className="text-[10px] text-text-muted font-bold tracking-wider uppercase opacity-80">
                                                                         {new Date(note.created_at).toLocaleDateString(undefined, {
                                                                             day: 'numeric',
                                                                             month: 'short',
@@ -3950,27 +4265,30 @@ const SubjectDetail = () => {
                                                                             Media
                                                                         </span>
                                                                     )}
+                                                                    {hasHighlights && (
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                                                setViewingHighlightsNote({
+                                                                                    ...note,
+                                                                                    triggerRect: {
+                                                                                        centerX: rect.left + rect.width / 2,
+                                                                                        centerY: rect.top + rect.height / 2
+                                                                                    }
+                                                                                });
+                                                                            }}
+                                                                            className="text-[9px] text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 px-2 py-0.5 rounded-full font-black uppercase tracking-widest flex items-center gap-1 cursor-pointer transition-all hover:scale-105"
+                                                                            title="View Key Highlights"
+                                                                        >
+                                                                            <Zap className="w-2.5 h-2.5" fill="currentColor" />
+                                                                            <span>{kh.length} {kh.length === 1 ? 'Highlight' : 'Highlights'}</span>
+                                                                        </button>
+                                                                    )}
                                                                 </div>
-                                                                <h4 className={`font-heading font-bold text-white tracking-tight break-words group-hover:text-emerald-400 transition-colors ${notesViewMode === 'list' ? 'text-[16px]' : 'text-[18px]'}`}>
+                                                                <h4 className={`font-heading font-bold text-text tracking-tight break-words group-hover:text-emerald-400 transition-colors ${notesViewMode === 'list' ? 'text-[16px]' : 'text-[18px]'}`}>
                                                                     {note.title}
                                                                 </h4>
-
-                                                                {notesViewMode === 'grid' && (() => {
-                                                                    const nTags = Array.isArray(note.tags) ? note.tags : (note.parsedTags || []);
-                                                                    if (!nTags || nTags.length === 0) return null;
-                                                                    return (
-                                                                        <div className="flex flex-wrap gap-1.5 mt-4">
-                                                                            {nTags.slice(0, 3).map((tag, idx) => (
-                                                                                <span key={idx} className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-white/[0.03] text-slate-400 border border-white/[0.06] uppercase tracking-wider">
-                                                                                    {tag}
-                                                                                </span>
-                                                                            ))}
-                                                                            {nTags.length > 3 && (
-                                                                                <span className="text-[9px] font-bold text-slate-600 px-1">+{nTags.length - 3}</span>
-                                                                            )}
-                                                                        </div>
-                                                                    );
-                                                                })()}
                                                             </div>
                                                         </div>
 
@@ -3980,7 +4298,7 @@ const SubjectDetail = () => {
                                                                 {(() => {
                                                                     const nTags = Array.isArray(note.tags) ? note.tags : (note.parsedTags || []);
                                                                     return nTags.slice(0, 2).map((tag, idx) => (
-                                                                        <span key={idx} className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-white/[0.03] text-slate-500 border border-white/[0.06] uppercase tracking-wider">
+                                                                        <span key={idx} className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-surface-2 text-text-muted border border-border uppercase tracking-wider">
                                                                             {tag}
                                                                         </span>
                                                                     ));
@@ -3990,7 +4308,7 @@ const SubjectDetail = () => {
                                                     </div>
 
                                                     {/* Actions Section */}
-                                                    <div className={`flex items-center relative z-10 ${notesViewMode === 'list' ? 'shrink-0 py-0 border-l border-white/[0.06] pl-5 ml-2 gap-4' : 'w-full pt-3 border-t border-white/[0.06] mt-auto justify-between'}`}>
+                                                    <div className={`flex items-center relative z-10 ${notesViewMode === 'list' ? 'shrink-0 py-0 border-l border-border pl-5 ml-2 gap-4' : 'w-full pt-3 border-t border-border mt-auto justify-between'}`}>
                                                         {notesViewMode === 'grid' && (
                                                             <div className="flex items-center gap-3 overflow-hidden flex-1 mr-2">
                                                                 {note.question_id && (
@@ -4029,27 +4347,51 @@ const SubjectDetail = () => {
                                                                         e.stopPropagation();
                                                                         navigateToQuestion(note.question_id);
                                                                     }}
-                                                                    className="p-1.5 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-md transition-all cursor-pointer"
+                                                                    className="p-1.5 text-text-muted hover:text-indigo-400 hover:bg-indigo-400/10 rounded-md transition-all cursor-pointer"
                                                                     title="Go to Source Question"
                                                                 >
                                                                     <LinkIcon className="w-3.5 h-3.5" />
                                                                 </button>
                                                             )}
+
+                                                            {/* ⚡ Highlights Quick Preview Modal Button */}
+                                                            {hasHighlights && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        const rect = e.currentTarget.getBoundingClientRect();
+                                                                        setViewingHighlightsNote({
+                                                                            ...note,
+                                                                            triggerRect: {
+                                                                                centerX: rect.left + rect.width / 2,
+                                                                                centerY: rect.top + rect.height / 2
+                                                                            }
+                                                                        });
+                                                                        setActiveNoteDropdown(null);
+                                                                    }}
+                                                                    className="p-1.5 rounded-md transition-all cursor-pointer text-amber-500/70 hover:text-amber-400 hover:bg-amber-500/10"
+                                                                    title="View Key Highlights"
+                                                                >
+                                                                    <Zap className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
+
                                                             <div className="relative">
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
                                                                         setActiveNoteDropdown(activeNoteDropdown === note.id ? null : note.id);
                                                                     }}
-                                                                    className={`p-1.5 rounded-md transition-all cursor-pointer ${activeNoteDropdown === note.id ? 'bg-white/10 text-emerald-400' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}
+                                                                    className={`p-1.5 rounded-md transition-all cursor-pointer ${activeNoteDropdown === note.id ? 'bg-surface-3 text-emerald-400' : 'text-text-muted hover:text-text hover:bg-surface-3'}`}
                                                                     title="More Options"
                                                                 >
                                                                     <MoreVertical className="w-3.5 h-3.5" />
                                                                 </button>
 
+
                                                                 {activeNoteDropdown === note.id && (
                                                                     <div
-                                                                        className="absolute right-0 bottom-full mb-2 w-36 glass rounded-xl border border-white/10 shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200"
+                                                                        className="absolute right-0 bottom-full mb-2 w-36 glass rounded-xl border border-border-hover shadow-2xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200"
                                                                         onClick={(e) => e.stopPropagation()}
                                                                     >
                                                                         <button
@@ -4059,7 +4401,7 @@ const SubjectDetail = () => {
                                                                                 setSelectedItems(new Set([note.id]));
                                                                                 setActiveNoteDropdown(null);
                                                                             }}
-                                                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-text hover:text-text hover:bg-surface-3 transition-colors text-left"
                                                                         >
                                                                             <CheckCircle className="w-3.5 h-3.5 text-indigo-400" />
                                                                             <span>Select</span>
@@ -4070,7 +4412,7 @@ const SubjectDetail = () => {
                                                                                 setActiveNoteDropdown(null);
                                                                                 handleEditNote(note);
                                                                             }}
-                                                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-text hover:text-text hover:bg-surface-3 transition-colors text-left"
                                                                         >
                                                                             <Pencil className="w-3.5 h-3.5 text-emerald-400" />
                                                                             <span>Edit Note</span>
@@ -4081,7 +4423,7 @@ const SubjectDetail = () => {
                                                                                 setActiveNoteDropdown(null);
                                                                                 setConfirmDeleteNote({ open: true, note });
                                                                             }}
-                                                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-slate-300 hover:text-red-400 hover:bg-red-500/10 transition-colors text-left"
+                                                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] font-semibold text-text hover:text-red-400 hover:bg-red-500/10 transition-colors text-left"
                                                                         >
                                                                             <Trash2 className="w-3.5 h-3.5 text-red-400" />
                                                                             <span>Delete Note</span>
@@ -4092,7 +4434,8 @@ const SubjectDetail = () => {
                                                         </div>
                                                     </div>
                                                 </div>
-                                            ));
+                                                );
+                                            });
                                         })()}
 
                                         {hasMoreNotes && !noteSearchQuery && !selectedNoteTag && (
@@ -4100,7 +4443,7 @@ const SubjectDetail = () => {
                                                 <button
                                                     onClick={() => setNotePage(prev => prev + 1)}
                                                     disabled={loadingMoreNotes}
-                                                    className="group relative flex items-center gap-3 px-10 py-4 bg-surface-2/40 hover:bg-emerald-500/10 border border-white/5 hover:border-emerald-500/30 rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                                    className="group relative flex items-center gap-3 px-10 py-4 bg-surface-2/40 hover:bg-emerald-500/10 border border-border hover:border-emerald-500/30 rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                                                 >
                                                     <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl blur-xl" />
                                                     {loadingMoreNotes ? (
@@ -4108,7 +4451,7 @@ const SubjectDetail = () => {
                                                     ) : (
                                                         <ChevronDown className="w-5 h-5 text-emerald-400 group-hover:translate-y-0.5 transition-transform" />
                                                     )}
-                                                    <span className="text-slate-300 group-hover:text-white font-semibold tracking-wide">
+                                                    <span className="text-text group-hover:text-text font-semibold tracking-wide">
                                                         {loadingMoreNotes ? 'Loading Notes...' : 'Load More Notes'}
                                                     </span>
                                                 </button>
@@ -4123,34 +4466,34 @@ const SubjectDetail = () => {
                     {activeTab === 'solutions' && (
                         <div className="fade-in pb-12">
                             {/* Header & Search */}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-border pb-4">
                                 <div className="flex items-center gap-2">
-                                    <ListChecks className="w-6 h-6 text-blue-400" />
-                                    <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Solutions Library</h3>
+                                    <Lightbulb className="w-6 h-6 text-blue-400" />
+                                    <h3 className="text-[20px] font-heading font-bold text-text tracking-tight">Solutions Library</h3>
                                 </div>
 
                                 <div className="flex items-center gap-3">
                                     <div className="relative group flex-1 sm:min-w-[280px]">
-                                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
+                                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-blue-400 transition-colors" />
                                         <input
                                             type="text"
                                             value={solutionSearchQuery}
                                             onChange={(e) => setSolutionSearchQuery(e.target.value)}
                                             placeholder="Search solutions..."
-                                            className="w-full bg-surface-2/50 border border-white/[0.08] rounded-xl py-2.5 pl-10 pr-4 text-[13px] text-white focus:outline-none focus:border-blue-500/40 focus:bg-surface-2 transition-all"
+                                            className="w-full bg-surface-2/50 border border-border rounded-xl py-2.5 pl-10 pr-4 text-[13px] text-text focus:outline-none focus:border-blue-500/40 focus:bg-surface-2 transition-all"
                                         />
                                     </div>
-                                    <div className="flex bg-surface-2/80 p-1 rounded-xl border border-white/[0.06] shrink-0">
+                                    <div className="flex bg-surface-2/80 p-1 rounded-xl border border-border shrink-0">
                                         <button
                                             onClick={() => setSolutionsViewMode('grid')}
-                                            className={`p-1.5 rounded-lg transition-all ${solutionsViewMode === 'grid' ? 'bg-blue-500 text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                            className={`p-1.5 rounded-lg transition-all ${solutionsViewMode === 'grid' ? 'bg-blue-500 text-white shadow-sm' : 'text-text-muted hover:text-text'}`}
                                             title="Grid View"
                                         >
                                             <LayoutGrid className="w-4 h-4" />
                                         </button>
                                         <button
                                             onClick={() => setSolutionsViewMode('list')}
-                                            className={`p-1.5 rounded-lg transition-all ${solutionsViewMode === 'list' ? 'bg-blue-500 text-white shadow-sm' : 'text-slate-500 hover:text-slate-200'}`}
+                                            className={`p-1.5 rounded-lg transition-all ${solutionsViewMode === 'list' ? 'bg-blue-500 text-white shadow-sm' : 'text-text-muted hover:text-text'}`}
                                             title="List View"
                                         >
                                             <List className="w-4 h-4" />
@@ -4161,21 +4504,21 @@ const SubjectDetail = () => {
 
                             <div className="w-full">
                                 {solutions.length === 0 ? (
-                                    <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                        <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5 rotate-3">
-                                            <ListChecks className="w-10 h-10 text-blue-500/70" />
+                                    <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-border-hover flex flex-col items-center">
+                                        <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-border rotate-3">
+                                            <Lightbulb className="w-10 h-10 text-blue-500/70" />
                                         </div>
-                                        <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No solutions yet</h3>
-                                        <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                        <h3 className="text-2xl font-heading font-bold text-text mb-2 tracking-tight">No solutions yet</h3>
+                                        <p className="text-text-muted text-sm max-w-sm leading-relaxed mb-8">
                                             Add solutions to questions to keep track of your learning path.
                                         </p>
                                     </div>
                                 ) : (
                                     <div className={`grid gap-5 ${solutionsViewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
                                         {filteredSolutions.length === 0 ? (
-                                            <div className="col-span-full py-12 flex flex-col items-center justify-center text-center glass-panel rounded-2xl border-dashed border-white/10">
-                                                <Search className="w-8 h-8 text-slate-600 mb-3" />
-                                                <p className="text-slate-400 font-medium">No solutions match your search</p>
+                                            <div className="col-span-full py-12 flex flex-col items-center justify-center text-center glass-panel rounded-2xl border-dashed border-border-hover">
+                                                <Search className="w-8 h-8 text-text-muted mb-3" />
+                                                <p className="text-text-muted font-medium">No solutions match your search</p>
                                                 <button onClick={() => setSolutionSearchQuery('')} className="mt-2 text-blue-400 text-sm hover:underline hover:text-blue-300 transition-colors">Clear search</button>
                                             </div>
                                         ) : (
@@ -4183,7 +4526,7 @@ const SubjectDetail = () => {
                                                 <div
                                                     key={solution.id}
                                                     id={`solution-${solution.id}`}
-                                                    className={`glass-panel rounded-xl border transition-all flex group relative overflow-hidden ${solutionsViewMode === 'list' ? 'items-center py-3 pr-5 pl-1' : 'flex-col p-5'} border-white/[0.06] hover:border-blue-500/30 hover:bg-white/[0.02] cursor-pointer`}
+                                                    className={`glass-panel rounded-xl border transition-all flex group relative overflow-hidden ${solutionsViewMode === 'list' ? 'items-center py-3 pr-5 pl-1' : 'flex-col p-5'} border-border hover:border-blue-500/30 hover:bg-surface-2 cursor-pointer`}
                                                     onClick={() => {
                                                         setViewingSolution(solution);
                                                         if (solution.source_image_id) {
@@ -4202,14 +4545,14 @@ const SubjectDetail = () => {
                                                         {/* Title Section */}
                                                         <div className={`flex items-start gap-3 relative z-10 ${solutionsViewMode === 'list' ? 'w-1/3 shrink-0' : 'mb-4'}`}>
                                                             <div className={`rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0 ${solutionsViewMode === 'list' ? 'p-1.5' : 'p-2.5'}`}>
-                                                                <ListChecks className={`${solutionsViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
+                                                                <Lightbulb className={`${solutionsViewMode === 'list' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
                                                             </div>
                                                             <div className="min-w-0">
-                                                                <h4 className={`font-heading font-bold text-white tracking-tight break-words truncate group-hover:text-blue-400 transition-colors ${solutionsViewMode === 'list' ? 'text-[14px]' : 'text-[15px]'}`}>
+                                                                <h4 className={`font-heading font-bold text-text tracking-tight break-words truncate group-hover:text-blue-400 transition-colors ${solutionsViewMode === 'list' ? 'text-[14px]' : 'text-[15px]'}`}>
                                                                     {solution.title || 'Solution'}
                                                                 </h4>
                                                                 <div className="flex items-center gap-2 mt-1">
-                                                                    <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap">
+                                                                    <span className="text-[10px] text-text-muted font-medium whitespace-nowrap">
                                                                         {new Date(solution.created_at).toLocaleDateString(undefined, {
                                                                             day: 'numeric',
                                                                             month: 'short',
@@ -4218,7 +4561,7 @@ const SubjectDetail = () => {
                                                                     </span>
                                                                     {solutionsViewMode === 'list' && solution.question_id && (
                                                                         <>
-                                                                            <div className="w-1 h-1 rounded-full bg-slate-700" />
+                                                                            <div className="w-1 h-1 rounded-full bg-surface-2" />
                                                                             <span className="text-[10px] text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">Question Link</span>
                                                                         </>
                                                                     )}
@@ -4228,8 +4571,8 @@ const SubjectDetail = () => {
 
                                                         {/* Content Section */}
                                                         {solutionsViewMode === 'grid' ? (
-                                                            <div className="text-sm text-slate-300 leading-relaxed mb-4 relative z-10 overflow-hidden max-h-[140px] pointer-events-none [mask-image:linear-gradient(to_bottom,black_60%,transparent)]">
-                                                                <div className="prose prose-sm prose-invert max-w-none prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mt-0 prose-p:mb-2 prose-headings:font-bold prose-headings:text-white prose-headings:m-0 prose-headings:mb-1.5 prose-h1:text-[15px] prose-h2:text-[14px] prose-h3:text-[13px] prose-a:text-indigo-400 prose-code:text-slate-300 prose-code:bg-white/[0.06] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
+                                                            <div className="text-sm text-text leading-relaxed mb-4 relative z-10 overflow-hidden max-h-[140px] pointer-events-none [mask-image:linear-gradient(to_bottom,black_60%,transparent)]">
+                                                                <div className="prose prose-sm prose-invert max-w-none prose-p:text-text prose-p:leading-relaxed prose-p:mt-0 prose-p:mb-2 prose-headings:font-bold prose-headings:text-text prose-headings:m-0 prose-headings:mb-1.5 prose-h1:text-[15px] prose-h2:text-[14px] prose-h3:text-[13px] prose-a:text-indigo-400 prose-code:text-text prose-code:bg-surface-2 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5">
                                                                     <ReactMarkdown
                                                                         remarkPlugins={[remarkGfm, remarkMath]}
                                                                         rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
@@ -4240,7 +4583,7 @@ const SubjectDetail = () => {
                                                             </div>
                                                         ) : (
                                                             <div className="flex-1 min-w-0 relative z-10 hidden md:block">
-                                                                <p className="text-[12px] text-slate-400 truncate opacity-70 group-hover:opacity-100 transition-opacity">
+                                                                <p className="text-[12px] text-text-muted truncate opacity-70 group-hover:opacity-100 transition-opacity">
                                                                     {solution.content?.substring(0, 200).replace(/[#*`\n]/g, ' ')}...
                                                                 </p>
                                                             </div>
@@ -4256,7 +4599,7 @@ const SubjectDetail = () => {
                                                                         setViewingSolution(solution);
                                                                     }}
                                                                     disabled={fetchingImageId === `solution-${solution.id}`}
-                                                                    className={`flex items-center gap-2 rounded-xl font-bold bg-white/[0.04] text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 transition-all border border-white/[0.08] disabled:opacity-50 cursor-pointer ${solutionsViewMode === 'list' ? 'p-2' : 'px-4 py-2 text-[12px]'}`}
+                                                                    className={`flex items-center gap-2 rounded-xl font-bold bg-surface-2 text-text-muted hover:text-blue-400 hover:bg-blue-500/10 transition-all border border-border disabled:opacity-50 cursor-pointer ${solutionsViewMode === 'list' ? 'p-2' : 'px-4 py-2 text-[12px]'}`}
                                                                     title="View Source Image"
                                                                 >
                                                                     {fetchingImageId === `solution-${solution.id}` ? (
@@ -4271,7 +4614,7 @@ const SubjectDetail = () => {
                                                     </div>
 
                                                     {/* Actions Section */}
-                                                    <div className={`flex items-center relative z-10 ${solutionsViewMode === 'list' ? 'shrink-0 py-0 border-l border-white/[0.06] pl-5 ml-2 gap-4' : 'w-full pt-3 border-t border-white/[0.06] mt-auto justify-between'}`}>
+                                                    <div className={`flex items-center relative z-10 ${solutionsViewMode === 'list' ? 'shrink-0 py-0 border-l border-border pl-5 ml-2 gap-4' : 'w-full pt-3 border-t border-border mt-auto justify-between'}`}>
                                                         {solutionsViewMode === 'grid' && (
                                                             <div className="flex items-center gap-3 overflow-hidden flex-1 mr-2">
                                                                 {solution.question_id && (
@@ -4297,7 +4640,7 @@ const SubjectDetail = () => {
                                                                         e.stopPropagation();
                                                                         navigateToQuestion(solution.question_id);
                                                                     }}
-                                                                    className="p-1.5 text-slate-500 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-md transition-all cursor-pointer"
+                                                                    className="p-1.5 text-text-muted hover:text-indigo-400 hover:bg-indigo-400/10 rounded-md transition-all cursor-pointer"
                                                                     title="Go to Source Question"
                                                                 >
                                                                     <LinkIcon className="w-3.5 h-3.5" />
@@ -4308,7 +4651,7 @@ const SubjectDetail = () => {
                                                                     e.stopPropagation();
                                                                     handleOpenEditSolution(solution);
                                                                 }}
-                                                                className="p-1.5 text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-md transition-all cursor-pointer"
+                                                                className="p-1.5 text-text-muted hover:text-emerald-400 hover:bg-emerald-400/10 rounded-md transition-all cursor-pointer"
                                                                 title="Edit Solution"
                                                             >
                                                                 <Pencil className="w-3.5 h-3.5" />
@@ -4318,7 +4661,7 @@ const SubjectDetail = () => {
                                                                     e.stopPropagation();
                                                                     setConfirmDeleteNote({ open: true, note: { ...solution, isSolution: true } });
                                                                 }}
-                                                                className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-md transition-all cursor-pointer"
+                                                                className="p-1.5 text-text-muted hover:text-red-400 hover:bg-red-400/10 rounded-md transition-all cursor-pointer"
                                                                 title="Delete Solution"
                                                             >
                                                                 <Trash2 className="w-3.5 h-3.5" />
@@ -4342,17 +4685,17 @@ const SubjectDetail = () => {
                             const progressPct = totalTopics > 0 ? Math.round((doneCount / totalTopics) * 100) : 0;
 
                             return (
-                                <div key={session.id} className="glass-panel rounded-2xl border border-white/[0.06] overflow-hidden mb-4">
+                                <div key={session.id} className="glass-panel rounded-2xl border border-border overflow-hidden mb-4">
                                     {/* Session Header */}
                                     <div
-                                        className={`p-4 flex items-center justify-between cursor-pointer transition-colors hover:bg-white/[0.02] ${isExpanded ? 'border-b border-white/[0.05] bg-white/[0.02]' : ''}`}
+                                        className={`p-4 flex items-center justify-between cursor-pointer transition-colors hover:bg-surface-2 ${isExpanded ? 'border-b border-border bg-surface-2' : ''}`}
                                         onClick={() => setActiveRevisionSessionId(isExpanded ? null : session.id)}
                                     >
                                         <div className="flex-1 flex flex-col md:flex-row md:items-center justify-between gap-4">
                                             <div className="flex flex-col gap-1.5">
                                                 <div className="flex items-center gap-3">
-                                                    <h4 className="text-base font-bold text-white tracking-tight">{session.name}</h4>
-                                                    <span className="text-[10px] text-slate-500 font-medium tracking-wide">
+                                                    <h4 className="text-base font-bold text-text tracking-tight">{session.name}</h4>
+                                                    <span className="text-[10px] text-text-muted font-medium tracking-wide">
                                                         {new Date(session.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
                                                     </span>
                                                 </div>
@@ -4363,31 +4706,31 @@ const SubjectDetail = () => {
                                                             style={{ width: `${progressPct}%` }}
                                                         />
                                                     </div>
-                                                    <span className="text-[11px] font-semibold text-slate-400">
+                                                    <span className="text-[11px] font-semibold text-text-muted">
                                                         {progressPct}%
                                                     </span>
                                                 </div>
                                             </div>
 
                                             <div className="flex items-center gap-4 mr-4">
-                                                <div className="flex items-center gap-2 bg-surface-2/80 px-3 py-1.5 rounded-lg border border-white/[0.05]">
+                                                <div className="flex items-center gap-2 bg-surface-2/80 px-3 py-1.5 rounded-lg border border-border">
                                                     <div className="flex flex-col text-right">
-                                                        <span className="text-xs font-bold text-white leading-tight">
+                                                        <span className="text-xs font-bold text-text leading-tight">
                                                             <span className={doneCount === totalTopics ? 'text-emerald-400' : 'text-violet-400'}>{doneCount}</span>
-                                                            <span className="text-slate-500 mx-1">/</span>
+                                                            <span className="text-text-muted mx-1">/</span>
                                                             <span>{totalTopics}</span>
                                                         </span>
-                                                        <span className="text-[9px] text-slate-500 uppercase tracking-wider font-bold">Topics Done</span>
+                                                        <span className="text-[9px] text-text-muted uppercase tracking-wider font-bold">Topics Done</span>
                                                     </div>
-                                                    <div className="w-1 h-8 rounded-full bg-white/[0.05]" />
+                                                    <div className="w-1 h-8 rounded-full bg-surface-2" />
                                                     {doneCount > 0 && doneCount === totalTopics ? (
                                                         <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400">
                                                             <CheckCircle className="w-4 h-4" />
                                                         </div>
                                                     ) : (
-                                                        <div className="w-8 h-8 rounded-full bg-surface-3 flex items-center justify-center text-slate-400 relative">
+                                                        <div className="w-8 h-8 rounded-full bg-surface-3 flex items-center justify-center text-text-muted relative">
                                                             <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 36 36">
-                                                                <path className="text-white/5" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
+                                                                <path className="text-text/5" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
                                                                 <path className="text-violet-500" strokeDasharray={`${progressPct}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
                                                             </svg>
                                                         </div>
@@ -4401,7 +4744,7 @@ const SubjectDetail = () => {
                                                     e.stopPropagation();
                                                     setEditingRevisionSession(session);
                                                 }}
-                                                className="p-2 rounded-lg text-slate-500 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                                                className="p-2 rounded-lg text-text-muted hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
                                                 title="Edit Session"
                                             >
                                                 <Pencil className="w-4 h-4" />
@@ -4411,12 +4754,12 @@ const SubjectDetail = () => {
                                                     e.stopPropagation();
                                                     setConfirmDeleteRevisionSession({ open: true, sessionId: session.id });
                                                 }}
-                                                className="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                                className="p-2 rounded-lg text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
                                                 title="Delete Session"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
-                                            <div className={`p-2 rounded-lg text-slate-500 transition-transform ${isExpanded ? 'rotate-180 text-white' : ''}`}>
+                                            <div className={`p-2 rounded-lg text-text-muted transition-transform ${isExpanded ? 'rotate-180 text-text' : ''}`}>
                                                 <ChevronDown className="w-5 h-5" />
                                             </div>
                                         </div>
@@ -4424,10 +4767,10 @@ const SubjectDetail = () => {
 
                                     {/* Session Content (Topics) */}
                                     {isExpanded && (
-                                        <div className="p-4 bg-surface-1/50">
+                                        <div className="p-4 bg-surface/50">
                                             <div className="flex flex-col gap-2">
                                                 {session.topics?.length === 0 ? (
-                                                    <p className="text-sm text-slate-500 italic py-2">No topics in this session.</p>
+                                                    <p className="text-sm text-text-muted italic py-2">No topics in this session.</p>
                                                 ) : (() => {
                                                     // Render topics
                                                     const allTopics = session.topics;
@@ -4449,8 +4792,8 @@ const SubjectDetail = () => {
                                                                 <div key={item.topicId} className="flex flex-col">
                                                                     <div
                                                                         className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all cursor-pointer group
-                                                                    ${isDone ? 'bg-emerald-500/[0.06] border-emerald-500/20' : 'bg-surface-2/50 border-white/[0.06]'}
-                                                                    hover:border-white/[0.12]`}
+                                                                    ${isDone ? 'bg-emerald-500/[0.06] border-emerald-500/20' : 'bg-surface-2/50 border-border'}
+                                                                    hover:border-border-hover`}
                                                                         onClick={() => setExpandedRevisionGroups(prev => ({ ...prev, [`${session.id}_${item.topicId}`]: !isGrpExpanded }))}
                                                                     >
                                                                         <button
@@ -4466,19 +4809,19 @@ const SubjectDetail = () => {
                                                                             }
                                                                         </button>
                                                                         <div className="flex-1 min-w-0">
-                                                                            <span className={`font-semibold text-[14px] ${isDone ? 'text-white' : 'text-slate-200'}`}>
+                                                                            <span className={`font-semibold text-[14px] ${isDone ? 'text-text' : 'text-text'}`}>
                                                                                 {item.topicName}
                                                                             </span>
-                                                                            <span className="ml-2 text-[11px] text-slate-500">{childDone}/{children.length} done</span>
+                                                                            <span className="ml-2 text-[11px] text-text-muted">{childDone}/{children.length} done</span>
                                                                         </div>
                                                                         <div className="flex items-center gap-2 shrink-0">
-                                                                            <div className={`p-1 rounded text-slate-500 transition-transform ${isGrpExpanded ? 'rotate-180' : ''}`}>
+                                                                            <div className={`p-1 rounded text-text-muted transition-transform ${isGrpExpanded ? 'rotate-180' : ''}`}>
                                                                                 <ChevronDown className="w-4 h-4" />
                                                                             </div>
                                                                         </div>
                                                                     </div>
                                                                     {isGrpExpanded && (
-                                                                        <div className="ml-6 border-l-2 border-white/[0.06] pl-3 flex flex-col gap-1.5 mt-1.5 mb-1">
+                                                                        <div className="ml-6 border-l-2 border-border pl-3 flex flex-col gap-1.5 mt-1.5 mb-1">
                                                                             {children.map(child => renderTopicRow(child))}
                                                                         </div>
                                                                     )}
@@ -4490,7 +4833,7 @@ const SubjectDetail = () => {
                                                             <div
                                                                 key={item.topicId}
                                                                 className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all group
-                                                            ${isDone ? 'bg-emerald-500/[0.06] border-emerald-500/20' : 'bg-surface-2/40 border-white/[0.05] hover:border-white/[0.1]'}`}
+                                                            ${isDone ? 'bg-emerald-500/[0.06] border-emerald-500/20' : 'bg-surface-2/40 border-border hover:border-border-hover'}`}
                                                             >
                                                                 <button
                                                                     onClick={() => handleRevisionToggle(session.id, item.topicId, item.status)}
@@ -4504,12 +4847,12 @@ const SubjectDetail = () => {
                                                                         : isDone && <CheckCircle className="w-3.5 h-3.5" />
                                                                     }
                                                                 </button>
-                                                                <span className={`flex-1 text-[13px] font-medium transition-colors ${isDone ? 'text-slate-400 line-through decoration-slate-600' : 'text-slate-200'}`}>
+                                                                <span className={`flex-1 text-[13px] font-medium transition-colors ${isDone ? 'text-text-muted line-through decoration-slate-600' : 'text-text'}`}>
                                                                     {item.topicName}
                                                                 </span>
                                                                 <div className="flex items-center gap-2 shrink-0 ml-auto">
                                                                     {item.completedAt && (
-                                                                        <span className="text-[10px] text-slate-600 font-medium hidden md:block">
+                                                                        <span className="text-[10px] text-text-muted font-medium hidden md:block">
                                                                             {new Date(item.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                                         </span>
                                                                     )}
@@ -4530,20 +4873,27 @@ const SubjectDetail = () => {
                         return (
                             <div className="fade-in">
                                 {/* Header */}
-                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-border pb-4">
                                     <div className="flex items-center gap-2">
                                         <RefreshCw className="w-6 h-6 text-indigo-400" />
-                                        <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Revision Tracker</h3>
+                                        <h3 className="text-[20px] font-heading font-bold text-text tracking-tight">Revision Tracker</h3>
                                     </div>
+                                    <button
+                                        onClick={() => setShowCreateRevisionSession(true)}
+                                        className="bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 hover:border-violet-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98] ml-auto shrink-0"
+                                    >
+                                        <PlusCircle className="w-4 h-4" strokeWidth={2} />
+                                        <span>New Session</span>
+                                    </button>
                                 </div>
 
                                 {revisionSessions.length === 0 ? (
-                                    <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-white/10 flex flex-col items-center">
-                                        <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-white/5">
+                                    <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-border-hover flex flex-col items-center">
+                                        <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-border">
                                             <RefreshCw className="w-10 h-10 text-violet-500/70" />
                                         </div>
-                                        <h3 className="text-2xl font-heading font-bold text-white mb-2 tracking-tight">No revision sessions</h3>
-                                        <p className="text-slate-400 text-sm max-w-sm leading-relaxed mb-8">
+                                        <h3 className="text-2xl font-heading font-bold text-text mb-2 tracking-tight">No revision sessions</h3>
+                                        <p className="text-text-muted text-sm max-w-sm leading-relaxed mb-8">
                                             Create a targeted session of specific topics from the syllabus to start your revision.
                                         </p>
                                         <button
@@ -4563,390 +4913,205 @@ const SubjectDetail = () => {
                         );
                     })()}
 
-                    {activeTab === 'library' && (
-                        <div className="fade-in pb-12 px-1">
-                            {/* Header for Library */}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-4">
-                                <div className="flex items-center gap-2">
-                                    <Layers className="w-6 h-6 text-indigo-400" />
-                                    <h3 className="text-[20px] font-heading font-bold text-white tracking-tight">Resource Library</h3>
-                                </div>
-                                {isSelectionMode ? (
-                                    <div className="flex items-center h-[50px] bg-[#121214]/80 border border-white/[0.08] rounded-2xl px-2 shadow-[0_8px_30px_rgb(0,0,0,0.6)] transition-all animate-in fade-in zoom-in-95 duration-300 w-full sm:w-auto">
-                                        <div className="flex items-center pl-3 pr-2">
-                                            <div className="w-6 h-6 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center text-[12px] font-bold mr-2">
-                                                {selectedItems.size}
-                                            </div>
-                                            <span className="text-[13px] text-slate-300 font-medium hidden sm:inline">selected</span>
-                                        </div>
+                    {activeTab === 'todos' && (() => {
+                        const totalTodosCount = todos.length;
+                        const pendingTodosCount = todos.filter(t => t.status === 'pending').length;
+                        const completedTodosCount = todos.filter(t => t.status === 'completed').length;
 
-                                        <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
+                        // Filtered todos
+                        const filteredTodos = todos.filter(t => {
+                            if (todoFilterGroup !== 'all') {
+                                if (todoFilterGroup === 'ungrouped' && t.groupId) return false;
+                                if (todoFilterGroup !== 'ungrouped' && t.groupId !== todoFilterGroup) return false;
+                            }
+                            if (todoFilterStatus === 'pending' && t.status !== 'pending') return false;
+                            if (todoFilterStatus === 'completed' && t.status !== 'completed') return false;
+                            if (todoFilterPriority !== 'all' && t.priority !== todoFilterPriority) return false;
+                            if (todoSearchQuery.trim()) {
+                                const q = todoSearchQuery.toLowerCase();
+                                const matchTitle = (t.title || '').toLowerCase().includes(q);
+                                const matchDesc = (t.description || '').toLowerCase().includes(q);
+                                const matchSub = (t.subTodos || []).some(s => (s.title || '').toLowerCase().includes(q));
+                                if (!matchTitle && !matchDesc && !matchSub) return false;
+                            }
+                            return true;
+                        });
 
-                                        <button
-                                            onClick={() => {
-                                                if (selectedItems.size === files.length) setSelectedItems(new Set());
-                                                else setSelectedItems(new Set(files.map(f => f.id)));
-                                            }}
-                                            className="text-[12px] font-medium text-slate-300 hover:text-white px-4 py-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
-                                        >
-                                            {selectedItems.size > 0 && selectedItems.size === files.length ? 'Clear' : 'Select All'}
-                                        </button>
-
-                                        <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
-
-                                        <button
-                                            onClick={async () => {
-                                                const loadingToast = toast.loading('Creating Zip...');
-                                                try {
-                                                    const zip = new JSZip();
-                                                    const usedNames = new Map();
-
-                                                    for (const fileId of selectedItems) {
-                                                        try {
-                                                            const f = await getFileData(id, fileId);
-                                                            if (f && f.data) {
-                                                                let baseName = f.file_name || 'file';
-                                                                let ext = '';
-                                                                const lastDot = baseName.lastIndexOf('.');
-                                                                if (lastDot !== -1) {
-                                                                    ext = baseName.substring(lastDot);
-                                                                    baseName = baseName.substring(0, lastDot);
-                                                                } else {
-                                                                    const typeMap = { 'image': '.jpg', 'pdf': '.pdf', 'doc': '.docx', 'xlsx': '.xlsx', 'html': '.html', 'csv': '.csv' };
-                                                                    ext = typeMap[f.file_type] || '';
-                                                                }
-
-                                                                let finalName = `${baseName}${ext}`;
-                                                                if (usedNames.has(finalName)) {
-                                                                    const count = usedNames.get(finalName) + 1;
-                                                                    usedNames.set(finalName, count);
-                                                                    finalName = `${baseName}_${count}${ext}`;
-                                                                } else {
-                                                                    usedNames.set(finalName, 1);
-                                                                }
-
-                                                                const base64Content = f.data.includes(',') ? f.data.split(',')[1] : f.data;
-                                                                zip.file(finalName, base64Content, { base64: true });
-                                                            }
-                                                        } catch (err) {
-                                                            console.error(`Failed to include file ${fileId} in zip:`, err);
-                                                        }
-                                                    }
-
-                                                    const content = await zip.generateAsync({ type: 'blob' });
-                                                    const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
-                                                    const zipFileName = `${subject?.name || 'Library'}_Export_${timestamp}.zip`.replace(/\s+/g, '_');
-                                                    saveAs(content, zipFileName);
-
-                                                    setIsSelectionMode(false);
-                                                    setSelectedItems(new Set());
-                                                    toast.success('Zip downloaded!', { id: loadingToast });
-                                                } catch (err) {
-                                                    console.error('Zip download error:', err);
-                                                    toast.error('Failed to create Zip', { id: loadingToast });
-                                                }
-                                            }}
-                                            disabled={selectedItems.size === 0}
-                                            className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all cursor-pointer ${selectedItems.size === 0 ? 'text-slate-600 cursor-not-allowed opacity-50' : 'text-emerald-400 hover:text-white hover:bg-emerald-500/20'}`}
-                                        >
-                                            <Download className="w-4 h-4" />
-                                            <span className="text-[12px] font-medium hidden md:inline">Download</span>
-                                        </button>
-
-                                        <button
-                                            onClick={() => {
-                                                setConfirmDeleteFile({ open: true, items: Array.from(selectedItems).map(id => files.find(f => f.id === id)).filter(Boolean) });
-                                            }}
-                                            disabled={selectedItems.size === 0 || Array.from(selectedItems).some(id => files.find(f => f.id === id)?.is_linked)}
-                                            className="flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:text-white hover:bg-rose-500/20 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                                            title={Array.from(selectedItems).some(id => files.find(f => f.id === id)?.is_linked) ? "Some selected files are linked to notes/questions" : ""}
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                            <span className="text-[12px] font-medium hidden md:inline">Delete</span>
-                                        </button>
-
-                                        <div className="w-px h-6 bg-white/[0.08] mx-2"></div>
-
-                                        <button
-                                            onClick={() => {
-                                                setIsSelectionMode(false);
-                                                setSelectedItems(new Set());
-                                            }}
-                                            className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
-                                            title="Cancel Selection"
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </button>
+                        return (
+                            <div className="fade-in pb-12">
+                                {/* Header */}
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-border pb-4">
+                                    <div className="flex items-center gap-2">
+                                        <CheckSquare className="w-6 h-6 text-indigo-400" />
+                                        <h3 className="text-[20px] font-heading font-bold text-text tracking-tight">TODO Tracker</h3>
                                     </div>
-                                ) : (
-                                    <div className="flex items-center bg-white/[0.03] p-1 rounded-xl border border-white/[0.06] shrink-0">
-                                        <div className="flex items-center bg-white/[0.02] rounded-lg p-0.5">
-                                            <div className="relative group">
+                                    <div className="flex items-center gap-3 ml-auto flex-wrap sm:flex-nowrap">
+                                        {/* Search */}
+                                        <div className="relative group flex-1 sm:min-w-[240px]">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-indigo-400 transition-colors" />
+                                            <input
+                                                type="text"
+                                                value={todoSearchQuery}
+                                                onChange={(e) => setTodoSearchQuery(e.target.value)}
+                                                placeholder="Search TODOs..."
+                                                className="w-full bg-surface-2/50 border border-border-hover rounded-xl py-2 pl-10 pr-4 text-[13px] text-text focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all"
+                                            />
+                                            {todoSearchQuery && (
                                                 <button
-                                                    onClick={() => setLibraryViewMode('categorywise')}
-                                                    className={`p-1.5 rounded-lg transition-all ${libraryViewMode === 'categorywise' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
-                                                    title="Type View"
+                                                    onClick={() => setTodoSearchQuery('')}
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
                                                 >
-                                                    <LayoutGrid className="w-3.5 h-3.5" />
-                                                </button>
-                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#121214] border border-white/10 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 uppercase tracking-widest shadow-xl">
-                                                    Type
-                                                </div>
-                                            </div>
-                                            <div className="relative group">
-                                                <button
-                                                    onClick={() => setLibraryViewMode('datewise')}
-                                                    className={`p-1.5 rounded-lg transition-all ${libraryViewMode === 'datewise' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}
-                                                    title="Timeline View"
-                                                >
-                                                    <Clock className="w-3.5 h-3.5" />
-                                                </button>
-                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#121214] border border-white/10 text-[9px] font-bold text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 uppercase tracking-widest shadow-xl">
-                                                    Timeline
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="w-px h-4 bg-white/10 mx-1" />
-
-                                        <div className="flex items-center gap-0 shrink-0">
-                                            <button
-                                                onClick={() => setShowTimeTraveler(true)}
-                                                className={`px-3 py-1.5 ${fileSearchQuery ? 'rounded-l-lg' : 'rounded-lg'} text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 border ${fileSearchQuery ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30 border-r-indigo-500/10 hover:bg-indigo-500/30' : 'text-slate-500 hover:text-white hover:bg-white/[0.05] border-transparent'}`}
-                                            >
-                                                <History className="w-3.5 h-3.5" />
-                                                <span className="hidden sm:inline">Filter</span>
-                                            </button>
-                                            {fileSearchQuery && (
-                                                <button
-                                                    onClick={() => setFileSearchQuery('')}
-                                                    className="h-[28px] px-2 flex items-center justify-center rounded-r-lg bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 border border-indigo-500/30 border-l-0 hover:border-rose-500/30 transition-colors"
-                                                    title="Clear Filters"
-                                                >
-                                                    <X className="w-3.5 h-3.5" />
+                                                    <X className="w-4 h-4" />
                                                 </button>
                                             )}
                                         </div>
+
+                                        {/* Group Filter */}
+                                        {todoGroups.length > 0 && (
+                                            <select
+                                                value={todoFilterGroup}
+                                                onChange={(e) => setTodoFilterGroup(e.target.value)}
+                                                className="bg-surface-2/50 border border-border text-text rounded-xl px-3 py-2 text-[13px] focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all cursor-pointer hover:border-border-hover"
+                                            >
+                                                <option value="all">All Groups</option>
+                                                {todoGroups.map(g => (
+                                                    <option key={g.id} value={g.id}>{g.name}</option>
+                                                ))}
+                                            </select>
+                                        )}
+
+                                        {/* Priority Filter */}
+                                        <select
+                                            value={todoFilterPriority}
+                                            onChange={(e) => setTodoFilterPriority(e.target.value)}
+                                            className="bg-surface-2/50 border border-border text-text rounded-xl px-3 py-2 text-[13px] focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all cursor-pointer hover:border-border-hover"
+                                        >
+                                            <option value="all">All Priorities</option>
+                                            <option value="urgent">Urgent</option>
+                                            <option value="high">High</option>
+                                            <option value="medium">Medium</option>
+                                            <option value="low">Low</option>
+                                        </select>
+
+                                        {/* Status Filter */}
+                                        <select
+                                            value={todoFilterStatus}
+                                            onChange={(e) => setTodoFilterStatus(e.target.value)}
+                                            className="bg-surface-2/50 border border-border text-text rounded-xl px-3 py-2 text-[13px] focus:outline-none focus:border-indigo-500/50 focus:bg-surface-2 transition-all cursor-pointer hover:border-border-hover"
+                                        >
+                                            <option value="all">All Status ({totalTodosCount})</option>
+                                            <option value="pending">Pending ({pendingTodosCount})</option>
+                                            <option value="completed">Completed ({completedTodosCount})</option>
+                                        </select>
+
+                                        {/* Manage Groups Button */}
+                                        <button
+                                            onClick={() => setShowManageGroupsModal(true)}
+                                            className="bg-surface-2/50 text-text-muted hover:text-text border border-border hover:border-border-hover flex items-center gap-1.5 text-[13px] font-semibold px-3 py-2 rounded-xl transition-all shadow-sm cursor-pointer shrink-0"
+                                            title="Manage Groups"
+                                        >
+                                            <Layers className="w-4 h-4" />
+                                            <span className="hidden md:inline">Groups</span>
+                                        </button>
+
+                                        {/* New TODO Button */}
+                                        <button
+                                            onClick={() => setShowCreateTodoModal(true)}
+                                            className="bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 hover:border-violet-500/40 flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all shadow-md cursor-pointer active:scale-[0.98] shrink-0 ml-auto"
+                                        >
+                                            <PlusCircle className="w-4 h-4" strokeWidth={2} />
+                                            <span>New TODO</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* List of TODO Cards */}
+                                {todos.length === 0 ? (
+                                    <div className="glass-panel p-16 text-center rounded-2xl border-dashed border-border-hover flex flex-col items-center">
+                                        <div className="w-20 h-20 rounded-2xl bg-surface-2 flex items-center justify-center mb-6 shadow-inner border border-border">
+                                            <CheckSquare className="w-10 h-10 text-violet-500/70" />
+                                        </div>
+                                        <h3 className="text-2xl font-heading font-bold text-text mb-2 tracking-tight">No TODOs</h3>
+                                        <p className="text-text-muted text-sm max-w-sm leading-relaxed mb-8">
+                                            Create tasks, sub-todos, study goals, links & notes for this subject.
+                                        </p>
+                                        <button
+                                            onClick={() => setShowCreateTodoModal(true)}
+                                            className="bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 hover:border-violet-500/40 flex items-center gap-2 px-6 py-3 rounded-lg transition-all cursor-pointer font-semibold"
+                                        >
+                                            <PlusCircle className="w-4 h-4" />
+                                            <span>Create TODO</span>
+                                        </button>
+                                    </div>
+                                ) : filteredTodos.length === 0 ? (
+                                    <div className="glass-panel p-12 text-center rounded-2xl border border-border flex flex-col items-center">
+                                        <p className="text-text-muted text-sm mb-4">No TODOs match your active filters.</p>
+                                        <button
+                                            onClick={() => {
+                                                setTodoFilterGroup('all');
+                                                setTodoFilterStatus('all');
+                                                setTodoFilterPriority('all');
+                                                setTodoSearchQuery('');
+                                            }}
+                                            className="px-4 py-2 rounded-xl bg-surface-2 border border-border text-text hover:bg-surface-3 font-semibold text-xs transition-all cursor-pointer"
+                                        >
+                                            Reset Filters
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col gap-2">
+                                        {filteredTodos.map(todo => (
+                                            <TodoCard
+                                                key={todo.id}
+                                                todo={todo}
+                                                onToggleStatus={handleToggleTodoStatus}
+                                                onToggleSubTodo={handleToggleSubTodo}
+                                                onAddSubTodo={handleAddSubTodo}
+                                                onDeleteSubTodo={handleDeleteSubTodo}
+                                                onEdit={(t) => setEditingTodo(t)}
+                                                onDelete={(todoId) => setConfirmDeleteTodo({ open: true, todoId })}
+                                            />
+                                        ))}
                                     </div>
                                 )}
                             </div>
+                        );
+                    })()}
 
-                            {files.length === 0 ? (
-                                <div className="glass-panel rounded-xl p-16 text-center border-dashed border-primary/20 w-full relative overflow-hidden group">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-                                    <div className="w-20 h-20 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-6 border border-primary/20 pulse-ring">
-                                        <Layers className="w-10 h-10 text-primary" strokeWidth={1.5} />
-                                    </div>
-                                    <h3 className="text-2xl font-heading font-bold text-white mb-3 tracking-tight">No resources yet</h3>
-                                    <p className="text-slate-400 text-sm max-w-sm mx-auto mb-8 leading-relaxed">
-                                        Upload documents, diagrams, textbook snippets, or handwritten notes. They'll be saved here for easy reference.
-                                    </p>
-                                    <button
-                                        onClick={() => setShowFileModal(true)}
-                                        className="btn-primary flex items-center gap-2 mx-auto px-6 py-3 rounded-xl text-sm font-semibold cursor-pointer"
-                                    >
-                                        <PlusCircle className="w-4 h-4" />
-                                        <span>Upload Your First File</span>
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="space-y-12">
-                                    {groupedLibraryItems.map((group, gIdx) => (
-                                        <div key={group.title} className="relative">
-                                            <div className="sticky top-0 z-30 pt-4 pb-6 bg-surface mb-2">
-                                                <div className="flex items-center gap-4">
-                                                    <h2 className="text-xl font-heading font-bold text-white tracking-tight flex items-center gap-3">
-                                                        {group.title}
-                                                        <span className="text-[11px] font-bold text-slate-500 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">{group.items.length}</span>
-                                                    </h2>
-                                                    <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
-                                                </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                                                {group.items.map((file, index) => {
-                                                    const isGlobalLast = gIdx === groupedLibraryItems.length - 1 && index === group.items.length - 1;
-                                                    const hasLink = file.linked_question_id || file.linked_note_id;
-
-                                                    return (
-                                                        <div
-                                                            key={file.id}
-                                                            ref={isGlobalLast ? lastFileElementRef : null}
-                                                            className={`group relative aspect-square rounded-xl bg-surface-2 transition-all duration-300 cursor-pointer shadow-lg active:scale-[0.98] fade-in border ${isSelectionMode
-                                                                ? (selectedItems.has(file.id) ? 'border-indigo-500 ring-2 ring-indigo-500/50 bg-indigo-500/10 scale-95 opacity-90' : 'border-white/[0.04] scale-100 opacity-100')
-                                                                : (activeFileDropdown === file.id ? 'border-primary/40 shadow-xl z-[40]' : 'border-white/[0.04] hover:border-primary/40 hover:shadow-primary/5')
-                                                                }`}
-                                                            onClick={() => {
-                                                                if (isSelectionMode) {
-                                                                    const newSelected = new Set(selectedItems);
-                                                                    if (newSelected.has(file.id)) newSelected.delete(file.id);
-                                                                    else newSelected.add(file.id);
-                                                                    setSelectedItems(newSelected);
-                                                                    return;
-                                                                }
-                                                                if (activeFileDropdown === file.id) setActiveFileDropdown(null);
-                                                                else handleFileClick(file);
-                                                            }}
-                                                            style={{ animationDelay: `${(index % 10) * 0.05}s` }}
-                                                        >
-                                                            <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none">
-                                                                {file.thumbnail ? (
-                                                                    <img
-                                                                        src={file.thumbnail}
-                                                                        alt={file.file_name}
-                                                                        className="w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
-                                                                        loading="lazy"
-                                                                    />
-                                                                ) : (file.data && (file.file_type === 'image' || !file.file_type)) ? (
-                                                                    <img
-                                                                        src={file.data}
-                                                                        alt={file.file_name}
-                                                                        className="w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
-                                                                        loading="lazy"
-                                                                    />
-                                                                ) : (
-                                                                    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-surface-3 to-surface-2 transition-all duration-500 text-slate-300">
-                                                                        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                                                            {file.file_type === 'pdf' ? <FileText className="w-7 h-7 text-rose-400" /> :
-                                                                             file.file_type === 'xlsx' ? <Layers className="w-7 h-7 text-emerald-400" /> :
-                                                                             file.file_type === 'doc' ? <FileText className="w-7 h-7 text-blue-400" /> :
-                                                                             file.file_type === 'html' ? <FileText className="w-7 h-7 text-orange-400" /> :
-                                                                             <ImageIcon className="w-7 h-7 text-indigo-400" />}
-                                                                        </div>
-                                                                        <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">{file.file_type || 'Image'}</span>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-
-                                                            {/* Indicators */}
-                                                            {hasLink && (
-                                                                <div className="absolute top-2 left-2 flex gap-1 z-20">
-                                                                    {file.linked_question_id && (
-                                                                        <div className="p-1.5 rounded-lg bg-indigo-500/80 text-white border border-white/10 shadow-lg" title="Linked to Question">
-                                                                            <Activity className="w-3 h-3" />
-                                                                        </div>
-                                                                    )}
-                                                                    {file.linked_note_id && (
-                                                                        <div className="p-1.5 rounded-lg bg-emerald-500/80 text-white border border-white/10 shadow-lg" title="Linked to Note">
-                                                                            <FileText className="w-3 h-3" />
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            )}
-
-                                                            {/* Selection Indicator */}
-                                                            {isSelectionMode && (
-                                                                <div className="absolute top-3 right-3 z-30">
-                                                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selectedItems.has(file.id) ? 'bg-indigo-500 border-indigo-500' : 'border-white/30 bg-black/40 backdrop-blur-sm'}`}>
-                                                                        {selectedItems.has(file.id) && <CheckCircle className="w-3.5 h-3.5 text-white" />}
-                                                                    </div>
-                                                                </div>
-                                                            )}
-
-                                                            {/* Standard Identical Overlay from Library.jsx */}
-                                                            <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-4 z-10 transition-all group-hover:bg-black/20">
-                                                                <div className="flex items-center justify-between mb-1.5 relative">
-                                                                    <div className="text-[10px] font-bold text-primary uppercase tracking-wider">
-                                                                        {subject?.name}
-                                                                    </div>
-
-                                                                    <div className={`flex items-center gap-1 transition-opacity ${activeFileDropdown === file.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                                                                        {!isSelectionMode && hasLink && (
-                                                                            <button
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    if (file.linked_question_id) navigateToQuestion(file.linked_question_id);
-                                                                                    else if (file.linked_note_id) {
-                                                                                        const note = notes.find(n => n.id === file.linked_note_id);
-                                                                                        if (note) {
-                                                                                            setViewingNote(note);
-                                                                                            
-                                                                                        }
-                                                                                    }
-                                                                                }}
-                                                                                className="p-1 px-[5px] bg-primary/20 hover:bg-primary text-white rounded-lg border border-primary/30 transition-all cursor-pointer"
-                                                                                title="View Linked Content"
-                                                                            >
-                                                                                <LinkIcon className="w-3 h-3" />
-                                                                            </button>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-
-                                                                <div className="flex items-center justify-between gap-2">
-                                                                    <p className="text-[11px] font-semibold text-white truncate flex-1 leading-tight mb-0.5">
-                                                                        {file.file_name || new Date(file.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                                                    </p>
-
-                                                                    {!isSelectionMode && (
-                                                                        <div className={`relative shrink-0 transition-opacity ${activeFileDropdown === file.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} onClick={e => e.stopPropagation()}>
-                                                                            <button
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    setActiveFileDropdown(activeFileDropdown === file.id ? null : file.id);
-                                                                                }}
-                                                                                className={`p-1 flex items-center justify-center rounded-lg border transition-all cursor-pointer ${activeFileDropdown === file.id ? 'bg-primary border-primary text-white' : 'bg-black/40 hover:bg-black/60 text-white/80 border-white/10 backdrop-blur-sm'}`}
-                                                                                title="More Options"
-                                                                            >
-                                                                                <MoreVertical className="w-3.5 h-3.5" />
-                                                                            </button>
-                                                                            {activeFileDropdown === file.id && (
-                                                                                <div className="absolute right-0 top-full mt-2 w-36 bg-[#121214]/95 border border-white/10 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.6)] py-1.5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50 backdrop-blur-xl" onClick={e => e.stopPropagation()}>
-                                                                                    <button
-                                                                                        onClick={() => { setIsSelectionMode(true); setSelectedItems(new Set([file.id])); setActiveFileDropdown(null); }}
-                                                                                        className="w-full flex items-center justify-start gap-2.5 px-3.5 py-2 text-[12px] font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
-                                                                                    >
-                                                                                        <CheckCircle className="w-3.5 h-3.5 text-indigo-400" /> Select
-                                                                                    </button>
-                                                                                    <button
-                                                                                        onClick={() => {
-                                                                                            setActiveFileDropdown(null);
-                                                                                            setRenameFileData({ open: true, file, name: file.file_name || '' });
-                                                                                        }}
-                                                                                        className="w-full flex items-center justify-start gap-2.5 px-3.5 py-2 text-[12px] font-medium text-slate-300 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
-                                                                                    >
-                                                                                        <Pencil className="w-3.5 h-3.5 text-emerald-400" /> Rename
-                                                                                    </button>
-                                                                                    <button
-                                                                                        onClick={() => {
-                                                                                            if (file.is_linked) return;
-                                                                                            setActiveFileDropdown(null);
-                                                                                            setConfirmDeleteFile({ open: true, items: [file] });
-                                                                                        }}
-                                                                                        disabled={file.is_linked}
-                                                                                        className={`w-full flex items-center justify-start gap-2.5 px-3.5 py-2 text-[12px] font-medium transition-all ${file.is_linked ? 'text-slate-600 cursor-not-allowed grayscale' : 'text-slate-300 hover:text-rose-400 hover:bg-rose-500/10 cursor-pointer'}`}
-                                                                                        title={file.is_linked ? "This file is linked to a note or question" : "Delete File"}
-                                                                                    >
-                                                                                        <Trash2 className={`w-3.5 h-3.5 ${file.is_linked ? 'text-slate-700' : 'text-rose-500'}`} /> {file.is_linked ? 'In Use' : 'Delete'}
-                                                                                    </button>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {loadingMoreFiles && (
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5 mt-5">
-                                    {[...Array(5)].map((_, i) => (
-                                        <div key={`skeleton-${i}`} className="aspect-square rounded-2xl bg-surface-2/40 border border-white/[0.04] animate-pulse overflow-hidden">
-                                            <div className="w-full h-full bg-indigo-500/5" />
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                    {activeTab === 'library' && (
+                        <div className="fade-in pb-12">
+                            <FileExplorer
+                                files={files}
+                                folders={folders}
+                                scopeId={id}
+                                scopeType="subject"
+                                onFilesChange={setFiles}
+                                onFoldersChange={setFolders}
+                                onFileUpload={(fId) => {
+                                    setUploadFolderId(fId);
+                                    setShowFileModal(true);
+                                }}
+                                onNavigate={(folderId) => {
+                                    setCurrentFolderId(folderId);
+                                    setFilePage(0);
+                                    fetchFolderContents(id, 'subject', folderId, FILE_LIMIT, 0).then(res => {
+                                        setFiles(res.files || []);
+                                        setHasMoreFiles((res.files || []).length === FILE_LIMIT);
+                                    });
+                                }}
+                                isSelectionMode={isSelectionMode}
+                                setIsSelectionMode={setIsSelectionMode}
+                                selectedIds={selectedItems}
+                                setSelectedIds={setSelectedItems}
+                                onFileClick={setViewingFile}
+                                foldersApi={foldersApi}
+                                filesApi={filesApi}
+                            />
                         </div>
                     )}
                 </>
             )}
+
 
             <CreateRevisionSessionModal
                 isOpen={showCreateRevisionSession}
@@ -4961,6 +5126,41 @@ const SubjectDetail = () => {
                 onSubmit={handleEditRevisionSession}
                 session={editingRevisionSession}
                 topics={topics}
+            />
+
+            <CreateTodoModal
+                isOpen={showCreateTodoModal}
+                onClose={() => setShowCreateTodoModal(false)}
+                onSubmit={handleCreateTodo}
+                groups={todoGroups}
+                onQuickCreateGroup={handleQuickCreateGroup}
+            />
+
+            <EditTodoModal
+                isOpen={!!editingTodo}
+                onClose={() => setEditingTodo(null)}
+                onSubmit={handleEditTodo}
+                todo={editingTodo}
+                groups={todoGroups}
+            />
+
+            <ManageTodoGroupsModal
+                isOpen={showManageGroupsModal}
+                onClose={() => setShowManageGroupsModal(false)}
+                groups={todoGroups}
+                onCreateGroup={handleQuickCreateGroup}
+                onUpdateGroup={handleUpdateGroup}
+                onDeleteGroup={handleDeleteGroup}
+            />
+
+            <ConfirmDialog
+                isOpen={confirmDeleteTodo.open}
+                title="Delete TODO"
+                message="Are you sure you want to delete this TODO and all of its sub-tasks? This action cannot be undone."
+                onConfirm={() => handleDeleteTodo(confirmDeleteTodo.todoId)}
+                onCancel={() => setConfirmDeleteTodo({ open: false, todoId: null })}
+                confirmText="Delete TODO"
+                danger
             />
 
             <ConfirmDialog
@@ -5023,6 +5223,23 @@ const SubjectDetail = () => {
                     sourceImage={viewingSolution ? fetchedImages[`solution-${viewingSolution.id}`] : null}
                     isFetchingImage={fetchingImageId === (viewingSolution ? `solution-${viewingSolution.id}` : null)}
                     onEdit={handleOpenEditSolution}
+                    isFullscreen={isSolutionFullscreen}
+                    onMinimize={() => {
+                        globalMinimize({
+                            type: 'solution',
+                            id: viewingSolution.id,
+                            data: viewingSolution,
+                            title: viewingSolution.title || 'Solution',
+                            typeLabel: 'Solution',
+                            props: {
+                                sourceImage: viewingSolution ? fetchedImages[`solution-${viewingSolution.id}`] : null,
+                                isFetchingImage: fetchingImageId === (viewingSolution ? `solution-${viewingSolution.id}` : null),
+                                onEdit: handleOpenEditSolution,
+                                isFullscreen: isSolutionFullscreen,
+                            }
+                        });
+                        setViewingSolution(null);
+                    }}
                 />
             )}
 
@@ -5076,14 +5293,42 @@ const SubjectDetail = () => {
 
             <EditSolutionModal
                 isOpen={showEditSolutionModal}
-                onClose={() => {
+                onClose={(finalFullscreen) => {
                     setShowEditSolutionModal(false);
                     setEditingSolution(null);
+                    setIsSolutionFullscreen(finalFullscreen || false);
+                    if (reopenViewSolutionAfterEdit) {
+                        setViewingSolution(editingSolution);
+                        setReopenViewSolutionAfterEdit(false);
+                    }
                 }}
                 subjectId={id}
                 solution={editingSolution}
                 onSolutionUpdated={handleEditSolutionUpdated}
+                isFullscreen={isSolutionFullscreen}
             />
+
+            {viewingImageUrl && (
+                <ImageViewerModal
+                    isOpen={true}
+                    onClose={() => setViewingImageUrl(null)}
+                    imageUrl={viewingImageUrl}
+                    title={viewingImageTitle}
+                    onMinimize={(isFullscreen) => {
+                        globalMinimize({
+                            type: 'image',
+                            id: viewingImageUrl,
+                            data: { imageUrl: viewingImageUrl },
+                            title: viewingImageTitle,
+                            typeLabel: 'Image',
+                            props: {
+                                isFullscreen: isFullscreen
+                            }
+                        });
+                        setViewingImageUrl(null);
+                    }}
+                />
+            )}
 
             <TimeTraveler
                 isOpen={showTimeTraveler}
@@ -5097,6 +5342,7 @@ const SubjectDetail = () => {
                 message="Enter a new identity for this material."
                 confirmText="Save Name"
                 type="primary"
+                icon={Pencil}
                 onConfirm={handleRenameFile}
                 onCancel={() => setRenameFileData({ open: false, file: null, name: '' })}
             >
@@ -5109,11 +5355,18 @@ const SubjectDetail = () => {
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') handleRenameFile();
                         }}
-                        className="w-full bg-white/[0.03] border border-white/[0.1] rounded-xl px-4 py-3.5 text-white text-[14px] focus:outline-none focus:border-primary/50 transition-all"
+                        className="w-full bg-surface-2 border border-border-hover rounded-xl px-4 py-3.5 text-text text-[14px] focus:outline-none focus:border-primary/50 transition-all"
                         placeholder="e.g. Biology Session 1"
                     />
                 </div>
             </ConfirmDialog>
+
+            {viewingHighlightsNote && (
+                <KeyHighlightsModal
+                    note={viewingHighlightsNote}
+                    onClose={() => setViewingHighlightsNote(null)}
+                />
+            )}
         </div>
     );
 };

@@ -46,13 +46,12 @@ const EditSessionModal = ({ isOpen, onClose, subjectId, session, onSessionUpdate
         <ModalPortal>
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop fade-in" onClick={onClose}>
                 <div
-                    className="w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-                    style={{ background: 'rgba(22, 22, 34, 0.95)', border: '1px solid rgba(255,255,255,0.08)' }}
+                    className="w-full max-w-lg bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col"
                     onClick={e => e.stopPropagation()}
                 >
                     {/* Header */}
-                    <div className="flex items-center justify-between px-7 py-5 border-b border-white/[0.06] shrink-0">
-                        <h3 className="text-lg font-heading font-semibold text-white flex items-center gap-3">
+                    <div className="flex items-center justify-between px-7 py-5 border-b border-border shrink-0">
+                        <h3 className="text-lg font-heading font-semibold text-text flex items-center gap-3">
                             <div className="p-2 rounded-lg bg-primary/10 text-primary">
                                 <Pencil className="w-5 h-5" />
                             </div>
@@ -60,7 +59,7 @@ const EditSessionModal = ({ isOpen, onClose, subjectId, session, onSessionUpdate
                         </h3>
                         <button
                             onClick={onClose}
-                            className="p-2 text-slate-500 hover:text-white hover:bg-white/[0.06] rounded-lg transition-all cursor-pointer"
+                            className="p-2 text-text-muted hover:text-text hover:bg-surface-3/10 rounded-lg transition-all cursor-pointer"
                         >
                             <X className="w-5 h-5" />
                         </button>
@@ -69,42 +68,42 @@ const EditSessionModal = ({ isOpen, onClose, subjectId, session, onSessionUpdate
                     {/* Body */}
                     <form id="edit-session-form" onSubmit={handleSubmit} className="px-7 py-6 space-y-5">
                         <div>
-                            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-2.5">Title *</label>
+                            <label className="block text-[10px] font-extrabold text-text-muted uppercase tracking-[0.18em] mb-2.5">Title *</label>
                             <input
                                 value={form.title}
                                 onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
-                                className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 focus:bg-surface-2/70 transition-all placeholder:text-slate-600/80"
+                                className="w-full bg-surface-2 border border-border text-text rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 transition-all placeholder:text-text-muted/60"
                                 autoFocus
                                 placeholder="Session title..."
                             />
                         </div>
                         <div>
-                            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-2.5">Date</label>
+                            <label className="block text-[10px] font-extrabold text-text-muted uppercase tracking-[0.18em] mb-2.5">Date</label>
                             <input
                                 type="date"
                                 value={form.sessionDate}
                                 onChange={(e) => setForm((p) => ({ ...p, sessionDate: e.target.value }))}
-                                className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 focus:bg-surface-2/70 transition-all [color-scheme:dark]"
+                                className="w-full bg-surface-2 border border-border text-text rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 transition-all"
                             />
                         </div>
                         <div>
-                            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-2.5">Notes</label>
+                            <label className="block text-[10px] font-extrabold text-text-muted uppercase tracking-[0.18em] mb-2.5">Notes</label>
                             <textarea
                                 value={form.notes}
                                 onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
                                 rows={3}
                                 placeholder="Optional session notes..."
-                                className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 focus:bg-surface-2/70 transition-all placeholder:text-slate-600/80 resize-none"
+                                className="w-full bg-surface-2 border border-border text-text rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 transition-all placeholder:text-text-muted/60 resize-none"
                             />
                         </div>
                     </form>
 
                     {/* Footer */}
-                    <div className="px-7 py-5 border-t border-white/[0.06] flex gap-3 shrink-0">
+                    <div className="px-7 py-5 border-t border-border flex gap-3 shrink-0">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex-1 px-5 py-3 rounded-xl text-[13px] font-semibold text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer border border-transparent hover:border-white/[0.08]"
+                            className="flex-1 px-5 py-3 rounded-xl text-[13px] font-semibold text-text-muted hover:text-text hover:bg-surface-3/10 transition-all cursor-pointer border border-transparent hover:border-border"
                         >
                             Cancel
                         </button>

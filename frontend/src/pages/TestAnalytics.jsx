@@ -18,23 +18,23 @@ import toast from 'react-hot-toast';
 // ── colour helpers ────────────────────────────────────────────────────────────
 const accColor = (v) => v >= 75 ? '#34d399' : v >= 50 ? '#fbbf24' : '#f87171';
 const accPill = (v) => v >= 75
-    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-    : v >= 50 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-        : 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+    ? 'bg-emerald-500/10 text-emerald-500 [.dark_&]:text-emerald-400 border-emerald-500/20'
+    : v >= 50 ? 'bg-amber-500/10 text-amber-600 [.dark_&]:text-amber-400 border-amber-500/20'
+        : 'bg-rose-500/10 text-rose-600 [.dark_&]:text-rose-400 border-rose-500/20';
 
 const consistLabel = (v) => v >= 85 ? 'Highly Consistent' : v >= 65 ? 'Moderate' : 'Inconsistent';
-const consistColor = (v) => v >= 85 ? 'text-emerald-400' : v >= 65 ? 'text-amber-400' : 'text-rose-400';
+const consistColor = (v) => v >= 85 ? 'text-emerald-500 [.dark_&]:text-emerald-400' : v >= 65 ? 'text-amber-600 [.dark_&]:text-amber-400' : 'text-rose-600 [.dark_&]:text-rose-400';
 const consistBorder = (v) => v >= 85 ? 'border-emerald-500/20 from-emerald-500/8' : v >= 65 ? 'border-amber-500/20 from-amber-500/8' : 'border-rose-500/20 from-rose-500/8';
 
 // ── Custom tooltip ────────────────────────────────────────────────────────────
 const ChartTip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
     return (
-        <div className="bg-[#13132a]/95 border border-white/10 rounded-xl p-3 shadow-2xl text-[13px] min-w-[140px]">
-            <p className="text-slate-500 mb-1.5 text-[11px] font-medium uppercase tracking-wider">{payload[0]?.payload?.date || label}</p>
+        <div className="bg-surface-2/95 border border-border rounded-xl p-3 shadow-2xl text-[13px] min-w-[140px]">
+            <p className="text-text-muted mb-1.5 text-[11px] font-medium uppercase tracking-wider">{payload[0]?.payload?.date || label}</p>
             {payload.map((p, i) => (
                 <div key={i} className="flex items-center justify-between gap-4 py-0.5">
-                    <span className="text-slate-400 font-medium">{p.name}:</span>
+                    <span className="text-text-muted font-medium">{p.name}:</span>
                     <span style={{ color: p.color }} className="font-bold">
                         {p.value}{p.name.includes('Acc') || p.name === 'Accuracy' || p.name === 'Target' ? '%' : ''}
                     </span>
@@ -49,10 +49,10 @@ const AIInsightText = ({ text }) => (
     <div className="space-y-1 text-sm leading-relaxed">
         {text.split('\n').filter(Boolean).map((line, i) => {
             if (/^#+\s|^[A-Z][A-Za-z ]+:/.test(line.trim()) || (line.includes('→') && line.length < 70))
-                return <p key={i} className="text-pink-300 font-semibold mt-3 mb-0.5">{line.replace(/^#+\s/, '')}</p>;
+                return <p key={i} className="text-pink-600 [.dark_&]:text-pink-300 font-semibold mt-3 mb-0.5">{line.replace(/^#+\s/, '')}</p>;
             if (/^[-•*]/.test(line.trim()))
-                return <p key={i} className="text-slate-300 pl-4 before:content-['·'] before:mr-2 before:text-pink-400">{line.replace(/^[-•*]\s*/, '')}</p>;
-            return <p key={i} className="text-slate-400">{line}</p>;
+                return <p key={i} className="text-text-muted pl-4 before:content-['·'] before:mr-2 before:text-pink-500">{line.replace(/^[-•*]\s*/, '')}</p>;
+            return <p key={i} className="text-text-muted">{line}</p>;
         })}
     </div>
 );
@@ -181,7 +181,7 @@ const TestAnalytics = () => {
             <div className="flex items-center gap-3 mb-4">
                 <button
                     onClick={() => navigate(-1)}
-                    className="flex items-center gap-2 text-[13px] font-semibold text-slate-400 hover:text-white transition-all hover:bg-white/[0.06] px-3 py-1.5 rounded-lg border border-white/[0.06] hover:border-white/[0.1] transition-all cursor-pointer"
+                    className="flex items-center gap-2 text-[13px] font-semibold text-text-muted hover:text-text transition-all hover:bg-surface-3/10 px-3 py-1.5 rounded-lg border border-border hover:border-border-hover transition-all cursor-pointer"
                 >
                     <ArrowLeft className="w-4 h-4" />
                     <span>Back</span>
@@ -191,10 +191,10 @@ const TestAnalytics = () => {
             {/* Header Content */}
             <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-8">
                 <div>
-                    <h1 className="text-[22px] md:text-[24px] font-heading font-semibold text-white tracking-tight leading-tight mb-2">
+                    <h1 className="text-[22px] md:text-[24px] font-heading font-semibold text-text tracking-tight leading-tight mb-2">
                         {testData?.name.toUpperCase() || 'Test'} <span className="opacity-40 ml-1"> — Analytics</span>
                     </h1>
-                    <div className="flex items-center gap-2 text-slate-500 text-[14px] ml-0.5">
+                    <div className="flex items-center gap-2 text-text-muted text-[14px] ml-0.5">
                         <Activity className="w-4 h-4 text-pink-500/60" />
                         <span>{attempts.length} attempt{attempts.length !== 1 ? 's' : ''}</span>
                     </div>
@@ -204,7 +204,7 @@ const TestAnalytics = () => {
                     <button
                         onClick={generateInsights}
                         disabled={aiLoading || attempts.length === 0}
-                        className="flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all cursor-pointer border border-violet-500/20 bg-violet-500/10 text-violet-300 hover:text-white hover:bg-violet-500/20 group disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="flex items-center gap-2 text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-all cursor-pointer border border-violet-500/20 bg-violet-500/10 text-violet-300 hover:text-text hover:bg-violet-500/20 group disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                         {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4 group-hover:scale-110 transition-transform" strokeWidth={2} />}
                         <span>AI Insights</span>
@@ -223,7 +223,7 @@ const TestAnalytics = () => {
                             {aiInsight && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
                         </div>
                         {aiLoading
-                            ? <p className="text-slate-400 text-sm flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin text-violet-400" /> Analysing your performance…</p>
+                            ? <p className="text-text-muted text-sm flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin text-violet-400" /> Analysing your performance…</p>
                             : <AIInsightText text={aiInsight} />}
                     </div>
                 )}
@@ -231,66 +231,76 @@ const TestAnalytics = () => {
                 {/* ── KPI Row ────────────────────────────────────────────── */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
                     {[
-                        { label: 'Latest Score', value: latestR ? `${latestR.my_score}/${latestR.total_score}` : '—', color: 'text-pink-400', border: 'border-pink-500/20', bg: 'from-pink-500/8' },
-                        { label: 'Latest Accuracy', value: `${latestAcc}%`, color: 'text-emerald-400', border: 'border-emerald-500/20', bg: 'from-emerald-500/8' },
-                        { label: 'Avg Accuracy', value: `${stats.avgAccuracy ?? 0}%`, color: 'text-sky-400', border: 'border-sky-500/20', bg: 'from-sky-500/8' },
-                        { label: 'Best Attempt', value: `${stats.bestAccuracy ?? 0}%`, color: 'text-amber-400', border: 'border-amber-500/20', bg: 'from-amber-500/8' },
+                        { label: 'Latest Score', value: latestR ? `${latestR.my_score}/${latestR.total_score}` : '—', color: 'text-pink-500 [.dark_&]:text-pink-400', border: 'border-pink-500/20', bg: 'from-pink-500/10', icon: <Target className="w-3.5 h-3.5" /> },
+                        { label: 'Latest Accuracy', value: `${latestAcc}%`, color: 'text-emerald-500 [.dark_&]:text-emerald-400', border: 'border-emerald-500/20', bg: 'from-emerald-500/10', icon: <Activity className="w-3.5 h-3.5" /> },
+                        { label: 'Avg Accuracy', value: `${stats.avgAccuracy ?? 0}%`, color: 'text-sky-500 [.dark_&]:text-sky-400', border: 'border-sky-500/20', bg: 'from-sky-500/10', icon: <BarChart3 className="w-3.5 h-3.5" /> },
+                        { label: 'Best Attempt', value: `${stats.bestAccuracy ?? 0}%`, color: 'text-amber-600 [.dark_&]:text-amber-400', border: 'border-amber-500/20', bg: 'from-amber-500/10', icon: <Award className="w-3.5 h-3.5" /> },
                         {
                             label: 'Improvement',
                             value: stats.improvement !== undefined ? `${impPositive ? '+' : ''}${stats.improvement}%` : '—',
-                            color: impNeutral ? 'text-slate-400' : impPositive ? 'text-emerald-400' : 'text-rose-400',
-                            border: impNeutral ? 'border-white/10' : impPositive ? 'border-emerald-500/20' : 'border-rose-500/20',
-                            bg: impNeutral ? 'from-white/4' : impPositive ? 'from-emerald-500/8' : 'from-rose-500/8'
+                            color: impNeutral ? 'text-text-muted' : impPositive ? 'text-emerald-500 [.dark_&]:text-emerald-400' : 'text-rose-600 [.dark_&]:text-rose-400',
+                            border: impNeutral ? 'border-border' : impPositive ? 'border-emerald-500/20' : 'border-rose-500/20',
+                            bg: impNeutral ? 'from-surface-3/10' : impPositive ? 'from-emerald-500/10' : 'from-rose-500/10',
+                            icon: <TrendingUp className="w-3.5 h-3.5" />
                         },
                         {
                             label: 'Consistency',
                             value: stats.consistencyScore != null ? `${stats.consistencyScore}` : '—',
                             sub: stats.consistencyScore != null ? consistLabel(stats.consistencyScore) : '',
-                            color: stats.consistencyScore != null ? consistColor(stats.consistencyScore) : 'text-slate-400',
-                            border: stats.consistencyScore != null ? consistBorder(stats.consistencyScore).split(' ')[0] : 'border-white/10',
-                            bg: stats.consistencyScore != null ? consistBorder(stats.consistencyScore).split(' ')[1] || 'from-white/4' : 'from-white/4'
+                            color: stats.consistencyScore != null ? consistColor(stats.consistencyScore) : 'text-text-muted',
+                            border: stats.consistencyScore != null ? consistBorder(stats.consistencyScore).split(' ')[0] : 'border-border',
+                            bg: stats.consistencyScore != null ? (consistBorder(stats.consistencyScore).split(' ')[1] || 'from-surface-3/10').replace('/8', '/10') : 'from-surface-3/10',
+                            icon: <Zap className="w-3.5 h-3.5" />
                         },
                         {
                             label: 'Projected',
                             value: stats.projectedAccuracy != null ? `${stats.projectedAccuracy}%` : '—',
                             sub: stats.projectedAccuracy != null ? 'next attempt' : 'need 2+ attempts',
-                            color: stats.projectedAccuracy != null ? accColor(stats.projectedAccuracy).replace('#', 'text-[#') + ']' : 'text-slate-400',
+                            color: 'text-purple-500 [.dark_&]:text-purple-400',
                             colorDirect: stats.projectedAccuracy != null ? accColor(stats.projectedAccuracy) : undefined,
-                            border: stats.projectedAccuracy != null ? 'border-purple-500/20' : 'border-white/10',
-                            bg: 'from-purple-500/8'
+                            border: stats.projectedAccuracy != null ? 'border-purple-500/20' : 'border-border',
+                            bg: 'from-purple-500/10',
+                            icon: <Brain className="w-3.5 h-3.5" />
                         },
                     ].map((kpi, i) => (
-                        <div key={i} className={`rounded-2xl border ${kpi.border} bg-gradient-to-b ${kpi.bg} to-transparent bg-[#0f0f1a] p-3.5 flex flex-col gap-1.5`}>
-                            <p className="text-xl font-heading font-bold leading-none" style={kpi.colorDirect ? { color: kpi.colorDirect } : undefined}>
-                                <span className={kpi.colorDirect ? '' : kpi.color}>{kpi.value}</span>
-                            </p>
-                            {kpi.sub && <p className="text-[10px] text-slate-500">{kpi.sub}</p>}
-                            <p className="text-[11px] text-slate-500 mt-auto">{kpi.label}</p>
+                        <div key={i} className={`group relative p-4 rounded-2xl border ${kpi.border} bg-gradient-to-b ${kpi.bg} to-transparent bg-surface-2 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl hover:shadow-black/5 cursor-default flex flex-col gap-2 min-h-[100px]`}>
+                            <div className={`flex items-center gap-2 opacity-70 group-hover:opacity-100 transition-opacity ${kpi.color}`}>
+                                {kpi.icon}
+                                <span className="text-[10px] font-bold uppercase tracking-wider">{kpi.label}</span>
+                            </div>
+                            <div className="mt-auto">
+                                <p className="text-2xl font-heading font-black leading-tight tracking-tight" style={kpi.colorDirect ? { color: kpi.colorDirect } : undefined}>
+                                    <span className={kpi.colorDirect ? '' : kpi.color}>{kpi.value}</span>
+                                </p>
+                                {kpi.sub && <p className="text-[10px] text-text-muted font-medium mt-1 leading-none opacity-80">{kpi.sub}</p>}
+                            </div>
+                            {/* Subtle background glow on hover */}
+                            <div className={`absolute inset-0 rounded-2xl bg-gradient-to-tr ${kpi.bg} to-transparent opacity-0 group-hover:opacity-10 transition-opacity pointer-events-none`} />
                         </div>
                     ))}
                 </div>
 
                 {/* ── Target Score + Trend ─────────────────────────────── */}
-                <div className="glass rounded-3xl border border-white/8 p-5 shadow-xl">
+                <div className="glass rounded-3xl border border-border p-5 shadow-xl">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-5">
                         <div className="flex items-center gap-3 flex-1">
                             <TrendingUp className="w-4 h-4 text-pink-400" />
-                            <h2 className="text-sm font-heading font-semibold text-white">Trend Analysis</h2>
-                            <div className="flex bg-black/30 p-1 rounded-lg ml-2">
+                            <h2 className="text-sm font-heading font-semibold text-text">Trend Analysis</h2>
+                            <div className="flex bg-surface-3/10 p-1 rounded-lg ml-2">
                                 <button
                                     onClick={() => setTrendType('accuracy')}
-                                    className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${trendType === 'accuracy' ? 'bg-pink-500/20 text-pink-400' : 'text-slate-500 hover:text-slate-300'}`}
+                                    className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${trendType === 'accuracy' ? 'bg-pink-500/20 text-pink-500 [.dark_&]:text-pink-400' : 'text-text-muted hover:text-text-muted'}`}
                                 >Accuracy</button>
                                 <button
                                     onClick={() => setTrendType('score')}
-                                    className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${trendType === 'score' ? 'bg-violet-500/20 text-violet-400' : 'text-slate-500 hover:text-slate-300'}`}
+                                    className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${trendType === 'score' ? 'bg-violet-500/20 text-violet-600 [.dark_&]:text-violet-400' : 'text-text-muted hover:text-text-muted'}`}
                                 >Marks</button>
                             </div>
                         </div>
 
                         {/* Target Score Tracker */}
                         <div className="flex items-center gap-3">
-                            <span className="text-xs text-slate-400 whitespace-nowrap">Target:</span>
+                            <span className="text-xs text-text-muted whitespace-nowrap">Target:</span>
                             <input
                                 type="range" min={10} max={100} step={5}
                                 value={targetScore}
@@ -299,7 +309,7 @@ const TestAnalytics = () => {
                             />
                             <span className="text-sm font-bold text-pink-400 w-10">{targetScore}%</span>
                             {latestAcc !== '--' && (
-                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${latestAcc >= targetScore ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
+                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${latestAcc >= targetScore ? 'bg-emerald-500/10 text-emerald-500 [.dark_&]:text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-600 [.dark_&]:text-rose-400 border-rose-500/20'}`}>
                                     {latestAcc >= targetScore ? '✓ Hit' : `${(targetScore - latestAcc).toFixed(1)}% gap`}
                                 </span>
                             )}
@@ -316,12 +326,13 @@ const TestAnalytics = () => {
                                             <stop offset="95%" stopColor={trendType === 'accuracy' ? '#ec4899' : '#8b5cf6'} stopOpacity={0.0} />
                                         </linearGradient>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                                    <XAxis dataKey="attempt" tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }} tickLine={false} axisLine={false} dy={6} />
+                                    <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border/20" vertical={false} />
+                                    <XAxis dataKey="attempt" tick={{ fill: 'currentColor', fontSize: 11 }} className="text-text-muted/50" tickLine={false} axisLine={false} dy={6} />
                                     <YAxis
                                         domain={trendType === 'accuracy' ? [0, 100] : ['auto', 'auto']}
                                         tickFormatter={v => trendType === 'accuracy' ? `${v}%` : v}
-                                        tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }}
+                                        tick={{ fill: 'currentColor', fontSize: 10 }}
+                                        className="text-text-muted/50"
                                         tickLine={false}
                                         axisLine={false}
                                     />
@@ -358,28 +369,28 @@ const TestAnalytics = () => {
                     <div className="rounded-3xl border border-orange-500/25 bg-gradient-to-br from-orange-500/[0.06] via-rose-500/[0.03] to-transparent p-6">
                         <div className="flex items-center gap-2 mb-5">
                             <ShieldAlert className="w-5 h-5 text-orange-400" />
-                            <h2 className="text-base font-heading font-semibold text-white">Exam Trap Topics</h2>
+                            <h2 className="text-base font-heading font-semibold text-text">Exam Trap Topics</h2>
                             <span className="text-xs text-orange-400/70 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full ml-1">High frequency · Low accuracy</span>
                         </div>
-                        <p className="text-xs text-slate-500 mb-4">These topics appear most frequently in your tests but have the lowest accuracy — the highest risk area in a real exam.</p>
+                        <p className="text-xs text-text-muted mb-4">These topics appear most frequently in your tests but have the lowest accuracy — the highest risk area in a real exam.</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                             {examTraps.map((t, i) => {
                                 const acc = Number(t.accuracy);
                                 const riskLevel = t.riskScore >= 3 ? 'High' : t.riskScore >= 1.5 ? 'Medium' : 'Low';
-                                const riskColor = t.riskScore >= 3 ? 'text-rose-400 bg-rose-500/10 border-rose-500/20'
-                                    : t.riskScore >= 1.5 ? 'text-orange-400 bg-orange-500/10 border-orange-500/20'
-                                        : 'text-amber-400 bg-amber-500/10 border-amber-500/20';
+                                const riskColor = t.riskScore >= 3 ? 'text-rose-600 [.dark_&]:text-rose-400 bg-rose-500/10 border-rose-500/20'
+                                    : t.riskScore >= 1.5 ? 'text-orange-600 [.dark_&]:text-orange-400 bg-orange-500/10 border-orange-500/20'
+                                        : 'text-amber-600 [.dark_&]:text-amber-400 bg-amber-500/10 border-amber-500/20';
                                 return (
-                                    <div key={i} className="bg-black/20 rounded-xl p-4 border border-white/[0.06] flex flex-col gap-3">
+                                    <div key={i} className="bg-surface-3/10 rounded-xl p-4 border border-border flex flex-col gap-3">
                                         <div className="flex items-start justify-between gap-2">
-                                            <p className="text-sm font-semibold text-white leading-tight">{t.topic_name}</p>
+                                            <p className="text-sm font-semibold text-text leading-tight">{t.topic_name}</p>
                                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex-shrink-0 ${riskColor}`}>{riskLevel}</span>
                                         </div>
-                                        <div className="w-full bg-black/30 rounded-full h-1.5">
+                                        <div className="w-full bg-surface-3/20 rounded-full h-1.5">
                                             <div className="h-full rounded-full" style={{ width: `${acc}%`, backgroundColor: accColor(acc) }} />
                                         </div>
                                         <div className="flex items-center justify-between text-[11px]">
-                                            <span className="text-slate-500">{t.total_questions} questions seen</span>
+                                            <span className="text-text-muted">{t.total_questions} questions seen</span>
                                             <span className="font-bold" style={{ color: accColor(acc) }}>{acc}% acc</span>
                                         </div>
                                     </div>
@@ -391,26 +402,26 @@ const TestAnalytics = () => {
 
                 {/* ── Recovery vs Decline ─────────────────────────────── */}
                 {(recovering.length > 0 || declining.length > 0) && (
-                    <div className="glass rounded-3xl border border-white/8 p-5 shadow-xl">
+                    <div className="glass rounded-3xl border border-border p-5 shadow-xl">
                         <div className="flex items-center gap-2 mb-5">
                             <RefreshCw className="w-4 h-4 text-sky-400" />
-                            <h2 className="text-sm font-heading font-semibold text-white">Recovery vs Decline</h2>
-                            <span className="text-xs text-slate-500 ml-1">topics with consistent change across attempts</span>
+                            <h2 className="text-sm font-heading font-semibold text-text">Recovery vs Decline</h2>
+                            <span className="text-xs text-text-muted ml-1">topics with consistent change across attempts</span>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {recovering.length > 0 && (
                                 <div>
-                                    <p className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5 mb-3 uppercase tracking-wider">
+                                    <p className="text-xs font-semibold text-emerald-500 [.dark_&]:text-emerald-400 flex items-center gap-1.5 mb-3 uppercase tracking-wider">
                                         <ArrowUpRight className="w-3.5 h-3.5" /> Improving ({recovering.length})
                                     </p>
                                     <div className="space-y-2">
                                         {recovering.slice(0, 6).map((t, i) => (
                                             <div key={i} className="flex items-center gap-3 bg-emerald-500/[0.04] border border-emerald-500/10 rounded-xl p-3">
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-xs font-medium text-white truncate">{t.name}</p>
-                                                    <p className="text-[10px] text-slate-500 mt-0.5">{t.first}% → {t.last}%</p>
+                                                    <p className="text-xs font-medium text-text truncate">{t.name}</p>
+                                                    <p className="text-[10px] text-text-muted mt-0.5">{t.first}% → {t.last}%</p>
                                                 </div>
-                                                <span className="text-sm font-bold text-emerald-400 flex-shrink-0">+{t.delta.toFixed(1)}%</span>
+                                                <span className="text-sm font-bold text-emerald-500 [.dark_&]:text-emerald-400 flex-shrink-0">+{t.delta.toFixed(1)}%</span>
                                             </div>
                                         ))}
                                     </div>
@@ -418,17 +429,17 @@ const TestAnalytics = () => {
                             )}
                             {declining.length > 0 && (
                                 <div>
-                                    <p className="text-xs font-semibold text-rose-400 flex items-center gap-1.5 mb-3 uppercase tracking-wider">
+                                    <p className="text-xs font-semibold text-rose-600 [.dark_&]:text-rose-400 flex items-center gap-1.5 mb-3 uppercase tracking-wider">
                                         <ArrowDownRight className="w-3.5 h-3.5" /> Declining ({declining.length})
                                     </p>
                                     <div className="space-y-2">
                                         {declining.slice(0, 6).map((t, i) => (
                                             <div key={i} className="flex items-center gap-3 bg-rose-500/[0.04] border border-rose-500/10 rounded-xl p-3">
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-xs font-medium text-white truncate">{t.name}</p>
-                                                    <p className="text-[10px] text-slate-500 mt-0.5">{t.first}% → {t.last}%</p>
+                                                    <p className="text-xs font-medium text-text truncate">{t.name}</p>
+                                                    <p className="text-[10px] text-text-muted mt-0.5">{t.first}% → {t.last}%</p>
                                                 </div>
-                                                <span className="text-sm font-bold text-rose-400 flex-shrink-0">−{t.delta.toFixed(1)}%</span>
+                                                <span className="text-sm font-bold text-rose-600 [.dark_&]:text-rose-400 flex-shrink-0">−{t.delta.toFixed(1)}%</span>
                                             </div>
                                         ))}
                                     </div>
@@ -444,27 +455,27 @@ const TestAnalytics = () => {
                         <div className="rounded-3xl border border-rose-500/20 bg-gradient-to-br from-rose-500/[0.05] to-transparent p-6">
                             <div className="flex items-center gap-2 mb-5">
                                 <AlertTriangle className="w-4 h-4 text-rose-400" />
-                                <h2 className="text-sm font-heading font-semibold text-white">Needs Improvement</h2>
+                                <h2 className="text-sm font-heading font-semibold text-text">Needs Improvement</h2>
                                 <span className="text-xs text-rose-400/60 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded-full">&lt;75% accuracy</span>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* Weak subjects */}
                                 {(global.subjectPerformance || []).filter(s => Number(s.accuracy) < 75).length > 0 && (
                                     <div>
-                                        <p className="text-xs text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5"><BookOpen className="w-3 h-3" /> Subjects</p>
+                                        <p className="text-xs text-text-muted uppercase tracking-wider mb-3 flex items-center gap-1.5"><BookOpen className="w-3 h-3" /> Subjects</p>
                                         <div className="space-y-2">
                                             {(global.subjectPerformance || []).filter(s => Number(s.accuracy) < 75)
                                                 .sort((a, b) => Number(a.accuracy) - Number(b.accuracy))
                                                 .map((s, i) => {
                                                     const acc = Number(s.accuracy);
                                                     return (
-                                                        <div key={i} className="bg-black/20 rounded-xl p-3 border border-white/[0.04]">
+                                                        <div key={i} className="bg-surface-3/10 rounded-xl p-3 border border-border">
                                                             <div className="flex items-center justify-between mb-1.5">
-                                                                <span className="text-xs font-medium text-white">{s.subject_name}</span>
+                                                                <span className="text-xs font-medium text-text">{s.subject_name}</span>
                                                                 <span className={`text-xs font-bold px-1.5 py-0.5 rounded-lg border ${accPill(acc)}`}>{acc}%</span>
                                                             </div>
-                                                            <div className="w-full bg-black/30 rounded-full h-1"><div className="h-full rounded-full" style={{ width: `${acc}%`, backgroundColor: accColor(acc) }} /></div>
-                                                            <p className="text-[10px] text-slate-600 mt-1">{s.total_correct}/{s.total_questions} correct · {Number(s.total_questions) - Number(s.total_correct)} wrong</p>
+                                                            <div className="w-full bg-surface-3/20 rounded-full h-1"><div className="h-full rounded-full" style={{ width: `${acc}%`, backgroundColor: accColor(acc) }} /></div>
+                                                            <p className="text-[10px] text-text-muted mt-1">{s.total_correct}/{s.total_questions} correct · {Number(s.total_questions) - Number(s.total_correct)} wrong</p>
                                                         </div>
                                                     );
                                                 })}
@@ -474,7 +485,7 @@ const TestAnalytics = () => {
                                 {/* Weak topics */}
                                 {(global.topicPerformance || []).filter(t => Number(t.accuracy) < 75).length > 0 && (
                                     <div>
-                                        <p className="text-xs text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5"><Target className="w-3 h-3" /> Topics</p>
+                                        <p className="text-xs text-text-muted uppercase tracking-wider mb-3 flex items-center gap-1.5"><Target className="w-3 h-3" /> Topics</p>
                                         <div className="space-y-2">
                                             {(global.topicPerformance || []).filter(t => Number(t.accuracy) < 75)
                                                 .sort((a, b) => Number(a.accuracy) - Number(b.accuracy))
@@ -482,14 +493,14 @@ const TestAnalytics = () => {
                                                 .map((t, i) => {
                                                     const acc = Number(t.accuracy);
                                                     return (
-                                                        <div key={i} className="bg-black/20 rounded-xl p-3 border border-white/[0.04] flex items-center gap-3">
+                                                        <div key={i} className="bg-surface-3/10 rounded-xl p-3 border border-border flex items-center gap-3">
                                                             <div className="flex-1 min-w-0">
-                                                                <p className="text-xs font-medium text-white truncate">{t.topic_name}</p>
-                                                                <div className="w-full bg-black/30 rounded-full h-1 mt-1"><div className="h-full rounded-full" style={{ width: `${acc}%`, backgroundColor: accColor(acc) }} /></div>
+                                                                 <p className="text-xs font-medium text-text truncate">{t.topic_name}</p>
+                                                                 <div className="w-full bg-surface-3/20 rounded-full h-1 mt-1"><div className="h-full rounded-full" style={{ width: `${acc}%`, backgroundColor: accColor(acc) }} /></div>
                                                             </div>
                                                             <div className="text-right flex-shrink-0">
                                                                 <p className="text-xs font-bold" style={{ color: accColor(acc) }}>{acc}%</p>
-                                                                <p className="text-[10px] text-slate-600">{t.total_correct}/{t.total_questions}</p>
+                                                                <p className="text-[10px] text-text-muted">{t.total_correct}/{t.total_questions}</p>
                                                             </div>
                                                         </div>
                                                     );
@@ -504,26 +515,26 @@ const TestAnalytics = () => {
 
                 {/* ── Most Asked Topics (Subject Wise) ─────────────────── */}
                 {Object.keys(topicsBySub).length > 0 && (
-                    <div className="glass rounded-3xl border border-white/8 p-6 shadow-xl">
+                    <div className="glass rounded-3xl border border-border p-6 shadow-xl">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
                             <div className="flex items-center gap-2">
                                 <Flame className="w-5 h-5 text-amber-500" />
-                                <h2 className="text-base font-heading font-semibold text-white">Most Asked Topics</h2>
-                                <span className="text-xs text-slate-500 ml-1">subject-wise frequency focus</span>
+                                <h2 className="text-base font-heading font-semibold text-text">Most Asked Topics</h2>
+                                <span className="text-xs text-text-muted ml-1">subject-wise frequency focus</span>
                             </div>
 
                             <div className="relative group self-start sm:self-center">
                                 <select
-                                    className="bg-white/5 border border-white/10 text-slate-300 text-[11px] font-bold uppercase tracking-wider rounded-xl pl-4 pr-10 py-2 outline-none focus:border-pink-500/50 appearance-none cursor-pointer hover:bg-white/[0.08] transition-all min-w-[160px]"
+                                    className="bg-surface-2 border border-border text-text-muted text-[11px] font-bold uppercase tracking-wider rounded-xl pl-4 pr-10 py-2 outline-none focus:border-pink-500/50 appearance-none cursor-pointer hover:bg-surface-3/10 transition-all min-w-[160px]"
                                     value={filterTopicSubject}
                                     onChange={e => setFilterTopicSubject(e.target.value)}
                                 >
-                                    <option value="All" className="bg-[#161622]">ALL SUBJECTS</option>
+                                    <option value="All" className="bg-surface-2">ALL SUBJECTS</option>
                                     {Object.keys(topicsBySub).sort().map(sub => (
-                                        <option key={sub} value={sub} className="bg-[#161622]">{sub.toUpperCase()}</option>
+                                        <option key={sub} value={sub} className="bg-surface-2">{sub.toUpperCase()}</option>
                                     ))}
                                 </select>
-                                <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none group-hover:text-slate-300 transition-colors" />
+                                <ChevronDown className="w-3.5 h-3.5 text-text-muted absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none group-hover:text-text-muted transition-colors" />
                             </div>
                         </div>
                         <div className={`grid grid-cols-1 ${filterTopicSubject === 'All' ? 'md:grid-cols-2 lg:grid-cols-3' : 'md:grid-cols-1'} gap-6`}>
@@ -531,23 +542,23 @@ const TestAnalytics = () => {
                                 .filter(([sub]) => filterTopicSubject === 'All' || sub === filterTopicSubject)
                                 .map(([sub, topics]) => (
                                     <div key={sub} className={`flex flex-col gap-3 ${filterTopicSubject !== 'All' ? 'max-w-2xl mx-auto w-full' : ''}`}>
-                                        <div className="flex items-center gap-2 pb-2 border-b border-white/[0.04]">
+                                        <div className="flex items-center gap-2 pb-2 border-b border-border">
                                             <BookOpen className="w-3.5 h-3.5 text-pink-400" />
-                                            <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">{sub}</span>
+                                            <span className="text-xs font-bold text-text-muted uppercase tracking-widest">{sub}</span>
                                         </div>
                                         <div className={`grid grid-cols-1 ${filterTopicSubject === 'All' ? 'gap-2' : 'sm:grid-cols-2 lg:grid-cols-3 gap-2.5 mx-auto max-w-4xl'}`}>
                                             {[...topics].sort((a, b) => Number(b.total_questions) - Number(a.total_questions))
                                                 .slice(0, filterTopicSubject === 'All' ? 5 : undefined)
                                                 .map((t, idx) => (
-                                                    <div key={idx} className="flex items-center justify-between gap-3 p-2.5 bg-white/[0.02] border border-white/[0.04] rounded-xl hover:bg-white/[0.05] transition-all group overflow-hidden">
+                                                    <div key={idx} className="flex items-center justify-between gap-3 p-2.5 bg-surface-3/10 border border-border rounded-xl hover:bg-surface-3/10 transition-all group overflow-hidden">
                                                         <div className="flex items-center gap-2.5 min-w-0">
-                                                            <span className="text-[9px] font-black text-slate-600 group-hover:text-pink-500/50 w-4">#{idx + 1}</span>
+                                                            <span className="text-[9px] font-black text-text-muted group-hover:text-pink-500/50 w-4">#{idx + 1}</span>
                                                             <div className="min-w-0">
-                                                                <p className="text-xs text-slate-200 font-bold truncate leading-tight mb-0.5">{t.topic_name}</p>
-                                                                <p className="text-[9px] text-slate-500 truncate font-medium">{t.accuracy}% Accuracy</p>
+                                                                <p className="text-xs text-text font-bold truncate leading-tight mb-0.5">{t.topic_name}</p>
+                                                                <p className="text-[9px] text-text-muted truncate font-medium">{t.accuracy}% Accuracy</p>
                                                             </div>
                                                         </div>
-                                                        <div className={`px-2 py-0.5 rounded-lg text-[11px] font-black ${Number(t.total_questions) > 0 ? 'bg-pink-500/10 text-pink-400 border border-pink-500/20' : 'bg-slate-800 text-slate-500'}`}>
+                                                        <div className={`px-2 py-0.5 rounded-lg text-[11px] font-black ${Number(t.total_questions) > 0 ? 'bg-pink-500/10 text-pink-400 border border-pink-500/20' : 'bg-surface-2 text-text-muted'}`}>
                                                             {t.total_questions}
                                                         </div>
                                                     </div>
@@ -559,17 +570,17 @@ const TestAnalytics = () => {
                     </div>
                 )}
 
-                <div className="glass rounded-3xl border border-white/8 p-5 shadow-xl">
+                <div className="glass rounded-3xl border border-border p-5 shadow-xl">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                         <div className="flex items-center gap-2">
                             <BarChart2 className="w-4 h-4 text-pink-400" />
-                            <h2 className="text-sm font-heading font-semibold text-white">Global Breakdown</h2>
-                            <span className="text-xs text-slate-500">all attempts combined</span>
+                            <h2 className="text-sm font-heading font-semibold text-text">Global Breakdown</h2>
+                            <span className="text-xs text-text-muted">all attempts combined</span>
                         </div>
-                        <div className="flex bg-black/30 p-1 rounded-xl w-fit">
+                        <div className="flex bg-surface-3/10 p-1 rounded-xl w-fit">
                             {['subjects', 'topics'].map(t => (
                                 <button key={t} onClick={() => setActiveTab(t)}
-                                    className={`px-4 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all ${activeTab === t ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'}`}>
+                                    className={`px-4 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all ${activeTab === t ? 'bg-surface-2 shadow-sm text-text' : 'text-text-muted hover:text-text'}`}>
                                     {t}
                                 </button>
                             ))}
@@ -582,9 +593,9 @@ const TestAnalytics = () => {
                                 <div style={{ height: Math.max(140, subjectBarData.length * 36) }}>
                                     <ResponsiveContainer width="100%" height="100%">
                                         <BarChart data={subjectBarData} layout="vertical" margin={{ left: 0, right: 30, top: 0, bottom: 0 }}>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" horizontal={false} />
-                                            <XAxis type="number" domain={[0, 100]} tickFormatter={v => `${v}%`} tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} tickLine={false} axisLine={false} />
-                                            <YAxis type="category" dataKey="name" width={100} tick={{ fill: 'rgba(255,255,255,0.55)', fontSize: 10 }} tickLine={false} axisLine={false} />
+                                            <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border/20" horizontal={false} />
+                                            <XAxis type="number" domain={[0, 100]} tickFormatter={v => `${v}%`} tick={{ fill: 'currentColor', fontSize: 10 }} className="text-text-muted/50" tickLine={false} axisLine={false} />
+                                            <YAxis type="category" dataKey="name" width={100} tick={{ fill: 'currentColor', fontSize: 10 }} className="text-text-muted/80" tickLine={false} axisLine={false} />
                                             <Tooltip content={<ChartTip />} />
                                             <Bar dataKey="Accuracy" radius={[0, 6, 6, 0]} barSize={13}>
                                                 {subjectBarData.map((e, i) => <Cell key={i} fill={accColor(e.Accuracy)} />)}
@@ -608,9 +619,9 @@ const TestAnalytics = () => {
                                     .sort(([a], [b]) => a.localeCompare(b))
                                     .map(([sub, topics]) => (
                                         <div key={sub} className="space-y-4">
-                                            <div className="flex items-center gap-2 pb-2 border-b border-white/[0.04]">
+                                            <div className="flex items-center gap-2 pb-2 border-b border-border">
                                                 <BookOpen className="w-3.5 h-3.5 text-pink-400" />
-                                                <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">{sub}</span>
+                                                <span className="text-xs font-bold text-text-muted uppercase tracking-widest">{sub}</span>
                                             </div>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                 {topics.sort((a, b) => Number(b.accuracy) - Number(a.accuracy)).map((t, i) => (
@@ -628,8 +639,8 @@ const TestAnalytics = () => {
                     <div className="space-y-3">
                         <div className="flex items-center gap-2">
                             <Activity className="w-4 h-4 text-pink-400" />
-                            <h2 className="text-sm font-heading font-semibold text-white">Attempt History</h2>
-                            <span className="px-2 py-0.5 rounded-full bg-white/8 text-[11px] text-white/40">{attempts.length}</span>
+                            <h2 className="text-sm font-heading font-semibold text-text">Attempt History</h2>
+                            <span className="px-2 py-0.5 rounded-full bg-surface-3/10 border border-border text-[11px] text-text-muted">{attempts.length}</span>
                         </div>
                         <div className="space-y-2">
                             {[...attempts].reverse().map((a, revIdx) => {
@@ -639,31 +650,31 @@ const TestAnalytics = () => {
                                 const pct = a.accuracy ?? 0;
                                 const isOpen = expandedAttempt === r.id;
                                 return (
-                                    <div key={r.id} className={`rounded-2xl border transition-all overflow-hidden ${isOpen ? 'border-pink-500/25 bg-[#0f0f1a]' : 'border-white/[0.05] bg-white/[0.01] hover:bg-white/[0.02]'}`}>
+                                    <div key={r.id} className={`rounded-2xl border transition-all overflow-hidden ${isOpen ? 'border-pink-500/25 bg-surface-2' : 'border-border bg-surface-3/10 hover:bg-surface-3/10'}`}>
                                         <button className="w-full p-4 flex items-center gap-3 text-left" onClick={() => setExpanded(isOpen ? null : r.id)}>
                                             <div className="w-8 h-8 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center flex-shrink-0">
                                                 <span className="text-[10px] font-bold text-pink-400">#{num}</span>
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-semibold text-white">{new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                                                <p className="text-xs text-slate-500">{r.total_qs} qs · {r.my_score}/{r.total_score} marks</p>
+                                                <p className="text-sm font-semibold text-text">{new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                                                <p className="text-xs text-text-muted">{r.total_qs} qs · {r.my_score}/{r.total_score} marks</p>
                                             </div>
                                             <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${accPill(pct)}`}>{pct}%</span>
                                             <div className="hidden sm:block w-20">
-                                                <div className="w-full bg-white/[0.04] rounded-full h-1.5">
+                                                <div className="w-full bg-surface-3/10 rounded-full h-1.5">
                                                     <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: accColor(pct) }} />
                                                 </div>
                                             </div>
-                                            {isOpen ? <ChevronUp className="w-4 h-4 text-pink-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-slate-500 flex-shrink-0" />}
+                                            {isOpen ? <ChevronUp className="w-4 h-4 text-pink-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-text-muted flex-shrink-0" />}
                                         </button>
                                         {isOpen && (
-                                            <div className="px-4 pb-4 border-t border-white/[0.05] pt-3">
+                                            <div className="px-4 pb-4 border-t border-border pt-3">
                                                 <div className="flex items-center justify-between mb-3">
-                                                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Breakdown</span>
-                                                    <div className="flex bg-black/30 p-0.5 rounded-lg">
+                                                    <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Breakdown</span>
+                                                    <div className="flex bg-surface-3/10 p-0.5 rounded-lg">
                                                         {['subjects', 'topics'].map(t => (
                                                             <button key={t} onClick={() => setAttemptTab(t)}
-                                                                className={`px-3 py-0.5 rounded-md text-xs font-semibold capitalize transition-all ${attemptTab === t ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'}`}>{t}</button>
+                                                                className={`px-3 py-0.5 rounded-md text-xs font-semibold capitalize transition-all ${attemptTab === t ? 'bg-surface-2 shadow-sm text-text' : 'text-text-muted hover:text-text'}`}>{t}</button>
                                                         ))}
                                                     </div>
                                                 </div>
@@ -679,10 +690,10 @@ const TestAnalytics = () => {
                 )}
 
                 {attempts.length === 0 && (
-                    <div className="glass rounded-3xl border border-white/8 p-14 text-center">
+                    <div className="glass rounded-3xl border border-border p-14 text-center">
                         <Activity className="w-10 h-10 text-pink-400/30 mx-auto mb-4" />
-                        <p className="text-slate-300 font-medium">No attempts yet</p>
-                        <p className="text-slate-500 text-sm mt-1">Log a test attempt to see analytics.</p>
+                        <p className="text-text-muted font-medium">No attempts yet</p>
+                        <p className="text-text-muted text-sm mt-1">Log a test attempt to see analytics.</p>
                     </div>
                 )}
             </div>
@@ -692,15 +703,15 @@ const TestAnalytics = () => {
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 const BreakdownCard = ({ name, accuracy, correct, total, marks }) => (
-    <div className="bg-white/[0.02] hover:bg-white/[0.04] p-4 rounded-xl border border-white/5 flex flex-col gap-2 transition-colors">
+    <div className="bg-surface-3/10 hover:bg-surface-3/10 p-4 rounded-xl border border-border flex flex-col gap-2 transition-colors">
         <div className="flex justify-between items-start gap-2">
-            <p className="text-xs font-semibold text-white leading-tight">{name}</p>
+            <p className="text-xs font-semibold text-text leading-tight">{name}</p>
             <span className={`px-2 py-0.5 rounded-lg text-xs font-bold border flex-shrink-0 ${accPill(accuracy)}`}>{accuracy}%</span>
         </div>
-        <div className="w-full bg-black/30 rounded-full h-1.5">
+        <div className="w-full bg-surface-3/20 rounded-full h-1.5">
             <div className="h-full rounded-full" style={{ width: `${Math.min(100, accuracy)}%`, backgroundColor: accColor(accuracy) }} />
         </div>
-        <p className="text-[11px] text-slate-500">
+        <p className="text-[11px] text-text-muted">
             {correct} / {total} correct {marks !== undefined && Number(marks) > 0 && `· ~${marks} marks contribution`}
         </p>
     </div>
@@ -708,7 +719,7 @@ const BreakdownCard = ({ name, accuracy, correct, total, marks }) => (
 
 
 const BreakdownList = ({ items, nameKey, emptyText, groupTopicsBySubject = false }) => {
-    if (!items?.length) return <p className="text-xs text-slate-500 text-center py-3">{emptyText}</p>;
+    if (!items?.length) return <p className="text-xs text-text-muted text-center py-3">{emptyText}</p>;
 
     if (groupTopicsBySubject && nameKey === 'topic_name') {
         const groups = {};
@@ -724,7 +735,7 @@ const BreakdownList = ({ items, nameKey, emptyText, groupTopicsBySubject = false
                     <div key={sub} className="space-y-2.5">
                         <div className="flex items-center gap-2 px-1">
                             <div className="w-1 h-3 bg-pink-500/40 rounded-full" />
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{sub}</p>
+                            <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest">{sub}</p>
                         </div>
                         <div className="space-y-2">
                             {topics.sort((a, b) => Number(b.accuracy) - Number(a.accuracy)).map((item, i) => (
@@ -749,24 +760,24 @@ const BreakdownList = ({ items, nameKey, emptyText, groupTopicsBySubject = false
 const BreakdownListItem = ({ item, nameKey }) => {
     const acc = Number(item.accuracy);
     return (
-        <div className="bg-black/20 rounded-xl p-2.5 border border-white/[0.04] flex items-center gap-3">
+        <div className="bg-surface-3/10 rounded-xl p-2.5 border border-border flex items-center gap-3">
             <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-white truncate">{item[nameKey]}</p>
-                <div className="w-full bg-black/30 rounded-full h-1 mt-1.5">
+                <p className="text-xs font-medium text-text truncate">{item[nameKey]}</p>
+                <div className="w-full bg-surface-3/20 rounded-full h-1 mt-1.5">
                     <div className="h-full rounded-full" style={{ width: `${Math.min(100, acc)}%`, backgroundColor: accColor(acc) }} />
                 </div>
             </div>
             <div className="text-right flex-shrink-0">
                 <p className="text-xs font-bold" style={{ color: accColor(acc) }}>{acc}%</p>
-                <p className="text-[10px] text-slate-600">{item.total_correct}/{item.total_questions}</p>
+                <p className="text-[10px] text-text-muted">{item.total_correct}/{item.total_questions}</p>
             </div>
         </div>
     );
 };
 
 const EmptyState = ({ text }) => (
-    <div className="p-10 text-center rounded-xl border border-dashed border-white/10">
-        <p className="text-slate-500 text-sm">{text}</p>
+    <div className="p-10 text-center rounded-xl border border-dashed border-border">
+        <p className="text-text-muted text-sm">{text}</p>
     </div>
 );
 

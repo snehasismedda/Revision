@@ -72,13 +72,12 @@ const SubjectModal = ({ isOpen, onClose, editingSubject, onSubjectSaved, existin
         <ModalPortal>
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop fade-in" onClick={onClose}>
                 <div
-                    className="w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-                    style={{ background: 'rgba(22, 22, 34, 0.95)', border: '1px solid rgba(255,255,255,0.08)' }}
+                    className="w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col bg-surface-2 border border-border"
                     onClick={e => e.stopPropagation()}
                 >
                     {/* Header */}
-                    <div className="flex items-center justify-between px-7 py-5 border-b border-white/[0.06] shrink-0">
-                        <h3 className="text-lg font-heading font-semibold text-white flex items-center gap-3">
+                    <div className="flex items-center justify-between px-7 py-5 border-b border-border shrink-0">
+                        <h3 className="text-lg font-heading font-semibold text-text flex items-center gap-3">
                             <div className="p-2 rounded-lg bg-primary/10 text-primary">
                                 <LibraryBig className="w-5 h-5" />
                             </div>
@@ -86,7 +85,7 @@ const SubjectModal = ({ isOpen, onClose, editingSubject, onSubjectSaved, existin
                         </h3>
                         <button
                             onClick={onClose}
-                            className="p-2 text-slate-500 hover:text-white hover:bg-white/[0.06] rounded-lg transition-all cursor-pointer"
+                            className="p-2 text-text-muted hover:text-text hover:bg-surface-3/10 rounded-lg transition-all cursor-pointer"
                         >
                             <X className="w-5 h-5" />
                         </button>
@@ -99,29 +98,29 @@ const SubjectModal = ({ isOpen, onClose, editingSubject, onSubjectSaved, existin
                         )}
 
                         <div>
-                            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-2.5">Subject Name *</label>
+                            <label className="block text-[10px] font-extrabold text-text-muted uppercase tracking-[0.18em] mb-2.5">Subject Name *</label>
                             <input
                                 required
                                 autoFocus
                                 value={form.name}
                                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                                className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 focus:bg-surface-2/70 transition-all placeholder:text-slate-600/80"
+                                className="w-full bg-surface-2 border border-border text-text rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 transition-all placeholder:text-text-muted/60"
                                 placeholder="e.g. Mathematics, Physics..."
                             />
                         </div>
                         <div>
-                            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-2.5">Description</label>
+                            <label className="block text-[10px] font-extrabold text-text-muted uppercase tracking-[0.18em] mb-2.5">Description</label>
                             <textarea
                                 value={form.description}
                                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                                 rows={2}
-                                className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 focus:bg-surface-2/70 transition-all placeholder:text-slate-600/80 resize-none"
+                                className="w-full bg-surface-2 border border-border text-text rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 transition-all placeholder:text-text-muted/60 resize-none"
                                 placeholder="Optional description..."
                             />
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-2.5">Tags</label>
+                            <label className="block text-[10px] font-extrabold text-text-muted uppercase tracking-[0.18em] mb-2.5">Tags</label>
                             <div className="flex flex-wrap gap-2 mb-2">
                                 {form.tags.map(tag => (
                                     <span key={tag} className="px-2.5 py-1 text-[12px] font-medium bg-primary/10 text-primary border border-primary/20 rounded-lg flex items-center gap-1.5">
@@ -129,7 +128,7 @@ const SubjectModal = ({ isOpen, onClose, editingSubject, onSubjectSaved, existin
                                         <button
                                             type="button"
                                             onClick={() => setForm(f => ({ ...f, tags: f.tags.filter(t => t !== tag) }))}
-                                            className="hover:text-white transition-colors"
+                                            className="hover:text-text transition-colors"
                                         >
                                             <X className="w-3 h-3" />
                                         </button>
@@ -149,19 +148,19 @@ const SubjectModal = ({ isOpen, onClose, editingSubject, onSubjectSaved, existin
                                         setTagInput('');
                                     }
                                 }}
-                                className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 focus:bg-surface-2/70 transition-all placeholder:text-slate-600/80"
+                                className="w-full bg-surface-2 border border-border text-text rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 transition-all placeholder:text-text-muted/60"
                                 placeholder="Type a tag and press Enter..."
                             />
                             {existingTags.filter(t => !form.tags.includes(t)).length > 0 && (
                                 <div className="mt-3">
-                                    <p className="text-[10px] text-slate-500 mb-2 uppercase tracking-wider font-semibold">Available Tags</p>
+                                    <p className="text-[10px] text-text-muted mb-2 uppercase tracking-wider font-semibold">Available Tags</p>
                                     <div className="flex flex-wrap gap-2">
                                         {existingTags.filter(t => !form.tags.includes(t)).map(tag => (
                                             <button
                                                 key={tag}
                                                 type="button"
                                                 onClick={() => setForm(f => ({ ...f, tags: [...f.tags, tag] }))}
-                                                className="px-2 py-1 text-[11px] font-medium bg-surface-3/50 text-slate-300 hover:text-white hover:bg-surface-3 border border-white/[0.06] hover:border-white/[0.12] rounded-md transition-all cursor-pointer shadow-sm active:scale-95"
+                                                className="px-2 py-1 text-[11px] font-medium bg-surface-3/50 text-text-muted hover:text-text hover:bg-surface-3 border border-border hover:border-primary/40 rounded-md transition-all cursor-pointer shadow-sm active:scale-95"
                                             >
                                                 + {tag}
                                             </button>
@@ -175,11 +174,11 @@ const SubjectModal = ({ isOpen, onClose, editingSubject, onSubjectSaved, existin
                     </form>
 
                     {/* Footer */}
-                    <div className="px-7 py-5 border-t border-white/[0.06] flex gap-3 shrink-0">
+                    <div className="px-7 py-5 border-t border-border flex gap-3 shrink-0">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex-1 px-5 py-3 rounded-xl text-[13px] font-semibold text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer border border-transparent hover:border-white/[0.08]"
+                            className="flex-1 px-5 py-3 rounded-xl text-[13px] font-semibold text-text-muted hover:text-text hover:bg-surface-3/10 transition-all cursor-pointer border border-transparent hover:border-border"
                         >
                             Cancel
                         </button>

@@ -62,37 +62,37 @@ const CreateRevisionSessionModal = ({ isOpen, onClose, onSubmit, topics }) => {
 
         return (
             <div key={item.id} className="ml-4 mt-1">
-                <div className="flex items-center gap-2 group p-1.5 rounded hover:bg-white/[0.04]">
+                <div className="flex items-center gap-2 group p-1.5 rounded-lg hover:bg-surface-3/10 transition-all">
                     {hasChildren ? (
                         <button
                             type="button"
                             onClick={() => toggleExpand(item.id)}
-                            className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/10 text-slate-400 group-hover:text-slate-300 cursor-pointer"
+                            className="w-5 h-5 flex items-center justify-center rounded hover:bg-surface-3/20 text-text-muted group-hover:text-text transition-all cursor-pointer"
                         >
                             {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                         </button>
                     ) : (
-                        <div className="w-5 h-5 flex items-center justify-center text-slate-600">
+                        <div className="w-5 h-5 flex items-center justify-center text-text-muted/40">
                             •
                         </div>
                     )}
                     <button
                         type="button"
                         onClick={() => handleToggleSelect(item, isSelected)}
-                        className={`w-4 h-4 rounded border flex items-center justify-center transition-colors cursor-pointer
-                            ${isSelected ? 'bg-violet-500 border-violet-500 text-white' : 'border-slate-500'}`}
+                        className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all cursor-pointer shadow-sm
+                            ${isSelected ? 'bg-violet-500 border-violet-500 text-white shadow-lg shadow-violet-500/20' : 'border-border bg-surface-2 group-hover:border-violet-500/40'}`}
                     >
                         {isSelected && <CheckSquare className="w-3.5 h-3.5" />}
                     </button>
                     <span
-                        className={`text-[13px] ${isSelected ? 'text-white font-medium' : 'text-slate-300'} cursor-pointer select-none`}
+                        className={`text-[13px] ${isSelected ? 'text-text font-bold' : 'text-text-muted'} cursor-pointer select-none transition-colors`}
                         onClick={() => handleToggleSelect(item, isSelected)}
                     >
                         {item.name}
                     </span>
                 </div>
                 {hasChildren && isExpanded && (
-                    <div className="border-l border-white/[0.05] ml-2.5">
+                    <div className="border-l border-border ml-2.5 pl-1.5 py-0.5">
                         {children.map(c => renderNode(c))}
                     </div>
                 )}
@@ -113,12 +113,11 @@ const CreateRevisionSessionModal = ({ isOpen, onClose, onSubmit, topics }) => {
         <ModalPortal>
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop fade-in" onClick={onClose}>
                 <div
-                    className="w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-                    style={{ background: 'rgba(22, 22, 34, 0.95)', border: '1px solid rgba(255,255,255,0.08)' }}
+                    className="w-full max-w-md bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
                     onClick={e => e.stopPropagation()}
                 >
-                    <div className="flex items-center justify-between px-7 py-5 border-b border-white/[0.06] shrink-0">
-                        <h3 className="text-lg font-heading font-semibold text-white flex items-center gap-3">
+                    <div className="flex items-center justify-between px-7 py-5 border-b border-border shrink-0">
+                        <h3 className="text-lg font-heading font-semibold text-text flex items-center gap-3">
                             <div className="p-2 rounded-lg bg-violet-500/10 text-violet-400">
                                 <ClipboardList className="w-5 h-5" />
                             </div>
@@ -126,7 +125,7 @@ const CreateRevisionSessionModal = ({ isOpen, onClose, onSubmit, topics }) => {
                         </h3>
                         <button
                             onClick={onClose}
-                            className="p-2 text-slate-500 hover:text-white hover:bg-white/[0.06] rounded-lg transition-all cursor-pointer"
+                            className="p-2 text-text-muted hover:text-text hover:bg-surface-3/10 rounded-lg transition-all cursor-pointer"
                         >
                             <X className="w-5 h-5" />
                         </button>
@@ -135,41 +134,41 @@ const CreateRevisionSessionModal = ({ isOpen, onClose, onSubmit, topics }) => {
                     <div className="px-7 py-6 overflow-y-auto custom-scrollbar">
                         <form id="create-revision-form" onSubmit={handleSubmit} className="space-y-6">
                             <div>
-                                <label className="block text-sm font-semibold text-slate-300 mb-2">Session Name</label>
+                                <label className="block text-[10px] font-extrabold text-text-muted uppercase tracking-[0.18em] mb-2.5">Session Name</label>
                                 <input
                                     autoFocus
                                     type="text"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     placeholder="e.g. Weekend Full Mock Revision"
-                                    className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-violet-400/40 focus:ring-2 focus:ring-violet-400/15 transition-all font-medium"
+                                    className="w-full bg-surface-2 border border-border text-text rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-violet-400/40 focus:ring-2 focus:ring-violet-400/15 transition-all font-medium placeholder:text-text-muted/60 shadow-inner"
                                     required
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-semibold text-slate-300 mb-2">
+                                <label className="block text-[10px] font-extrabold text-text-muted uppercase tracking-[0.18em] mb-2.5">
                                     Select Topics ({selectedTopics.size} selected)
                                 </label>
-                                <div className="bg-surface-2/50 border border-white/[0.08] rounded-xl p-4 max-h-[300px] overflow-y-auto custom-scrollbar">
+                                <div className="bg-surface-2 border border-border rounded-xl p-4 max-h-[300px] overflow-y-auto custom-scrollbar shadow-inner">
                                     {topics.length > 0 ? (
                                         <div className="-ml-4">
                                             {topics.map(renderNode)}
                                         </div>
                                     ) : (
-                                        <p className="text-center text-slate-500 text-sm py-4">No syllabus topics available.</p>
+                                        <p className="text-center text-text-muted/60 text-sm py-4">No syllabus topics available.</p>
                                     )}
                                 </div>
                             </div>
                         </form>
                     </div>
 
-                    <div className="px-7 py-5 border-t border-white/[0.06] shrink-0 flex items-center justify-end bg-black/20">
+                    <div className="px-7 py-5 border-t border-border shrink-0 flex items-center justify-end bg-surface-2/50">
                         <div className="flex gap-3">
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="px-5 py-3 rounded-xl text-[13px] font-semibold text-slate-400 hover:text-white transition-all cursor-pointer"
+                                className="px-5 py-3 rounded-xl text-[13px] font-semibold text-text-muted hover:text-text transition-all cursor-pointer"
                             >
                                 Cancel
                             </button>

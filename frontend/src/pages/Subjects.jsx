@@ -84,8 +84,8 @@ const Subjects = () => {
                         <LibraryBig className="w-5 h-5 text-primary" />
                         <span className="text-[11px] font-bold tracking-widest text-primary uppercase">Library</span>
                     </div>
-                    <h1 className="text-3xl font-heading font-bold text-white tracking-tight">Subjects</h1>
-                    <p className="text-slate-400 text-sm mt-1.5">
+                    <h1 className="text-3xl font-heading font-bold text-text tracking-tight">Subjects</h1>
+                    <p className="text-text-muted text-sm mt-1.5">
                         {activeCount} subject{activeCount !== 1 ? 's' : ''} in your library
                     </p>
                 </div>
@@ -96,7 +96,7 @@ const Subjects = () => {
                             <select
                                 value={selectedTag}
                                 onChange={(e) => setSelectedTag(e.target.value)}
-                                className="w-full sm:w-auto bg-surface-2/50 border border-white/[0.08] text-slate-200 rounded-xl px-4 py-2.5 sm:py-2 text-[13px] focus:outline-none focus:border-primary/40 focus:bg-surface-2 transition-all appearance-none cursor-pointer pr-10 hover:border-white/[0.15]"
+                                className="w-full sm:w-auto bg-surface-2/50 border border-border text-text-muted rounded-xl px-4 py-2.5 sm:py-2 text-[13px] focus:outline-none focus:border-primary/40 focus:bg-surface-2 transition-all appearance-none cursor-pointer pr-10 hover:border-border-hover"
                                 style={{
                                     backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(148, 163, 184, 1)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
                                     backgroundRepeat: 'no-repeat',
@@ -112,18 +112,18 @@ const Subjects = () => {
                         </div>
                     )}
                     <div className="relative group flex-1 sm:flex-none">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-primary transition-colors" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-primary transition-colors" />
                         <input
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Filter subjects..."
-                            className="bg-surface-2/50 border border-white/[0.08] rounded-xl py-2.5 sm:py-2 pl-10 pr-4 text-[13px] text-white w-full sm:w-[200px] md:w-[240px] focus:outline-none focus:border-primary/40 focus:bg-surface-2 transition-all"
+                            className="bg-surface-2/50 border border-border rounded-xl py-2.5 sm:py-2 pl-10 pr-4 text-[13px] text-text w-full sm:w-[200px] md:w-[240px] focus:outline-none focus:border-primary/40 focus:bg-surface-2 transition-all"
                         />
                         {searchQuery && (
                             <button
                                 onClick={() => setSearchQuery('')}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white cursor-pointer"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text cursor-pointer"
                             >
                                 <X className="w-4 h-4" />
                             </button>
@@ -131,7 +131,7 @@ const Subjects = () => {
                     </div>
                     <button
                         onClick={() => setShowArchived(!showArchived)}
-                        className={`btn-secondary flex items-center justify-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer whitespace-nowrap border ${showArchived ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' : 'bg-surface-2/50 border-white/[0.08] text-slate-400 hover:text-white hover:border-white/20'}`}
+                        className={`btn-secondary flex items-center justify-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl transition-all cursor-pointer whitespace-nowrap border ${showArchived ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' : 'bg-surface-2/50 border-border text-text-muted hover:text-text hover:border-border'}`}
                     >
                         <Archive className="w-3.5 h-3.5" />
                         <span>{showArchived ? 'Hide Archive' : 'Show Archive'}</span>
@@ -162,7 +162,7 @@ const Subjects = () => {
             {(loading || !isLoaded) ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {[...Array(3)].map((_, i) => (
-                        <div key={i} className="glass p-8 animate-pulse h-[160px] rounded-xl border-white/5" />
+                        <div key={i} className="glass p-8 animate-pulse h-[160px] rounded-xl border-border" />
                     ))}
                 </div>
             ) : subjects.length === 0 ? (
@@ -171,8 +171,8 @@ const Subjects = () => {
                     <div className="w-20 h-20 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-6 border border-primary/20 pulse-ring">
                         <BookOpen className="w-10 h-10 text-primary" strokeWidth={1.5} />
                     </div>
-                    <h3 className="text-2xl font-heading font-bold text-white mb-3 tracking-tight">No subjects yet</h3>
-                    <p className="text-slate-400 text-sm max-w-sm mx-auto mb-8 leading-relaxed">
+                    <h3 className="text-2xl font-heading font-bold text-text mb-3 tracking-tight">No subjects yet</h3>
+                    <p className="text-text-muted text-sm max-w-sm mx-auto mb-8 leading-relaxed">
                         Create your first subject to start building your knowledge tree and tracking performance.
                     </p>
                     <button
@@ -214,10 +214,10 @@ const Subjects = () => {
                     </div>
 
                     {showArchived && subjects.some(s => s.is_archived) && (
-                        <div className="pt-10 border-t border-white/[0.05]">
+                        <div className="pt-10 border-t border-border">
                             <div className="flex items-center gap-3 mb-6">
                                 <Archive className="w-5 h-5 text-amber-500/50" />
-                                <h2 className="text-xl font-heading font-bold text-slate-500 tracking-tight">Archived Subjects</h2>
+                                <h2 className="text-xl font-heading font-bold text-text-muted tracking-tight">Archived Subjects</h2>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 opacity-60 hover:opacity-100 transition-opacity">
                                 {subjects

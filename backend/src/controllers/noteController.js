@@ -47,7 +47,7 @@ export const getAllNotes = async (req, res, next) => {
 export const createNote = async (req, res, next) => {
     try {
         const { subjectId } = req.params;
-        const { questionId, title, content, sourceImageIds: existingSourceImageIds, images, parentNoteId, tags } = req.body;
+        const { questionId, title, content, sourceImageIds: existingSourceImageIds, images, parentNoteId, tags, key_highlights } = req.body;
 
         let finalContent = content;
         let finalTitle = title;
@@ -98,7 +98,7 @@ export const createNote = async (req, res, next) => {
             sourceImageIds = [...sourceImageIds, ...newImageIds];
         }
 
-        const note = await noteModel.createNote(subjectId, questionId, finalTitle, finalContent, sourceImageIds, parentNoteId, tags);
+        const note = await noteModel.createNote(subjectId, questionId, finalTitle, finalContent, sourceImageIds, parentNoteId, tags, key_highlights);
 
         await subjectModel.touchSubject(subjectId);
 
@@ -136,7 +136,7 @@ export const deleteNote = async (req, res, next) => {
 export const updateNote = async (req, res, next) => {
     try {
         const { subjectId, noteId } = req.params;
-        const { title, content, tags, sourceImageIds: existingSourceImageIds, images } = req.body;
+        const { title, content, tags, sourceImageIds: existingSourceImageIds, images, key_highlights } = req.body;
 
         if (!title || !content) {
             return res.status(400).json({ error: 'Title and content are required' });
@@ -158,7 +158,8 @@ export const updateNote = async (req, res, next) => {
             title, 
             content, 
             tags, 
-            source_image_ids: sourceImageIds 
+            source_image_ids: sourceImageIds,
+            key_highlights: key_highlights || []
         });
         
         if (!note) {

@@ -68,29 +68,29 @@ const TopicMultiSelect = ({ options, value = [], onChange }) => {
         <div className="relative flex-[2] min-w-[200px]" ref={containerRef}>
             <div
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full h-10 px-3 bg-[#0f0f1a] border border-white/10 rounded-lg text-sm text-white flex items-center justify-between cursor-pointer hover:border-pink-500/50"
+                className="w-full h-10 px-3 bg-[#0f0f1a] border border-border rounded-lg text-sm text-text flex items-center justify-between cursor-pointer hover:border-pink-500/50"
             >
-                <span className="truncate pr-2 text-slate-300">
+                <span className="truncate pr-2 text-text-muted">
                     {value.length === 0 ? "Select Topics..." : `${value.length} selected`}
                 </span>
-                <ChevronDown className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                <ChevronDown className="w-4 h-4 text-text-muted flex-shrink-0" />
             </div>
 
             {isOpen && (
-                <div className="absolute z-50 w-full mt-1 bg-[#1a1a2e] border border-white/10 rounded-xl shadow-2xl overflow-hidden">
-                    <div className="p-2 border-b border-white/5 relative">
-                        <Search className="w-4 h-4 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2" />
+                <div className="absolute z-50 w-full mt-1 bg-[#1a1a2e] border border-border rounded-xl shadow-2xl overflow-hidden">
+                    <div className="p-2 border-b border-border relative">
+                        <Search className="w-4 h-4 text-text-muted absolute left-4 top-1/2 -translate-y-1/2" />
                         <input
                             type="text"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             placeholder="Search topics..."
-                            className="w-full bg-[#0f0f1a] border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-sm text-white focus:outline-none focus:border-pink-500/50"
+                            className="w-full bg-[#0f0f1a] border border-border rounded-lg pl-8 pr-3 py-1.5 text-sm text-text focus:outline-none focus:border-pink-500/50"
                         />
                     </div>
                     <div className="max-h-48 overflow-y-auto custom-scrollbar p-1">
                         {filtered.length === 0 ? (
-                            <div className="px-3 py-2 text-xs text-slate-500 text-center">
+                            <div className="px-3 py-2 text-xs text-text-muted text-center">
                                 No topics found
                             </div>
                         ) : (
@@ -98,7 +98,7 @@ const TopicMultiSelect = ({ options, value = [], onChange }) => {
                                 <div
                                     key={t.id}
                                     onClick={() => toggleOption(t.id)}
-                                    className="px-2 py-1.5 hover:bg-white/[0.03] rounded-lg cursor-pointer flex items-center gap-2 transition-colors"
+                                    className="px-2 py-1.5 hover:bg-surface-3/10 rounded-lg cursor-pointer flex items-center gap-2 transition-colors"
                                 >
                                     <div
                                         className={`w-4 h-4 rounded-md border flex items-center justify-center transition-colors ${value.includes(t.id)
@@ -107,10 +107,10 @@ const TopicMultiSelect = ({ options, value = [], onChange }) => {
                                             }`}
                                     >
                                         {value.includes(t.id) && (
-                                            <CheckSquare className="w-3 h-3 text-white" />
+                                            <CheckSquare className="w-3 h-3 text-text" />
                                         )}
                                     </div>
-                                    <span className="text-sm text-slate-300 truncate">
+                                    <span className="text-sm text-text-muted truncate">
                                         {"\u00A0".repeat(t.depth * 2)}
                                         {t.name}
                                     </span>
@@ -182,17 +182,26 @@ const TestDetail = () => {
         }
     };
 
-    // Initialize from context if available, then fetch results
+    // Sync from context when available
     useEffect(() => {
         if (cachedTest && cachedSeries) {
-            setTestData({
+            setTestData(prev => ({
                 ...cachedTest,
                 series_name: cachedSeries.series.name,
-                results: testData?.results || [] // Preserve results if already loaded
-            });
+                results: prev?.results || [] 
+            }));
+
+            // Pre-load topics for subjects in this series
+            if (cachedTest.subjects) {
+                cachedTest.subjects.forEach(sub => loadTopics(sub.id));
+            }
         }
+    }, [cachedTest, cachedSeries?.series?.name, loadTopics]);
+
+    // Initial load and specific data fetch
+    useEffect(() => {
         loadData();
-    }, [testId, cachedTest, cachedSeries?.series?.name]);
+    }, [testId, seriesId]);
 
     const handleAddQuestion = () => {
         const defaultSubjectId = testData?.subjects?.[0]?.id || "";
@@ -300,7 +309,7 @@ const TestDetail = () => {
             <div className="flex items-center gap-3 mb-4">
                 <button
                     onClick={() => navigate(-1)}
-                    className="flex items-center gap-2 text-[13px] font-semibold text-slate-400 hover:text-white transition-all hover:bg-white/[0.06] px-3 py-1.5 rounded-lg border border-white/[0.06] hover:border-white/[0.1] transition-all cursor-pointer"
+                    className="flex items-center gap-2 text-[13px] font-semibold text-text-muted hover:text-text transition-all hover:bg-surface-2 px-3 py-1.5 rounded-lg border border-border hover:border-border-hover transition-all cursor-pointer"
                 >
                     <ArrowLeft className="w-4 h-4" />
                     <span>Back</span>
@@ -310,39 +319,39 @@ const TestDetail = () => {
             {/* Header Content */}
             <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-8">
                 <div>
-                    <h1 className="text-[22px] md:text-[24px] font-heading font-semibold text-white tracking-tight leading-tight mb-2">
+                    <h1 className="text-[22px] md:text-[24px] font-heading font-semibold text-text tracking-tight leading-tight mb-2">
                         {testData?.name || 'Mock Test'}
                     </h1>
-                    <div className="flex items-center gap-2 text-slate-500 text-[14px] ml-0.5">
+                    <div className="flex items-center gap-2 text-text-muted text-[14px] ml-0.5">
                         <Calendar className="w-4 h-4 text-emerald-500/80" />
                         <span>{testData?.test_date ? new Date(testData.test_date).toLocaleDateString() : 'No date'}</span>
                         <span className="mx-2 opacity-20">•</span>
-                        <span className="text-slate-500/80 font-medium">{testData?.series_name}</span>
+                        <span className="text-text-muted/80 font-medium">{testData?.series_name}</span>
                     </div>
                 </div>
             </div>
 
             <div className="space-y-6">
                 {/* Marks Entry block */}
-                <div className="glass p-6 rounded-3xl border border-white/10 shadow-xl">
-                    <h2 className="text-lg font-heading font-semibold text-white mb-6">
+                <div className="glass p-6 rounded-3xl border border-border shadow-xl">
+                    <h2 className="text-lg font-heading font-semibold text-text mb-6">
                         Test Score
                     </h2>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-400">
+                            <label className="text-sm font-medium text-text-muted">
                                 Total Possible Score
                             </label>
                             <input
                                 type="number"
                                 value={totalScore}
                                 onChange={(e) => setTotalScore(e.target.value)}
-                                className="w-full h-11 px-4 bg-white/[0.03] border border-white/10 rounded-xl text-white text-lg focus:outline-none focus:border-pink-500/50 transition-colors"
+                                className="w-full h-11 px-4 bg-surface-3/10 border border-border rounded-xl text-text text-lg focus:outline-none focus:border-pink-500/50 transition-colors"
                                 placeholder="e.g. 100"
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-400">
+                            <label className="text-sm font-medium text-text-muted">
                                 Your Score Achieved
                             </label>
                             <input
@@ -354,7 +363,7 @@ const TestDetail = () => {
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-400">
+                            <label className="text-sm font-medium text-text-muted">
                                 Total Questions Attempted
                             </label>
                             <input
@@ -388,7 +397,7 @@ const TestDetail = () => {
                                     }
                                 }}
 
-                                className="w-full h-11 px-4 bg-white/[0.03] border border-white/10 rounded-xl text-white text-lg focus:outline-none focus:border-pink-500/50 transition-colors"
+                                className="w-full h-11 px-4 bg-surface-3/10 border border-border rounded-xl text-text text-lg focus:outline-none focus:border-pink-500/50 transition-colors"
                                 placeholder="e.g. 25"
                             />
                         </div>
@@ -396,13 +405,13 @@ const TestDetail = () => {
                 </div>
 
                 {/* Question Breakdown Block */}
-                <div className="glass p-6 rounded-3xl border border-white/10 shadow-xl space-y-6">
+                <div className="glass p-6 rounded-3xl border border-border shadow-xl space-y-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h2 className="text-lg font-heading font-semibold text-white">
+                            <h2 className="text-lg font-heading font-semibold text-text">
                                 Question Breakdown
                             </h2>
-                            <p className="text-sm text-slate-400 mt-1">
+                            <p className="text-sm text-text-muted mt-1">
                                 Tag multiple topics per question to fuel your global subject
                                 analytics
                             </p>
@@ -417,8 +426,8 @@ const TestDetail = () => {
 
                     <div className="space-y-3">
                         {questions.length === 0 ? (
-                            <div className="text-center py-10 border-2 border-dashed border-white/5 rounded-2xl">
-                                <p className="text-slate-500 text-sm">
+                            <div className="text-center py-10 border-2 border-dashed border-border rounded-2xl">
+                                <p className="text-text-muted text-sm">
                                     No questions added yet.
                                     <br />
                                     Type in Total Questions to automatically generate fields, or
@@ -430,9 +439,9 @@ const TestDetail = () => {
                                 return (
                                     <div
                                         key={q.id}
-                                        className="flex flex-col sm:flex-row gap-3 items-center bg-white/[0.02] border border-white/10 p-3 rounded-xl hover:border-pink-500/30 transition-colors"
+                                        className="flex flex-col sm:flex-row gap-3 items-center bg-surface-3/10 border border-border p-3 rounded-xl hover:border-pink-500/30 transition-colors"
                                     >
-                                        <span className="text-xs font-bold text-slate-500 w-6">
+                                        <span className="text-xs font-bold text-text-muted w-6">
                                             Q{index + 1}
                                         </span>
                                         <select
@@ -444,7 +453,7 @@ const TestDetail = () => {
                                                     e.target.value,
                                                 )
                                             }
-                                            className="flex-1 min-w-[140px] h-10 px-3 bg-[#0f0f1a] border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-pink-500/50 custom-select"
+                                            className="flex-1 min-w-[140px] h-10 px-3 bg-[#0f0f1a] border border-border rounded-lg text-sm text-text focus:outline-none focus:border-pink-500/50 custom-select"
                                         >
                                             <option value="" disabled>
                                                 Select Subject
@@ -486,7 +495,7 @@ const TestDetail = () => {
 
                                         <button
                                             onClick={() => handleRemoveQuestion(q.id)}
-                                            className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors border border-transparent hover:border-rose-500/20"
+                                            className="w-10 h-10 flex items-center justify-center rounded-lg text-text-muted hover:text-rose-400 hover:bg-rose-500/10 transition-colors border border-transparent hover:border-rose-500/20"
                                         >
                                             <Trash2 className="w-4 h-4" />
                                         </button>
@@ -500,7 +509,7 @@ const TestDetail = () => {
                 <button
                     onClick={handleSaveResults}
                     disabled={saving || !totalScore || !myScore || !totalQs}
-                    className="w-full h-14 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 text-white font-semibold flex items-center justify-center gap-3 transition-all disabled:opacity-50 disabled:grayscale shadow-[0_4px_20px_-5px_rgba(236,72,153,0.4)]"
+                    className="w-full h-14 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 text-text font-semibold flex items-center justify-center gap-3 transition-all disabled:opacity-50 disabled:grayscale shadow-[0_4px_20px_-5px_rgba(236,72,153,0.4)]"
                 >
                     <Save className="w-5 h-5" />
                     <span className="text-lg">Log This Attempt</span>
@@ -509,8 +518,8 @@ const TestDetail = () => {
                 {/* Past Attempts Section */}
                 {testData.results && testData.results.length > 0 && (
                     <div className="mt-12 space-y-4">
-                        <h2 className="text-xl font-heading font-bold text-white flex items-center gap-2">
-                            Past Attempts <span className="px-2 py-0.5 rounded-full bg-white/10 text-xs text-white/70">{testData.results.length}</span>
+                        <h2 className="text-xl font-heading font-bold text-text flex items-center gap-2">
+                            Past Attempts <span className="px-2 py-0.5 rounded-full bg-surface-3 text-xs text-text/70">{testData.results.length}</span>
                         </h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {testData.results.map((result, idx) => {
@@ -518,12 +527,12 @@ const TestDetail = () => {
                                 const attemptNumber = testData.results.length - idx;
 
                                 return (
-                                    <div key={result.id} className="glass p-5 rounded-2xl border border-white/5 relative overflow-hidden group">
+                                    <div key={result.id} className="glass p-5 rounded-2xl border border-border relative overflow-hidden group">
                                         <div className="absolute top-0 left-0 w-1 h-full bg-pink-500/50"></div>
                                         <div className="flex justify-between items-start mb-4">
                                             <div>
-                                                <p className="text-xs text-slate-400 font-medium">Attempt #{attemptNumber}</p>
-                                                <p className="text-sm font-semibold text-white mt-0.5">{new Date(result.created_at).toLocaleDateString()}</p>
+                                                <p className="text-xs text-text-muted font-medium">Attempt #{attemptNumber}</p>
+                                                <p className="text-sm font-semibold text-text mt-0.5">{new Date(result.created_at).toLocaleDateString()}</p>
                                             </div>
                                             <div className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold text-sm">
                                                 {percent}%
@@ -531,11 +540,11 @@ const TestDetail = () => {
                                         </div>
 
                                         <div className="flex items-end gap-2 mb-4 mt-2">
-                                            <span className="text-3xl font-heading font-bold text-white leading-none">{result.my_score}</span>
-                                            <span className="text-sm text-slate-400 font-medium mb-1">/ {result.total_score}</span>
+                                            <span className="text-3xl font-heading font-bold text-text leading-none">{result.my_score}</span>
+                                            <span className="text-sm text-text-muted font-medium mb-1">/ {result.total_score}</span>
                                         </div>
 
-                                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                                        <div className="flex items-center gap-2 text-xs text-text-muted">
                                             <div className="w-1.5 h-1.5 rounded-full bg-pink-500/50"></div>
                                             {result.total_qs} Questions Attempted
                                         </div>

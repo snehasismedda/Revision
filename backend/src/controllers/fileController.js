@@ -2,6 +2,7 @@ import * as noteModel from '../models/noteModel.js';
 import * as questionModel from '../models/questionModel.js';
 import * as fileModel from '../models/fileModel.js';
 import * as topicModel from '../models/topicModel.js';
+import * as folderModel from '../models/folderModel.js';
 import { ollama, models } from '../config/ollama.js';
 import { noteAnalysisPrompt } from '../system_prompts/index.js';
 import { parseQuestionToRichText } from '../services/ai_service/response/questionParser.js';
@@ -26,8 +27,19 @@ export const getAllFiles = async (req, res) => {
 
 export const getFileById = async (req, res) => {
     try {
-        const { subjectId, id } = req.params;
-        const file = await fileModel.getFileById(id, subjectId);
+        const { id, subjectId, seriesId } = req.params;
+        const { metadataOnly } = req.query;
+        
+        let file;
+        if (metadataOnly === 'true') {
+            file = await fileModel.getFileById(id, subjectId, seriesId);
+            if (file) {
+                delete file.data; // Remove huge data string
+            }
+        } else {
+            file = await fileModel.getFileById(id, subjectId, seriesId);
+        }
+
         if (!file) return res.status(404).json({ error: 'File not found' });
         res.status(200).json({ file });
     } catch (error) {
@@ -39,13 +51,14 @@ export const getFileById = async (req, res) => {
 export const getFilesBySubject = async (req, res) => {
     try {
         const { id: subjectId } = req.params;
-        const { limit, offset, type, metadataOnly } = req.query;
+        const { limit, offset, type, metadataOnly, folderId } = req.query;
         const files = await fileModel.getFilesBySubject(
             subjectId,
             limit ? parseInt(limit, 10) : undefined,
             offset ? parseInt(offset, 10) : undefined,
             type,
-            metadataOnly === 'true'
+            metadataOnly === 'true',
+            folderId
         );
         res.status(200).json({ files });
     } catch (error) {
@@ -54,10 +67,29 @@ export const getFilesBySubject = async (req, res) => {
     }
 };
 
+export const getFilesByTestSeries = async (req, res) => {
+    try {
+        const { id: seriesId } = req.params;
+        const { limit, offset, type, metadataOnly, folderId } = req.query;
+        const files = await fileModel.getFilesByTestSeries(
+            seriesId,
+            limit ? parseInt(limit, 10) : undefined,
+            offset ? parseInt(offset, 10) : undefined,
+            type,
+            metadataOnly === 'true',
+            folderId
+        );
+        res.status(200).json({ files });
+    } catch (error) {
+        console.error('[getFilesByTestSeries]', error);
+        res.status(500).json({ error: 'Failed to fetch test series files' });
+    }
+};
+
 export const saveFileAs = async (req, res) => {
-    const { content, type, fileType, fileName, subjectId, skipAI } = req.body; // type here is content type ('question', 'note'). fileType is 'image', 'pdf', etc.
-    if (!content || !type || !subjectId) {
-        return res.status(400).json({ error: 'content, type, and subjectId are required' });
+    const { content, type, fileType, fileName, subjectId, seriesId, skipAI } = req.body; // type here is content type ('question', 'note', 'file'). 
+    if (!content || !type || (!subjectId && !seriesId)) {
+        return res.status(400).json({ error: 'content, type, and either subjectId or seriesId are required' });
     }
 
     try {
@@ -65,7 +97,15 @@ export const saveFileAs = async (req, res) => {
         const thumbnail = await generateThumbnail(content, fileType || 'image');
 
         // 1. Create file 
-        const savedFile = await fileModel.createFile(subjectId, content, fileType || 'image', fileName, thumbnail);
+        const savedFile = await fileModel.createFile({
+            subjectId,
+            testSeriesId: seriesId,
+            folderId: req.body.folderId,
+            data: content,
+            fileType: fileType || 'image',
+            fileName,
+            thumbnail
+        });
         const sourceImageId = savedFile.id;
 
         if (type === 'file') {
@@ -155,8 +195,19 @@ export const saveFileAs = async (req, res) => {
 
 export const deleteFile = async (req, res) => {
     try {
-        const { subjectId, id } = req.params;
-        await fileModel.softDeleteFile(id, subjectId);
+        const { id, subjectId, seriesId } = req.params;
+        
+        // Check if file is in a system folder
+        const file = await fileModel.getFileById(id, subjectId, seriesId);
+        if (file?.folder_id) {
+            const folder = await folderModel.getFolderById(file.folder_id, subjectId, seriesId);
+            if (folder?.is_system) {
+                return res.status(403).json({ error: 'Files in system folders cannot be deleted manually' });
+            }
+        }
+
+        console.log(`[deleteFile] Attempting soft delete for file: ${id}, subjectId: ${subjectId}, seriesId: ${seriesId}`);
+        await fileModel.softDeleteFile(id, subjectId, seriesId);
         res.status(200).json({ success: true });
     } catch (error) {
         console.error('[deleteFile]', error);
@@ -166,13 +217,50 @@ export const deleteFile = async (req, res) => {
 
 export const updateFile = async (req, res) => {
     try {
-        const { subjectId, id } = req.params;
-        const { fileName } = req.body;
-        const [updatedFile] = await fileModel.updateFileName(id, subjectId, fileName);
+        const { id, subjectId, seriesId } = req.params;
+        const { fileName, folderId } = req.body;
+
+        // Check if file is in a system folder (prevent renaming or moving out)
+        const file = await fileModel.getFileById(id, subjectId, seriesId);
+        if (file?.folder_id) {
+            const folder = await folderModel.getFolderById(file.folder_id, subjectId, seriesId);
+            if (folder?.is_system) {
+                return res.status(403).json({ error: 'Files in system folders cannot be renamed or moved' });
+            }
+        }
+
+        const [updatedFile] = await fileModel.updateFileName(id, subjectId, seriesId, fileName, folderId);
         if (!updatedFile) return res.status(404).json({ error: 'File not found' });
         res.status(200).json({ file: updatedFile });
     } catch (error) {
         console.error('[updateFile]', error);
         res.status(500).json({ error: 'Failed to update file' });
+    }
+};
+
+export const getFileRawData = async (req, res) => {
+    try {
+        const { id } = req.params;
+        // We use a simplified fetch here as id is unique
+        const file = await fileModel.getFileById(id);
+        if (!file || !file.data) return res.status(404).json({ error: 'File not found' });
+
+        // Handle Data URIs
+        if (file.data.startsWith('data:')) {
+            const [header, base64Data] = file.data.split(';base64,');
+            const contentType = header.split(':')[1];
+            const buffer = Buffer.from(base64Data, 'base64');
+            
+            res.setHeader('Content-Type', contentType);
+            res.setHeader('Content-Length', buffer.length);
+            res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for a year
+            return res.send(buffer);
+        }
+
+        // Fallback for plain data
+        res.status(400).json({ error: 'File data format not supported for raw streaming' });
+    } catch (error) {
+        console.error('[getFileRawData]', error);
+        res.status(500).json({ error: 'Failed to stream file data' });
     }
 };

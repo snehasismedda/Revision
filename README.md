@@ -57,7 +57,7 @@ A dedicated **Backup Container** runs alongside PostgreSQL:
 
 #### Pull Required AI Models
 ```bash
-ollama pull qwen2.5:7b
+ollama pull qwen3:8b
 ollama pull qwen2.5-vl
 ```
 

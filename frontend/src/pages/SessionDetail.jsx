@@ -19,22 +19,7 @@ import remarkMath from 'remark-math';
 import rehypeRaw from 'rehype-raw';
 import rehypeKatex from 'rehype-katex';
 
-const preprocessMarkdown = (text) => {
-    if (!text) return '';
-    return text
-        .replace(/\\\\\[/g, '\n$$\n')
-        .replace(/\\\\\]/g, '\n$$\n')
-        .replace(/\\\[/g, '\n$$\n')
-        .replace(/\\\]/g, '\n$$\n')
-        .replace(/\\\(/g, '$')
-        .replace(/\\\)/g, '$')
-        .replace(/\$\$\$\$/g, '$$\n$$')
-        .replace(/\$ \$/g, '$$')
-        .replace(/([^\n])\$\$/g, '$1\n$$')
-        .replace(/\$\$([^\n])/g, '$$\n$1')
-        .replace(/\\bottom([a-zA-Z])/g, '\\bot $1')
-        .replace(/\\bottom/g, '\\bot');
-};
+import { preprocessMarkdown } from '../utils/markdownUtils';
 
 const EMERALD = '#10b981';
 const AMBER = '#f59e0b';
@@ -43,12 +28,12 @@ const RED = '#ef4444';
 const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
     return (
-        <div className="glass p-3 border border-white/10 rounded-lg shadow-xl  text-sm">
-            <p className="text-slate-300 font-heading font-semibold mb-1.5">{label}</p>
+        <div className="bg-surface-2/95 p-3 border border-border rounded-lg shadow-xl text-sm">
+            <p className="text-text font-heading font-semibold mb-1.5">{label}</p>
             {payload.map((p) => (
                 <div key={p.name} className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
-                    <span className="font-medium text-white">{p.name}: {p.value}%</span>
+                    <span className="font-medium text-text">{p.name}: {p.value}%</span>
                 </div>
             ))}
         </div>
@@ -168,7 +153,7 @@ const SessionDetail = () => {
             <div className="flex items-center justify-between mb-8">
                 <Link
                     to={`/subjects/${subjectId}`}
-                    className="flex items-center gap-1.5 text-sm font-medium text-slate-400 hover:text-primary transition-colors bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg border border-white/5"
+                    className="flex items-center gap-1.5 text-sm font-medium text-text-muted hover:text-primary transition-colors bg-surface-2 hover:bg-surface-3 px-3 py-1.5 rounded-lg border border-border"
                 >
                     <ArrowLeft className="w-4 h-4" />
                     Back
@@ -177,7 +162,7 @@ const SessionDetail = () => {
                     {!session.testId && (
                         <Link
                             to={`/subjects/${subjectId}/sessions/${id}/tag`}
-                            className="flex items-center gap-2 text-[13px] font-semibold text-slate-300 hover:text-white transition-all bg-white/5 hover:bg-white/10 px-4 py-2 rounded-lg border border-white/5"
+                            className="flex items-center gap-2 text-[13px] font-semibold text-text hover:text-text transition-all bg-surface-2 hover:bg-surface-3 px-4 py-2 rounded-lg border border-border"
                         >
                             <Tags className="w-4 h-4 text-indigo-400" />
                             Tag Topics
@@ -185,7 +170,7 @@ const SessionDetail = () => {
                     )}
                     <button
                         onClick={() => setShowConfirm(true)}
-                        className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all cursor-pointer border border-transparent hover:border-red-500/10"
+                        className="p-2 text-text-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all cursor-pointer border border-transparent hover:border-red-500/10"
                         title="Delete Session"
                     >
                         <Trash2 className="w-5 h-5" />
@@ -201,9 +186,9 @@ const SessionDetail = () => {
                             <Activity className="w-3.5 h-3.5" />
                             Session Overview
                         </div>
-                        <h1 className="text-3xl font-heading font-bold text-white tracking-tight leading-tight">{session.title}</h1>
+                        <h1 className="text-3xl font-heading font-bold text-text tracking-tight leading-tight">{session.title}</h1>
                         <div className="flex items-center gap-4 mt-2.5">
-                            <div className="flex items-center gap-1.5 text-slate-400 text-[13px]">
+                            <div className="flex items-center gap-1.5 text-text-muted text-[13px]">
                                 <Calendar className="w-4 h-4" />
                                 {new Date(session.sessionDate).toLocaleDateString(undefined, {
                                     month: 'long',
@@ -211,8 +196,8 @@ const SessionDetail = () => {
                                     year: 'numeric'
                                 })}
                             </div>
-                            <div className="w-1 h-1 rounded-full bg-slate-700" />
-                            <div className="flex items-center gap-1.5 text-slate-400 text-[13px]">
+                            <div className="w-1 h-1 rounded-full bg-surface-2" />
+                            <div className="flex items-center gap-1.5 text-text-muted text-[13px]">
                                 <Target className="w-4 h-4" />
                                 {session.totalQuestions} questions tracked
                             </div>
@@ -228,10 +213,10 @@ const SessionDetail = () => {
             {/* ═══════════════════════════════════════ */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-10">
                 {/* Accuracy Card */}
-                <div className="lg:col-span-1 glass p-6 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group">
+                <div className="lg:col-span-1 bg-surface-2 border border-border p-6 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group">
                     <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Final Accuracy</span>
-                    <div className={`text-5xl font-heading font-bold tracking-tighter ${session.accuracy >= 75 ? 'text-emerald-400' : session.accuracy >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
+                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-4">Final Accuracy</span>
+                    <div className={`text-5xl font-heading font-bold tracking-tighter ${session.accuracy >= 75 ? 'text-emerald-500 [.dark_&]:text-emerald-400' : session.accuracy >= 50 ? 'text-amber-600 [.dark_&]:text-amber-400' : 'text-rose-600 [.dark_&]:text-rose-400'}`}>
                         {session.accuracy}%
                     </div>
                     <div className="mt-4">
@@ -240,39 +225,39 @@ const SessionDetail = () => {
                 </div>
 
                 {/* Score Breakdown Card */}
-                <div className="lg:col-span-3 glass p-6 rounded-2xl flex flex-col justify-center relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/[0.02] rounded-bl-full pointer-events-none" />
+                <div className="lg:col-span-3 bg-surface-2 border border-border p-6 rounded-2xl flex flex-col justify-center relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-surface-3/10 rounded-bl-full pointer-events-none" />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center relative z-10">
                         <div className="space-y-4">
                             <div className="flex items-center justify-between text-sm">
-                                <span className="text-slate-400 font-medium">Session Distribution</span>
-                                <span className="text-slate-500 text-xs">{session.totalQuestions} Questions</span>
+                                <span className="text-text-muted font-medium">Session Distribution</span>
+                                <span className="text-text-muted text-xs">{session.totalQuestions} Questions</span>
                             </div>
-                            <div className="w-full bg-white/5 rounded-full h-3.5 overflow-hidden flex shadow-inner group-hover:shadow-primary/5 transition-shadow">
+                            <div className="w-full bg-surface-3/10 rounded-full h-3.5 overflow-hidden flex shadow-inner group-hover:shadow-primary/5 transition-shadow">
                                 <div
                                     className="bg-emerald-500 h-full transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(16,185,129,0.3)]"
                                     style={{ width: `${(session.totalCorrect / session.totalQuestions) * 100}%` }}
                                 />
                                 <div
-                                    className="bg-red-500/50 h-full transition-all duration-1000 ease-out"
+                                    className="bg-rose-500/50 h-full transition-all duration-1000 ease-out"
                                     style={{ width: `${(session.totalIncorrect / session.totalQuestions) * 100}%` }}
                                 />
                             </div>
                             <div className="flex justify-between items-center px-1">
                                 <div className="flex items-center gap-2.5">
                                     <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                                    <span className="text-sm font-semibold text-slate-200">{session.totalCorrect} Correct</span>
+                                    <span className="text-sm font-semibold text-text">{session.totalCorrect} Correct</span>
                                 </div>
                                 <div className="flex items-center gap-2.5">
-                                    <span className="text-sm font-semibold text-slate-200">{session.totalIncorrect} Incorrect</span>
-                                    <div className="w-2.5 h-2.5 rounded-full bg-red-500/50" />
+                                    <span className="text-sm font-semibold text-text">{session.totalIncorrect} Incorrect</span>
+                                    <div className="w-2.5 h-2.5 rounded-full bg-rose-500/50" />
                                 </div>
                             </div>
                         </div>
 
-                        <div className="bg-white/[0.03] border border-white/[0.05] p-4 rounded-xl">
-                            <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3">Author's Note</h4>
-                            <p className="text-[13px] text-slate-400 leading-relaxed italic">
+                        <div className="bg-surface-3/10 border border-border p-4 rounded-xl">
+                            <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-widest mb-3">Author's Note</h4>
+                            <p className="text-[13px] text-text-muted leading-relaxed italic">
                                 {session.notes || "No additional notes provided for this study session."}
                             </p>
                         </div>
@@ -289,9 +274,9 @@ const SessionDetail = () => {
                     <div className="flex items-center justify-between mb-8 relative z-10">
                         <div className="flex items-center gap-2">
                             <BarChart3 className="w-5 h-5 text-primary" />
-                            <h2 className="text-lg font-heading font-bold text-white tracking-tight">Question Distribution</h2>
+                            <h2 className="text-lg font-heading font-bold text-text tracking-tight">Question Distribution</h2>
                         </div>
-                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">{topicPerformance.length} topics covered</span>
+                        <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">{topicPerformance.length} topics covered</span>
                     </div>
 
                     <div className="h-[280px] w-full relative z-10">
@@ -301,17 +286,19 @@ const SessionDetail = () => {
                                 layout="vertical"
                                 margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                             >
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" horizontal={false} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border/20" horizontal={false} />
                                 <XAxis
                                     type="number"
-                                    tick={{ fill: '#475569', fontSize: 11 }}
+                                    tick={{ fill: 'currentColor', fontSize: 11 }}
+                                    className="text-text-muted/50"
                                     tickLine={false}
                                     axisLine={false}
                                 />
                                 <YAxis
                                     type="category"
                                     dataKey="topicName"
-                                    tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }}
+                                    tick={{ fill: 'currentColor', fontSize: 11, fontWeight: 500 }}
+                                    className="text-text-muted/70"
                                     tickLine={false}
                                     axisLine={false}
                                     width={140}
@@ -322,10 +309,10 @@ const SessionDetail = () => {
                                         if (active && payload && payload.length) {
                                             return (
                                                 <div className="glass p-3 border border-indigo-500/20 rounded-xl shadow-2xl  text-sm ring-1 ring-white/10">
-                                                    <p className="text-white font-heading font-bold mb-1.5">{label}</p>
+                                                    <p className="text-text font-heading font-bold mb-1.5">{label}</p>
                                                     <div className="flex items-center gap-2">
                                                         <div className="w-2 h-2 rounded-full bg-indigo-400" />
-                                                        <span className="text-slate-300">Questions: <span className="text-white font-bold">{payload[0].value}</span></span>
+                                                        <span className="text-text">Questions: <span className="text-text font-bold">{payload[0].value}</span></span>
                                                     </div>
                                                 </div>
                                             );
@@ -354,11 +341,11 @@ const SessionDetail = () => {
             {topicPerformance.length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
                     {/* Best Areas */}
-                    <div className="glass p-6 rounded-2xl border-emerald-500/10 relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-32 h-32 bg-emerald-500/[0.04] rounded-full blur-3xl pointer-events-none" />
+                    <div className="bg-surface-2 border border-border p-6 rounded-2xl border-emerald-500/10 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
                         <div className="flex items-center gap-2 mb-5 relative z-10">
                             <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                            <h2 className="text-lg font-heading font-bold text-white tracking-tight">Session Victories</h2>
+                            <h2 className="text-lg font-heading font-bold text-text tracking-tight">Session Victories</h2>
                         </div>
                         <div className="space-y-2 relative z-10">
                             {topicPerformance.filter(t => t.accuracy >= 75).slice(0, 3).length > 0 ? (
@@ -368,25 +355,25 @@ const SessionDetail = () => {
                                             {i + 1}
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-semibold text-slate-100 truncate">{t.topicName}</p>
+                                            <p className="text-sm font-semibold text-text truncate">{t.topicName}</p>
                                         </div>
                                         <PerformanceBadge accuracy={t.accuracy} />
                                     </div>
                                 ))
                             ) : (
-                                <div className="p-8 rounded-xl border border-dashed border-white/5 text-center">
-                                    <p className="text-xs text-slate-500">No high-accuracy areas this session.</p>
+                                <div className="p-8 rounded-xl border border-dashed border-border text-center">
+                                    <p className="text-xs text-text-muted">No high-accuracy areas this session.</p>
                                 </div>
                             )}
                         </div>
                     </div>
 
                     {/* Weak Areas */}
-                    <div className="glass p-6 rounded-2xl border-red-500/10 relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-32 h-32 bg-red-500/[0.04] rounded-full blur-3xl pointer-events-none" />
+                    <div className="bg-surface-2 border border-border p-6 rounded-2xl border-rose-500/10 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-32 h-32 bg-rose-500/5 rounded-full blur-3xl pointer-events-none" />
                         <div className="flex items-center gap-2 mb-5 relative z-10">
-                            <AlertTriangle className="w-5 h-5 text-red-500" />
-                            <h2 className="text-lg font-heading font-bold text-white tracking-tight">Needs Support</h2>
+                            <AlertTriangle className="w-5 h-5 text-rose-500" />
+                            <h2 className="text-lg font-heading font-bold text-text tracking-tight">Needs Support</h2>
                         </div>
                         <div className="space-y-2 relative z-10">
                             {[...topicPerformance].reverse().filter(t => t.accuracy < 50).slice(0, 3).length > 0 ? (
@@ -396,14 +383,14 @@ const SessionDetail = () => {
                                             {i + 1}
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-semibold text-slate-100 truncate">{t.topicName}</p>
+                                            <p className="text-sm font-semibold text-text truncate">{t.topicName}</p>
                                         </div>
                                         <PerformanceBadge accuracy={t.accuracy} />
                                     </div>
                                 ))
                             ) : (
-                                <div className="p-8 rounded-xl border border-dashed border-white/5 text-center">
-                                    <p className="text-xs text-slate-500">No major weak areas detected!</p>
+                                <div className="p-8 rounded-xl border border-dashed border-border text-center">
+                                    <p className="text-xs text-text-muted">No major weak areas detected!</p>
                                 </div>
                             )}
                         </div>
@@ -420,7 +407,7 @@ const SessionDetail = () => {
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-2">
                             <BarChart3 className="w-5 h-5 text-primary" />
-                            <h2 className="text-lg font-heading font-bold text-white tracking-tight">Topic-wise Efficiency</h2>
+                            <h2 className="text-lg font-heading font-bold text-text tracking-tight">Topic-wise Efficiency</h2>
                         </div>
                     </div>
 
@@ -428,11 +415,12 @@ const SessionDetail = () => {
                         {topicPerformance.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={topicPerformance} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" horizontal={false} />
+                                    <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border/20" horizontal={false} />
                                     <XAxis
                                         type="number"
                                         domain={[0, 100]}
-                                        tick={{ fill: '#475569', fontSize: 11 }}
+                                        tick={{ fill: 'currentColor', fontSize: 11 }}
+                                        className="text-text-muted/50"
                                         tickFormatter={(v) => `${v}%`}
                                         axisLine={false}
                                         tickLine={false}
@@ -440,7 +428,8 @@ const SessionDetail = () => {
                                     <YAxis
                                         type="category"
                                         dataKey="topicName"
-                                        tick={{ fill: '#cbd5e1', fontSize: 12, fontWeight: 500 }}
+                                        tick={{ fill: 'currentColor', fontSize: 12, fontWeight: 500 }}
+                                        className="text-text-muted/70"
                                         width={140}
                                         axisLine={false}
                                         tickLine={false}
@@ -455,8 +444,8 @@ const SessionDetail = () => {
                             </ResponsiveContainer>
                         ) : (
                             <div className="flex flex-col items-center justify-center h-full text-center space-y-3">
-                                <BarChart3 className="w-12 h-12 text-slate-700 mx-auto" strokeWidth={1} />
-                                <p className="text-slate-500 text-sm">Tag topics to see breakdown</p>
+                                <BarChart3 className="w-12 h-12 text-text-muted mx-auto" strokeWidth={1} />
+                                <p className="text-text-muted text-sm">Tag topics to see breakdown</p>
                             </div>
                         )}
                     </div>
@@ -471,7 +460,7 @@ const SessionDetail = () => {
                             <div className="p-1.5 rounded-md bg-indigo-500/15 text-indigo-400">
                                 <Sparkles className="w-4 h-4" />
                             </div>
-                            <h2 className="text-lg font-heading font-bold text-white tracking-tight">AI Evaluation</h2>
+                            <h2 className="text-lg font-heading font-bold text-text tracking-tight">AI Evaluation</h2>
                         </div>
                         <button
                             onClick={loadInsight}

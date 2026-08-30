@@ -1,7 +1,9 @@
 import * as solutionModel from '../models/solutionModel.js';
 import * as fileModel from '../models/fileModel.js';
+import * as folderModel from '../models/folderModel.js';
 import * as deletionService from '../services/deletionService.js';
 import * as subjectModel from '../models/subjectModel.js';
+import { generateThumbnail } from '../utils/thumbnailGenerator.js';
 
 export const getSolutionImage = async (req, res, next) => {
     try {
@@ -38,7 +40,15 @@ export const createSolution = async (req, res, next) => {
         let sourceImageId = existingSourceImageId;
 
         if (sourceImageContent && !sourceImageId) {
-            const savedImage = await fileModel.createFile(subjectId, sourceImageContent);
+            const solutionsFolder = await folderModel.getSystemFolderByName(subjectId, 'Solutions');
+            const thumbnail = await generateThumbnail(sourceImageContent, 'image');
+            const savedImage = await fileModel.createFile({ 
+                subjectId, 
+                data: sourceImageContent, 
+                thumbnail,
+                folderId: solutionsFolder?.id,
+                fileName: `solution_${questionId || Date.now()}.png`
+            });
             sourceImageId = savedImage.id;
         }
 
@@ -87,7 +97,18 @@ export const updateSolution = async (req, res, next) => {
         };
 
         if (sourceImageContent) {
-            const savedImage = await fileModel.createFile(subjectId, sourceImageContent);
+            const solutionsFolder = await folderModel.getSystemFolderByName(subjectId, 'Solutions');
+            const existingSolution = await solutionModel.getSolutionById(solutionId, subjectId);
+            const qId = existingSolution?.question_id;
+            const thumbnail = await generateThumbnail(sourceImageContent, 'image');
+
+            const savedImage = await fileModel.createFile({ 
+                subjectId, 
+                data: sourceImageContent, 
+                thumbnail,
+                folderId: solutionsFolder?.id,
+                fileName: `solution_${qId || solutionId}.png`
+            });
             updateData.source_image_id = savedImage.id;
         }
 

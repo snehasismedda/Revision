@@ -30,6 +30,10 @@ export const request = async (path, options = {}) => {
         }
     }
 
+    if (options.blob) {
+        return await res.blob();
+    }
+
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
@@ -172,6 +176,9 @@ export const aiApi = {
     formatNoteStream: (body, onChunk) => streamRequest('/ai/format-note', body, onChunk),
     editSection: (body) => request('/ai/edit-section', { method: 'POST', body }),
     editSectionStream: (body, onChunk) => streamRequest('/ai/edit-section', body, onChunk),
+    youtubeTranscript: (body) => request('/ai/youtube-transcript', { method: 'POST', body }),
+    processTranscript: (body) => request('/ai/process-transcript', { method: 'POST', body }),
+    processTranscriptStream: (body, onChunk) => streamRequest('/ai/process-transcript', body, onChunk),
 };
 
 // Questions
@@ -215,6 +222,19 @@ export const revisionApi = {
     analytics: (subjectId) => request(`/subjects/${subjectId}/revision-tracker/analytics`),
 };
 
+// TODOs & Groups API
+export const todosApi = {
+    list: (subjectId) => request(`/subjects/${subjectId}/todos`),
+    create: (subjectId, data) => request(`/subjects/${subjectId}/todos`, { method: 'POST', body: data }),
+    update: (subjectId, todoId, data) => request(`/subjects/${subjectId}/todos/${todoId}`, { method: 'PUT', body: data }),
+    toggleStatus: (subjectId, todoId, status) => request(`/subjects/${subjectId}/todos/${todoId}/status`, { method: 'PUT', body: { status } }),
+    delete: (subjectId, todoId) => request(`/subjects/${subjectId}/todos/${todoId}`, { method: 'DELETE' }),
+    listGroups: (subjectId) => request(`/subjects/${subjectId}/todos/groups`),
+    createGroup: (subjectId, data) => request(`/subjects/${subjectId}/todos/groups`, { method: 'POST', body: data }),
+    updateGroup: (subjectId, groupId, data) => request(`/subjects/${subjectId}/todos/groups/${groupId}`, { method: 'PUT', body: data }),
+    deleteGroup: (subjectId, groupId) => request(`/subjects/${subjectId}/todos/groups/${groupId}`, { method: 'DELETE' }),
+};
+
 // Solutions
 export const solutionsApi = {
     list: (subjectId) => request(`/subjects/${subjectId}/solutions`),
@@ -228,24 +248,97 @@ export const solutionsApi = {
 export const filesApi = {
     list: (limit, offset, type, metadataOnly = false) => {
         let q = [];
-        if (limit != null) q.push(`limit=${limit}`);
-        if (offset != null) q.push(`offset=${offset}`);
-        if (type != null) q.push(`type=${type}`);
-        if (metadataOnly) q.push(`metadataOnly=true`);
+        if (limit != null) { q.push(`limit=${limit}`); }
+        if (offset != null) { q.push(`offset=${offset}`); }
+        if (type != null) { q.push(`type=${type}`); }
+        if (metadataOnly) { q.push(`metadataOnly=true`); }
         const qs = q.length ? '?' + q.join('&') : '';
         return request(`/files${qs}`);
     },
-    listBySubject: (subjectId, limit, offset, type, metadataOnly = false) => {
+    listBySubject: (subjectId, limit, offset, type, metadataOnly = false, folderId = undefined) => {
         let q = [];
-        if (limit != null) q.push(`limit=${limit}`);
-        if (offset != null) q.push(`offset=${offset}`);
-        if (type != null) q.push(`type=${type}`);
-        if (metadataOnly) q.push(`metadataOnly=true`);
+        if (limit != null) { q.push(`limit=${limit}`); }
+        if (offset != null) { q.push(`offset=${offset}`); }
+        if (type != null) { q.push(`type=${type}`); }
+        if (metadataOnly) { q.push(`metadataOnly=true`); }
+        if (folderId !== undefined) { q.push(`folderId=${folderId === null ? 'null' : folderId}`); }
         const qs = q.length ? '?' + q.join('&') : '';
         return request(`/files/subject/${subjectId}${qs}`);
     },
-    getById: (subjectId, id) => request(`/files/subject/${subjectId}/${id}`),
+    listByTestSeries: (seriesId, limit, offset, type, metadataOnly = false, folderId = undefined) => {
+        let q = [];
+        if (limit != null) { q.push(`limit=${limit}`); }
+        if (offset != null) { q.push(`offset=${offset}`); }
+        if (type != null) { q.push(`type=${type}`); }
+        if (metadataOnly) { q.push(`metadataOnly=true`); }
+        if (folderId !== undefined) { q.push(`folderId=${folderId === null ? 'null' : folderId}`); }
+        const qs = q.length ? '?' + q.join('&') : '';
+        return request(`/files/test-series/${seriesId}${qs}`);
+    },
+    getById: (id, subjectId, seriesId, metadataOnly = false) => {
+        const query = metadataOnly ? '?metadataOnly=true' : '';
+        const path = subjectId ? `/files/subject/${subjectId}/${id}${query}` : `/files/test-series/${seriesId}/${id}${query}`;
+        return request(path);
+    },
     saveAs: (body) => request('/files/save-as', { method: 'POST', body }),
-    delete: (subjectId, fileId) => request(`/files/subject/${subjectId}/${fileId}`, { method: 'DELETE' }),
-    update: (subjectId, fileId, body) => request(`/files/subject/${subjectId}/${fileId}`, { method: 'PUT', body }),
+    delete: (id, subjectId, seriesId) => {
+        const path = subjectId ? `/files/subject/${subjectId}/${id}` : `/files/test-series/${seriesId}/${id}`;
+        return request(path, { method: 'DELETE' });
+    },
+    update: (id, body, subjectId, seriesId) => {
+        const path = subjectId ? `/files/subject/${subjectId}/${id}` : `/files/test-series/${seriesId}/${id}`;
+        return request(path, { method: 'PUT', body });
+    },
+    getRaw: (id) => request(`/files/${id}/raw`, { blob: true }),
+};
+
+// Folders
+export const foldersApi = {
+    list: (subjectId, testSeriesId, parentId = undefined) => {
+        let q = [];
+        if (subjectId) q.push(`subjectId=${subjectId}`);
+        if (testSeriesId) q.push(`testSeriesId=${testSeriesId}`);
+        if (parentId !== undefined) q.push(`parentId=${parentId === null ? 'null' : parentId}`);
+        return request(`/folders?${q.join('&')}`);
+    },
+    getContents: (subjectId, testSeriesId, folderId = null, limit = 20, offset = 0) => {
+        let q = [];
+        if (subjectId) q.push(`subjectId=${subjectId}`);
+        if (testSeriesId) q.push(`testSeriesId=${testSeriesId}`);
+        if (folderId !== undefined) q.push(`folderId=${folderId === null ? 'null' : folderId}`);
+        if (limit != null) q.push(`limit=${limit}`);
+        if (offset != null) q.push(`offset=${offset}`);
+        return request(`/folders/contents?${q.join('&')}`);
+    },
+    create: (body) => request('/folders', { method: 'POST', body }),
+    rename: (id, body) => request(`/folders/${id}`, { method: 'PUT', body }),
+    delete: (id, body) => request(`/folders/${id}`, { method: 'DELETE', body }), // body takes { deleteFiles: boolean, subjectId, testSeriesId }
+};
+
+// System Prompts
+export const systemPromptsApi = {
+    list: () => request('/system-prompts'),
+    create: (body) => request('/system-prompts', { method: 'POST', body }),
+    update: (id, body) => request(`/system-prompts/${id}`, { method: 'PUT', body }),
+    delete: (id) => request(`/system-prompts/${id}`, { method: 'DELETE' }),
+};
+
+// Quiz Sets
+export const quizSetsApi = {
+    list: () => request('/quiz-sets'),
+    getById: (id) => request(`/quiz-sets/${id}`),
+    create: (body) => request('/quiz-sets', { method: 'POST', body }),
+    delete: (id) => request(`/quiz-sets/${id}`, { method: 'DELETE' }),
+    update: (id, body) => request(`/quiz-sets/${id}`, { method: 'PUT', body }),
+};
+
+// Time Tables
+export const timeTableApi = {
+    list: () => request('/timetables'),
+    getById: (id) => request(`/timetables/${id}`),
+    create: (body) => request('/timetables', { method: 'POST', body }),
+    update: (id, body) => request(`/timetables/${id}`, { method: 'PUT', body }),
+    delete: (id) => request(`/timetables/${id}`, { method: 'DELETE' }),
+    setActive: (id) => request(`/timetables/${id}/active`, { method: 'POST' }),
+    toggleActive: (id) => request(`/timetables/${id}/active`, { method: 'PATCH' }),
 };

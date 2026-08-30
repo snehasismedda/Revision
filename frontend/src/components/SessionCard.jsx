@@ -13,7 +13,7 @@ const ProgressRing = ({ value, size = 44, stroke = 3.5 }) => {
             <svg width={size} height={size} className="-rotate-90">
                 <circle
                     cx={size / 2} cy={size / 2} r={radius}
-                    fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={stroke}
+                    fill="none" stroke="var(--color-border)" strokeWidth={stroke}
                 />
                 <circle
                     cx={size / 2} cy={size / 2} r={radius}
@@ -25,7 +25,7 @@ const ProgressRing = ({ value, size = 44, stroke = 3.5 }) => {
                 />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-[11px] font-heading font-bold text-white">{value}%</span>
+                <span className="text-[11px] font-heading font-bold text-text">{value}%</span>
             </div>
         </div>
     );
@@ -43,7 +43,7 @@ const SessionCard = ({ subjectId, session, onDelete, onEdit, viewMode = 'grid' }
 
     return (
         <div
-            className={`glass-panel group relative overflow-hidden rounded-xl border border-white/[0.06] transition-all hover:-translate-y-0.5 cursor-pointer ${isList ? 'flex items-center gap-4 py-2 pr-5 pl-1' : 'flex flex-col'}`}
+            className={`glass-panel group relative overflow-hidden rounded-xl border border-border transition-all hover:-translate-y-0.5 cursor-pointer ${isList ? 'flex items-center gap-4 py-2 pr-5 pl-1' : 'flex flex-col'}`}
             onClick={() => navigate(`/subjects/${subjectId}/sessions/${session.id}`)}
         >
             {/* Hover glow */}
@@ -53,7 +53,7 @@ const SessionCard = ({ subjectId, session, onDelete, onEdit, viewMode = 'grid' }
             {isList && (
                 <div
                     className="absolute left-0 top-0 bottom-0 w-1"
-                    style={{ backgroundColor: totalQ > 0 ? (accuracy >= 75 ? '#34d399' : accuracy >= 50 ? '#fbbf24' : '#f87171') : 'rgba(255,255,255,0.1)' }}
+                    style={{ backgroundColor: totalQ > 0 ? (accuracy >= 75 ? '#34d399' : accuracy >= 50 ? '#fbbf24' : '#f87171') : 'var(--color-border)' }}
                 />
             )}
 
@@ -64,7 +64,7 @@ const SessionCard = ({ subjectId, session, onDelete, onEdit, viewMode = 'grid' }
                     {/* Title and Date */}
                     <div className="min-w-0 shrink-0" style={isList ? { width: '40%' } : {}}>
                         <div className="flex items-center gap-2 mb-1">
-                            <h4 className="font-heading font-semibold text-white tracking-tight text-[15px] truncate group-hover:text-primary-light transition-colors">
+                            <h4 className="font-heading font-semibold text-text tracking-tight text-[15px] truncate group-hover:text-primary-light transition-colors">
                                 {session.title}
                             </h4>
                             {session.testId && (
@@ -74,17 +74,17 @@ const SessionCard = ({ subjectId, session, onDelete, onEdit, viewMode = 'grid' }
                             )}
                         </div>
 
-                        <div className="flex items-center gap-3 mt-2 text-[11px] font-medium text-slate-500">
+                        <div className="flex items-center gap-3 mt-2 text-[11px] font-medium text-text-muted">
                             <span className="flex items-center gap-1.5 shrink-0">
-                                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                <Calendar className="w-3.5 h-3.5 text-text-muted" />
                                 {new Date(session.sessionDate).toLocaleDateString(undefined, {
                                     month: 'short',
                                     day: 'numeric',
                                 })}
                             </span>
-                            <div className="w-px h-3 bg-white/10" />
+                            <div className="w-px h-3 bg-border" />
                             <span className="flex items-center gap-1.5 shrink-0">
-                                <Target className="w-3.5 h-3.5 text-slate-400" />
+                                <Target className="w-3.5 h-3.5 text-text-muted" />
                                 {totalQ} Qs
                             </span>
                         </div>
@@ -94,10 +94,10 @@ const SessionCard = ({ subjectId, session, onDelete, onEdit, viewMode = 'grid' }
                     <div className={`min-w-0 ${isList ? 'flex-1 flex items-center gap-6' : 'mt-4 flex items-center gap-2'}`}>
                         {totalQ > 0 ? (
                             <div className="flex items-center gap-2 shrink-0">
-                                <span className={`inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-md ${isList ? 'hidden md:inline-flex' : ''}`}>
+                                <span className={`inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 [.light_&]:text-emerald-700 bg-emerald-500/10 [.light_&]:bg-emerald-500/20 px-2 py-1 rounded-md ${isList ? 'hidden md:inline-flex' : ''}`}>
                                     <CheckCircle2 className="w-3 h-3" /> {correct} correct
                                 </span>
-                                {isList && <span className="text-emerald-400 font-bold text-[12px] md:hidden">{correct}✔</span>}
+                                {isList && <span className="text-emerald-400 [.light_&]:text-emerald-700 font-bold text-[12px] md:hidden">{correct}✔</span>}
                                 {incorrect > 0 && (
                                     <>
                                         <span className={`inline-flex items-center gap-1 text-[10px] font-semibold text-red-400 bg-red-500/10 px-2 py-1 rounded-md ${isList ? 'hidden md:inline-flex' : ''}`}>
@@ -108,16 +108,16 @@ const SessionCard = ({ subjectId, session, onDelete, onEdit, viewMode = 'grid' }
                                 )}
                             </div>
                         ) : (
-                            <div className={`py-1 py-1.5 px-3 bg-white/[0.02] rounded-lg border border-white/[0.05] border-dashed shrink-0 ${isList ? 'hidden sm:block' : ''}`}>
-                                <p className="text-[10px] text-slate-600 text-center font-medium uppercase tracking-widest">No entries yet</p>
+                            <div className={`py-1 py-1.5 px-3 bg-surface-3/5 rounded-lg border border-border border-dashed shrink-0 ${isList ? 'hidden sm:block' : ''}`}>
+                                <p className="text-[10px] text-text-muted/60 text-center font-medium uppercase tracking-widest">No entries yet</p>
                             </div>
                         )}
 
                         {/* Notes: only show if space allows or in grid */}
                         {session.notes && (
                             <div className={`flex items-center gap-1.5 min-w-0 ${isList ? 'flex-1 hidden lg:flex' : 'mb-3 mt-3'}`}>
-                                <FileText className="w-3 h-3 text-slate-600 shrink-0" />
-                                <p className="text-[11px] text-slate-500 truncate group-hover:text-slate-400 transition-colors">{session.notes}</p>
+                                <FileText className="w-3 h-3 text-text-muted shrink-0" />
+                                <p className="text-[11px] text-text-muted truncate group-hover:text-text transition-colors">{session.notes}</p>
                             </div>
                         )}
                     </div>
@@ -139,11 +139,11 @@ const SessionCard = ({ subjectId, session, onDelete, onEdit, viewMode = 'grid' }
             </div>
 
             {/* Footer / Actions */}
-            <div className={`px-5 py-3 flex items-center gap-2 ${isList ? 'shrink-0 py-0 border-t-0 border-l border-white/[0.06]' : 'border-t border-white/[0.06]'}`}>
+            <div className={`px-5 py-3 flex items-center gap-2 ${isList ? 'shrink-0 py-0 border-t-0 border-l border-border' : 'border-t border-border'}`}>
                 <div className={`flex items-center gap-2 ${isList ? 'flex-col sm:flex-row' : ''}`}>
                     <button
                         onClick={(e) => { e.stopPropagation(); navigate(`/subjects/${subjectId}/sessions/${session.id}`); }}
-                        className={`flex items-center gap-1.5 rounded-lg text-[11px] font-semibold text-slate-400 hover:text-white hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/[0.1] transition-all cursor-pointer ${isList ? 'p-1.5 sm:px-3 sm:py-1.5' : 'px-3 py-1.5'}`}
+                        className={`flex items-center gap-1.5 rounded-lg text-[11px] font-semibold text-text-muted hover:text-text hover:bg-surface-3/10 border border-border hover:border-border transition-all cursor-pointer ${isList ? 'p-1.5 sm:px-3 sm:py-1.5' : 'px-3 py-1.5'}`}
                         title="Analytics"
                     >
                         <BarChart3 className="w-3.5 h-3.5 text-indigo-400" />
@@ -152,7 +152,7 @@ const SessionCard = ({ subjectId, session, onDelete, onEdit, viewMode = 'grid' }
                     {!session.testId && (
                         <button
                             onClick={(e) => { e.stopPropagation(); navigate(`/subjects/${subjectId}/sessions/${session.id}/tag`); }}
-                            className={`flex items-center gap-1.5 rounded-lg text-[11px] font-semibold text-primary hover:text-white hover:bg-primary/15 border border-primary/20 hover:border-primary/40 transition-all cursor-pointer ${isList ? 'p-1.5 sm:px-3 sm:py-1.5' : 'px-3 py-1.5'}`}
+                            className={`flex items-center gap-1.5 rounded-lg text-[11px] font-semibold text-primary hover:text-text hover:bg-primary/15 border border-primary/20 hover:border-primary/40 transition-all cursor-pointer ${isList ? 'p-1.5 sm:px-3 sm:py-1.5' : 'px-3 py-1.5'}`}
                             title="Tag Topics"
                         >
                             <Tags className="w-3.5 h-3.5" />
@@ -168,7 +168,7 @@ const SessionCard = ({ subjectId, session, onDelete, onEdit, viewMode = 'grid' }
                     {onEdit && (
                         <button
                             onClick={(e) => { e.stopPropagation(); onEdit(session); }}
-                            className="p-1.5 text-slate-500 hover:text-primary hover:bg-primary/10 rounded-md transition-colors cursor-pointer"
+                            className="p-1.5 text-text-muted hover:text-primary hover:bg-primary/10 rounded-md transition-colors cursor-pointer"
                             title="Edit"
                         >
                             <Pencil className="w-3.5 h-3.5" />
@@ -177,7 +177,7 @@ const SessionCard = ({ subjectId, session, onDelete, onEdit, viewMode = 'grid' }
                     {onDelete && (
                         <button
                             onClick={(e) => { e.stopPropagation(); onDelete(session); }}
-                            className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors cursor-pointer"
+                            className="p-1.5 text-text-muted hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors cursor-pointer"
                             title="Delete"
                         >
                             <Trash2 className="w-3.5 h-3.5" />

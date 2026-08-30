@@ -1,15 +1,24 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { notesApi, aiApi } from '../../api/index.js';
 import toast from 'react-hot-toast';
-import { X, PlusCircle, Trash2, Save, FileText, Image as ImageIcon, Camera, RefreshCcw, FlipHorizontal, ChevronDown, Scissors, Check, RotateCw, ZoomIn, ZoomOut, Wand2, Sparkles, Info, Tag, Type, LayoutGrid, Sun, Moon, Eye, EyeOff } from 'lucide-react';
+import { X, PlusCircle, Trash2, Save, FileText, Image as ImageIcon, Camera, RefreshCcw, FlipHorizontal, ChevronDown, Scissors, Check, RotateCw, ZoomIn, ZoomOut, Wand2, Sparkles, Info, Tag, Type, LayoutGrid, Sun, Moon, Eye, EyeOff, Zap, Plus } from 'lucide-react';
 import ModalPortal from '../ModalPortal.jsx';
 import ImageCropper from '../common/ImageCropper.jsx';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeRaw from 'rehype-raw';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
+import { preprocessMarkdown } from '../../utils/markdownUtils';
 
 const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, initialTitle, initialContent, parentNoteId, isMinimized, onMinimize }) => {
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
     const [tags, setTags] = useState([]);
     const [tagInput, setTagInput] = useState('');
+    const [keyHighlights, setKeyHighlights] = useState([]);
+    const [highlightInput, setHighlightInput] = useState('');
     const [addingNote, setAddingNote] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isEnhancing, setIsEnhancing] = useState(false);
@@ -31,6 +40,11 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
     // Cropping State
     const [imageToCrop, setImageToCrop] = useState(null);
     const [isCropping, setIsCropping] = useState(false);
+
+    // Collapsible Section States
+    const [showImagesSection, setShowImagesSection] = useState(true);
+    const [showTagsSection, setShowTagsSection] = useState(true);
+    const [showHighlightsSection, setShowHighlightsSection] = useState(true);
 
     // Camera State
     const [cameras, setCameras] = useState([]);
@@ -271,13 +285,14 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
         }
         setAddingNote(true);
         try {
-            const { note } = await notesApi.create(subjectId, {
+        const { note } = await notesApi.create(subjectId, {
                 title: title.trim(),
                 content: content.trim(),
                 questionId,
                 parentNoteId: parentNoteId || null,
                 tags: finalTags,
-                images: embeddedImages // Bulk upload images
+                images: embeddedImages,
+                key_highlights: keyHighlights
             });
             onNoteAdded(note);
             handleModalClose(true);
@@ -298,6 +313,8 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
         setContent('');
         setTags([]);
         setTagInput('');
+        setKeyHighlights([]);
+        setHighlightInput('');
         setEmbeddedImages([]);
         setImageMethod('upload');
         setIsCropping(false);
@@ -309,10 +326,10 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
 
     const renderImagePanel = () => (
         <div className="space-y-4">
-            <div className={`flex p-0.5 rounded-lg border ${isLightMode ? 'bg-black/[0.05] border-black/[0.1]' : 'bg-white/[0.025] border-white/[0.05]'}`}>
+            <div className={`flex p-0.5 rounded-lg border ${isLightMode ? 'bg-black/[0.05] border-black/[0.1]' : 'bg-surface-2 border-border'}`}>
                 <button
                     onClick={() => setImageMethod('upload')}
-                    className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all cursor-pointer flex items-center justify-center gap-1.5 ${imageMethod === 'upload' ? (isLightMode ? 'bg-white text-slate-900 shadow-sm' : 'bg-white/[0.07] text-white shadow-sm') : 'text-slate-500 hover:text-slate-400'}`}
+                    className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all cursor-pointer flex items-center justify-center gap-1.5 ${imageMethod === 'upload' ? (isLightMode ? 'bg-white text-text-muted shadow-sm' : 'bg-surface-2 text-text shadow-sm') : 'text-text-muted hover:text-text-muted'}`}
                 >
                     <ImageIcon className="w-3 h-3" /> Upload
                 </button>
@@ -322,7 +339,7 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
                         getCameras();
                         startCamera(selectedCameraId);
                     }}
-                    className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all cursor-pointer flex items-center justify-center gap-1.5 ${imageMethod === 'camera' ? (isLightMode ? 'bg-white text-slate-900 shadow-sm' : 'bg-white/[0.07] text-white shadow-sm') : 'text-slate-500 hover:text-slate-400'}`}
+                    className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all cursor-pointer flex items-center justify-center gap-1.5 ${imageMethod === 'camera' ? (isLightMode ? 'bg-white text-text-muted shadow-sm' : 'bg-surface-2 text-text shadow-sm') : 'text-text-muted hover:text-text-muted'}`}
                 >
                     <Camera className="w-3 h-3" /> Camera
                 </button>
@@ -338,7 +355,7 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
                                 setSelectedCameraId(newId);
                                 startCamera(newId);
                             }}
-                            className={`flex-1 border rounded-lg py-1.5 px-2 text-[10px] outline-none ${isLightMode ? 'bg-white border-slate-200 text-slate-600' : 'bg-white/[0.03] border-white/[0.06] text-slate-400'}`}
+                            className={`flex-1 border rounded-lg py-1.5 px-2 text-[10px] outline-none ${isLightMode ? 'bg-white border-slate-200 text-text-muted' : 'bg-surface-2 border-border text-text-muted'}`}
                         >
                             {cameras.map(camera => (
                                 <option key={camera.deviceId} value={camera.deviceId}>
@@ -348,7 +365,7 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
                         </select>
                     </div>
 
-                    <div className={`relative aspect-video rounded-lg overflow-hidden border flex items-center justify-center ${isLightMode ? 'bg-slate-100 border-slate-200' : 'bg-[#0e0e16] border-white/[0.06]'}`}>
+                    <div className={`relative aspect-video rounded-lg overflow-hidden border flex items-center justify-center ${isLightMode ? 'bg-surface-2 border-slate-200' : 'bg-[#0e0e16] border-border'}`}>
                         {cameraStream ? (
                             <>
                                 <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
@@ -373,7 +390,7 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
                 </div>
             ) : (
                 <div
-                    className={`relative rounded-xl border border-dashed py-6 flex flex-col items-center text-center transition-all cursor-pointer group ${isLightMode ? 'bg-white border-slate-300 hover:border-emerald-500/40 hover:bg-emerald-50/20' : 'border-white/[0.08] hover:border-emerald-500/25'}`}
+                    className={`relative rounded-xl border border-dashed py-6 flex flex-col items-center text-center transition-all cursor-pointer group ${isLightMode ? 'bg-white border-slate-300 hover:border-emerald-500/40 hover:bg-emerald-50/20' : 'border-border hover:border-emerald-500/25'}`}
                     onDragOver={e => e.preventDefault()}
                     onDrop={e => {
                         e.preventDefault();
@@ -404,11 +421,11 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
                             }
                         }}
                     />
-                    <div className={`w-8 h-8 rounded-lg border flex items-center justify-center mb-2 ${isLightMode ? 'bg-slate-50 border-slate-200 text-slate-400' : 'bg-white/[0.04] border-white/[0.06] text-slate-600'}`}>
+                    <div className={`w-8 h-8 rounded-lg border flex items-center justify-center mb-2 ${isLightMode ? 'bg-surface-2 border-slate-200 text-text-muted' : 'bg-surface-2 border-border text-text-muted'}`}>
                         <ImageIcon className="w-4 h-4" />
                     </div>
-                    <p className={`text-[11px] font-medium ${isLightMode ? 'text-slate-900' : 'text-slate-400'}`}>Drop image here</p>
-                    <p className={`text-[9px] ${isLightMode ? 'text-slate-500' : 'text-slate-700'}`}>or click to browse</p>
+                    <p className={`text-[11px] font-medium ${isLightMode ? 'text-text-muted' : 'text-text-muted'}`}>Drop image here</p>
+                    <p className={`text-[9px] ${isLightMode ? 'text-text-muted' : 'text-text-muted'}`}>or click to browse</p>
                 </div>
             )}
         </div>
@@ -422,7 +439,7 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
                     <div className={`flex items-center gap-1 p-1 rounded-2xl shadow-2xl border backdrop-blur-xl transition-all
                         ${isLightMode 
                             ? 'bg-white/90 border-slate-200 shadow-emerald-100/50' 
-                            : 'bg-[#1a1a2e]/90 border-white/10 shadow-black/60'}`}
+                            : 'bg-[#1a1a2e]/90 border-border-hover shadow-black/60'}`}
                     >
                         <button
                             onClick={() => onMinimize && onMinimize(false)}
@@ -436,7 +453,7 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
                             </div>
                         </button>
 
-                        <div className={`w-px h-6 mx-0.5 ${isLightMode ? 'bg-slate-200' : 'bg-white/10'}`} />
+                        <div className={`w-px h-6 mx-0.5 ${isLightMode ? 'bg-surface-2' : 'bg-surface-3'}`} />
 
                         <button
                             onClick={(e) => {
@@ -444,7 +461,7 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
                                 handleModalClose();
                             }}
                             className={`p-3 rounded-xl transition-all active:scale-90 cursor-pointer group flex items-center justify-center
-                                ${isLightMode ? 'hover:bg-rose-50 text-slate-400 hover:text-rose-500' : 'hover:bg-rose-500/10 text-slate-500 hover:text-rose-400'}`}
+                                ${isLightMode ? 'hover:bg-rose-50 text-text-muted hover:text-rose-500' : 'hover:bg-rose-500/10 text-text-muted hover:text-rose-400'}`}
                             title="Close"
                         >
                             <X size={20} strokeWidth={2.5} className="group-hover:rotate-90 transition-transform" />
@@ -456,24 +473,24 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
             <div className={`fixed inset-0 z-[110] flex items-center justify-center p-0 transition-all duration-500
                     ${isMinimized ? 'opacity-0 pointer-events-none scale-95' : 'opacity-100 scale-100'}`}>
                 
-                <div className={`absolute inset-0 modal-backdrop transition-opacity duration-500 ${isLightMode ? 'bg-black/10' : 'bg-black/60'} ${isMinimized ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} />
+                <div className={`absolute inset-0 modal-backdrop transition-opacity duration-500 ${isMinimized ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} onClick={() => handleModalClose()} />
 
                 <div
                     className="w-full h-[100dvh] flex flex-col overflow-hidden relative z-10"
-                    style={{ background: isLightMode ? '#f5f7fa' : '#161625', transition: 'background 0.3s ease' }}
+                    style={{ background: isLightMode ? '#f8fafc' : '#161625', transition: 'background 0.3s ease' }}
                     onClick={e => e.stopPropagation()}
                 >
                     {/* Header */}
-                    <div className={`flex items-center justify-between px-5 sm:px-8 py-3.5 border-b shrink-0 ${isLightMode ? 'bg-[#eef2f7] border-slate-200' : 'bg-[#161625] border-white/[0.05]'}`}>
+                    <div className={`flex items-center justify-between px-5 sm:px-8 py-3.5 border-b shrink-0 ${isLightMode ? 'bg-white border-slate-200' : 'bg-[#161625] border-border'}`}>
                         <div className="flex items-center gap-3">
                             <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isLightMode ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-emerald-500/10 border border-emerald-500/15 text-emerald-400'}`}>
                                 <PlusCircle className="w-4 h-4" />
                             </div>
                             <div>
-                                <h3 className={`text-[15px] font-heading font-bold tracking-tight leading-none ${isLightMode ? 'text-slate-900' : 'text-white'}`}>
+                                <h3 className={`text-[15px] font-heading font-bold tracking-tight leading-none ${isLightMode ? 'text-text-muted' : 'text-text'}`}>
                                     {isCropping ? 'Crop Image' : 'New Note'}
                                 </h3>
-                                <p className={`text-[11px] mt-0.5 hidden sm:block ${isLightMode ? 'text-slate-500' : 'text-slate-600'}`}>Create and organize your study material</p>
+                                <p className={`text-[11px] mt-0.5 hidden sm:block ${isLightMode ? 'text-text-muted' : 'text-text-muted'}`}>Create and organize your study material</p>
                             </div>
                         </div>
 
@@ -510,7 +527,7 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
                                     {onMinimize && (
                                         <button
                                             onClick={() => onMinimize(true)}
-                                            className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all border ${isLightMode ? 'bg-white shadow-sm text-slate-500 border-slate-200 hover:bg-slate-50' : 'bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.08]'}`}
+                                            className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all border ${isLightMode ? 'bg-white shadow-sm text-text-muted border-slate-200 hover:bg-surface-2' : 'bg-surface-2 border-border text-text-muted hover:bg-surface-2'}`}
                                             title="Minimize Mode"
                                         >
                                             <Eye className="w-4 h-4" />
@@ -520,7 +537,7 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
                             )}
                             <button
                                 onClick={() => handleModalClose()}
-                                className={`p-2 rounded-lg transition-all cursor-pointer ml-1 ${isLightMode ? 'text-slate-600 hover:bg-slate-200/50' : 'text-slate-400 hover:bg-white/[0.05]'}`}
+                                className={`p-2 rounded-lg transition-all cursor-pointer ml-1 ${isLightMode ? 'text-text-muted hover:bg-surface-2' : 'text-text-muted hover:bg-surface-2'}`}
                             >
                                 <X className="w-4 h-4" />
                             </button>
@@ -531,106 +548,229 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
                     {!isCropping && (
                         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
                             {/* Left Sidebar */}
-                            <div className={`w-full lg:w-[320px] xl:w-[360px] shrink-0 border-b lg:border-b-0 lg:border-r flex flex-col overflow-hidden ${isLightMode ? 'bg-[#f1f4f9] border-slate-200' : 'bg-[#1e1e2d] border-white/[0.04]'}`}>
+                            <div className={`w-full lg:w-[320px] xl:w-[360px] shrink-0 border-b lg:border-b-0 lg:border-r flex flex-col overflow-hidden ${isLightMode ? 'bg-[#f1f4f9] border-slate-200' : 'bg-[#1e1e2d] border-border'}`}>
                                 <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6">
                                     {/* Title */}
                                     <div>
-                                        <label className={`text-[10px] font-extrabold uppercase tracking-[0.2em] mb-2.5 block ${isLightMode ? 'text-slate-400' : 'text-slate-500'}`}>Title</label>
+                                        <label className={`text-[10px] font-extrabold uppercase tracking-[0.2em] mb-2.5 block ${isLightMode ? 'text-text-muted' : 'text-text-muted'}`}>Title</label>
                                         <input
                                             type="text"
                                             value={title}
                                             onChange={(e) => setTitle(e.target.value)}
                                             placeholder="What is this note about?"
-                                            className={`w-full border rounded-xl px-4 py-3 text-[14px] focus:outline-none transition-all ${isLightMode ? 'bg-white border-slate-200 text-slate-900 focus:border-emerald-500/40' : 'bg-white/[0.03] border-white/[0.06] text-slate-100 focus:border-emerald-500/30'}`}
+                                            className={`w-full border rounded-xl px-4 py-3 text-[14px] focus:outline-none transition-all ${isLightMode ? 'bg-white border-slate-200 text-text-muted focus:border-emerald-500/40' : 'bg-surface-2 border-border text-text focus:border-emerald-500/30'}`}
                                         />
-                                    </div>
-
-                                    {/* Images Section */}
-                                    <div>
-                                        <label className={`text-[10px] font-extrabold uppercase tracking-[0.2em] mb-3 flex items-center justify-between ${isLightMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                            <span className="flex items-center gap-1.5"><ImageIcon className="w-3 h-3" /> Images</span>
-                                            <span className="text-[9px] lowercase bg-emerald-500/10 text-emerald-500 px-1.5 py-0.5 rounded">{embeddedImages.length} items</span>
-                                        </label>
-                                        
-                                        {renderImagePanel()}
-
-                                        {embeddedImages.length > 0 && (
-                                            <div className="mt-4 grid grid-cols-2 gap-2">
-                                                {embeddedImages.map((img, idx) => (
-                                                    <div 
-                                                        key={img.referenceId}
-                                                        className={`group relative aspect-square rounded-lg border overflow-hidden cursor-move transition-all hover:scale-[1.02] hover:shadow-xl ${isLightMode ? 'bg-white border-slate-200' : 'bg-white/[0.02] border-white/[0.05]'}`}
-                                                        onClick={() => insertReferenceId(img.referenceId)}
-                                                        title="Click to insert at cursor"
-                                                    >
-                                                        <img src={img.data} alt={img.referenceId} className="w-full h-full object-cover" />
-                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-2">
-                                                            <span className="text-white text-[9px] font-bold mb-1">[[{img.referenceId}]]</span>
-                                                            <button
-                                                                type="button"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleRemoveImage(img.referenceId);
-                                                                }}
-                                                                className="p-1 rounded bg-red-500 text-white hover:bg-red-600 transition-colors"
-                                                            >
-                                                                <Trash2 className="w-3 h-3" />
-                                                            </button>
-                                                        </div>
-                                                        <div className="absolute top-1 left-1 bg-black/60 text-white text-[8px] px-1 rounded font-mono">
-                                                            {img.referenceId}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                        {embeddedImages.length > 0 && (
-                                            <p className={`text-[9px] mt-2 text-center italic ${isLightMode ? 'text-slate-400' : 'text-slate-600'}`}>Click image to insert into note</p>
-                                        )}
                                     </div>
 
                                     {/* Tags */}
                                     <div>
-                                        <label className={`text-[10px] font-extrabold uppercase tracking-[0.2em] mb-2.5 flex items-center gap-1.5 ${isLightMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                            <Tag className="w-3 h-3" /> Tags
-                                        </label>
-                                        {tags.length > 0 && (
-                                            <div className="flex flex-wrap gap-1.5 mb-2.5">
-                                                {tags.map(tag => (
-                                                    <span key={tag} className={`px-2 py-0.5 text-[10px] font-semibold rounded-md flex items-center gap-1 border ${isLightMode ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/15'}`}>
-                                                        {tag}
-                                                        <button type="button" onClick={() => setTags(t => t.filter(x => x !== tag))} className="hover:scale-110 cursor-pointer">
-                                                            <X className="w-2.5 h-2.5" />
-                                                        </button>
-                                                    </span>
-                                                ))}
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowTagsSection(!showTagsSection)}
+                                            className={`w-full text-[10px] font-extrabold uppercase tracking-[0.2em] mb-2.5 flex items-center justify-between cursor-pointer select-none ${isLightMode ? 'text-text-muted hover:text-text' : 'text-text-muted hover:text-text'}`}
+                                        >
+                                            <span className="flex items-center gap-1.5">
+                                                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showTagsSection ? '' : '-rotate-90'}`} />
+                                                <Tag className="w-3 h-3" /> Tags
+                                            </span>
+                                            {tags.length > 0 && (
+                                                <span className="text-[9px] lowercase bg-emerald-500/10 text-emerald-500 px-1.5 py-0.5 rounded">{tags.length} tags</span>
+                                            )}
+                                        </button>
+                                        {showTagsSection && (
+                                            <div className="animate-in fade-in duration-200">
+                                                {tags.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1.5 mb-2.5">
+                                                        {tags.map(tag => (
+                                                            <span key={tag} className={`px-2 py-0.5 text-[10px] font-semibold rounded-md flex items-center gap-1 border ${isLightMode ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/15'}`}>
+                                                                {tag}
+                                                                <button type="button" onClick={() => setTags(t => t.filter(x => x !== tag))} className="hover:scale-110 cursor-pointer">
+                                                                    <X className="w-2.5 h-2.5" />
+                                                                </button>
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                <input
+                                                    value={tagInput}
+                                                    onChange={(e) => setTagInput(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' || e.key === ',') {
+                                                            e.preventDefault();
+                                                            const t = tagInput.trim();
+                                                            if (t && !tags.includes(t)) setTags([...tags, t]);
+                                                            setTagInput('');
+                                                        }
+                                                    }}
+                                                    className={`w-full border rounded-xl px-3 py-2 text-[12px] focus:outline-none transition-all ${isLightMode ? 'bg-white border-slate-200 text-text-muted' : 'bg-surface-2 border-border text-text'}`}
+                                                    placeholder="Add tag..."
+                                                />
+
+                                                {/* Existing Tags Suggestions */}
+                                                {availableTags.filter(t => !tags.includes(t)).length > 0 && (
+                                                    <div className="mt-3">
+                                                        <p className={`text-[9px] font-extrabold uppercase tracking-wider mb-2 ${isLightMode ? 'text-text-muted' : 'text-text-muted'}`}>Existing Tags</p>
+                                                        <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto custom-scrollbar pr-1">
+                                                            {availableTags
+                                                                .filter(t => !tags.includes(t))
+                                                                .map(tag => (
+                                                                    <button
+                                                                        key={tag}
+                                                                        type="button"
+                                                                        onClick={() => setTags([...tags, tag])}
+                                                                        className={`px-2 py-1 text-[10px] font-medium rounded-md border transition-all cursor-pointer ${
+                                                                            isLightMode 
+                                                                                ? 'bg-white border-slate-200 text-text-muted hover:border-emerald-500/40 hover:bg-emerald-50/30' 
+                                                                                : 'bg-surface-2 border-border text-text-muted hover:border-emerald-500/30 hover:bg-emerald-500/5'
+                                                                        }`}
+                                                                    >
+                                                                        {tag}
+                                                                    </button>
+                                                                ))
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
-                                        <input
-                                            value={tagInput}
-                                            onChange={(e) => setTagInput(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter' || e.key === ',') {
-                                                    e.preventDefault();
-                                                    const t = tagInput.trim();
-                                                    if (t && !tags.includes(t)) setTags([...tags, t]);
-                                                    setTagInput('');
-                                                }
-                                            }}
-                                            className={`w-full border rounded-xl px-3 py-2 text-[12px] focus:outline-none transition-all ${isLightMode ? 'bg-white border-slate-200 text-slate-900' : 'bg-white/[0.03] border-white/[0.06] text-slate-100'}`}
-                                            placeholder="Add tag..."
-                                        />
+                                    </div>
+
+                                    {/* Key Highlights */}
+                                    <div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowHighlightsSection(!showHighlightsSection)}
+                                            className={`w-full text-[10px] font-extrabold uppercase tracking-[0.2em] mb-2.5 flex items-center justify-between cursor-pointer select-none ${isLightMode ? 'text-amber-600' : 'text-amber-400'}`}
+                                        >
+                                            <span className="flex items-center gap-1.5">
+                                                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showHighlightsSection ? '' : '-rotate-90'}`} />
+                                                <Zap className="w-3 h-3" /> Key Highlights
+                                            </span>
+                                            {keyHighlights.length > 0 && (
+                                                <span className="text-[9px] lowercase bg-amber-500/10 text-amber-500 px-1.5 py-0.5 rounded">{keyHighlights.length} items</span>
+                                            )}
+                                        </button>
+
+                                        {showHighlightsSection && (
+                                            <div className="animate-in fade-in duration-200">
+                                                {keyHighlights.length > 0 && (
+                                                    <div className="flex flex-col gap-1.5 mb-3 max-h-[200px] overflow-y-auto custom-scrollbar pr-1">
+                                                        {keyHighlights.map((hl, idx) => (
+                                                            <div key={idx} className={`flex items-start gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] font-medium group min-w-0 max-w-full ${isLightMode ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-amber-500/10 border-amber-500/20 text-amber-300'}`}>
+                                                                <Zap className="w-3 h-3 shrink-0 mt-0.5 opacity-70" />
+                                                                <span className="flex-1 min-w-0 leading-snug break-words overflow-x-auto custom-scrollbar">
+                                                                    <ReactMarkdown
+                                                                        remarkPlugins={[remarkGfm, remarkMath]}
+                                                                        rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false }]]}
+                                                                        components={{
+                                                                            p: ({ children }) => <span className="inline">{children}</span>
+                                                                        }}
+                                                                    >
+                                                                        {preprocessMarkdown(hl)}
+                                                                    </ReactMarkdown>
+                                                                </span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setKeyHighlights(h => h.filter((_, i) => i !== idx))}
+                                                                    className={`shrink-0 opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110 cursor-pointer mt-0.5 ${isLightMode ? 'text-amber-500 hover:text-red-500' : 'text-amber-400 hover:text-red-400'}`}
+                                                                >
+                                                                    <X className="w-2.5 h-2.5" />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        value={highlightInput}
+                                                        onChange={(e) => setHighlightInput(e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                e.preventDefault();
+                                                                const h = highlightInput.trim();
+                                                                if (h) { setKeyHighlights(prev => [...prev, h]); setHighlightInput(''); }
+                                                            }
+                                                        }}
+                                                        className={`flex-1 border rounded-xl px-3 py-2 text-[12px] focus:outline-none transition-all ${isLightMode ? 'bg-white border-amber-200 text-slate-700 focus:border-amber-400 placeholder:text-slate-400' : 'bg-surface-2 border-amber-500/20 text-text focus:border-amber-500/50 placeholder:text-text-muted'}`}
+                                                        placeholder="Type highlight, press Enter..."
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { const h = highlightInput.trim(); if (h) { setKeyHighlights(prev => [...prev, h]); setHighlightInput(''); } }}
+                                                        className={`p-2 rounded-xl border transition-all cursor-pointer shrink-0 ${isLightMode ? 'bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100' : 'bg-amber-500/10 border-amber-500/20 text-amber-400 hover:bg-amber-500/20'}`}
+                                                    >
+                                                        <Plus className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Images Section (Moved to Bottom) */}
+                                    <div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowImagesSection(!showImagesSection)}
+                                            className={`w-full text-[10px] font-extrabold uppercase tracking-[0.2em] mb-3 flex items-center justify-between cursor-pointer select-none ${isLightMode ? 'text-text-muted hover:text-text' : 'text-text-muted hover:text-text'}`}
+                                        >
+                                            <span className="flex items-center gap-1.5">
+                                                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showImagesSection ? '' : '-rotate-90'}`} />
+                                                <ImageIcon className="w-3 h-3" /> Images
+                                            </span>
+                                            <span className="text-[9px] lowercase bg-emerald-500/10 text-emerald-500 px-1.5 py-0.5 rounded">{embeddedImages.length} items</span>
+                                        </button>
+                                        
+                                        {showImagesSection && (
+                                            <div className="animate-in fade-in duration-200">
+                                                {renderImagePanel()}
+
+                                                {embeddedImages.length > 0 && (
+                                                    <div className="mt-4 grid grid-cols-2 gap-2">
+                                                        {embeddedImages.map((img, idx) => (
+                                                            <div 
+                                                                key={img.referenceId}
+                                                                className={`group relative aspect-square rounded-lg border overflow-hidden cursor-move transition-all hover:scale-[1.02] hover:shadow-xl ${isLightMode ? 'bg-white border-slate-200' : 'bg-surface-2 border-border'}`}
+                                                                onClick={() => insertReferenceId(img.referenceId)}
+                                                                title="Click to insert at cursor"
+                                                            >
+                                                                <img src={img.data} alt={img.referenceId} className="w-full h-full object-cover" />
+                                                                <div className="absolute inset-0 bg-surface-2/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-2">
+                                                                    <span className="text-text text-[9px] font-bold mb-1">[[{img.referenceId}]]</span>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleRemoveImage(img.referenceId);
+                                                                        }}
+                                                                        className="p-1 rounded bg-red-500 text-white hover:bg-red-600 transition-colors"
+                                                                    >
+                                                                        <Trash2 className="w-3 h-3" />
+                                                                    </button>
+                                                                </div>
+                                                                <div className="absolute top-1 left-1 bg-surface-3/60 text-text text-[8px] px-1 rounded font-mono">
+                                                                    {img.referenceId}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {embeddedImages.length > 0 && (
+                                                    <p className={`text-[9px] mt-2 text-center italic ${isLightMode ? 'text-text-muted' : 'text-text-muted'}`}>Click image to insert into note</p>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
 
                             {/* Right Panel: Editor */}
                             <div className="flex-1 flex flex-col overflow-hidden min-w-0 bg-transparent">
-                                <div className={`flex items-center justify-between px-5 sm:px-8 py-3 border-b shrink-0 ${isLightMode ? 'bg-[#f8fafc] border-slate-200' : 'bg-transparent border-white/[0.04]'}`}>
+                                <div className={`flex items-center justify-between px-5 sm:px-8 py-3 border-b shrink-0 ${isLightMode ? 'bg-[#f8fafc] border-slate-200' : 'bg-transparent border-border'}`}>
                                     <div className="flex items-center gap-2">
-                                        <FileText className={`w-3.5 h-3.5 ${isLightMode ? 'text-slate-400' : 'text-slate-600'}`} />
-                                        <span className={`text-[11px] font-bold uppercase tracking-[0.15em] ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>Content</span>
-                                        <span className={`text-[10px] ml-1 ${isLightMode ? 'text-slate-400' : 'text-slate-700'}`}>— Use [[IMG_XXXX | right | small]] for layout</span>
+                                        <FileText className={`w-3.5 h-3.5 ${isLightMode ? 'text-text-muted' : 'text-text-muted'}`} />
+                                        <span className={`text-[11px] font-bold uppercase tracking-[0.15em] ${isLightMode ? 'text-text-muted' : 'text-text-muted'}`}>Content</span>
+                                        <span className={`text-[10px] ml-1 ${isLightMode ? 'text-text-muted' : 'text-text-muted'}`}>— Use [[IMG_XXXX | right | small]] for layout</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <button
@@ -661,16 +801,16 @@ const AddNoteModal = ({ isOpen, onClose, subjectId, onNoteAdded, questionId, ini
                                             value={content}
                                             onChange={(e) => setContent(e.target.value)}
                                             placeholder="Start writing your notes here...&#10;&#10;Click images in the sidebar to place them in your content."
-                                            className={`w-full flex-1 px-5 sm:px-8 py-6 text-[15px] focus:outline-none resize-none font-mono leading-[1.8] placeholder:text-slate-400 ${isLightMode ? 'bg-white text-slate-800' : 'bg-[#1c1c28] text-slate-200'}`}
+                                            className={`w-full flex-1 px-5 sm:px-8 py-6 text-[15px] focus:outline-none resize-none font-mono leading-[1.8] placeholder:text-text-muted ${isLightMode ? 'bg-white text-text-muted' : 'bg-[#1c1c28] text-text'}`}
                                             style={{ caretColor: '#10b981' }}
                                         />
                                     </form>
                                 </div>
 
-                                <div className={`px-5 sm:px-8 py-2.5 border-t shrink-0 flex items-center justify-between ${isLightMode ? 'bg-[#f8fafc] border-slate-200' : 'bg-transparent border-white/[0.03]'}`}>
+                                <div className={`px-5 sm:px-8 py-2.5 border-t shrink-0 flex items-center justify-between ${isLightMode ? 'bg-[#f8fafc] border-slate-200' : 'bg-transparent border-border'}`}>
                                     <div className="flex items-center gap-4">
-                                        <span className={`text-[10px] font-medium ${isLightMode ? 'text-slate-500' : 'text-slate-700'}`}>{content.length} characters</span>
-                                        <span className={`text-[10px] font-medium ${isLightMode ? 'text-slate-500' : 'text-slate-700'}`}>{embeddedImages.length} images linked</span>
+                                        <span className={`text-[10px] font-medium ${isLightMode ? 'text-text-muted' : 'text-text-muted'}`}>{content.length} characters</span>
+                                        <span className={`text-[10px] font-medium ${isLightMode ? 'text-text-muted' : 'text-text-muted'}`}>{embeddedImages.length} images linked</span>
                                     </div>
                                     {content.trim() && (
                                         <div className="flex items-center gap-1.5">

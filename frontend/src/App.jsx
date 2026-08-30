@@ -1,12 +1,15 @@
 import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth, AuthProvider } from './context/AuthContext.jsx';
+import useTimeTableNotifications from './hooks/useTimeTableNotifications.js';
 import { SubjectProvider } from './context/SubjectContext.jsx';
 import { TestSeriesProvider } from './context/TestSeriesContext.jsx';
 import { TopicProvider } from './context/TopicContext.jsx';
 import { AnalyticsProvider } from './context/AnalyticsContext.jsx';
 import { FileProvider } from './context/FileContext.jsx';
+import { FolderProvider } from './context/FolderContext.jsx';
 import Layout from './components/Layout.jsx';
+import { ThemeProvider } from './context/ThemeContext.jsx';
 
 // Lazy load pages
 const Login = lazy(() => import('./pages/Login.jsx'));
@@ -24,6 +27,7 @@ const TestSeriesDetail = lazy(() => import('./pages/TestSeriesDetail.jsx'));
 const TestDetail = lazy(() => import('./pages/TestDetail.jsx'));
 const TestAnalytics = lazy(() => import('./pages/TestAnalytics.jsx'));
 const TestSeriesInsights = lazy(() => import('./pages/TestSeriesInsights.jsx'));
+const Tools = lazy(() => import('./pages/Tools.jsx'));
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -39,6 +43,13 @@ const PublicRoute = ({ children }) => {
   const { user, loading } = useAuth();
   if (loading) return null;
   return user ? <Navigate to="/" replace /> : children;
+};
+
+/* Runs global side-effects that require auth context */
+const GlobalEffects = () => {
+  const { user } = useAuth();
+  useTimeTableNotifications(!!user);
+  return null;
 };
 
 const AppRoutes = () => (
@@ -67,6 +78,7 @@ const AppRoutes = () => (
         <Route path="tests/:seriesId/test/:testId/analytics" element={<TestAnalytics />} />
         <Route path="tests/:seriesId/insights" element={<TestSeriesInsights />} />
         <Route path="library" element={<Library />} />
+        <Route path="tools" element={<Tools />} />
       </Route>
 
       {/* Fallback */}
@@ -82,38 +94,43 @@ import GlobalQuickViewModal from './components/GlobalQuickViewModal.jsx';
 
 const App = () => (
   <BrowserRouter>
-    <AuthProvider>
-      <QuickViewProvider>
-        <SubjectProvider>
-          <TestSeriesProvider>
-            <TopicProvider>
-              <AnalyticsProvider>
-                <FileProvider>
-                  <Toaster
-                  position="top-right"
-                  toastOptions={{
-                    duration: 4000,
-                    style: {
-                      background: '#1a1a2e',
-                      color: '#fff',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      borderRadius: '12px',
-                      fontSize: '14px',
-                      padding: '12px 16px',
-                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                    },
-                  }}
-                />
-                <AppRoutes />
-                <GlobalQuickViewModal />
-                <QuickViewBar />
-              </FileProvider>
-            </AnalyticsProvider>
-            </TopicProvider>
-          </TestSeriesProvider>
-        </SubjectProvider>
-      </QuickViewProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <QuickViewProvider>
+          <SubjectProvider>
+            <TestSeriesProvider>
+              <TopicProvider>
+                <AnalyticsProvider>
+                  <FileProvider>
+                    <GlobalEffects />
+                    <Toaster
+                    position="top-right"
+                    toastOptions={{
+                      duration: 4000,
+                      style: {
+                        background: '#1a1a2e',
+                        color: '#fff',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '12px',
+                        fontSize: '14px',
+                        padding: '12px 16px',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                      },
+                    }}
+                  />
+                  <FolderProvider>
+                    <AppRoutes />
+                    <GlobalQuickViewModal />
+                    <QuickViewBar />
+                  </FolderProvider>
+                </FileProvider>
+              </AnalyticsProvider>
+              </TopicProvider>
+            </TestSeriesProvider>
+          </SubjectProvider>
+        </QuickViewProvider>
+      </AuthProvider>
+    </ThemeProvider>
   </BrowserRouter>
 );
 

@@ -3,7 +3,7 @@ import { CheckCircle2, AlertTriangle, HelpCircle } from 'lucide-react';
 const PerformanceBadge = ({ accuracy }) => {
     if (accuracy == null) {
         return (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-bold bg-slate-500/10 text-slate-400 border border-slate-500/15 shadow-sm">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-bold bg-surface-2 text-text-muted border border-slate-500/15 shadow-sm">
                 <HelpCircle className="w-4 h-4" />
                 New
             </span>

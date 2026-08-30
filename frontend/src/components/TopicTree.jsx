@@ -66,8 +66,8 @@ const TopicNode = ({ topic, subjectId, depth = 0, setConfirmDelete, defaultExpan
             {/* Tree connector lines */}
             {depth > 0 && (
                 <>
-                    <div className="absolute -left-6 top-0 bottom-0 w-px bg-white/[0.06]" />
-                    <div className="absolute -left-6 top-[20px] w-4 h-px bg-white/[0.06]" />
+                    <div className="absolute -left-6 top-0 bottom-0 w-px bg-border" />
+                    <div className="absolute -left-6 top-[20px] w-4 h-px bg-border" />
                 </>
             )}
 
@@ -76,20 +76,20 @@ const TopicNode = ({ topic, subjectId, depth = 0, setConfirmDelete, defaultExpan
                 className={`flex items-center gap-2 group/node relative z-10 rounded-lg transition-all min-w-0
                     ${depth === 0
                         ? 'py-2.5 px-2 hover:bg-primary/[0.04]'
-                        : 'py-1.5 px-2 hover:bg-white/[0.04]'
+                        : 'py-1.5 px-2 hover:bg-surface-3/10'
                     }`}
             >
                 {/* Expand/collapse or leaf bullet */}
                 {hasChildren || depth === 0 ? (
                     <button
                         onClick={() => hasChildren && setExpanded(!expanded)}
-                        className={`p-1 rounded-md transition-all text-slate-500 shrink-0 ${hasChildren ? 'hover:text-primary hover:bg-primary/10 cursor-pointer' : 'opacity-30 cursor-default'}`}
+                        className={`p-1 rounded-md transition-all text-text-muted shrink-0 ${hasChildren ? 'hover:text-primary hover:bg-primary/10 cursor-pointer' : 'opacity-30 cursor-default'}`}
                     >
                         {expanded && hasChildren ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                     </button>
                 ) : (
                     <div className="w-[28px] flex justify-center shrink-0">
-                        <Circle className="w-1.5 h-1.5 fill-slate-600 text-slate-600" />
+                        <Circle className="w-1.5 h-1.5 fill-text-muted/60 text-text-muted/60" />
                     </div>
                 )}
 
@@ -101,13 +101,13 @@ const TopicNode = ({ topic, subjectId, depth = 0, setConfirmDelete, defaultExpan
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            className="flex-1 bg-surface-2/80 border border-primary/30 text-slate-100 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-all"
+                            className="flex-1 bg-surface-2/80 border border-primary/30 text-text rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-all"
                             disabled={savingRename}
                         />
                         <button onClick={handleRename} disabled={savingRename} className="p-1 text-emerald-400 hover:bg-emerald-500/10 rounded-md transition-colors cursor-pointer">
                             <Check className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => { setEditing(false); setEditName(topic.name); }} className="p-1 text-slate-500 hover:bg-white/5 rounded-md transition-colors cursor-pointer">
+                        <button onClick={() => { setEditing(false); setEditName(topic.name); }} className="p-1 text-text-muted hover:bg-surface-3/10 rounded-md transition-colors cursor-pointer">
                             <X className="w-3.5 h-3.5" />
                         </button>
                     </div>
@@ -116,10 +116,10 @@ const TopicNode = ({ topic, subjectId, depth = 0, setConfirmDelete, defaultExpan
                         onDoubleClick={() => { setEditing(true); setEditName(topic.name); }}
                         className={`flex-1 min-w-0 truncate transition-colors cursor-default select-none
                             ${depth === 0
-                                ? 'text-[15px] font-heading font-bold text-slate-100 tracking-tight'
+                                ? 'text-[15px] font-heading font-bold text-text tracking-tight'
                                 : depth === 1
-                                    ? 'text-[13px] font-semibold text-slate-300 group-hover/node:text-slate-100'
-                                    : 'text-[13px] font-medium text-slate-500 group-hover/node:text-slate-300'
+                                    ? 'text-[13px] font-semibold text-text/90 group-hover/node:text-text'
+                                    : 'text-[13px] font-medium text-text-muted group-hover/node:text-text/90'
                             }`}
                         title={topic.name}
                     >
@@ -132,21 +132,21 @@ const TopicNode = ({ topic, subjectId, depth = 0, setConfirmDelete, defaultExpan
                     <div className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover/node:opacity-100 transition-opacity">
                         <button
                             onClick={() => { setEditing(true); setEditName(topic.name); }}
-                            className="p-1.5 text-slate-500 hover:text-primary hover:bg-primary/10 rounded-md transition-colors cursor-pointer"
+                            className="p-1.5 text-text-muted hover:text-primary hover:bg-primary/10 rounded-md transition-colors cursor-pointer"
                             title="Rename"
                         >
                             <Pencil className="w-3.5 h-3.5" />
                         </button>
                         <button
                             onClick={() => setAddingChild((v) => !v)}
-                            className={`p-1.5 rounded-md transition-colors cursor-pointer ${addingChild ? 'text-primary bg-primary/10' : 'text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10'}`}
+                            className={`p-1.5 rounded-md transition-colors cursor-pointer ${addingChild ? 'text-primary bg-primary/10' : 'text-text-muted hover:text-emerald-400 hover:bg-emerald-500/10'}`}
                             title="Add subtopic"
                         >
                             <Plus className="w-3.5 h-3.5" />
                         </button>
                         <button
                             onClick={() => setConfirmDelete({ open: true, id: topic.id, name: topic.name })}
-                            className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors cursor-pointer"
+                            className="p-1.5 text-text-muted hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors cursor-pointer"
                             title="Delete"
                         >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -158,19 +158,19 @@ const TopicNode = ({ topic, subjectId, depth = 0, setConfirmDelete, defaultExpan
             {/* Inline add-subtopic input */}
             {addingChild && (
                 <form onSubmit={handleAddChild} className="ml-[28px] mt-1 mb-2 flex items-center gap-1.5 fade-in">
-                    <div className="w-3.5 h-px bg-white/[0.06]" />
+                    <div className="w-3.5 h-px bg-border" />
                     <input
                         autoFocus
                         value={newChildName}
                         onChange={(e) => setNewChildName(e.target.value)}
                         placeholder="Subtopic name..."
-                        className="flex-1 bg-surface-2/80 border border-white/10 text-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20 transition-all placeholder:text-slate-600"
+                        className="flex-1 bg-surface-2/80 border border-border text-text rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20 transition-all placeholder:text-text-muted/60"
                         disabled={savingChild}
                     />
                     <button type="submit" disabled={savingChild || !newChildName.trim()} className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded-md transition-colors disabled:opacity-40 cursor-pointer">
                         <Check className="w-3.5 h-3.5" />
                     </button>
-                    <button type="button" onClick={() => { setAddingChild(false); setNewChildName(''); }} className="p-1.5 text-slate-500 hover:bg-white/5 rounded-md transition-colors cursor-pointer">
+                    <button type="button" onClick={() => { setAddingChild(false); setNewChildName(''); }} className="p-1.5 text-text-muted hover:bg-surface-3/10 rounded-md transition-colors cursor-pointer">
                         <X className="w-3.5 h-3.5" />
                     </button>
                 </form>
@@ -214,11 +214,11 @@ const TopicTree = ({ topics, subjectId, defaultExpanded = true }) => {
 
     if (!topics?.length) {
         return (
-            <div className="glass-panel p-8 rounded-xl border-dashed border-white/10 text-center">
-                <div className="w-12 h-12 rounded-xl bg-white/5 mx-auto flex items-center justify-center mb-4 border border-white/5">
-                    <GitBranch className="w-5 h-5 text-slate-500" />
+            <div className="bg-surface p-8 rounded-xl border border-dashed border-border text-center">
+                <div className="w-12 h-12 rounded-xl bg-surface-3/5 mx-auto flex items-center justify-center mb-4 border border-border">
+                    <GitBranch className="w-5 h-5 text-text-muted" />
                 </div>
-                <p className="text-slate-400 text-sm font-medium">
+                <p className="text-text-muted text-sm font-medium">
                     No topics yet. Use "Manage Syllabus" to add topics to this subject.
                 </p>
             </div>
@@ -227,12 +227,7 @@ const TopicTree = ({ topics, subjectId, defaultExpanded = true }) => {
 
     return (
         <div
-            className="rounded-xl relative"
-            style={{
-                background: 'rgba(22, 22, 34, 0.5)',
-                border: '1px solid rgba(255,255,255,0.05)',
-                padding: '1.25rem 1.5rem',
-            }}
+            className="rounded-xl relative bg-surface-2 border border-border p-5"
         >
             <ConfirmDialog
                 isOpen={confirmDelete.open}

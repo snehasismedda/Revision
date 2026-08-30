@@ -77,13 +77,12 @@ const EditQuestionModal = ({ isOpen, onClose, subjectId, question, topics, onQue
         <ModalPortal>
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop fade-in" onClick={onClose}>
                 <div
-                    className="w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-                    style={{ background: 'rgba(22, 22, 34, 0.95)', border: '1px solid rgba(255,255,255,0.08)' }}
+                    className="w-full max-w-2xl bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
                     onClick={e => e.stopPropagation()}
                 >
                     {/* Header */}
-                    <div className="flex items-center justify-between px-7 py-5 border-b border-white/[0.06] shrink-0">
-                        <h3 className="text-lg font-heading font-semibold text-white flex items-center gap-3">
+                    <div className="flex items-center justify-between px-7 py-5 border-b border-border shrink-0">
+                        <h3 className="text-lg font-heading font-semibold text-text flex items-center gap-3">
                             <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
                                 <FileText className="w-5 h-5" />
                             </div>
@@ -91,7 +90,7 @@ const EditQuestionModal = ({ isOpen, onClose, subjectId, question, topics, onQue
                         </h3>
                         <button
                             onClick={onClose}
-                            className="p-2 text-slate-500 hover:text-white hover:bg-white/[0.06] rounded-lg transition-all cursor-pointer"
+                            className="p-2 text-text-muted hover:text-text hover:bg-surface-3/10 rounded-lg transition-all cursor-pointer"
                         >
                             <X className="w-5 h-5" />
                         </button>
@@ -101,7 +100,7 @@ const EditQuestionModal = ({ isOpen, onClose, subjectId, question, topics, onQue
                     <div className="px-7 py-6 overflow-y-auto custom-scrollbar space-y-6">
                         <form id="edit-question-form" onSubmit={handleUpdate} className="space-y-6">
                             <div>
-                                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] mb-2.5 text-slate-400">
+                                <label className="block text-[10px] font-extrabold text-text-muted uppercase tracking-[0.18em] mb-2.5">
                                     Question Text
                                 </label>
                                 <textarea
@@ -109,36 +108,36 @@ const EditQuestionModal = ({ isOpen, onClose, subjectId, question, topics, onQue
                                     onChange={(e) => setContent(e.target.value)}
                                     placeholder="Edit question content..."
                                     rows={6}
-                                    className="w-full bg-surface-2/50 border border-white/[0.08] text-slate-100 rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-indigo-400/40 focus:ring-2 focus:ring-indigo-400/15 focus:bg-surface-2/70 transition-all placeholder:text-slate-600/80 resize-none"
+                                    className="w-full bg-surface-2 border border-border text-text rounded-xl px-4 py-3.5 text-[14px] focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15 focus:bg-surface-2 transition-all placeholder:text-text-muted/60 shadow-inner resize-none"
                                 />
                             </div>
 
                             <div>
                                 <div className="flex items-center justify-between mb-2.5">
-                                    <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.18em] flex items-center gap-2 text-slate-400">
+                                    <label className="block text-[10px] font-extrabold text-text-muted uppercase tracking-[0.18em] flex items-center gap-2 text-text-muted">
                                         <Hash className="w-3 h-3" /> Topic Tags
                                     </label>
                                     <div className="relative w-48">
-                                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
+                                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-text-muted" />
                                         <input
                                             type="text"
                                             value={topicSearchQuery}
                                             onChange={(e) => setTopicSearchQuery(e.target.value)}
                                             placeholder="Search topics..."
-                                            className="w-full bg-surface-3/50 border border-white/5 rounded-lg py-1 pl-8 pr-3 text-[11px] text-slate-300 outline-none focus:border-indigo-400/40 transition-all placeholder:text-slate-600"
+                                            className="w-full bg-surface-2 border border-border rounded-lg py-1 pl-8 pr-3 text-[11px] text-text outline-none focus:border-primary/40 transition-all placeholder:text-text-muted/60 shadow-inner"
                                         />
                                         {topicSearchQuery && (
                                             <button
                                                 type="button"
                                                 onClick={() => setTopicSearchQuery('')}
-                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
                                             >
                                                 <X className="w-2.5 h-2.5" />
                                             </button>
                                         )}
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-41 overflow-y-auto p-2 rounded-xl bg-surface-2/30 border border-white/[0.04]">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-41 overflow-y-auto p-2 rounded-xl bg-surface-2 border border-border">
                                     {filteredTopics.map(topic => {
                                         const isSelected = tags.includes(topic.name);
                                         return (
@@ -148,8 +147,8 @@ const EditQuestionModal = ({ isOpen, onClose, subjectId, question, topics, onQue
                                                 onClick={() => toggleTag(topic.name)}
                                                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[12px] font-medium transition-all border cursor-pointer
                                                     ${isSelected
-                                                        ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300 shadow-[0_2px_8px_rgba(99,102,241,0.1)]'
-                                                        : 'bg-white/5 border-transparent text-slate-500 hover:bg-white/10 hover:text-slate-300'
+                                                        ? 'bg-primary/20 border-primary/30 text-primary shadow-[0_2px_8px_rgba(139,92,246,0.1)]'
+                                                        : 'bg-surface-3 border-transparent text-text-muted hover:bg-surface hover:text-text'
                                                     }`}
                                             >
                                                 {isSelected ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Circle className="w-3.5 h-3.5 opacity-40" />}
@@ -159,7 +158,7 @@ const EditQuestionModal = ({ isOpen, onClose, subjectId, question, topics, onQue
                                         );
                                     })}
                                     {filteredTopics.length === 0 && (
-                                        <div className="col-span-full py-4 text-center text-[12px] text-slate-500 italic">
+                                        <div className="col-span-full py-4 text-center text-[12px] text-text-muted italic">
                                             {topicSearchQuery ? 'No topics found matching your search' : 'No topics available. Add topics to regular syllabus first.'}
                                         </div>
                                     )}
@@ -169,12 +168,12 @@ const EditQuestionModal = ({ isOpen, onClose, subjectId, question, topics, onQue
                     </div>
 
                     {/* Footer */}
-                    <div className="px-7 py-5 border-t border-white/[0.06] shrink-0 flex items-center justify-end">
+                    <div className="px-7 py-5 border-t border-border shrink-0 flex items-center justify-end">
                         <div className="flex gap-3">
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="px-5 py-3 rounded-xl text-[13px] font-semibold text-slate-400 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer border border-transparent hover:border-white/[0.08]"
+                                className="px-5 py-3 rounded-xl text-[13px] font-semibold text-text-muted hover:text-text hover:bg-surface-3/10 transition-all cursor-pointer border border-transparent hover:border-border"
                             >
                                 Cancel
                             </button>
@@ -182,7 +181,7 @@ const EditQuestionModal = ({ isOpen, onClose, subjectId, question, topics, onQue
                                 form="edit-question-form"
                                 type="submit"
                                 disabled={saving}
-                                className="bg-indigo-600 text-white text-[13px] font-semibold px-6 py-3 rounded-xl disabled:opacity-50 transition-all cursor-pointer shadow-lg shadow-indigo-500/20 flex items-center gap-2 group min-w-[140px] justify-center active:scale-[0.98] hover:bg-indigo-500"
+                                className="bg-primary text-white text-[13px] font-semibold px-6 py-3 rounded-xl disabled:opacity-50 transition-all cursor-pointer shadow-lg shadow-primary/20 flex items-center gap-2 group min-w-[140px] justify-center active:scale-[0.98] hover:bg-primary-dark"
                             >
                                 {saving ? (
                                     <>
