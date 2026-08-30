@@ -132,7 +132,7 @@ export const getOpenApiSpec = (serverUrl = 'https://resume-zips-unfixable.ngrok-
                                     tags: {
                                         type: 'array',
                                         items: { type: 'string' },
-                                        description: 'List of relevant keywords or sub-topic tags'
+                                        description: 'List of relevant keywords or sub-topic tags such as chapter name, topic name, etc.'
                                     },
                                     keyHighlights: {
                                         type: 'array',
@@ -172,7 +172,7 @@ export const getOpenApiSpec = (serverUrl = 'https://resume-zips-unfixable.ngrok-
             post: {
                 operationId: 'saveQuestionWithLinkedNote',
                 summary: 'Save a Question, Solution, and linked Note using subjectId',
-                description: 'Saves the question into Questions tab, step-by-step solution into Solutions table, and detailed theory/notes into Notes table using the subjectId UUID.',
+                description: 'Saves the question into Questions tab, step-by-step solution into Solutions table, and optionally creates a linked theory note in the Notes table ONLY IF new concepts or core theory are involved. noteTitle and noteContent are strictly optional and not mandatory for all questions.',
                 requestBody: {
                     required: true,
                     content: {
@@ -199,21 +199,21 @@ export const getOpenApiSpec = (serverUrl = 'https://resume-zips-unfixable.ngrok-
                                     },
                                     noteTitle: {
                                         type: 'string',
-                                        description: 'Title of the conceptual topic/theory (e.g. Banker Algorithm & Deadlock Avoidance Theory)'
+                                        description: 'OPTIONAL. Title of the conceptual topic/theory (e.g. Banker Algorithm & Deadlock Avoidance Theory). Use ONLY if new concepts or theory are involved and need a dedicated note. Not mandatory for all questions—omit if no new concepts are involved.'
                                     },
                                     noteContent: {
                                         type: 'string',
-                                        description: 'Deep theoretical explanation, core definitions, formulas, underlying principles, and exam tips about the TOPIC. Do NOT repeat the step-by-step calculation of this specific problem.'
+                                        description: 'OPTIONAL. Deep theoretical explanation, core definitions, formulas, underlying principles, and exam tips about the TOPIC. Do NOT repeat the step-by-step calculation of this specific problem. Use ONLY if new concepts are involved that need to be learned/revised. Not mandatory—omit if no new concepts are involved or if only the question and solution are needed.'
                                     },
                                     tags: {
                                         type: 'array',
                                         items: { type: 'string' },
-                                        description: 'Tags for the question, solution, and linked note'
+                                        description: 'Tags for the question. Add relevant tags like "QS marks", "chapter name", "topic name", "year of exam", if clearly visible in the question paper. Do not add extra description. For Notes just make such as chapter name and keywords if any. Do not add description.'
                                     },
                                     keyHighlights: {
                                         type: 'array',
                                         items: { type: 'string' },
-                                        description: 'Key formulas or tricks to remember'
+                                        description: 'Key formulas or tricks to remember. Don\'t make it lengthy, just give bullet points'
                                     },
                                     imageBase64: {
                                         type: 'string',
