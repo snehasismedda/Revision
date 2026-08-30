@@ -1,8 +1,28 @@
-const BASE_URL = '/api';
+const getBaseUrl = () => {
+    const raw = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL;
+    if (raw && raw.trim() !== '') {
+        const trimmed = raw.trim().replace(/\/+$/, '');
+        return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+    }
+    return '/api';
+};
+
+const BASE_URL = getBaseUrl();
+
+if (typeof window !== 'undefined') {
+    window.__API_BASE_URL__ = BASE_URL;
+    console.log(`[API Config] Active backend target: ${BASE_URL} (${BASE_URL === '/api' ? 'Local Proxy' : 'Remote / Hosted'})`);
+}
+
+
+const DEFAULT_HEADERS = {
+    'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
+};
 
 export const request = async (path, options = {}) => {
     let res = await fetch(`${BASE_URL}${path}`, {
-        headers: { 'Content-Type': 'application/json', ...options.headers },
+        headers: { ...DEFAULT_HEADERS, ...options.headers },
         credentials: 'include',
         ...options,
         body: options.body ? JSON.stringify(options.body) : undefined,
@@ -13,12 +33,13 @@ export const request = async (path, options = {}) => {
         try {
             const refreshRes = await fetch(`${BASE_URL}/auth/refresh`, {
                 method: 'POST',
+                headers: { ...DEFAULT_HEADERS },
                 credentials: 'include',
             });
             if (refreshRes.ok) {
                 // Retry original request
                 res = await fetch(`${BASE_URL}${path}`, {
-                    headers: { 'Content-Type': 'application/json', ...options.headers },
+                    headers: { ...DEFAULT_HEADERS, ...options.headers },
                     credentials: 'include',
                     ...options,
                     _retry: true,
@@ -114,7 +135,7 @@ export const analyticsApi = {
 export const streamRequest = async (path, body, onChunk, options = {}) => {
     let res = await fetch(`${BASE_URL}${path}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...options.headers },
+        headers: { ...DEFAULT_HEADERS, ...options.headers },
         credentials: 'include',
         body: JSON.stringify({ ...body, stream: true }),
         ...options,
@@ -125,12 +146,13 @@ export const streamRequest = async (path, body, onChunk, options = {}) => {
         try {
             const refreshRes = await fetch(`${BASE_URL}/auth/refresh`, {
                 method: 'POST',
+                headers: { ...DEFAULT_HEADERS },
                 credentials: 'include',
             });
             if (refreshRes.ok) {
                 res = await fetch(`${BASE_URL}${path}`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...options.headers },
+                    headers: { ...DEFAULT_HEADERS, ...options.headers },
                     credentials: 'include',
                     body: JSON.stringify({ ...body, stream: true }),
                     ...options,

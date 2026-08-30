@@ -16,4 +16,5 @@ frontend/capacitor.config.json
 # OS
 .DS_Store
 Thumbs.db
-brain/*
+brain/
+

@@ -31,9 +31,31 @@ import { dateSerializationMiddleware } from './utils/serialization.js';
 const app = express();
 
 // --- Middleware ---
+const allowedOrigins = (process.env.CLIENT_URL || '')
+    .split(',')
+    .map(url => url.trim())
+    .filter(Boolean);
+
+const isOriginAllowed = (origin) => {
+    if (!origin) return true; // allow non-browser requests or same-origin
+    if (allowedOrigins.includes(origin)) return true;
+    // Allow local development (http/https on localhost or 127.0.0.1 on any port)
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
+    // Allow Vercel preview and production domains
+    if (/^https:\/\/.*\.vercel\.app$/.test(origin)) return true;
+    return false;
+};
+
 app.use(cors({
-    origin: [process.env.CLIENT_URL || 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
+    origin: (origin, callback) => {
+        if (isOriginAllowed(origin)) {
+            callback(null, true);
+        } else {
+            callback(null, false);
+        }
+    },
     credentials: true,
+    optionsSuccessStatus: 200,
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
