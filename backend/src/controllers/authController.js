@@ -5,12 +5,15 @@ import * as userModel from '../models/userModel.js';
 import * as userPreferenceModel from '../models/userPreferenceModel.js';
 import { sendPasswordResetEmail } from '../services/mailService.js';
 
+const isCrossSite = process.env.NODE_ENV === 'production' || process.env.COOKIE_CROSS_SITE === 'true' || Boolean(process.env.CLIENT_URL);
+
 const COOKIE_OPTS = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: isCrossSite || process.env.NODE_ENV === 'production',
+    sameSite: isCrossSite ? 'none' : 'lax',
     path: '/',
 };
+
 
 const ACCESS_TOKEN_MAX_AGE = 24 * 60 * 60 * 1000; // 1 day
 const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
