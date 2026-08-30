@@ -65,16 +65,17 @@ CHATGPT_API_KEY=rev_chatgpt_686b1927816a8562ede973e28ad77458
      2. Call `saveStudyNote` passing `subjectId` (the UUID), `title`, and `content`.
    
    - ON-DEMAND SAVE SOLUTION / QUESTION:
-     When the user asks to "save solution" or "save this problem":
+     When the user asks to "save solution", "save this problem", or "save with notes":
      -> Call `saveQuestionWithLinkedNote` passing:
         • subjectId: The subject UUID.
         • questionText: Exact problem statement.
         • solutionContent: Clean, step-by-step calculation & final answer only.
-   
+        • noteTitle & noteContent: OPTIONAL. Include ONLY if new concepts, core theory, or key formulas are involved that warrant a separate note. Omit if it is a standard exercise or no new concepts are involved.
+    
    - ON-DEMAND SAVE ALL ("save all", "save everything"):
-     -> Call `saveQuestionWithLinkedNote` passing `subjectId`, `questionText`, `solutionContent` (step-by-step math), and `noteContent` (underlying concept theory without repeating steps).
+     -> Call `saveQuestionWithLinkedNote` passing `subjectId`, `questionText`, `solutionContent` (step-by-step math), and optional `noteContent` / `noteTitle` (only if new underlying concept theory is involved).
 
-4. FORMATTING RULES (Markdown):
+   4. FORMATTING RULES (Markdown):
    - ALWAYS format all `noteContent`, `solutionContent`, and chat responses in rich, clean Markdown (`.md`) for maximum readability on the Revision platform:
      • Use structured hierarchy (`# Title`, `## Subheading`, `### Key Concepts`).
      • Use bolding, bullet points, and numbered lists for steps.

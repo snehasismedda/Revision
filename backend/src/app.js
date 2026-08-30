@@ -25,6 +25,7 @@ import quizSetRoute from './routes/quizSetRoute.js';
 import userRoute from './routes/userRoute.js';
 import timeTableRoute from './routes/timeTableRoute.js';
 import chatgptRoute from './integrations/chatgpt/chatgptRoute.js';
+import claudeRoute from './integrations/claude/claudeRoute.js';
 import { dateSerializationMiddleware } from './utils/serialization.js';
 
 const app = express();
@@ -62,6 +63,7 @@ app.use('/api/quiz-sets', quizSetRoute);
 app.use('/api/users', userRoute);
 app.use('/api/timetables', timeTableRoute);
 app.use('/api/integrations/chatgpt', chatgptRoute);
+app.use('/api/integrations/claude', claudeRoute);
 
 // --- Health Check ---
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
